@@ -1488,6 +1488,18 @@ export function ConversationMessageList({
                 // Backward-compat: treat unknown human author as the same person.
                 return 'unknown'
               }
+              const assistantKey = (m: any): string | null => {
+                if (!m || String(m?.role ?? '') !== 'assistant') return null
+                // Don't treat tool_result rows as part of an assistant "turn" for spacing.
+                if (String(m?.messageType ?? '') === 'tool_result') return null
+                const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
+                if (turnId) return `turn:${turnId}`
+                const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+                if (agentId) return `agent:${agentId}`
+                const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+                if (agentName) return `name:${agentName}`
+                return 'unknown'
+              }
               const prevUserKey = prev ? userKey(prev) : null
               const currUserKey = userKey(message)
               const nextUserKey = next ? userKey(next) : null
@@ -1496,6 +1508,12 @@ export function ConversationMessageList({
               // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
               // message chrome so the spacing/padding is consistent (including the first message in the run).
               const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
+              const prevAssistantKey = prev ? assistantKey(prev) : null
+              const currAssistantKey = assistantKey(message)
+              const nextAssistantKey = next ? assistantKey(next) : null
+              const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
+              const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
+              const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
               const startsNewGroup = (() => {
                 if (!prev) return false
                 if (message.role === 'assistant') return Boolean(showAssistantAvatar)
@@ -1535,6 +1553,7 @@ export function ConversationMessageList({
                       showAssistantAvatar={showAssistantAvatar}
                       isConsecutiveUser={isConsecutiveUser}
                       compactUserGroup={compactUserGroup}
+                      compactAssistantGroup={compactAssistantGroup}
                       startsNewGroup={startsNewGroup}
                       isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                       suppressLinkedConversationCard={suppressLinkedConversationCard}
@@ -1718,6 +1737,11 @@ interface ConversationMessageBubbleProps {
    * in a multi-message user run (so the entire run stacks tightly).
    */
   compactUserGroup?: boolean
+  /**
+   * When true, render assistant-message chrome in compact mode even if it's the first message
+   * in a multi-message assistant run (so the entire run stacks tightly).
+   */
+  compactAssistantGroup?: boolean
   /** True when this row begins a new visual author/role group (so it should get the standard top gap). */
   startsNewGroup?: boolean
   /**
@@ -1875,6 +1899,7 @@ const MemoizedMessageBubble = memo(
     showAssistantAvatar = true,
     isConsecutiveUser = false,
     compactUserGroup = false,
+    compactAssistantGroup = false,
     startsNewGroup = false,
     isFirstMessage = false,
     suppressLinkedConversationCard = false,
@@ -1973,7 +1998,8 @@ const MemoizedMessageBubble = memo(
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
         const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
-        const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
+        // Always use the compact bubble padding (no "normal" padding mode).
+        const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
           <div className="flex justify-end">
@@ -2068,12 +2094,57 @@ const MemoizedMessageBubble = memo(
               isConsecutiveSameUser ? 'mt-0' : 'mt-4'
             )}
           >
-            {/* Avatar slot: reserve width only (never height) so short messages stack tightly. */}
-            <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
-
-            {/* Actual avatar: render in-flow for normal rows, overlay for compact user runs (first message only). */}
-            {!isConsecutiveSameUser && !overlayUserAvatar ? (
-              <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+            {isConsecutiveSameUser ? (
+              // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
+              <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
+            ) : overlayUserAvatar ? (
+              // For compact user runs: reserve width only and overlay the avatar so it doesn't inflate row height.
+              <>
+                <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
+                <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+                  {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                  <div className="relative w-10 h-10">
+                    <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                      {shouldUseExplicitUserAvatar ? (
+                        <AvatarImage
+                          src={explicitUserAvatarUrl!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : userAvatarSeedOverride ? (
+                        <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                      ) : shouldUseAuthedUserAvatar ? (
+                        <AvatarImage
+                          src={effectiveUserAvatar!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                        {fallbackVariant === 'user-icon' ? (
+                          <Icon
+                            name="user"
+                            iconOverride={{ type: 'phosphor', component: 'User' }}
+                            weight="bold"
+                            size={isHero ? 20 : isDelegation ? 14 : 16}
+                            className="text-primary"
+                          />
+                        ) : (
+                          initialsFromName(effectiveUserName || effectiveUserEmail)
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <PresenceIndicator kind="online" active={showUserOnline} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Normal (non-compact) rows: render avatar in-flow so it reserves height (prevents overlap with next speaker).
+              <div className="relative flex-shrink-0 mt-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
                 {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
                 <div className="relative w-10 h-10">
                   <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
@@ -2107,44 +2178,7 @@ const MemoizedMessageBubble = memo(
                   <PresenceIndicator kind="online" active={showUserOnline} />
                 </div>
               </div>
-            ) : null}
-
-            {!isConsecutiveSameUser && overlayUserAvatar ? (
-              <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
-                {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
-                <div className="relative w-10 h-10">
-                  <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
-                    {shouldUseExplicitUserAvatar ? (
-                      <AvatarImage
-                        src={explicitUserAvatarUrl!}
-                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        className="rounded-full object-cover"
-                      />
-                    ) : userAvatarSeedOverride ? (
-                      <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                    ) : shouldUseAuthedUserAvatar ? (
-                      <AvatarImage
-                        src={effectiveUserAvatar!}
-                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        className="rounded-full object-cover"
-                      />
-                    ) : null}
-                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                      {fallbackVariant === 'user-icon' ? (
-                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                      ) : (
-                        initialsFromName(effectiveUserName || effectiveUserEmail)
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} />
-                </div>
-              </div>
-            ) : null}
+            )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
                 <div className="mb-0 text-sm font-bold font-mono text-foreground">
@@ -2161,7 +2195,8 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
-                compact={Boolean(compactUserGroup)}
+                // Always compact (no "normal" padding mode).
+                compact={true}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -2210,24 +2245,45 @@ const MemoizedMessageBubble = memo(
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
         return (
           <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
-            <div className={cn('flex items-start w-full', assistantGap)}>
+            <div className={cn('relative flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
-                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
-                  <AgentAvatarWithTurnUsageRing
-                    seed={agentName || 'AI'}
-                    imageUrl={agentAvatarUrl}
-                    modelIdOverride={agentModelId ?? null}
-                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
-                    size={avatarSize}
-                    rounded
-                    enabled={Boolean(expertMode)}
-                    usage={turnUsage}
-                    busy={Boolean(isConversationBusy)}
-                    className={cn('mx-auto', avatarClass)}
-                  />
-                </div>
+                compactAssistantGroup ? (
+                  <>
+                    <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
+                    <div className="absolute left-0 top-1 flex items-center justify-center" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                      <AgentAvatarWithTurnUsageRing
+                        seed={agentName || 'AI'}
+                        imageUrl={agentAvatarUrl}
+                        modelIdOverride={agentModelId ?? null}
+                        tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                        size={avatarSize}
+                        rounded
+                        enabled={Boolean(expertMode)}
+                        usage={turnUsage}
+                        busy={Boolean(isConversationBusy)}
+                        className={cn('mx-auto', avatarClass)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                    <AgentAvatarWithTurnUsageRing
+                      seed={agentName || 'AI'}
+                      imageUrl={agentAvatarUrl}
+                      modelIdOverride={agentModelId ?? null}
+                      tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                      size={avatarSize}
+                      rounded
+                      enabled={Boolean(expertMode)}
+                      usage={turnUsage}
+                      busy={Boolean(isConversationBusy)}
+                      className={cn('mx-auto', avatarClass)}
+                    />
+                  </div>
+                )
               ) : (
-                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
+                // Only reserve width, not height, so short consecutive assistant messages stack tightly.
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
@@ -2238,6 +2294,8 @@ const MemoizedMessageBubble = memo(
                   extraActions={null}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
+                  // Always compact (no "normal" padding mode).
+                  compact={true}
                   className="text-foreground"
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
@@ -2274,29 +2332,50 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'
             )}
           >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
-                <AgentAvatarWithTurnUsageRing
-                  seed={agentName || 'AI'}
-                  imageUrl={agentAvatarUrl}
-                  modelIdOverride={agentModelId ?? null}
-                  tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
-                  size={40}
-                  rounded
-                  enabled={Boolean(expertMode)}
-                  usage={turnUsage}
-                  busy={Boolean(isConversationBusy)}
-                  className="mx-auto"
-                />
-              </div>
+              compactAssistantGroup ? (
+                <>
+                  <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
+                  <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                    <AgentAvatarWithTurnUsageRing
+                      seed={agentName || 'AI'}
+                      imageUrl={agentAvatarUrl}
+                      modelIdOverride={agentModelId ?? null}
+                      tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                      size={40}
+                      rounded
+                      enabled={Boolean(expertMode)}
+                      usage={turnUsage}
+                      busy={Boolean(isConversationBusy)}
+                      className="mx-auto"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                  <AgentAvatarWithTurnUsageRing
+                    seed={agentName || 'AI'}
+                    imageUrl={agentAvatarUrl}
+                    modelIdOverride={agentModelId ?? null}
+                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                    size={40}
+                    rounded
+                    enabled={Boolean(expertMode)}
+                    usage={turnUsage}
+                    busy={Boolean(isConversationBusy)}
+                    className="mx-auto"
+                  />
+                </div>
+              )
             ) : (
-              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
+              // Only reserve width, not height, so short consecutive assistant messages stack tightly.
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
@@ -2318,6 +2397,8 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
+                // Always compact (no "normal" padding mode).
+                compact={true}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -2370,6 +2451,7 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
     if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
     if (Boolean(prevProps.compactUserGroup) !== Boolean(nextProps.compactUserGroup)) return false
+    if (Boolean(prevProps.compactAssistantGroup) !== Boolean(nextProps.compactAssistantGroup)) return false
     if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
     if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false

@@ -224,30 +224,11 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
           {/* Footer */}
           <div className="mt-auto pt-4 flex items-center justify-end gap-2">
             {showDeployCta ? (
-              isAlreadyDeployed && starship?.slug ? (
-                <>
-                  <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 border border-emerald-500/30 dark:border-emerald-500/30 shrink-0">
-                    <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      const deployedAgent = deployedAgents.find(a => a.sourceTemplateId === template.id)
-                      router.push(
-                        deployedAgent?.id
-                          ? `/ship/${encodeURIComponent(starship.slug)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(deployedAgent.id)}`
-                          : `/ship/${encodeURIComponent(starship.slug)}`
-                      )
-                    }}
-                  >
-                    <Icon name="message-square" className="h-3.5 w-3.5" />
-                    Start chat
-                  </Button>
-                </>
+              isAlreadyDeployed ? (
+                <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 border border-emerald-500/30 dark:border-emerald-500/30 shrink-0">
+                  <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+                </div>
               ) : (
                 <Button
                   size="sm"

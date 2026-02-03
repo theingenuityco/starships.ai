@@ -277,10 +277,9 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
 
     // Resolve starshipId from conversation for access checks + notification state updates
     const db = getConnection();
-    const convoRow = await db.queryOne<{ starship_id: string }>(
-      'SELECT starship_id FROM conversations WHERE id = $1',
-      [params.conversationId]
-    );
+    const convoRow = await db.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [
+      params.conversationId,
+    ]);
     const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
     if (!starshipId) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404);
@@ -305,7 +304,9 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
         return;
       }
     } else {
-      const ch = await db.queryOne<{ is_private: boolean }>('SELECT is_private FROM channels WHERE conversation_id = $1', [params.conversationId]);
+      const ch = await db.queryOne<{ is_private: boolean }>('SELECT is_private FROM channels WHERE conversation_id = $1', [
+        params.conversationId,
+      ]);
       if (ch?.is_private) {
         const member = await db.queryOne<{ ok: boolean }>(
           'SELECT true as ok FROM conversation_members WHERE conversation_id = $1 AND user_id = $2 LIMIT 1',
@@ -449,4 +450,3 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
 });
 
 export default router;
-

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth, AUTH_QUERY_KEYS } from '@/hooks/useAuth'
 import { useAcceptStarshipInvite } from '@/hooks/useStarshipInvites'
+import { STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
 import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -101,6 +102,10 @@ export default function AcceptInvitePage() {
     void acceptInvite
       .mutateAsync(inviteToken)
       .then(async starship => {
+        // Ensure starships list is updated before navigation so no code sees "0 starships" and creates a default.
+        if (user?.id) {
+          await queryClient.refetchQueries({ queryKey: STARSHIP_QUERY_KEYS.byOwner(user.id) })
+        }
         // Mark wizard complete so client-layout does not redirect back to /onboarding.
         await completeWizard.mutateAsync()
         await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
@@ -109,7 +114,7 @@ export default function AcceptInvitePage() {
       .catch(() => {
         // errors are surfaced via toast; keep page visible for retry
       })
-  }, [inviteToken, previewLoading, previewError, preview, userEmail, isAuthenticated, attempted, acceptInvite, completeWizard, queryClient, router])
+  }, [inviteToken, previewLoading, previewError, preview, user?.id, userEmail, isAuthenticated, attempted, acceptInvite, completeWizard, queryClient, router])
 
   const canRetry = Boolean(inviteToken) && isAuthenticated && !acceptInvite.isPending
 

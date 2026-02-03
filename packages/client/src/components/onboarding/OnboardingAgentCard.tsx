@@ -16,27 +16,36 @@ export interface OnboardingAgentCardProps {
   targetStarshipId: string
   onDeployed?: (template: AgentTemplateModel) => void
   onRemoved?: (template: AgentTemplateModel) => void
+  /** When true, Add/Remove only toggle selection (onDeployed/onRemoved); no API deploy. Used when no starship yet (wizard creates ship on step 5). */
+  selectionOnly?: boolean
+  /** When selectionOnly, whether this template is currently selected. */
+  isSelected?: boolean
   /** Compact layout: single line photo + name + role, short description, Add/Remove button */
   compact?: boolean
 }
 
-export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, onRemoved, compact = true }: OnboardingAgentCardProps) {
+export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, onRemoved, selectionOnly = false, isSelected = false, compact = true }: OnboardingAgentCardProps) {
   const createAgentMutation = useCreateAgentFromTemplate()
   const deleteAgentMutation = useDeleteAgent()
-  const { data: deployedAgents = [] } = useStarshipAgents(targetStarshipId, !!targetStarshipId)
+  const { data: deployedAgents = [] } = useStarshipAgents(targetStarshipId, !!targetStarshipId && !selectionOnly)
   const { data: requiredConnectors = [] } = useRequiredConnectors(template.id, !!template.id)
   const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
 
   const deployedAgent = deployedAgents.find(agent => agent.sourceTemplateId === template.id)
-  const isAlreadyDeployed = !!deployedAgent
-  const isDeploying = createAgentMutation.isPending
-  const isRemoving = deleteAgentMutation.isPending
+  const isAlreadyDeployed = selectionOnly ? isSelected : !!deployedAgent
+  const isDeploying = selectionOnly ? false : createAgentMutation.isPending
+  const isRemoving = selectionOnly ? false : deleteAgentMutation.isPending
   const displayName = String(template.name || '').trim()
   const displayRole = String(template.role || '').trim()
   const displayDescription = String(template.description || '').trim()
   const avatarUrl = template.avatarUrl
 
   const handleAdd = async () => {
+    if (selectionOnly) {
+      if (isAlreadyDeployed) return
+      onDeployed?.(template)
+      return
+    }
     if (!targetStarshipId || isAlreadyDeployed || isDeploying) return
     try {
       await createAgentMutation.mutateAsync({
@@ -50,6 +59,11 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
   }
 
   const handleRemove = async () => {
+    if (selectionOnly) {
+      if (!isAlreadyDeployed) return
+      onRemoved?.(template)
+      return
+    }
     if (!deployedAgent?.id || isRemoving) return
     try {
       await deleteAgentMutation.mutateAsync(deployedAgent.id)
@@ -90,21 +104,8 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
           const showLogo = !hiddenLogos[provider]
           const logoSrc = getConnectorLogoSrc(provider)
           return (
-            <div
-              key={provider}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40"
-              title={name}
-            >
-              {showLogo ? (
-                <Image
-                  src={logoSrc}
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="object-contain"
-                  onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                />
-              ) : null}
+            <div key={provider} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
+              {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
             </div>
           )
         })}

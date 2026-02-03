@@ -214,21 +214,8 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                   const showLogo = !hiddenLogos[provider]
                   const logoSrc = getConnectorLogoSrc(provider)
                   return (
-                    <div
-                      key={provider}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40"
-                      title={name}
-                    >
-                      {showLogo ? (
-                        <Image
-                          src={logoSrc}
-                          alt=""
-                          width={16}
-                          height={16}
-                          className="object-contain"
-                          onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                        />
-                      ) : null}
+                    <div key={provider} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
+                      {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
                     </div>
                   )
                 })}

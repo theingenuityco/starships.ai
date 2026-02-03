@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import type { MessageModel } from '@starships/protocol'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 export function ThreadPane(props: {
   starshipId: string
@@ -41,7 +41,38 @@ export function ThreadPane(props: {
     return !Array.isArray(conversationAgents) || conversationAgents.length < 1
   }, [agentsLoading, conversationAgents, conversationId])
 
-  const effectiveConversationId = isBrokenThread ? null : conversationId
+  // IMPORTANT:
+  // Even if a thread has 0 linked agents, we still keep the conversation id mounted so:
+  // - the thread can display/persist messages (human-only threads)
+  // - the composer can use the persist-only path without dropping out of "thread context"
+  // The server rejects agent execution for 0-agent non-channel conversations, but persisting messages is allowed.
+  const effectiveConversationId = conversationId
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run-thread-agentless-1',
+        hypothesisId: 'H5',
+        location: 'ThreadPane.tsx:broken_thread_eval',
+        message: 'thread pane conversation id resolution',
+        data: {
+          conversationId: typeof conversationId === 'string' ? conversationId : null,
+          effectiveConversationId: typeof effectiveConversationId === 'string' ? effectiveConversationId : null,
+          agentsLoading,
+          conversationAgentsLen: Array.isArray(conversationAgents) ? conversationAgents.length : null,
+          isBrokenThread,
+          pinnedFirstMessagePresent: Boolean((pinnedFirstMessage as any)?.id),
+          draftParentConversationIdPresent: Boolean(typeof draftParentConversationId === 'string' && draftParentConversationId.trim().length > 0),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [agentsLoading, conversationAgents, conversationId, draftParentConversationId, effectiveConversationId, isBrokenThread, pinnedFirstMessage])
+  // #endregion agent log
 
   const draftParticipants = useMemo<ConversationParticipantItem[] | null>(() => {
     if (effectiveConversationId) return null

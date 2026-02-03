@@ -318,7 +318,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
     const agents = Array.isArray(agentsData) ? (agentsData as any[]) : []
     const agent =
-      agents.find(a => String((a as any)?.slug || '').trim().toLowerCase() === agentFromUrl.toLowerCase()) ??
+      agents.find(
+        a =>
+          String((a as any)?.slug || '')
+            .trim()
+            .toLowerCase() === agentFromUrl.toLowerCase()
+      ) ??
       agents.find(a => String((a as any)?.id || '').trim() === agentFromUrl) ??
       null
     if (!agent?.id) return

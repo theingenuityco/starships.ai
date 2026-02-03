@@ -199,13 +199,7 @@ export function ThreadPane(props: {
         />
 
         <div className="flex-1 min-h-0">
-          <ConversationMessageList
-            conversationId={effectiveConversationId}
-            starshipId={starshipId}
-            bottomPaddingPx={180}
-            pinnedFirstMessage={pinnedFirstMessage ?? null}
-            contentWidth="full"
-          />
+          <ConversationMessageList conversationId={effectiveConversationId} starshipId={starshipId} bottomPaddingPx={180} pinnedFirstMessage={pinnedFirstMessage ?? null} contentWidth="full" />
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}

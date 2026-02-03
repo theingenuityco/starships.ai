@@ -295,9 +295,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (!best) return null
     const id = String(best.id)
     const agentName =
-      String(best.agentName || '').trim() ||
-      (conversationAgentNameById && conversationAgentNameById[id]?.agentName ? String(conversationAgentNameById[id]?.agentName) : '') ||
-      'A child agent'
+      String(best.agentName || '').trim() || (conversationAgentNameById && conversationAgentNameById[id]?.agentName ? String(conversationAgentNameById[id]?.agentName) : '') || 'A child agent'
     return { id, pendingCount: Number(best.pendingCount) || 0, agentName }
   }, [childPendingApprovals, conversationAgentNameById])
 

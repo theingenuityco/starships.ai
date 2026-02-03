@@ -83,4 +83,3 @@ export class ConversationParticipantEntity implements ConversationParticipantMod
     }
   }
 }
-

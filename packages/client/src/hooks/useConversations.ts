@@ -707,10 +707,45 @@ export function useConversationAgents(conversationId: string | null) {
   return useQuery({
     queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
     queryFn: async (): Promise<AgentModel[]> => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'useConversations.ts:useConversationAgents:before',
+          message: 'Fetching conversation agents via /messages',
+          data: { conversationId: conversationId ?? null },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion agent log
       const response: FetchResponse<ApiResponse<ConversationMessagesResponseData>> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
         params: { limit: 1, page: 1 }, // We only need agents, not all messages
       })
-      return response.data.data?.agents || []
+      const agents = response.data.data?.agents || []
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'useConversations.ts:useConversationAgents:after',
+          message: 'Fetched conversation agents via /messages',
+          data: {
+            conversationId: conversationId ?? null,
+            agentsCount: Array.isArray(agents) ? agents.length : null,
+            agent0: Array.isArray(agents) && agents[0] ? { id: (agents[0] as any)?.id ?? null, slug: (agents[0] as any)?.slug ?? null, name: (agents[0] as any)?.name ?? null } : null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion agent log
+      return agents
     },
     enabled: !!conversationId,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod

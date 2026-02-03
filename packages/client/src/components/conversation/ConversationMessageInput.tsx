@@ -202,6 +202,49 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       dmMentionAllowedRef.current = { kind, id }
     }, [conversationId, draftDirectMessageTarget, directMessagesData, userId])
 
+    type ResolvedDmTarget = { dmType: 'user_agent'; agentId: string } | { dmType: 'user_user'; peerUserId: string } | null
+
+    const resolvedDmTarget: ResolvedDmTarget = useMemo(() => {
+      // Draft DM (no conversation yet): we already know the target
+      if (!conversationId && draftDirectMessageTarget) {
+        if (draftDirectMessageTarget.dmType === 'user_agent') {
+          const agentId = String(draftDirectMessageTarget.agentId || '').trim()
+          return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+        }
+        if (draftDirectMessageTarget.dmType === 'user_user') {
+          const peerUserId = String(draftDirectMessageTarget.peerUserId || '').trim()
+          return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+        }
+      }
+
+      // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+      if (conversationId && !isChannelConversation) {
+        const cid = String(conversationId || '').trim()
+        const list = (directMessagesData as any)?.directMessages
+        const items = Array.isArray(list) ? (list as any[]) : []
+        const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+        const dm = match?.dm
+        if (dm && typeof dm === 'object') {
+          const dmType = String((dm as any).dmType || '')
+          if (dmType === 'user_agent') {
+            const agentId = String((dm as any).agentId || '').trim()
+            return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+          }
+          if (dmType === 'user_user') {
+            const peerFromList = String(match?.peerUser?.id || '').trim()
+            const a = String((dm as any).userAId || '').trim()
+            const b = String((dm as any).userBId || '').trim()
+            const me = String(userId || '').trim()
+            const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+            const peerUserId = peerFromList || derivedPeer
+            return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+          }
+        }
+      }
+
+      return null
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelConversation, userId])
+
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
     const [uploadedAttachmentIds, setUploadedAttachmentIds] = useState<string[]>([])
@@ -368,8 +411,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const requiresCreditsForDraft = useMemo(() => {
       // user↔user DMs are human-only (no agent run => no fixed message charge)
-      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
-      if (isDraftUserUserDm) return false
+      if (resolvedDmTarget?.dmType === 'user_user') return false
 
       // Mention-only contexts: only charge when an agent is explicitly mentioned.
       if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
@@ -627,7 +669,48 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
 
-      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
+      const resolvedDmForSend: ResolvedDmTarget = (() => {
+        // Draft DM (no conversation yet): we already know the target
+        if (!conversationId && draftDirectMessageTarget) {
+          if (draftDirectMessageTarget.dmType === 'user_agent') {
+            const agentId = String(draftDirectMessageTarget.agentId || '').trim()
+            return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+          }
+          if (draftDirectMessageTarget.dmType === 'user_user') {
+            const peerUserId = String(draftDirectMessageTarget.peerUserId || '').trim()
+            return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+          }
+        }
+
+        // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+        if (conversationId && !isChannelConversation) {
+          const cid = String(conversationId || '').trim()
+          const list = (directMessagesData as any)?.directMessages
+          const items = Array.isArray(list) ? (list as any[]) : []
+          const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+          const dm = match?.dm
+          if (dm && typeof dm === 'object') {
+            const dmType = String((dm as any).dmType || '')
+            if (dmType === 'user_agent') {
+              const agentId = String((dm as any).agentId || '').trim()
+              return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+            }
+            if (dmType === 'user_user') {
+              const peerFromList = String(match?.peerUser?.id || '').trim()
+              const a = String((dm as any).userAId || '').trim()
+              const b = String((dm as any).userBId || '').trim()
+              const me = String(userId || '').trim()
+              const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+              const peerUserId = peerFromList || derivedPeer
+              return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+            }
+          }
+        }
+
+        return null
+      })()
+
+      const isUserUserDm = resolvedDmForSend?.dmType === 'user_user'
 
       const resolveAgentById = (id: string): AgentModel | null => {
         const aid = String(id || '').trim()
@@ -642,7 +725,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // where applicable.
       let effectiveAgent: AgentModel | null | undefined = null
       let contentToSend = messageToSend
-      if (isDraftUserUserDm) {
+      if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
       } else {
@@ -652,7 +735,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // user↔agent DMs: lock to the DM target agent.
-        const dmAgentId = resolvedDmTarget?.dmType === 'user_agent' ? String(resolvedDmTarget.agentId || '').trim() : ''
+        const dmAgentId = resolvedDmForSend?.dmType === 'user_agent' ? String(resolvedDmForSend.agentId || '').trim() : ''
         const dmLockedAgent = dmAgentId ? resolveAgentById(dmAgentId) : null
         if (dmLockedAgent) {
           effectiveAgent = dmLockedAgent
@@ -697,7 +780,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       //
       // Without this, opening a thread via URL/refresh (or from a non-assistant message) can yield `selectedAgent === null`,
       // which incorrectly blocks sending with "Select an agent" even though the thread already has linked agents.
-      if (!effectiveAgent && !isDraftUserUserDm && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
         const linked = Array.isArray(conversationAgents) ? conversationAgents : []
         if (linked.length > 0) {
           effectiveAgent = linked[0] ?? null
@@ -708,14 +791,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If a thread has *no* agent selected/mentioned and *no* linked agents,
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isDraftUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !isMentionOnlyThread && !effectiveAgent)
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
       // This prevents a brief "agent is typing" flash for messages that the server will persist without agent execution
       // (e.g. user mentions like <@u:...> in a default-agent thread).
       const willTriggerAgentBestEffort = (() => {
-        if (isDraftUserUserDm) return false
+        if (isUserUserDm) return false
         if (shouldPersistOnly) return false
 
         const raw = String(messageToSend || '')
@@ -738,7 +821,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       })()
 
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm && !shouldPersistOnly) {
+      if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -1220,49 +1303,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       ]
     )
 
-    type ResolvedDmTarget = { dmType: 'user_agent'; agentId: string } | { dmType: 'user_user'; peerUserId: string } | null
-
-    const resolvedDmTarget: ResolvedDmTarget = useMemo(() => {
-      // Draft DM (no conversation yet): we already know the target
-      if (!conversationId && draftDirectMessageTarget) {
-        if (draftDirectMessageTarget.dmType === 'user_agent') {
-          const agentId = String(draftDirectMessageTarget.agentId || '').trim()
-          return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
-        }
-        if (draftDirectMessageTarget.dmType === 'user_user') {
-          const peerUserId = String(draftDirectMessageTarget.peerUserId || '').trim()
-          return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
-        }
-      }
-
-      // Existing DM: resolve from starship DM list (usually already cached by sidebar)
-      if (conversationId && !isChannelConversation) {
-        const cid = String(conversationId || '').trim()
-        const list = (directMessagesData as any)?.directMessages
-        const items = Array.isArray(list) ? (list as any[]) : []
-        const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
-        const dm = match?.dm
-        if (dm && typeof dm === 'object') {
-          const dmType = String((dm as any).dmType || '')
-          if (dmType === 'user_agent') {
-            const agentId = String((dm as any).agentId || '').trim()
-            return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
-          }
-          if (dmType === 'user_user') {
-            const peerFromList = String(match?.peerUser?.id || '').trim()
-            const a = String((dm as any).userAId || '').trim()
-            const b = String((dm as any).userBId || '').trim()
-            const me = String(userId || '').trim()
-            const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
-            const peerUserId = peerFromList || derivedPeer
-            return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
-          }
-        }
-      }
-
-      return null
-    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelConversation, userId])
-
     const agentLabelForUI = useCallback((a: AgentModel | null): string | null => {
       if (!a) return null
       const n = typeof a.name === 'string' ? a.name.trim() : ''
@@ -1316,9 +1356,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     })()
     const hasTargetAgent = isChannelConversation
       ? true
-      : isMentionOnlyThread
-        ? hasLeadingMentionToken
-        : Boolean(selectedAgent) || hasLeadingMentionToken || (isThreadConversation && linkedAgentCount > 0) || (isThreadContext && linkedAgentCount === 0)
+      : resolvedDmTarget?.dmType === 'user_user'
+        ? true
+        : resolvedDmTarget?.dmType === 'user_agent'
+          ? true
+          : isMentionOnlyThread
+            ? hasLeadingMentionToken
+            : hasLeadingMentionToken || (isThreadConversation && linkedAgentCount === 1) || (isThreadContext && linkedAgentCount === 0)
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units

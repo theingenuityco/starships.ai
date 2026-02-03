@@ -77,7 +77,40 @@ export class NotificationService {
       return;
     }
 
-    const { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
+    let { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
+
+    // DMs: only allow mentions of the other participant.
+    // This prevents @mention notifications (and mention indexing) from being used to target arbitrary users/agents from a DM.
+    if (isDm && dm) {
+      const authorUserId = typeof (message as any).userId === 'string' ? String((message as any).userId).trim() : '';
+      const authorAgentId = typeof (message as any).agentId === 'string' ? String((message as any).agentId).trim() : '';
+
+      const allowUserIds = new Set<string>();
+      const allowAgentIds = new Set<string>();
+
+      if (dm.dmType === 'user_user') {
+        // Only allow mentioning the other user in this DM (never self, never third parties).
+        const a = typeof (dm as any).userAId === 'string' ? String((dm as any).userAId).trim() : '';
+        const b = typeof (dm as any).userBId === 'string' ? String((dm as any).userBId).trim() : '';
+        if (authorUserId && a && b) {
+          const other = authorUserId === a ? b : authorUserId === b ? a : '';
+          if (other) allowUserIds.add(other);
+        }
+      } else if (dm.dmType === 'user_agent') {
+        const dmUserId = typeof (dm as any).userId === 'string' ? String((dm as any).userId).trim() : '';
+        const dmAgentId = typeof (dm as any).agentId === 'string' ? String((dm as any).agentId).trim() : '';
+        // If the human authored the message, only allow mentioning the agent (the other participant).
+        if (authorUserId) {
+          if (dmAgentId) allowAgentIds.add(dmAgentId);
+        } else if (authorAgentId) {
+          // If the agent authored the message, only allow mentioning the human (the other participant).
+          if (dmUserId) allowUserIds.add(dmUserId);
+        }
+      }
+
+      if (userIds.length > 0) userIds = userIds.filter((id) => allowUserIds.has(String(id || '').trim()));
+      if (agentIds.length > 0) agentIds = agentIds.filter((id) => allowAgentIds.has(String(id || '').trim()));
+    }
 
     // 1) Insert mention index rows (users + agents)
     const mentionTuples: Array<{ targetType: MentionTargetType; targetId: string }> = [];

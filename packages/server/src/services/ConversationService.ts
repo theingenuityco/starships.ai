@@ -1484,9 +1484,6 @@ export class ConversationService {
           t.startsWith('thread ');
 
         if (needs) {
-          // #region agent log H3
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3',location:'packages/server/src/services/ConversationService.ts:addConversationMessage:titleNeeds',message:'Early title generation considered',data:{conversationId:String(data.conversationId||''),isThread:Boolean(convo.parentConversationId),existingTitle:(convo.title||'').slice(0,80),needs:Boolean(needs),userContentLen:typeof data.content==='string'?data.content.length:0,userContentHasToken:typeof data.content==='string'&&data.content.includes('<@'),userContentHasAt:typeof data.content==='string'&&/(\s|^)@/.test(data.content)},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
@@ -1582,9 +1579,6 @@ export class ConversationService {
       // - For threads with >2 agents: mention-only; no fallback agent.
       if (agentQueue.length === 0) {
       const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
-      // #region agent log H6
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H6',location:'packages/server/src/services/ConversationService.ts:addConversationMessage:mentions',message:'Mention extraction results',data:{conversationId:String(data.conversationId||''),contentLen:typeof data.content==='string'?data.content.length:0,contentHasToken:typeof data.content==='string'&&data.content.includes('<@a:'),contentHasAt:typeof data.content==='string'&&/(\s|^)@/.test(data.content),allAgentsCount:Array.isArray(allStarshipAgents)?allStarshipAgents.length:0,extractedCount:initialTargetsUnlinked.length,extractedIds:initialTargetsUnlinked.slice(0,3).map(a=>String((a as any)?.id||'').slice(0,8))},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       // Auto-link mentioned agents not yet linked
       let linkedAny = false;
       for (const a of initialTargetsUnlinked) {
@@ -1611,9 +1605,6 @@ export class ConversationService {
       // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
       // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
       noAgentToRun = (isChannel || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0;
-      // #region agent log H6
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H6',location:'packages/server/src/services/ConversationService.ts:addConversationMessage:routing',message:'Agent queue computed',data:{conversationId:String(data.conversationId||''),isThread:Boolean(isThread),isChannel:Boolean(isChannel),isMentionOnlyThread:Boolean(isMentionOnlyThread),conversationAgentsCount:conversationAgents.length,agentQueueCount:agentQueue.length,noAgentToRun:Boolean(noAgentToRun),queueIds:agentQueue.slice(0,3).map(a=>String((a as any)?.id||'').slice(0,8))},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       }
     }
 
@@ -2501,9 +2492,6 @@ export class ConversationService {
       const userForTitle = stripMentionsForTitle(userContent);
       const ctxBlock = pinnedForTitle ? `Thread pinned message: "${safe(pinnedForTitle, 500)}"\n` : '';
       const prompt = `${ctxBlock}User message: "${safe(userForTitle, 400)}"\n\nReturn only the title text.`;
-      // #region agent log H3
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3',location:'packages/server/src/services/ConversationService.ts:generateConversationTitle:prompt',message:'Title prompt inputs summary',data:{conversationId:String(conversationId||''),userLen:String(userContent||'').length,userHasToken:String(userContent||'').includes('<@'),userHasAt:/(\s|^)@/.test(String(userContent||'')),pinnedLen:threadPinnedContent?threadPinnedContent.length:0,pinnedHasToken:Boolean(threadPinnedContent&&threadPinnedContent.includes('<@')),pinnedHasAt:Boolean(threadPinnedContent&&/(\s|^)@/.test(threadPinnedContent)),promptHasToken:prompt.includes('<@'),promptHasAt:/(\s|^)@/.test(prompt)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
 
       const completion = await client.chat.completions.create({
         model,
@@ -2516,9 +2504,6 @@ export class ConversationService {
       });
 
       const choice = completion.choices?.[0]?.message?.content || '';
-      // #region agent log H4
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4',location:'packages/server/src/services/ConversationService.ts:generateConversationTitle:choice',message:'Title model output summary',data:{conversationId:String(conversationId||''),choiceLen:String(choice||'').length,choiceHasToken:String(choice||'').includes('<@'),choiceHasAt:/(\s|^)@/.test(String(choice||'')),choicePrefix:String(choice||'').trim().slice(0,80)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const usage = (
         completion as unknown as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } }
       ).usage;

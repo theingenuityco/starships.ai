@@ -154,6 +154,10 @@ export function useNavigationOnboarding() {
   // Get current step info
   const currentStepInfo = currentStep ? ONBOARDING_STEPS[currentStep - 1] : null
 
+  const skipTour = useCallback(() => {
+    completeOnboardingMutation.mutate()
+  }, [completeOnboardingMutation])
+
   return {
     shouldShowOnboarding,
     hasCompletedOnboarding,
@@ -163,6 +167,7 @@ export function useNavigationOnboarding() {
     startOnboarding,
     nextStep,
     previousStep,
+    skipTour,
     isCompleting: completeOnboardingMutation.isPending,
   }
 }

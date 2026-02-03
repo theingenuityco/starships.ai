@@ -498,4 +498,18 @@ router.post('/users/me/onboarding/navigation/complete', jwtAuthMiddleware, async
   }
 });
 
+// POST /users/me/onboarding/wizard/complete - Mark wizard onboarding as completed
+router.post('/users/me/onboarding/wizard/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const userService = new UserService();
+    const user = await userService.markWizardOnboardingCompleted(req.user!.id);
+
+    sendSuccess(res, user);
+  } catch (error) {
+    handleError(error, res, 'marking wizard onboarding as completed');
+  }
+});
+
 export default router;

@@ -252,6 +252,28 @@ export class UserService {
   }
 
   /**
+   * Mark wizard onboarding as completed
+   */
+  async markWizardOnboardingCompleted(userId: string): Promise<UserModel> {
+    const existingUser = await this.userRepository.findById(userId);
+    if (!existingUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    const updatedUser = await this.userRepository.update(userId, {
+      wizardOnboardingCompleted: true,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    logger.info('[UserService] Wizard onboarding marked as completed', { userId });
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
    * Authenticate user (for login)
    */
   async authenticateUser(email: string, password: string): Promise<UserModel | null> {

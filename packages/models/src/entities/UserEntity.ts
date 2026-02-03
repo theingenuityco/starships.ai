@@ -177,6 +177,11 @@ export class UserEntity implements UserModel {
   @IsBoolean()
   navigationOnboardingCompleted?: boolean;
 
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  wizardOnboardingCompleted?: boolean;
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

@@ -44,6 +44,7 @@ export interface UserModel {
 
   // Onboarding tracking
   navigationOnboardingCompleted?: boolean; // Has user completed the navigation onboarding tour?
+  wizardOnboardingCompleted?: boolean; // Has user completed the wizard onboarding (name starship, invite, add agent)?
 }
 
 // ============================================================================

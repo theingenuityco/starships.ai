@@ -173,14 +173,16 @@ function LinkedConversationCard({
   starshipId?: string
   isUserOnline?: (userId: string) => boolean
 }) {
-  const { data: conversation } = useConversationDetail(linkedConversationId)
-  const { data: agents = [] } = useConversationAgents(linkedConversationId)
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
+  const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
   const { userId: authUserId } = useAuth()
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+  const title =
+    rawTitle ||
+    (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
@@ -188,7 +190,7 @@ function LinkedConversationCard({
     const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
     return Array.from(new Set(ids))
   }, [agentList])
-  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const { data: avatarAttachments = [], isLoading: isLoadingAvatarAttachments } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   // Starship member directory (resolve userId -> displayName/avatar for participant list)
@@ -210,7 +212,7 @@ function LinkedConversationCard({
 
   // Include human participants by sampling recent message authors.
   // The conversation detail endpoint does not currently include members/users.
-  const { data: participantsPreview } = useQuery({
+  const { data: participantsPreview, isLoading: isLoadingParticipantsPreview } = useQuery({
     queryKey: ['conversations', 'participants-preview', linkedConversationId],
     enabled: Boolean(linkedConversationId),
     queryFn: async () => {
@@ -329,6 +331,8 @@ function LinkedConversationCard({
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
 
+  const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
+
   // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
   // between renders when `linkedConversationId` flips from null -> string.
   if (!linkedConversationId) return null
@@ -350,38 +354,46 @@ function LinkedConversationCard({
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Participants (overlapping avatars) */}
-          {participantItems.length > 0 && (
+          {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
             <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
               {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
               <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
-                {participantItems
-                  .slice(0, 3)
-                  .slice()
-                  .reverse()
-                  .map(p => {
-                  if (p.kind === 'agent') {
-                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                    return (
-                      <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={p.key} className="h-7 w-7">
-                      <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                      </Avatar>
-                    </div>
-                  )
-                })}
+                {shouldShowAvatarPlaceholders ? (
+                  <>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/60 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/50 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/40 animate-pulse" aria-hidden="true" />
+                  </>
+                ) : (
+                  participantItems
+                    .slice(0, 3)
+                    .slice()
+                    .reverse()
+                    .map(p => {
+                      if (p.kind === 'agent') {
+                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                        return (
+                          <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={p.key} className="h-7 w-7">
+                          <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )
+                    })
+                )}
               </div>
               {participantItems.length > 3 ? (
                 <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span>
               ) : null}
             </div>
-          )}
+          ) : null}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
         </div>
       </div>

@@ -155,6 +155,7 @@ function AgentAvatarWithTurnUsageRing({
 function LinkedConversationCard({
   linkedConversationId,
   linkedConversationHref,
+  isActiveThread,
   enableChannelMessageThreads,
   onThreadAction,
   message,
@@ -163,6 +164,8 @@ function LinkedConversationCard({
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
+  /** When true, visually highlight this card as the active/open thread. */
+  isActiveThread?: boolean
   enableChannelMessageThreads: boolean
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   message: MessageModel
@@ -249,7 +252,12 @@ function LinkedConversationCard({
   if (!linkedConversationId) return null
 
   const cardInner = (
-    <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">
+    <div
+      className={cn(
+        'w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3',
+        isActiveThread && 'border-primary/60 bg-primary/5 ring-1 ring-primary/20'
+      )}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -405,6 +413,11 @@ interface ConversationMessageListProps {
   selectedMatchIndex?: number | null
   /** When true, hide the search input (e.g. when search is in navbar) and show only Prev/Next. */
   hideSearchInput?: boolean
+  /**
+   * When set, highlight the message row whose `linkedConversationId` matches this id.
+   * Used to visually indicate which parent message the currently-open thread is linked to.
+   */
+  activeThreadConversationId?: string | null
 }
 
 export function ConversationMessageList({
@@ -438,6 +451,7 @@ export function ConversationMessageList({
   onSearchResults,
   selectedMatchIndex,
   hideSearchInput = false,
+  activeThreadConversationId,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -1085,6 +1099,18 @@ export function ConversationMessageList({
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
 
+  const activeThreadParentMessageId = useMemo(() => {
+    const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
+    if (!tid) return null
+    for (const m of renderMessages) {
+      const anyMsg = m as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+      const linked = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : ''
+      if (linked && linked === tid) return m.id
+    }
+    return null
+  }, [activeThreadConversationId, renderMessages])
+
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
@@ -1157,6 +1183,43 @@ export function ConversationMessageList({
       bottomSnapStateRef.current.didSnapOnceContentExists = true
     }
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
+
+  const lastAutoScrollThreadIdRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    // When the thread pane opens, the main pane shrinks which can reflow text and
+    // push the clicked "thread card" message out of view. Best-effort: scroll the
+    // linked parent message back into the viewport once per thread open.
+    const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
+    if (!tid) return
+    if (lastAutoScrollThreadIdRef.current === tid) return
+
+    const messageId = typeof activeThreadParentMessageId === 'string' ? activeThreadParentMessageId : ''
+    if (!messageId) return
+
+    const container = scrollContainerRef.current
+    const el = messageRefs.current[messageId]
+    if (!container || !el) return
+
+    // Defer to next frame so layout reflow from pane resize is applied.
+    requestAnimationFrame(() => {
+      const c = scrollContainerRef.current
+      const node = messageRefs.current[messageId]
+      if (!c || !node) return
+
+      const cRect = c.getBoundingClientRect()
+      const r = node.getBoundingClientRect()
+      const pad = 16
+      const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
+      if (!fullyVisible) {
+        try {
+          node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        } catch {
+          /* ignore */
+        }
+      }
+      lastAutoScrollThreadIdRef.current = tid
+    })
+  }, [activeThreadConversationId, activeThreadParentMessageId])
 
   // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
@@ -1567,6 +1630,7 @@ export function ConversationMessageList({
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
                       expertMode={expertMode}
+                      activeThreadConversationId={activeThreadConversationId ?? null}
                       turnUsage={(() => {
                         if (!expertMode) return null
                         if (message.role !== 'assistant') return null
@@ -1769,6 +1833,8 @@ interface ConversationMessageBubbleProps {
   isUserOnline?: (userId: string) => boolean
   /** Conversation-scoped "busy" indicator (active or waiting_for_tools). */
   isConversationBusy?: boolean
+  /** When set, highlight this row if it links to the active thread. */
+  activeThreadConversationId?: string | null
   /**
    * Monotonic revision to force memoized bubbles to re-render when presence changes.
    * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
@@ -1916,6 +1982,7 @@ const MemoizedMessageBubble = memo(
     turnUsage,
     isUserOnline,
     isConversationBusy = false,
+    activeThreadConversationId,
     presenceRevision,
   }: ConversationMessageBubbleProps) {
     void presenceRevision
@@ -1953,6 +2020,8 @@ const MemoizedMessageBubble = memo(
       return null
     }, [linkedConversationId, starshipSlug])
 
+    const isActiveThreadLink = Boolean(linkedConversationId && activeThreadConversationId && linkedConversationId === activeThreadConversationId)
+
     const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
     const heroAvatarSlotPx = avatarSize + avatarSlotPadPx
     // In the normal app layout (non-hero), user avatars are rendered at 40px (w-10 h-10).
@@ -1968,7 +2037,7 @@ const MemoizedMessageBubble = memo(
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className={cn('h-7 w-7', isActiveThreadLink && 'bg-primary/10 text-primary hover:bg-primary/15')}
           onClick={e => {
             e.preventDefault()
             e.stopPropagation()
@@ -1980,7 +2049,7 @@ const MemoizedMessageBubble = memo(
           <Icon name="thread" className="h-4 w-4" />
         </Button>
       )
-    }, [enableChannelMessageThreads, linkedConversationId, message.content, message.id, onThreadAction])
+    }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2024,6 +2093,7 @@ const MemoizedMessageBubble = memo(
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
                     linkedConversationHref={linkedConversationHref}
+                    isActiveThread={isActiveThreadLink}
                     enableChannelMessageThreads={enableChannelMessageThreads}
                     onThreadAction={onThreadAction}
                     message={message}
@@ -2210,6 +2280,7 @@ const MemoizedMessageBubble = memo(
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
                   linkedConversationHref={linkedConversationHref}
+                  isActiveThread={isActiveThreadLink}
                   enableChannelMessageThreads={enableChannelMessageThreads}
                   onThreadAction={onThreadAction}
                   message={message}
@@ -2310,6 +2381,7 @@ const MemoizedMessageBubble = memo(
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
                     linkedConversationHref={linkedConversationHref}
+                    isActiveThread={isActiveThreadLink}
                     enableChannelMessageThreads={enableChannelMessageThreads}
                     onThreadAction={onThreadAction}
                     message={message}
@@ -2412,6 +2484,7 @@ const MemoizedMessageBubble = memo(
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
                   linkedConversationHref={linkedConversationHref}
+                  isActiveThread={isActiveThreadLink}
                   enableChannelMessageThreads={enableChannelMessageThreads}
                   onThreadAction={onThreadAction}
                   message={message}
@@ -2435,6 +2508,7 @@ const MemoizedMessageBubble = memo(
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     // Presence and busy indicators are independent of message content.
     if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
+    if (String(prevProps.activeThreadConversationId ?? '') !== String(nextProps.activeThreadConversationId ?? '')) return false
     if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }

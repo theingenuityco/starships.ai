@@ -110,6 +110,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const shouldShowWelcomeCard = searchParams.get('welcome') === '1'
+
+  const activeThreadConversationId = useMemo(() => {
+    const raw = (searchParams.get('thread') || '').trim()
+    if (!raw) return null
+    if (raw === 'draft') return null
+    return raw
+  }, [searchParams])
   const dismissWelcomeCard = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString())
     next.delete('welcome')
@@ -1045,6 +1052,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   }
                   bottomPaddingPx={inputHeight + 12}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                  activeThreadConversationId={activeThreadConversationId}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                   submittedQuery={submittedQuery.trim() || undefined}
                   onSearchSubmit={q => {

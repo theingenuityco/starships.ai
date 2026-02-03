@@ -643,7 +643,26 @@ export function ConversationMessageList({
   const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
   const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
 
-  const fallbackAgent = conversationAgents[0]
+  // IMPORTANT:
+  // For user↔agent DMs, the streaming placeholder message (`stream-${turnId}`) often arrives without
+  // an `agentId`/`agentName` initially. If we fall back to `conversationAgents[0]`, we can render the
+  // *wrong* agent label during streaming (e.g. "Aria") and then "snap back" once the final persisted
+  // message includes the correct agent metadata. Prefer the DM list's resolved agent instead.
+  const dmAgentFallback = useMemo<ConversationAgent | null>(() => {
+    const dm: any = (dmItem as any)?.dm
+    if (dm?.dmType !== 'user_agent') return null
+
+    const dmAgent: any = (dmItem as any)?.agent ?? null
+    const dmAgentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
+    const fromConversationList = dmAgentId && Array.isArray(conversationAgents) ? ((conversationAgents.find(a => String((a as any)?.id || '').trim() === dmAgentId) as any) ?? null) : null
+
+    return (dmAgent as any) || (fromConversationList as any) || null
+  }, [conversationAgents, dmItem])
+
+  const isUserAgentDm = (dmItem as any)?.dm?.dmType === 'user_agent'
+  // For user↔agent DMs, never fall back to some other agent (e.g. Aria) if we can't resolve the DM agent.
+  // Prefer rendering a generic "Assistant" over showing the wrong name during streaming.
+  const fallbackAgent = isUserAgentDm ? dmAgentFallback : conversationAgents[0]
   const fallbackAgentDisplayName = useMemo(() => {
     if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
     if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
@@ -674,8 +693,10 @@ export function ConversationMessageList({
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
+    const fallbackId = typeof (fallbackAgent as any)?.avatarAttachmentId === 'string' ? String((fallbackAgent as any).avatarAttachmentId).trim() : ''
+    if (fallbackId) ids.push(fallbackId)
     return Array.from(new Set(ids))
-  }, [conversationAgents])
+  }, [conversationAgents, fallbackAgent])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
   const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 

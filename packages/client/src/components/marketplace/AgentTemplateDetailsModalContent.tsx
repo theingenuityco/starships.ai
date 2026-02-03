@@ -46,11 +46,6 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
               {template.category}
             </Badge>
           ) : null}
-          {template.version ? (
-            <Badge variant="outline" className="font-mono text-xs">
-              <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{template.version}
-            </Badge>
-          ) : null}
           {template.model ? (
             <Badge variant="outline" className="font-mono text-xs">
               <Icon name="brain" className="w-3.5 h-3.5 mr-1.5" />

@@ -212,9 +212,9 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                 {template.category}
               </Badge>
             ) : null}
-            {template.version ? (
+            {template.model ? (
               <Badge variant="outline" className="font-mono text-xs border-border/60 bg-background/40">
-                v{template.version}
+                {template.model}
               </Badge>
             ) : null}
           </div>

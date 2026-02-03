@@ -162,11 +162,6 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                       <Badge variant="outline" className="text-xs capitalize">
                         {template.category}
                       </Badge>
-                      {isAgent && (template as AgentTemplateModel).version ? (
-                        <Badge variant="outline" className="text-xs font-mono">
-                          v{(template as AgentTemplateModel).version}
-                        </Badge>
-                      ) : null}
                       {isAgent && (template as AgentTemplateModel).model ? (
                         <Badge variant="outline" className="text-xs font-mono">
                           {(template as AgentTemplateModel).model}

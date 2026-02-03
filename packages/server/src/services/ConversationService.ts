@@ -1818,6 +1818,68 @@ export class ConversationService {
   }
 
   /**
+   * Determine whether an incoming user message will trigger any agent execution.
+   *
+   * Used for billing + UX gating: we only charge fixed "per user message" credits
+   * when the message will actually run an agent.
+   *
+   * IMPORTANT:
+   * - This is intentionally side-effect free (it does NOT auto-link mentioned agents).
+   * - Server remains authoritative; this is a best-effort routing preview.
+   */
+  async willTriggerAgentExecution(params: { conversationId: string; content: string }): Promise<boolean> {
+    try {
+      const conversationId = String(params.conversationId || '').trim();
+      const content = typeof params.content === 'string' ? params.content : '';
+      if (!conversationId) return false;
+
+      const [conversation, starship] = await Promise.all([
+        this.getConversationById(conversationId).catch(() => null),
+        this.getConversationStarship(conversationId).catch(() => null),
+      ]);
+      if (!conversation || !starship) return false;
+
+      const channelRepo = new ChannelRepository();
+      const dmRepo = new DirectMessageRepository();
+
+      const [channel, dm, conversationAgents, allStarshipAgents] = await Promise.all([
+        channelRepo.findByConversationId(conversationId).catch(() => null),
+        dmRepo.findByConversationId(conversationId).catch(() => null),
+        this.getConversationAgents(conversationId).catch(() => [] as AgentModel[]),
+        this.agentRepository.findByStarship(starship.id).catch(() => [] as AgentModel[]),
+      ]);
+
+      const isChannel = Boolean(channel);
+      const isUserUserDm = (dm as { dmType?: unknown } | null)?.dmType === 'user_user';
+      if (isUserUserDm) return false;
+
+      // For non-channel conversations, the runtime requires at least one linked agent (fallback).
+      // If none exist, we won't run any agent (ConversationService will throw later).
+      if (!isChannel && (!Array.isArray(conversationAgents) || conversationAgents.length < 1)) return false;
+
+      const isThread = Boolean((conversation as { parentConversationId?: string | null }).parentConversationId);
+      const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0;
+      const isMentionOnlyThread = Boolean(isThread && !isChannel && linkedAgentCount > 2);
+
+      // Mentions are resolved against the full starship agent list (not only currently-linked agents).
+      const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
+      const hasMention = mentioned.length > 0;
+
+      // Mention-only contexts only trigger when at least one agent is mentioned.
+      if (isChannel || isMentionOnlyThread) return hasMention;
+
+      // Normal conversations: any message triggers (mentions or fallback agent).
+      return hasMention || linkedAgentCount > 0;
+    } catch (err) {
+      console.warn('[ConversationService] willTriggerAgentExecution failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Fail closed: if we can't determine routing, do not claim an agent will run.
+      return false;
+    }
+  }
+
+  /**
    * Continue a conversation turn after an out-of-band tool approval/denial.
    *
    * This does NOT create a new user message and must NOT debit fixed user-message credits.

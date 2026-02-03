@@ -57,7 +57,7 @@ export class ConversationParticipantRepository extends BaseRepository {
             ORDER BY created_at ASC`,
           [conversationId]
         );
-        return Array.isArray(rows) ? rows.map((r) => String((r as any).user_id || '')).filter(Boolean) : [];
+        return Array.isArray(rows) ? rows.map((r) => String((r as { user_id?: unknown }).user_id || '')).filter(Boolean) : [];
       },
       'listUserIdsByConversation',
       'conversation_participants',
@@ -77,7 +77,7 @@ export class ConversationParticipantRepository extends BaseRepository {
             ORDER BY created_at ASC`,
           [conversationId]
         );
-        return Array.isArray(rows) ? rows.map((r) => String((r as any).agent_id || '')).filter(Boolean) : [];
+        return Array.isArray(rows) ? rows.map((r) => String((r as { agent_id?: unknown }).agent_id || '')).filter(Boolean) : [];
       },
       'listAgentIdsByConversation',
       'conversation_participants',

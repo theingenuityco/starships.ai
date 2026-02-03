@@ -572,28 +572,6 @@ export function ConversationMessageList({
     const fromOverride = typeof emptyHeroTitleOverride === 'string' ? emptyHeroTitleOverride.trim() : ''
     return fromOverride || null
   }, [conversationDetail, emptyHeroTitleOverride])
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H3',
-        location: 'ConversationMessageList.tsx:resolvedEmptyHeroTitle',
-        message: 'Resolved empty hero title',
-        data: {
-          conversationId: conversationId ?? null,
-          titleFromDetail: typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title).trim() : null,
-          titleFromOverride: typeof emptyHeroTitleOverride === 'string' ? emptyHeroTitleOverride.trim() : null,
-          resolvedEmptyHeroTitle: resolvedEmptyHeroTitle ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion agent log
-  }, [conversationId, conversationDetail, emptyHeroTitleOverride, resolvedEmptyHeroTitle])
 
   // Conversation agents (can be multiple). We need to resolve agent details per message by `message.agentId`.
   type ConversationAgent = {
@@ -635,6 +613,9 @@ export function ConversationMessageList({
         const avatarAttachmentId = typeof agent?.avatarAttachmentId === 'string' ? String(agent.avatarAttachmentId) : null
         return { kind: 'agent' as const, label, seed, avatarAttachmentId }
       }
+      // If we can't resolve the DM's agent, prefer "no participant" (generic DM hero)
+      // rather than falling back to conversationAgents[0] (which may be unrelated like Aria).
+      return null
     }
     if (dm?.dmType === 'user_user') {
       const peer: any = (dmItem as any)?.peerUser
@@ -652,51 +633,6 @@ export function ConversationMessageList({
     const avatarAttachmentId = typeof a0?.avatarAttachmentId === 'string' ? String(a0.avatarAttachmentId) : null
     return { kind: 'agent' as const, label, seed, avatarAttachmentId }
   }, [conversationAgents, dmItem, emptyHeroParticipantOverride])
-  useEffect(() => {
-    const dmType = String(((dmItem as any)?.dm as any)?.dmType || '')
-    const dmAgent = (dmItem as any)?.agent ?? null
-    const a0: any = (Array.isArray(conversationAgents) ? (conversationAgents as any[]) : [])[0] ?? null
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'H2',
-        location: 'ConversationMessageList.tsx:resolvedEmptyHeroParticipant',
-        message: 'Resolved empty hero participant',
-        data: {
-          conversationId: conversationId ?? null,
-          dmType: dmType || null,
-          hasParticipantOverride: Boolean(emptyHeroParticipantOverride),
-          dmAgent: dmAgent
-            ? {
-                id: typeof dmAgent?.id === 'string' ? String(dmAgent.id) : null,
-                slug: typeof dmAgent?.slug === 'string' ? String(dmAgent.slug) : null,
-                name: typeof dmAgent?.name === 'string' ? String(dmAgent.name) : null,
-              }
-            : null,
-          conversationAgentsCount: Array.isArray(conversationAgents) ? conversationAgents.length : null,
-          conversationAgent0: a0
-            ? {
-                id: typeof a0?.id === 'string' ? String(a0.id) : null,
-                slug: typeof a0?.slug === 'string' ? String(a0.slug) : null,
-                name: typeof a0?.name === 'string' ? String(a0.name) : null,
-              }
-            : null,
-          resolved:
-            resolvedEmptyHeroParticipant == null
-              ? null
-              : resolvedEmptyHeroParticipant.kind === 'human'
-                ? { kind: 'human', label: resolvedEmptyHeroParticipant.label }
-                : { kind: 'agent', label: resolvedEmptyHeroParticipant.label, avatarAttachmentId: resolvedEmptyHeroParticipant.avatarAttachmentId ?? null },
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion agent log
-  }, [conversationAgents, conversationId, dmItem, emptyHeroParticipantOverride, resolvedEmptyHeroParticipant])
 
   const emptyHeroAvatarAttachmentIds = useMemo(() => {
     const p = resolvedEmptyHeroParticipant

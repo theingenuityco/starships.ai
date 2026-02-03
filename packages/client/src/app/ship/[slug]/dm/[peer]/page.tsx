@@ -5,8 +5,9 @@ import { useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/u
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 type DmTarget = { dmType: 'user_agent'; agentId: string; agentSlug: string | null } | { dmType: 'user_user'; peerUserId: string }
 
@@ -72,6 +73,7 @@ export default function DmPeerPage() {
   const params = useParams<{ slug: string; peer: string }>()
   const slug = params.slug
   const peer = params.peer
+  const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
 
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
@@ -131,6 +133,23 @@ export default function DmPeerPage() {
           } as const),
     }
   }, [dmTarget, directMessagesData?.directMessages, membersAndInvites])
+
+  // Ensure the ship-level stream provider is pointed at the resolved DM conversation.
+  // `/ship/[slug]/layout.tsx` doesn't know about `/dm/<peer>`, so without this the stream context
+  // stays on `conversationId=null` and the DM message list is empty.
+  useEffect(() => {
+    const cid = resolved.conversationId ? String(resolved.conversationId) : ''
+    if (!cid) return
+    setPendingConversationId(cid)
+    return () => {
+      try {
+        const st = useStarshipUIStore.getState()
+        if (st.pendingConversationId === cid) st.setPendingConversationId(null)
+      } catch {
+        setPendingConversationId(null)
+      }
+    }
+  }, [resolved.conversationId, setPendingConversationId])
 
   // If we can't resolve the peer and we aren't in a loading window, bounce back to the starship root.
   if (!dmTarget && !dmsLoading && !agentsLoading) {

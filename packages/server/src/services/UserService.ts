@@ -353,7 +353,9 @@ export class UserService {
       // Prefer most recently updated account with an avatar.
       const sorted = [...accounts].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       const avatar = sorted
-        .map((a) => (a.profileData && typeof (a.profileData as any).avatar === 'string' ? String((a.profileData as any).avatar).trim() : ''))
+        .map((a) =>
+          a.profileData && typeof (a.profileData as any).avatar === 'string' ? String((a.profileData as any).avatar).trim() : ''
+        )
         .find((v) => v.length > 0);
 
       if (avatar) {

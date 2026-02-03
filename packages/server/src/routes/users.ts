@@ -393,37 +393,42 @@ router.post('/users/:id/email/change', jwtAuthMiddleware, rateLimiters.sensitive
 });
 
 // POST /users/:id/email/change/resend - Resend email change verification email
-router.post('/users/:id/email/change/resend', jwtAuthMiddleware, rateLimiters.sensitive, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
+router.post(
+  '/users/:id/email/change/resend',
+  jwtAuthMiddleware,
+  rateLimiters.sensitive,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!checkAuth(req, res)) return;
 
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
-    if (!paramValidation) return;
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+      if (!paramValidation) return;
 
-    // Authorization: Users can only resend their own email change
-    if (req.params.id !== req.user?.id) {
-      sendError(res, 'ACCESS_DENIED', 'You can only resend your own email change', 403);
-      return;
+      // Authorization: Users can only resend their own email change
+      if (req.params.id !== req.user?.id) {
+        sendError(res, 'ACCESS_DENIED', 'You can only resend your own email change', 403);
+        return;
+      }
+
+      const userService = new UserService();
+      const pendingChange = await userService.getPendingEmailChange(req.params.id);
+
+      if (!pendingChange) {
+        sendError(res, 'VALIDATION_ERROR', 'No pending email change found', 400);
+        return;
+      }
+
+      // Initiate email change - this atomically cancels old tokens and creates a new one
+      // Fix: Don't call cancelEmailChange separately to avoid race condition where
+      // cancel succeeds but initiate fails, leaving user without a pending change
+      await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
+
+      sendSuccess(res, { message: 'Email change verification email resent successfully.' });
+    } catch (error) {
+      handleError(error, res, 'resending email change verification email');
     }
-
-    const userService = new UserService();
-    const pendingChange = await userService.getPendingEmailChange(req.params.id);
-
-    if (!pendingChange) {
-      sendError(res, 'VALIDATION_ERROR', 'No pending email change found', 400);
-      return;
-    }
-
-    // Initiate email change - this atomically cancels old tokens and creates a new one
-    // Fix: Don't call cancelEmailChange separately to avoid race condition where
-    // cancel succeeds but initiate fails, leaving user without a pending change
-    await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
-
-    sendSuccess(res, { message: 'Email change verification email resent successfully.' });
-  } catch (error) {
-    handleError(error, res, 'resending email change verification email');
   }
-});
+);
 
 // POST /users/:id/email/change/cancel - Cancel email change
 router.post('/users/:id/email/change/cancel', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

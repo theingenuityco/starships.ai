@@ -38,8 +38,8 @@ export interface UserModel {
   isInstanceAdmin?: boolean;
 
   // Authentication method tracking
-  hasPassword: boolean;           // Does user have password auth?
-  authMethods: AuthMethod[];      // List of auth methods
+  hasPassword: boolean; // Does user have password auth?
+  authMethods: AuthMethod[]; // List of auth methods
   primaryAuthMethod: 'password' | 'oauth'; // Primary login method
 
   // Onboarding tracking

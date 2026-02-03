@@ -89,18 +89,18 @@ export function useNavigationOnboarding() {
       // Immediately mark as completed locally to prevent restart
       setHasCompletedLocally(true)
       setCurrentStep(null)
-      
+
       // Invalidate and refetch user query to refresh user data
       await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
       await queryClient.refetchQueries({ queryKey: ['auth', 'me'] })
-      
+
       // Redirect to Explore Agents after completion
       router.push('/marketplace')
     },
     onError: (error: any) => {
       // Extract error message (matches codebase pattern from useTemplates.ts)
       let errorMessage = 'Failed to complete onboarding'
-      
+
       if (error?.response?.data?.error) {
         const serverError = error.response.data.error
         if (typeof serverError === 'string') {
@@ -111,17 +111,17 @@ export function useNavigationOnboarding() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       // Log in dev (matches codebase pattern)
       if (process.env.NODE_ENV === 'development') {
         console.error('[Onboarding] Completion error:', error)
       }
-      
+
       // Show toast (matches codebase pattern - no action button, just description)
       toast.error('Unable to complete onboarding', {
         description: errorMessage,
       })
-      
+
       // DON'T reset state - keep user on the final step so they can retry manually
     },
   })

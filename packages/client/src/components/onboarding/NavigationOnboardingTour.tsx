@@ -21,7 +21,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding, skipTour, isCompleting } = useNavigationOnboardingContext()
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; pointerTop?: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
-  
+
   // Calculate sidebar width dynamically to exclude it from overlay
   const [sidebarWidth, setSidebarWidth] = useState(312) // Default: 56px (rail) + 256px (expanded sidebar)
 
@@ -29,7 +29,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   // Split into two effects to avoid race conditions (matches conversations/layout.tsx pattern)
   useEffect(() => {
     if (!shouldShowOnboarding || currentStep !== null || isCompleting) return
-    
+
     // If on conversations page, redirect to marketplace first
     if (pathname.includes('/conversations')) {
       router.replace('/marketplace')
@@ -41,7 +41,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   // Uses requestAnimationFrame for DOM readiness (matches client-layout.tsx pattern)
   useEffect(() => {
     if (!shouldShowOnboarding || currentStep !== null) return
-    
+
     // When we land on marketplace, start onboarding
     if (pathname === '/marketplace' || pathname.includes('/marketplace')) {
       // Use RAF only for DOM readiness, not navigation timing
@@ -150,13 +150,13 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       } catch (error) {
         // Silent fallback - matches codebase pattern of not logging everything
       }
-      
+
       // Fallback to default if sidebar not found or invalid
       setSidebarWidth(312)
     }
-    
+
     updateSidebarWidth()
-    
+
     // Try to observe sidebar
     try {
       const sidebar = document.querySelector('[data-navigation-sidebar]')
@@ -164,7 +164,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
         const observer = new ResizeObserver(updateSidebarWidth)
         observer.observe(sidebar)
         window.addEventListener('resize', updateSidebarWidth)
-        
+
         return () => {
           observer.disconnect()
           window.removeEventListener('resize', updateSidebarWidth)
@@ -173,7 +173,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
     } catch (error) {
       // Fallback: just listen to window resize
     }
-    
+
     // Fallback: just listen to window resize if sidebar not found
     window.addEventListener('resize', updateSidebarWidth)
     return () => {
@@ -196,12 +196,12 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed bg-black/50 z-[9998]"
-        style={{ 
+        style={{
           pointerEvents: 'auto',
           top: 0,
           right: 0,
           bottom: 0,
-          left: `${sidebarWidth}px`
+          left: `${sidebarWidth}px`,
         }}
       />
 
@@ -241,9 +241,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
               {/* Title */}
               <div>
                 <div className="flex items-center gap-2">
-                  {currentStepInfo.icon && (
-                    <Icon name={currentStepInfo.icon} className="w-5 h-5 text-primary" />
-                  )}
+                  {currentStepInfo.icon && <Icon name={currentStepInfo.icon} className="w-5 h-5 text-primary" />}
                   <h3 className="text-lg font-semibold text-foreground">{currentStepInfo.label}</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">{currentStepInfo.description}</p>
@@ -256,34 +254,17 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
                   <span className="text-xs text-muted-foreground">
                     {currentStep}/{totalSteps}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={skipTour}
-                    disabled={isCompleting}
-                    className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground"
-                  >
+                  <Button variant="ghost" size="sm" onClick={skipTour} disabled={isCompleting} className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground">
                     Skip tour (don&apos;t show again)
                   </Button>
                 </div>
 
                 {/* Navigation buttons - bottom right */}
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={previousStep}
-                    disabled={isFirstStep}
-                    className="text-xs"
-                  >
+                  <Button variant="outline" size="sm" onClick={previousStep} disabled={isFirstStep} className="text-xs">
                     Back
                   </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={nextStep}
-                    className="text-xs"
-                  >
+                  <Button variant="default" size="sm" onClick={nextStep} className="text-xs">
                     {isLastStep ? 'Finish' : 'Next'}
                   </Button>
                 </div>

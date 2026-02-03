@@ -15,9 +15,7 @@ export function useCompleteWizardOnboarding() {
 
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      const response: FetchResponse<ApiResponse<unknown>> = await api.post(
-        '/api/v1/users/me/onboarding/wizard/complete'
-      )
+      const response: FetchResponse<ApiResponse<unknown>> = await api.post('/api/v1/users/me/onboarding/wizard/complete')
       return response.data.data as void
     },
     onSuccess: async () => {

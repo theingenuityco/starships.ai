@@ -669,6 +669,28 @@ export function ConversationInterface({
         if (currentConversationId) {
           setConversationAgentStore(currentConversationId, (agent as { id: string }).id, formatAgentDisplayName(agent as Agent))
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'pre-fix',
+            hypothesisId: 'H4',
+            location: 'ConversationInterface.tsx:initialAgentIdEffect',
+            message: 'Applied initialAgentId selection',
+            data: {
+              initialAgentId,
+              selectedAgentWasNull: true,
+              selectedAgentId: (agent as any)?.id ?? null,
+              selectedAgentSlug: (agent as any)?.slug ?? null,
+              currentConversationId: currentConversationId ?? null,
+              externalConversationId: externalConversationId ?? null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion agent log
       }
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
@@ -725,6 +747,27 @@ export function ConversationInterface({
       lastAutoSelectedAgentIdRef.current = fallback.id
 
       setSelectedAgentWithLogging(fallback)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'ConversationInterface.tsx:fallbackDefaultAgentEffect',
+          message: 'Applied fallback default agent (pref aria*)',
+          data: {
+            initialAgentId: initialAgentId ?? null,
+            currentConversationId: currentConversationId ?? null,
+            externalConversationId: externalConversationId ?? null,
+            pickedFallback: { id: fallback.id, slug: (fallback as any)?.slug ?? null, name: (fallback as any)?.name ?? null },
+            starshipAgentsCount: Array.isArray(starshipAgentsData) ? starshipAgentsData.length : null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion agent log
     }
     // CRITICAL: currentConversationId and externalConversationId are NOT in dependencies
     // to prevent re-running when conversation is created or URL changes

@@ -36,6 +36,10 @@ interface StarshipConnectorsPanelProps {
    * Defaults to 3 (current connectors page behavior).
    */
   maxColumns?: 1 | 2 | 3
+  /** Hide description on each connector card (compact layout, e.g. deploy modal). */
+  hideCardDescription?: boolean
+  /** Override connect button label (e.g. "Connect" instead of "Connect Gmail"). */
+  connectButtonLabel?: string
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -52,7 +56,7 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
-export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false, maxColumns = 3 }: StarshipConnectorsPanelProps) {
+export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false, maxColumns = 3, hideCardDescription = false, connectButtonLabel }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { data: catalog = [] } = useConnectorCatalog()
@@ -338,9 +342,9 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
                 </div>
               </CardTitle>
             </div>
-            <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
+            {!hideCardDescription && <p className="text-sm text-muted-foreground">{catalogItem.description}</p>}
           </CardHeader>
-          <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
+          <CardContent className={`relative z-10 pt-0 pb-5 ${!hideCardDescription ? 'mt-auto' : ''}`}>
             <div className="flex gap-2 justify-end">
               <Button
                 size="sm"
@@ -360,7 +364,7 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
                   : isOauthConnectable
                     ? isConnected
                       ? 'Reconnect'
-                      : `Connect ${label}`
+                      : (connectButtonLabel ?? `Connect ${label}`)
                     : isApiKeyConnectable
                       ? isConnected
                         ? 'Update API key'

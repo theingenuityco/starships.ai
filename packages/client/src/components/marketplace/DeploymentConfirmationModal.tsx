@@ -49,10 +49,10 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   }, [allToolTemplates])
 
   const [toolPermissions, setToolPermissions] = useState<Record<string, AgentToolPermission>>({})
-  const [showDetails, setShowDetails] = useState(false)
+  const [capabilitiesEditing, setCapabilitiesEditing] = useState(false)
 
   useEffect(() => {
-    if (!isOpen) setShowDetails(false)
+    if (!isOpen) setCapabilitiesEditing(false)
   }, [isOpen])
 
   useEffect(() => {
@@ -129,123 +129,90 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             <DialogHeader className="flex-shrink-0">
               <DialogTitle className="flex items-center gap-2">
                 <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
-                Confirm {isAgent ? 'Deployment' : 'Installation'}
+                {isAgent ? `Deploy to ${starshipName}` : 'Installation'}
               </DialogTitle>
             </DialogHeader>
 
             <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5">
-              {/* Template Info – compact by default */}
+              {/* Template Info – alignment like marketplace profile: avatar, name + role, tags row, then description */}
               <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
-                <div className="flex items-start gap-3 min-w-0">
+                <div className="flex items-start gap-4 min-w-0">
                   {isAgent ? (
                     <MarketplaceAvatar
                       imageUrl={avatarUrl || null}
                       label={template.name}
                       seed={template.name || 'AI'}
-                      sizeClassName="h-10 w-10"
-                      shapeClassName="rounded-full"
+                      sizeClassName="h-20 w-20"
+                      shapeClassName="rounded-2xl"
                       ringClassName="ring-1 ring-border/40"
                       shadowClassName="shadow-sm"
                       showTintWhenMissing={false}
                       showInsetRing={false}
-                      fallbackTextClassName="text-xs font-semibold text-muted-foreground"
+                      fallbackTextClassName="text-base font-semibold text-muted-foreground"
                     />
                   ) : (
-                    <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
-                      <div className="text-lg">🔧</div>
+                    <div className="flex-shrink-0 p-2 rounded-2xl bg-primary/20 h-20 w-20 flex items-center justify-center">
+                      <div className="text-xl">🔧</div>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4 className="font-semibold text-sm leading-tight truncate">{template.name}</h4>
-                        <div className="mt-1 flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {template.category}
-                          </Badge>
-                          {isAgent && (template as AgentTemplateModel).version ? (
-                            <Badge variant="outline" className="text-xs font-mono">
-                              v{(template as AgentTemplateModel).version}
-                            </Badge>
-                          ) : null}
-                          {isAgent && (template as AgentTemplateModel).model ? (
-                            <Badge variant="outline" className="text-xs font-mono">
-                              {(template as AgentTemplateModel).model}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
+                    <h4 className="font-bold text-lg leading-tight truncate">{template.name}</h4>
+                    {isAgent && (template as AgentTemplateModel).role ? (
+                      <p className="mt-0.5 text-sm text-muted-foreground truncate">{(template as AgentTemplateModel).role}</p>
+                    ) : null}
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {template.category}
+                      </Badge>
+                      {isAgent && (template as AgentTemplateModel).version ? (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          v{(template as AgentTemplateModel).version}
+                        </Badge>
+                      ) : null}
+                      {isAgent && (template as AgentTemplateModel).model ? (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {(template as AgentTemplateModel).model}
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                 </div>
-                {template.description ? (
-                  <p className={cn('mt-3 text-sm text-muted-foreground leading-relaxed', isAgent && !showDetails ? 'line-clamp-1' : 'line-clamp-3')}>
-                    {template.description}
-                  </p>
-                ) : null}
+                {template.description ? <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{template.description}</p> : null}
               </div>
 
-              {/* Required connectors – compact line when collapsed, full card when expanded */}
+              {/* Connect App – always full section */}
               {isAgent && requiredConnectors.length > 0 && (
-                <>
-                  {!showDetails ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Icon name="plug" className="h-4 w-4 text-primary shrink-0" />
-                      <span>
-                        Requires: {requiredConnectors.map(c => c.provider).join(', ')}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Icon name="plug" className="h-4 w-4 text-primary" />
+                    <div className="text-sm font-semibold">Connect App</div>
+                  </div>
+                  {starshipId ? (
+                    <ConnectorSuggestionCard starshipId={starshipId} providers={requiredConnectors.map(c => c.provider)} hideSearch={true} hideDisconnect={false} compactCard connectButtonLabel="Connect" />
+                  ) : (
+                    <div className="rounded-xl border border-border/60 bg-card/50 p-3">
+                      <p className="text-sm text-muted-foreground">
+                        Connect these in Settings → Connectors
                         {starshipSlug ? (
                           <>
-                            {' · '}
-                            <button
-                              type="button"
+                            {' '}
+                            <a
+                              href={`/ship/${starshipSlug}/connectors`}
                               className="font-medium text-primary hover:underline"
-                              onClick={() => setShowDetails(true)}
+                              onClick={e => {
+                                e.preventDefault()
+                                onOpenChange(false)
+                                window.location.href = `/ship/${starshipSlug}/connectors`
+                              }}
                             >
-                              Connect
-                            </button>
+                              Open Connectors
+                            </a>
                           </>
                         ) : null}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Icon name="plug" className="h-4 w-4 text-primary" />
-                          <div className="text-sm font-semibold">Required connectors</div>
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => setShowDetails(false)}>
-                          Show less
-                        </Button>
-                      </div>
-                      {starshipId ? (
-                        <ConnectorSuggestionCard starshipId={starshipId} providers={requiredConnectors.map(c => c.provider)} hideSearch={true} hideDisconnect={false} />
-                      ) : (
-                        <div className="rounded-xl border border-border/60 bg-card/50 p-3">
-                          <p className="text-sm text-muted-foreground">
-                            Connect these in Settings → Connectors
-                            {starshipSlug ? (
-                              <>
-                                {' '}
-                                <a
-                                  href={`/ship/${starshipSlug}/connectors`}
-                                  className="font-medium text-primary hover:underline"
-                                  onClick={e => {
-                                    e.preventDefault()
-                                    onOpenChange(false)
-                                    window.location.href = `/ship/${starshipSlug}/connectors`
-                                  }}
-                                >
-                                  Open Connectors
-                                </a>
-                              </>
-                            ) : null}
-                          </p>
-                        </div>
-                      )}
+                      </p>
                     </div>
                   )}
-                </>
+                </div>
               )}
 
               {/* Tool: API key notice */}
@@ -256,119 +223,115 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                 </div>
               )}
 
-              {/* Capabilities – summary when collapsed, full grid when expanded (per-tool permissions preserved) */}
+              {/* Capabilities – always visible with color dot + name; edit icon reveals permission dropdowns */}
               {isAgent && assignedToolSlugs.length > 0 ? (
-                <>
-                  {!showDetails ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {assignedToolSlugs.length} {assignedToolSlugs.length === 1 ? 'capability' : 'capabilities'} · ask first by default
-                      </span>
-                      <Button type="button" variant="ghost" size="sm" className="h-8 text-primary" onClick={() => setShowDetails(true)}>
-                        Review capabilities
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Icon name="wrench" className="h-4 w-4 text-primary" />
-                          <div className="text-sm font-semibold">Capabilities</div>
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => setShowDetails(false)}>
-                          Show less
-                        </Button>
-                      </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Icon name="wrench" className="h-4 w-4 text-primary" />
+                    <div className="text-sm font-semibold">Capabilities</div>
+                    <Tooltip delayDuration={200}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                          onClick={() => setCapabilitiesEditing(prev => !prev)}
+                          aria-label={capabilitiesEditing ? 'Done editing permissions' : 'Edit permissions'}
+                        >
+                          <Icon name="pencil" className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        {capabilitiesEditing ? 'Done editing' : 'Edit permissions'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {assignedToolSlugs.map(slug => {
-                          const info = toolTemplateBySlug.get(slug)
-                          const title = info?.name?.trim() || slug
-                          const desc = info?.description?.trim() || ''
-                          const current = toolPermissions[slug] ?? 'ask'
-                          return (
-                            <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-start gap-3 min-w-0">
-                                  <div className="mt-1.5 flex-shrink-0">
-                                    <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
-                                      <Tooltip delayDuration={250}>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            type="button"
-                                            className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex-shrink-0"
-                                            aria-label={`Tool info: ${title}`}
-                                          >
-                                            <Icon name="info" iconOverride={{ type: 'phosphor', component: 'Info' }} className="h-4 w-4" />
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                          side="top"
-                                          align="start"
-                                          className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]"
-                                        >
-                                          <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
-                                      <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
-                                        <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
-                                          <span className="inline-flex items-center gap-1.5">
-                                            <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
-                                            <span>{permissionLabel(current)}</span>
-                                            <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
-                                          </span>
-                                        </Badge>
-                                      </button>
-                                    </span>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-72">
-                                    {(['allow', 'ask', 'deny'] as const).map(p => (
-                                      <DropdownMenuItem
-                                        key={p}
-                                        className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
-                                        onClick={() => {
-                                          if (isProcessing) return
-                                          setToolPermissions(prev => ({ ...prev, [slug]: p }))
-                                        }}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {assignedToolSlugs.map(slug => {
+                      const info = toolTemplateBySlug.get(slug)
+                      const title = info?.name?.trim() || slug
+                      const desc = info?.description?.trim() || ''
+                      const current = toolPermissions[slug] ?? 'ask'
+                      return (
+                        <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="mt-1.5 flex-shrink-0">
+                                <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
+                                  <Tooltip delayDuration={250}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex-shrink-0"
+                                        aria-label={`Tool info: ${title}`}
                                       >
-                                        <div className="flex flex-col gap-0.5">
-                                          <div className="flex items-center gap-2">
-                                            <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
-                                            <span className="text-sm font-medium">{permissionLabel(p)}</span>
-                                            <span className="ml-auto" />
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
-                                        </div>
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                        <Icon name="info" iconOverride={{ type: 'phosphor', component: 'Info' }} className="h-4 w-4" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      align="start"
+                                      className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]"
+                                    >
+                                      <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                               </div>
                             </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
+
+                            {capabilitiesEditing ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
+                                    <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
+                                      <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
+                                          <span>{permissionLabel(current)}</span>
+                                          <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
+                                        </span>
+                                      </Badge>
+                                    </button>
+                                  </span>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-72">
+                                  {(['allow', 'ask', 'deny'] as const).map(p => (
+                                    <DropdownMenuItem
+                                      key={p}
+                                      className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
+                                      onClick={() => {
+                                        if (isProcessing) return
+                                        setToolPermissions(prev => ({ ...prev, [slug]: p }))
+                                      }}
+                                    >
+                                      <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
+                                          <span className="text-sm font-medium">{permissionLabel(p)}</span>
+                                          <span className="ml-auto" />
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               ) : null}
             </div>
 
-            <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-                Cancel
-              </Button>
+            <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4 justify-end">
               <Button type="button" onClick={handleConfirm} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? (
                   <>

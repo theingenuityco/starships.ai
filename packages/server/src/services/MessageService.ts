@@ -5,7 +5,7 @@
  * Orchestrates between database persistence (MessageRepository) and business logic.
  */
 
-import { MessageRepository, AttachmentRepository } from '@starships/models';
+import { MessageRepository, AttachmentRepository, ConversationParticipantRepository } from '@starships/models';
 import type { Message, MessageModel } from '@starships/protocol';
 
 /**
@@ -14,10 +14,12 @@ import type { Message, MessageModel } from '@starships/protocol';
 export class MessageService {
   private messageRepository: MessageRepository;
   private attachmentRepository: AttachmentRepository;
+  private conversationParticipantRepository: ConversationParticipantRepository;
 
   constructor() {
     this.messageRepository = new MessageRepository();
     this.attachmentRepository = new AttachmentRepository();
+    this.conversationParticipantRepository = new ConversationParticipantRepository();
   }
 
   // ============================================================================
@@ -45,6 +47,23 @@ export class MessageService {
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
       ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });
+
+    // Ensure the author is recorded as a conversation participant.
+    // This allows participant lists to be stable even before a user has posted multiple times.
+    if (request.role === 'user' && request.userId) {
+      await this.conversationParticipantRepository.addUserParticipant({
+        conversationId: request.conversationId,
+        userId: request.userId,
+        createdBy: request.userId,
+        role: null,
+      });
+    } else if (request.role === 'assistant' && request.agentId) {
+      await this.conversationParticipantRepository.addAgentParticipant({
+        conversationId: request.conversationId,
+        agentId: request.agentId,
+        createdBy: request.userId ?? null,
+      });
+    }
 
     // Link attachments to message if provided
     if (request.attachmentIds && request.attachmentIds.length > 0) {
@@ -79,6 +98,22 @@ export class MessageService {
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
       ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });
+
+    // Ensure author is recorded as a participant for this conversation.
+    if (request.role === 'user' && request.userId) {
+      await this.conversationParticipantRepository.addUserParticipant({
+        conversationId: request.conversationId,
+        userId: request.userId,
+        createdBy: request.userId,
+        role: null,
+      });
+    } else if (request.role === 'assistant' && request.agentId) {
+      await this.conversationParticipantRepository.addAgentParticipant({
+        conversationId: request.conversationId,
+        agentId: request.agentId,
+        createdBy: request.userId ?? null,
+      });
+    }
 
     if (request.attachmentIds && request.attachmentIds.length > 0) {
       await Promise.all(request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id)));

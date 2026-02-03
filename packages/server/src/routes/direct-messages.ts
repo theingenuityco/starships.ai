@@ -10,7 +10,7 @@ import { validateData } from '@/utils/validation';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ConversationMemberRepository, DirectMessageRepository, StarshipMemberRepository } from '@starships/models';
+import { ConversationParticipantRepository, DirectMessageRepository, StarshipMemberRepository } from '@starships/models';
 import type { DirectMessageModel, AgentModel, ConversationModel } from '@starships/protocol';
 
 const router: Router = Router();
@@ -118,7 +118,7 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
     if (!(await verifyStarshipAccess(params.starshipId, authUserId, res))) return;
 
     const dmRepo = new DirectMessageRepository();
-    const memberRepo = new ConversationMemberRepository();
+    const participantRepo = new ConversationParticipantRepository();
 
     // Branch 1: user↔agent DM
     if (body.agentId || body.agentSlug) {
@@ -177,7 +177,7 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
         throw e;
       }
 
-      await memberRepo.createOrIgnoreMember({
+      await participantRepo.addUserParticipant({
         conversationId: conversation.id,
         userId: authUserId,
         role: 'admin',
@@ -264,13 +264,13 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
     }
 
     // Add both users to the backing conversation so listing + access checks work.
-    await memberRepo.createOrIgnoreMember({
+    await participantRepo.addUserParticipant({
       conversationId: conversation.id,
       userId: authUserId,
       role: 'admin',
       createdBy: authUserId,
     });
-    await memberRepo.createOrIgnoreMember({
+    await participantRepo.addUserParticipant({
       conversationId: conversation.id,
       userId: peerUserId,
       role: 'member',

@@ -41,7 +41,12 @@ export function ThreadPane(props: {
     return !Array.isArray(conversationAgents) || conversationAgents.length < 1
   }, [agentsLoading, conversationAgents, conversationId])
 
-  const effectiveConversationId = isBrokenThread ? null : conversationId
+  // IMPORTANT:
+  // Even if a thread has 0 linked agents, we still keep the conversation id mounted so:
+  // - the thread can display/persist messages (human-only threads)
+  // - the composer can use the persist-only path without dropping out of "thread context"
+  // The server rejects agent execution for 0-agent non-channel conversations, but persisting messages is allowed.
+  const effectiveConversationId = conversationId
 
   const draftParticipants = useMemo<ConversationParticipantItem[] | null>(() => {
     if (effectiveConversationId) return null
@@ -107,6 +112,59 @@ export function ThreadPane(props: {
     return items.length > 0 ? items : null
   }, [effectiveConversationId, pinnedFirstMessage, selectedAgent, userAvatar, userEmail, userId, userName])
 
+  const participantsHint = useMemo<ConversationParticipantItem[] | null>(() => {
+    if (!effectiveConversationId) return null
+    if (!pinnedFirstMessage) return null
+
+    const items: ConversationParticipantItem[] = []
+    const seen = new Set<string>()
+
+    const addHuman = (args: { id?: string | null; name?: string | null; avatarUrl?: string | null }) => {
+      const id = typeof args.id === 'string' ? args.id.trim() : ''
+      const name = typeof args.name === 'string' ? args.name.trim() : ''
+      const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
+      const label = name || (id ? `User ${id.slice(0, 6)}` : 'User')
+      const key = id ? `human:${id}` : name ? `human:name:${name}` : `human:unknown:${label}`
+      if (seen.has(key)) return
+      seen.add(key)
+      items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+    }
+
+    const addAgent = (args: { id?: string | null; name?: string | null; slug?: string | null; avatarAttachmentId?: string | null }) => {
+      const id = typeof args.id === 'string' ? args.id.trim() : ''
+      const name = typeof args.name === 'string' ? args.name.trim() : ''
+      const slug = typeof args.slug === 'string' ? args.slug.trim() : ''
+      const label = name || slug || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
+      const key = `agent:${id || label}`
+      if (seen.has(key)) return
+      seen.add(key)
+      const seed = name || slug || id || label
+      const avatarAttachmentId = typeof args.avatarAttachmentId === 'string' ? args.avatarAttachmentId.trim() : ''
+      items.push({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) })
+    }
+
+    // Ensure the linked/pinned message author is always included, even if they haven't posted in the thread yet.
+    const role = typeof (pinnedFirstMessage as any)?.role === 'string' ? String((pinnedFirstMessage as any).role) : ''
+    if (role === 'user') {
+      addHuman({
+        id: typeof (pinnedFirstMessage as any)?.userId === 'string' ? String((pinnedFirstMessage as any).userId) : null,
+        name: typeof (pinnedFirstMessage as any)?.userName === 'string' ? String((pinnedFirstMessage as any).userName) : null,
+        avatarUrl: typeof (pinnedFirstMessage as any)?.userAvatar === 'string' ? String((pinnedFirstMessage as any).userAvatar) : null,
+      })
+    } else if (role === 'assistant') {
+      addAgent({
+        id: typeof (pinnedFirstMessage as any)?.agentId === 'string' ? String((pinnedFirstMessage as any).agentId) : null,
+        name: typeof (pinnedFirstMessage as any)?.agentName === 'string' ? String((pinnedFirstMessage as any).agentName) : null,
+        avatarAttachmentId: null,
+      })
+    }
+
+    // Also include current user so the header is stable even before the first thread message is sent.
+    addHuman({ id: userId ?? null, name: userName ?? userEmail ?? null, avatarUrl: userAvatar ?? null })
+
+    return items.length > 0 ? items : null
+  }, [effectiveConversationId, pinnedFirstMessage, userAvatar, userEmail, userId, userName])
+
   return (
     <ConversationStreamProvider conversationId={effectiveConversationId} starshipId={starshipId}>
       <div className={cn('flex flex-col h-full min-h-0 w-full min-w-0', className)}>
@@ -124,6 +182,7 @@ export function ThreadPane(props: {
           fallbackTitle={draftTitle ?? 'New thread'}
           fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
           participantsOverride={draftParticipants}
+          participantsHint={participantsHint}
           rightSlot={
             <>
               <button
@@ -140,13 +199,7 @@ export function ThreadPane(props: {
         />
 
         <div className="flex-1 min-h-0">
-          <ConversationMessageList
-            conversationId={effectiveConversationId}
-            starshipId={starshipId}
-            bottomPaddingPx={180}
-            pinnedFirstMessage={pinnedFirstMessage ?? null}
-            contentWidth="full"
-          />
+          <ConversationMessageList conversationId={effectiveConversationId} starshipId={starshipId} bottomPaddingPx={180} pinnedFirstMessage={pinnedFirstMessage ?? null} contentWidth="full" />
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}

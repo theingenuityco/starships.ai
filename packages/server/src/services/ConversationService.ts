@@ -1517,13 +1517,6 @@ export class ConversationService {
       throw new NotFoundError('Starship', 'for conversation');
     }
     const allStarshipAgents = await this.agentRepository.findByStarship(starship.id);
-    const channelRepo = new ChannelRepository();
-    const channel = await channelRepo.findByConversationId(data.conversationId).catch(() => null);
-    const isChannel = Boolean(channel);
-    const dmRepo = new DirectMessageRepository();
-    const dm = await dmRepo.findByConversationId(data.conversationId).catch(() => null);
-    const isUserUserDm = dm?.dmType === 'user_user';
-
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation', data.conversationId);
@@ -1534,12 +1527,17 @@ export class ConversationService {
     // - When a thread has >2 linked agents, we stop using a default agent fallback.
     //   Only explicit @mentions will trigger agent execution for that message.
     const isThread = Boolean(conversation.parentConversationId);
+    // For threads, channel/DM "type" is determined by the parent/root conversation, not the child conversation id.
+    const contextConversationId = conversation.parentConversationId || data.conversationId;
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(contextConversationId).catch(() => null);
+    const isChannel = Boolean(channel);
+    const dmRepo = new DirectMessageRepository();
+    const dm = await dmRepo.findByConversationId(contextConversationId).catch(() => null);
+    const isUserUserDm = dm?.dmType === 'user_user';
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
-    if (!isChannel && !isUserUserDm && conversationAgents.length < 1) {
-      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
-    }
-
     let isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
 
     let agentQueue: AgentModel[] = [];
@@ -1601,9 +1599,19 @@ export class ConversationService {
           ? initialTargetsUnlinked
           : this.extractMentionedAgents(data.content, conversationAgents);
 
-      agentQueue = initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
-      noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+      const fallbackAgent = conversationAgents[0];
+      const allowFallback = !isChannel && !isMentionOnlyThread && Boolean(fallbackAgent);
+      agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
+      // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
+      // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
+      noAgentToRun = (isChannel || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0;
       }
+    }
+
+    // Preserve legacy behavior for non-thread, non-channel conversations that require a default agent:
+    // if no agents are linked AND there are no explicit/mentioned targets, surface a 404.
+    if (!isChannel && !isUserUserDm && !isThread && conversationAgents.length < 1 && agentQueue.length < 1) {
+      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
@@ -2456,17 +2464,34 @@ export class ConversationService {
         '- 4-8 words, sentence case, no trailing punctuation.',
         '- Capture the main user intent/topic from the initial context.',
         '- Avoid quotes, emojis, and personal data. Keep under 60 characters.',
+        '- Do not include @mentions or handles; omit them.',
       ].join('\n');
+
+      const stripMentionsForTitle = (s: string): string => {
+        const input = String(s || '');
+        // Remove structured mention tokens and replace legacy @mentions with a generic placeholder.
+        // (We intentionally avoid resolving IDs -> names for titles.)
+        return input
+          .replace(/<@a:[^>\s]+>/gi, ' agent ')
+          .replace(/<@u:[^>\s]+>/gi, ' user ')
+          .replace(/<@[^>\n]+>/g, ' ')
+          .replace(/(^|\s)@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|([a-z0-9._-]{1,100}))/gi, '$1mention')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
 
       const safe = (s: string, max: number) =>
         String(s || '')
+          .replace(/<@[^>\n]+>/g, ' ')
           .replace(/\n+/g, ' ')
           .replace(/\s+/g, ' ')
           .trim()
           .slice(0, max);
 
-      const ctxBlock = threadPinnedContent ? `Thread pinned message: "${safe(threadPinnedContent, 500)}"\n` : '';
-      const prompt = `${ctxBlock}User message: "${safe(userContent, 400)}"\n\nReturn only the title text.`;
+      const pinnedForTitle = threadPinnedContent ? stripMentionsForTitle(threadPinnedContent) : '';
+      const userForTitle = stripMentionsForTitle(userContent);
+      const ctxBlock = pinnedForTitle ? `Thread pinned message: "${safe(pinnedForTitle, 500)}"\n` : '';
+      const prompt = `${ctxBlock}User message: "${safe(userForTitle, 400)}"\n\nReturn only the title text.`;
 
       const completion = await client.chat.completions.create({
         model,

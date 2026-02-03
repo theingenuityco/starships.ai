@@ -607,8 +607,27 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         effectiveAgent = null
       }
 
+      // Thread defaulting:
+      // If we're in an existing thread conversation (not a draft) and the user didn't explicitly pick/mention an agent,
+      // fall back to the first linked agent on the thread.
+      //
+      // Without this, opening a thread via URL/refresh (or from a non-assistant message) can yield `selectedAgent === null`,
+      // which incorrectly blocks sending with "Select an agent" even though the thread already has linked agents.
+      if (!effectiveAgent && !isDraftUserUserDm && isThreadConversation && !isMentionOnlyThread) {
+        const linked = Array.isArray(conversationAgents) ? conversationAgents : []
+        if (linked.length > 0) {
+          effectiveAgent = linked[0] ?? null
+        }
+      }
+
+      // Human-only threads:
+      // If a thread has *no* agent selected/mentioned and *no* linked agents,
+      // allow the message to be persisted without triggering an agent.
+      // (This covers "thread started from a user message" and other edge cases.)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isDraftUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm) {
+      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm && !shouldPersistOnly) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -656,31 +675,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             sendConversationId = currentConversationId
             createdNewConversation = true
           } else {
+            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+
             // Starter conversations must be agent-backed (channels are created via the Channels UI).
-            if (!effectiveAgent) {
+            // EXCEPTION: child conversations (threads) may be created agent-less for human-only threads.
+            if (!effectiveAgent && !isThreadCreate) {
               resetFlags()
               toast.error('Select an agent', { description: 'Please select an agent to chat.' })
               return
             }
-            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
             const title = (() => {
               const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
               if (override) return override
-              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent)}`
+              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent!)}`
             })()
             const newConversation = await createConversation.mutateAsync(
               isThreadCreate
-                ? {
-                    title,
-                    starshipId: starshipId,
-                    parentConversationId: newConversationParentConversationId!.trim(),
-                    // IMPORTANT: threads are not channels; server requires at least one linked agent.
-                    agentSlug: effectiveAgent.slug,
-                  }
+                ? effectiveAgent
+                  ? {
+                      title,
+                      starshipId: starshipId,
+                      parentConversationId: newConversationParentConversationId!.trim(),
+                      // IMPORTANT: threads are not channels; server requires at least one linked agent for agent-triggering messages.
+                      agentSlug: effectiveAgent.slug,
+                    }
+                  : {
+                      title,
+                      starshipId: starshipId,
+                      parentConversationId: newConversationParentConversationId!.trim(),
+                    }
                 : {
                     title,
                     starshipId: starshipId,
-                    agentSlug: effectiveAgent.slug,
+                    agentSlug: effectiveAgent!.slug,
                   }
             )
             currentConversationId = newConversation.id
@@ -755,40 +782,42 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // CRITICAL: pre-seed the streamed cache with a temp user message + local turn_started
         // BEFORE uploads / sendMessageFn() so the stream-derived responder state does not
         // briefly drop to idle during the /conversations -> /conversations/:id route change.
-        try {
-          const now = new Date().toISOString()
-          const tempUser: any = {
-            id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            role: 'user',
-            content: contentToSend,
-            createdAt: now,
-            updatedAt: now,
-            messageType: 'user_input',
-            ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
-          }
-          // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
-          queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
-            const next = Array.isArray(old) ? old.slice() : []
-            const last = next.length > 0 ? next[next.length - 1] : null
-            const prev = next.length > 1 ? next[next.length - 2] : null
-            const already =
-              last?.type === 'turn_started' &&
-              last?.payload?.local === true &&
-              prev?.type === 'append' &&
-              prev?.message?.role === 'user' &&
-              typeof prev?.message?.id === 'string' &&
-              String(prev.message.id).startsWith('temp-user-') &&
-              String(prev?.message?.content ?? '') === String(contentToSend)
-            if (already) return next
-            next.push({ type: 'append', message: tempUser })
-            next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
-            return next
-          })
-        } catch {}
+        if (!shouldPersistOnly) {
+          try {
+            const now = new Date().toISOString()
+            const tempUser: any = {
+              id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              role: 'user',
+              content: contentToSend,
+              createdAt: now,
+              updatedAt: now,
+              messageType: 'user_input',
+              ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
+            }
+            // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
+            queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
+              const next = Array.isArray(old) ? old.slice() : []
+              const last = next.length > 0 ? next[next.length - 1] : null
+              const prev = next.length > 1 ? next[next.length - 2] : null
+              const already =
+                last?.type === 'turn_started' &&
+                last?.payload?.local === true &&
+                prev?.type === 'append' &&
+                prev?.message?.role === 'user' &&
+                typeof prev?.message?.id === 'string' &&
+                String(prev.message.id).startsWith('temp-user-') &&
+                String(prev?.message?.content ?? '') === String(contentToSend)
+              if (already) return next
+              next.push({ type: 'append', message: tempUser })
+              next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+              return next
+            })
+          } catch {}
 
-        // IMPORTANT: only after we seed the stream cache do we trigger the route transition.
-        if (createdNewConversation) {
-          onConversationStart?.(currentConversationId!)
+          // IMPORTANT: only after we seed the stream cache do we trigger the route transition.
+          if (createdNewConversation) {
+            onConversationStart?.(currentConversationId!)
+          }
         }
 
         // Clear composer
@@ -825,6 +854,47 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               toast.error(`Failed to upload ${pendingFile.file.name}`)
             }
           }
+        }
+
+        // Human-only thread message: persist without invoking ConversationService/agent execution.
+        if (shouldPersistOnly) {
+          try {
+            const resp = await api.post('/api/v1/messages', {
+              role: 'user',
+              content: contentToSend,
+              starshipId: starshipId,
+              conversationId: currentConversationId!,
+              messageType: 'user_input',
+              ...(attachmentIdsToSend.length > 0 ? { attachmentIds: attachmentIdsToSend } : null),
+            })
+
+            const created = (resp as any)?.data?.data ?? (resp as any)?.data ?? null
+            if (created?.id) {
+              // Append to the streamedQuery chunks as a legacy local chunk (hook reduces this into messages).
+              queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(currentConversationId!), (old: any) => {
+                const prev = Array.isArray(old) ? old.slice() : []
+                prev.push({ type: 'append', message: created })
+                return prev
+              })
+            } else {
+              // Fallback: refetch messages if response shape is unexpected.
+              void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(currentConversationId!) })
+            }
+
+            // If we created the thread conversation just now, navigate after we have the message cached.
+            if (createdNewConversation) {
+              onConversationStart?.(currentConversationId!)
+            }
+          } catch (error) {
+            toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
+            setMessage(messageToSend)
+          } finally {
+            setSending(false)
+            streamingRef.current = false
+            setPendingFiles([])
+            setUploadedAttachmentIds([])
+          }
+          return
         }
 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
@@ -1051,7 +1121,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const t = String(message || '').trim()
       return t.startsWith('<@a:') || t.startsWith('@')
     })()
-    const hasTargetAgent = isChannelConversation ? true : isMentionOnlyThread ? hasLeadingMentionToken : Boolean(selectedAgent) || hasLeadingMentionToken
+    const hasTargetAgent = isChannelConversation
+      ? true
+      : isMentionOnlyThread
+        ? hasLeadingMentionToken
+        : Boolean(selectedAgent) || hasLeadingMentionToken || (isThreadConversation && linkedAgentCount > 0) || (isThreadContext && linkedAgentCount === 0)
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units

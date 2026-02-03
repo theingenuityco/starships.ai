@@ -13,6 +13,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import api from '@/lib/api'
+import { LoadingSpinner } from '@/components/ui/simple-loading'
 
 function sanitizeThreadTitleSnippetFromMessageContent(
   input: string,
@@ -520,6 +521,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   if (!starshipData) {
     return null
+  }
+
+  // Prevent a brief "starter screen" flash on hard reloads inside a channel:
+  // `activeConversationId` is derived from `channelsData`, which can be loading on first paint.
+  // If we render `ConversationInterface` with `conversationId=null`, it correctly shows the starter UI,
+  // but that's incorrect UX for an existing channel route.
+  const isResolvingActiveChannelConversationId = Boolean(normalizedChannelSlug && !activeConversationId && channelsLoading)
+  if (isResolvingActiveChannelConversationId) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <LoadingSpinner size="lg">Loading channel…</LoadingSpinner>
+      </div>
+    )
   }
 
   const isThreadPaneOpen = Boolean(threadKey)

@@ -222,9 +222,9 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
               maxWidth: '90vw',
             }}
           >
-            {/* Skip - top right */}
-            <div className="absolute top-3 right-4">
-              <Button variant="ghost" size="sm" onClick={skipTour} disabled={isCompleting} className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground -mr-1">
+            {/* Skip - top right, aligned with footer Next button (same right as p-6) */}
+            <div className="absolute top-3 right-6">
+              <Button variant="ghost" size="sm" onClick={skipTour} disabled={isCompleting} className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground">
                 Skip
               </Button>
             </div>

@@ -16,9 +16,7 @@ interface AgentTemplateDetailsModalContentProps {
 export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDetailsModalContentProps) {
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
 
-  const toolSlugs: string[] = Array.isArray(template.assignedToolSlugs)
-    ? template.assignedToolSlugs.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-    : []
+  const toolSlugs: string[] = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter((s): s is string => typeof s === 'string' && s.trim().length > 0) : []
   const canCollapseTools = toolSlugs.length > 3
   const visibleToolSlugs = isToolsExpanded ? toolSlugs : toolSlugs.slice(0, 3)
 

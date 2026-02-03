@@ -157,36 +157,13 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       return sendSuccess(res, response, 200);
     }
 
-    // Get user's starships for redirect purpose; create default starship + agents if none
+    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
+    // only get the starship they were invited to; creation happens on /profile when needed.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
-      const starshipRepo = new StarshipRepository();
-      const userStarships = await starshipRepo.findByOwner(user.id);
-      let ship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
-
-      if (!ship) {
-        logger.info(`[AUTH] Creating starship for user ${user.email}`);
-        try {
-          ship = await StarshipService.createDefaultStarship(user.id);
-          if (ship) {
-            try {
-              await StarshipService.createInitialAgents(user.id, ship.id);
-              logger.info(`[AUTH] Created initial agents for user ${user.email}`);
-            } catch (agentError) {
-              logger.error('[AUTH] Failed to create initial agents', {
-                userId: user.id,
-                error: agentError instanceof Error ? agentError.message : 'Unknown error',
-              });
-            }
-          }
-        } catch (createError) {
-          logger.error('[AUTH] Failed to create default starship for newly approved user', {
-            userId: user.id,
-            error: createError instanceof Error ? createError.message : 'Unknown error',
-          });
-        }
-      }
-
+      const starshipService = new StarshipService();
+      const accessible = await starshipService.getStarshipsForUser(user.id);
+      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
       if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
     } catch (error) {
       logger.error('[AUTH] Failed to fetch starships for user', {
@@ -880,36 +857,13 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // Get user's starships for redirect purpose; create default starship + agents if none
+    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
+    // only get the starship they were invited to; creation happens on /profile when needed.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
-      const starshipRepo = new StarshipRepository();
-      const userStarships = await starshipRepo.findByOwner(user.id);
-      let ship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
-
-      if (!ship) {
-        logger.info(`[OAUTH-EXCHANGE] Creating starship for user ${user.email}`);
-        try {
-          ship = await StarshipService.createDefaultStarship(user.id);
-          if (ship) {
-            try {
-              await StarshipService.createInitialAgents(user.id, ship.id);
-              logger.info(`[OAUTH-EXCHANGE] Created initial agents for user ${user.email}`);
-            } catch (agentError) {
-              logger.error('[OAUTH-EXCHANGE] Failed to create initial agents', {
-                userId: user.id,
-                error: agentError instanceof Error ? agentError.message : 'Unknown error',
-              });
-            }
-          }
-        } catch (createError) {
-          logger.error('[OAUTH-EXCHANGE] Failed to create default starship for user', {
-            userId: user.id,
-            error: createError instanceof Error ? createError.message : 'Unknown error',
-          });
-        }
-      }
-
+      const starshipService = new StarshipService();
+      const accessible = await starshipService.getStarshipsForUser(user.id);
+      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
       if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
     } catch (error) {
       logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {

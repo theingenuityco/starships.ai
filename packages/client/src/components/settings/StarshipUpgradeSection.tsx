@@ -104,21 +104,21 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d)
   }
 
-  const accentByClass: Record<string, { ring: string; stripe: string; badge: string }> = {
+  const accentByClass: Record<string, { ring: string; cardBg: string; stripe: string }> = {
     scout: {
-      ring: 'ring-amber-500/20',
-      stripe: 'from-amber-500/35 via-amber-500/10 to-transparent',
-      badge: 'border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+      ring: 'ring-primary/20',
+      cardBg: 'bg-gradient-to-b from-amber-950/40 via-card to-card dark:from-amber-900/20 dark:via-card dark:to-card',
+      stripe: 'from-amber-500/15 via-amber-500/5 to-transparent dark:from-amber-400/10 dark:via-transparent dark:to-transparent',
     },
     frigate: {
-      ring: 'ring-violet-500/20',
-      stripe: 'from-violet-500/30 via-violet-500/10 to-transparent',
-      badge: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+      ring: 'ring-violet-500/15 dark:ring-violet-400/10',
+      cardBg: 'bg-gradient-to-b from-violet-950/35 via-card to-card dark:from-violet-900/25 dark:via-card dark:to-card',
+      stripe: 'from-violet-500/12 via-violet-500/4 to-transparent dark:from-violet-400/8 dark:via-transparent dark:to-transparent',
     },
     cruiser: {
-      ring: 'ring-neutral-900/20 dark:ring-neutral-100/20',
-      stripe: 'from-neutral-900/20 via-neutral-900/10 to-transparent dark:from-neutral-50/10 dark:via-neutral-50/5',
-      badge: 'border-neutral-900/30 bg-neutral-900/10 text-neutral-900 dark:border-neutral-100/20 dark:bg-neutral-50/10 dark:text-neutral-100',
+      ring: 'ring-slate-400/15 dark:ring-slate-300/10',
+      cardBg: 'bg-gradient-to-b from-slate-800/50 via-card to-card dark:from-slate-700/30 dark:via-card dark:to-card',
+      stripe: 'from-slate-400/10 via-slate-400/3 to-transparent dark:from-slate-300/8 dark:via-transparent dark:to-transparent',
     },
   }
 
@@ -129,9 +129,7 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
           <Icon name="layers" className="h-4 w-4 text-primary" />
           Upgrade starship
         </CardTitle>
-        {!hideDescription && (
-          <CardDescription className="text-sm">Change your ship class and included limits.</CardDescription>
-        )}
+        {!hideDescription && <CardDescription className="text-sm">Change your ship class and included limits.</CardDescription>}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
         {Array.isArray(plans) && plans.length > 0 ? (
@@ -158,12 +156,12 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
 
                   const price = plan.unitAmount === null ? null : plan.unitAmount === 0 ? 'Free' : `$${(plan.unitAmount / 100).toFixed(2)}`
                   const cadence = plan.unitAmount === null ? '' : plan.unitAmount === 0 ? '' : `${plan.currency.toUpperCase()}/${plan.interval ?? 'mo'}`
-                  const ctaText = isCurrent
+                  const ctaLabel = isCurrent
                     ? 'Current plan'
                     : subscribeMutation.isPending
                       ? 'Updating…'
                       : isUpgrade
-                        ? `Upgrade to ${plan.displayName}`
+                        ? 'Upgrade'
                         : isDowngrade
                           ? `Downgrade to ${plan.displayName}`
                           : `Switch to ${plan.displayName}`
@@ -173,13 +171,14 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                       key={plan.priceId}
                       className={`
                       relative overflow-hidden rounded-2xl border text-left h-full w-full cursor-default transition-all duration-200
+                      ${accent.cardBg}
                       ${subscribeMutation.isPending ? 'opacity-70' : ''}
-                      ${isCurrent ? 'border-primary/50 bg-card shadow-lg shadow-primary/10 ring-1 ring-primary/20' : `border-border bg-card hover:border-primary/40 hover:shadow-md ${accent.ring}`}
+                      ${isCurrent ? 'border-primary/40 shadow-md ring-1 ring-primary/15' : `border-border hover:border-muted-foreground/40 hover:shadow-sm ring-1 ${accent.ring}`}
                     `}
                     >
-                      <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${accent.stripe}`} />
+                      <div className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b ${accent.stripe}`} />
 
-                      {/* Top meta */}
+                      {/* Top meta - no upgrade badge, only Current on current plan */}
                       <div className="relative p-4 pb-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -189,19 +188,12 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                               <div className="text-xs text-muted-foreground">{cadence}</div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            {isCurrent ? (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                                <Icon name="check-circle" className="h-3.5 w-3.5" />
-                                Current
-                              </span>
-                            ) : (
-                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${accent.badge}`}>
-                                <Icon name={isUpgrade ? 'arrow-up' : isDowngrade ? 'arrow-down' : 'repeat'} className="h-3.5 w-3.5" />
-                                {isUpgrade ? 'Upgrade' : isDowngrade ? 'Downgrade' : 'Switch'}
-                              </span>
-                            )}
-                          </div>
+                          {isCurrent ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary shrink-0">
+                              <Icon name="check-circle" className="h-3.5 w-3.5" />
+                              Current
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="mt-3 text-xs text-muted-foreground">Built-in limits for this class:</div>
@@ -239,9 +231,10 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                             onClick={() => handleSubscribe(plan.priceId)}
                             disabled={subscribeMutation.isPending || isCurrent}
                             variant={isCurrent ? 'secondary' : 'default'}
-                            className="w-full"
+                            className="w-full gap-1.5"
                           >
-                            {ctaText}
+                            {!isCurrent && isUpgrade && <Icon name="arrow-up" className="h-3.5 w-3.5" />}
+                            {ctaLabel}
                           </Button>
                         </div>
                       </div>

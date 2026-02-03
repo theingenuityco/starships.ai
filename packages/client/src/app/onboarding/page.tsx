@@ -6,26 +6,28 @@ import { Orbitron } from 'next/font/google'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships, useUpdateStarship } from '@/hooks/useStarships'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
-import { useAgentTemplates } from '@/hooks/useTemplates'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useAgentTemplates, useRequiredConnectorsForTemplates } from '@/hooks/useTemplates'
 import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
+import { OnboardingAgentCard } from '@/components/onboarding/OnboardingAgentCard'
 import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
+import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { StarTheme } from '@/components/theme-context'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 5
 
-/** Shared content width for steps 1, 2, 4; step 3 uses wider layout. */
+/** Shared content width for steps 1, 2, 5; steps 3–4 use wider layout. */
 const CONTENT_MAX_W = 'max-w-3xl'
-const CONTENT_MAX_W_STEP3 = 'max-w-4xl'
+const CONTENT_MAX_W_STEP3_4 = 'max-w-4xl'
 /** Consistent input/field width across steps. */
 const INPUT_MAX_W = 'max-w-xl'
 /** Primary nav button (Next/Complete) min width and height. */
@@ -42,17 +44,34 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [starshipName, setStarshipName] = useState('')
   const [inviteEmailRows, setInviteEmailRows] = useState<string[]>([''])
+  /** Template IDs of agents the user added on step 3 (used to show required connectors on step 4). */
+  const [deployedTemplateIds, setDeployedTemplateIds] = useState<string[]>([])
 
   const updateStarship = useUpdateStarship()
   const createInvite = useCreateStarshipInvite(primaryStarship?.id ?? '')
   const completeWizard = useCompleteWizardOnboarding()
 
   const { data: allTemplates = [], isLoading: templatesLoading } = useAgentTemplates(undefined, !!primaryStarship?.id && step === 3)
-  const curatedTemplates: AgentTemplateModel[] = allTemplates.slice(0, 4)
+  const curatedTemplates: AgentTemplateModel[] = allTemplates.slice(0, 8)
+  const { data: starshipAgents = [] } = useStarshipAgents(primaryStarship?.id ?? '', step === 4 && !!primaryStarship?.id)
+  const templateIdsForConnectors =
+    deployedTemplateIds.length > 0 ? deployedTemplateIds : ([...new Set((starshipAgents as Array<{ sourceTemplateId?: string }>).map(a => a.sourceTemplateId).filter(Boolean))] as string[])
+  const { data: requiredConnectorsForSelected = [], isLoading: connectorsLoading } = useRequiredConnectorsForTemplates(templateIdsForConnectors, step === 4 && templateIdsForConnectors.length > 0)
+  const connectorProviders = requiredConnectorsForSelected.map(c => c.provider)
+
+  const userFirstName = (() => {
+    const raw = (user?.name || user?.email?.split('@')[0] || '').trim()
+    const first = raw.split(/\s+/)[0]
+    return first || ''
+  })()
 
   useEffect(() => {
-    if (primaryStarship?.name) setStarshipName(primaryStarship.name)
-  }, [primaryStarship?.name])
+    if (!primaryStarship?.name) return
+    const base = primaryStarship.name.trim()
+    const alreadyPersonalized = userFirstName && base.startsWith(`${userFirstName}'s `)
+    const suggestion = userFirstName && !alreadyPersonalized ? `${userFirstName}'s ${base}` : base
+    setStarshipName(suggestion)
+  }, [primaryStarship?.name, userFirstName])
 
   const isWizardComplete = user?.wizardOnboardingCompleted ?? false
   const hasStarship = primaryStarship != null
@@ -124,6 +143,18 @@ export default function OnboardingPage() {
     setStep(4)
   }, [])
 
+  const handleAgentDeployed = useCallback((template: AgentTemplateModel) => {
+    setDeployedTemplateIds(prev => (prev.includes(template.id) ? prev : [...prev, template.id]))
+  }, [])
+
+  const handleAgentRemoved = useCallback((template: AgentTemplateModel) => {
+    setDeployedTemplateIds(prev => prev.filter(id => id !== template.id))
+  }, [])
+
+  const handleStep4Next = useCallback(() => {
+    setStep(5)
+  }, [])
+
   const handleFinish = useCallback(async () => {
     await completeWizard.mutateAsync()
     if (primaryStarship?.slug) {
@@ -192,7 +223,7 @@ export default function OnboardingPage() {
         </header>
 
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
-          <div className={`w-full mx-auto min-w-0 ${step === 3 ? CONTENT_MAX_W_STEP3 : CONTENT_MAX_W}`}>
+          <div className={`w-full mx-auto min-w-0 ${step === 3 || step === 4 ? CONTENT_MAX_W_STEP3_4 : CONTENT_MAX_W}`}>
             <p className="text-xs text-muted-foreground mb-1">
               Step {step} of {TOTAL_STEPS}
             </p>
@@ -218,7 +249,7 @@ export default function OnboardingPage() {
             {step === 2 && (
               <div className="mt-6 space-y-6">
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Who else is on the {primaryStarship?.name ?? 'starship'} team?</h1>
+                  <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
                   <p className="mt-2 text-sm text-muted-foreground">Add colleagues by email.</p>
                 </div>
                 <div className={`space-y-3 ${INPUT_MAX_W}`}>
@@ -265,23 +296,18 @@ export default function OnboardingPage() {
             {step === 3 && (
               <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
                 <div className="shrink-0">
-                  <h1 className="text-3xl font-bold tracking-tight">Add an AI teammate (recommended)</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">You can add more agents from the marketplace later.</p>
+                  <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
+                  <p className="mt-2 text-sm text-muted-foreground">You can add more from the marketplace later.</p>
                 </div>
                 {templatesLoading ? (
                   <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
                 ) : curatedTemplates.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
                 ) : (
-                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-lg p-2 -mx-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-2">
+                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">
                       {curatedTemplates.map(template => (
-                        <AgentTemplateCard
-                          key={template.id}
-                          template={template}
-                          targetStarshipId={primaryStarship?.id}
-                          onClick={() => window.open(`/marketplace/agents/${encodeURIComponent(template.slug)}`, '_blank', 'noopener,noreferrer')}
-                        />
+                        <OnboardingAgentCard key={template.id} template={template} targetStarshipId={primaryStarship?.id ?? ''} onDeployed={handleAgentDeployed} onRemoved={handleAgentRemoved} />
                       ))}
                     </div>
                   </div>
@@ -298,6 +324,44 @@ export default function OnboardingPage() {
             )}
 
             {step === 4 && (
+              <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+                <div className="shrink-0">
+                  <h1 className="text-3xl font-bold tracking-tight">Connect your apps</h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {connectorProviders.length > 0
+                      ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
+                      : 'No connectors required by your agents. You can connect apps anytime from your workspace.'}
+                  </p>
+                </div>
+                {primaryStarship?.id && (
+                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+                    {connectorsLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading connectors...</p>
+                    ) : connectorProviders.length > 0 ? (
+                      <StarshipConnectorsPanel
+                        starshipId={primaryStarship.id}
+                        onlyProviders={connectorProviders}
+                        hideSearch
+                        hideDisconnect={false}
+                        maxColumns={2}
+                        hideCardDescription
+                        connectButtonLabel="Connect"
+                      />
+                    ) : null}
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 pt-4 shrink-0 mt-4">
+                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
+                    Back
+                  </Button>
+                  <Button onClick={handleStep4Next} className={BTN_PRIMARY}>
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {step === 5 && (
               <div className="mt-6 space-y-6">
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
@@ -311,7 +375,7 @@ export default function OnboardingPage() {
                 )}
 
                 <div className="flex items-center justify-between pt-6">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
+                  <Button variant="ghost" size="sm" onClick={() => setStep(4)} className={BTN_NAV_GHOST}>
                     Back
                   </Button>
                   <Button onClick={() => handleFinish()} disabled={completeWizard.isPending} className={BTN_PRIMARY}>

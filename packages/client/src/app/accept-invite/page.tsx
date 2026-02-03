@@ -21,8 +21,8 @@ export default function AcceptInvitePage() {
   const inviteToken = (searchParams.get('invite') || '').trim()
   const hasLegacyTokenParam = Boolean((searchParams.get('token') || '').trim())
 
-  const { isAuthenticated, isLoading, userEmail } = useAuth()
-  const acceptInvite = useAcceptStarshipInvite()
+  const { isAuthenticated, isLoading, user, userEmail } = useAuth()
+  const acceptInvite = useAcceptStarshipInvite(user?.id)
 
   const [attempted, setAttempted] = useState(false)
   const [preview, setPreview] = useState<InvitePreviewResponse | null>(null)
@@ -68,9 +68,7 @@ export default function AcceptInvitePage() {
 
     // If the user is logged in as the wrong email, force logout and prompt sign-in as the invited email.
     if (!isLoading && isAuthenticated && invitedEmail && currentEmail && invitedEmail !== currentEmail) {
-      router.replace(
-        `/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`
-      )
+      router.replace(`/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`)
       return
     }
 
@@ -135,17 +133,10 @@ export default function AcceptInvitePage() {
           ) : preview && userEmail && preview.invitedEmail && preview.invitedEmail.trim().toLowerCase() !== userEmail.trim().toLowerCase() ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                This invite was sent to <span className="font-medium">{preview.invitedEmail}</span>, but you’re signed in as{' '}
-                <span className="font-medium">{userEmail}</span>.
+                This invite was sent to <span className="font-medium">{preview.invitedEmail}</span>, but you’re signed in as <span className="font-medium">{userEmail}</span>.
               </p>
               <div className="flex items-center gap-2">
-                <Button
-                  onClick={() =>
-                    router.replace(
-                      `/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`
-                    )
-                  }
-                >
+                <Button onClick={() => router.replace(`/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`)}>
                   Sign in as invited email
                 </Button>
                 <Button variant="ghost" onClick={() => router.push('/')} disabled={acceptInvite.isPending}>
@@ -168,4 +159,3 @@ export default function AcceptInvitePage() {
     </div>
   )
 }
-

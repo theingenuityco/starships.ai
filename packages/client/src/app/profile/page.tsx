@@ -1,48 +1,61 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
+import { useUserStarships, useEnsureDefaultStarship } from '@/hooks/useStarships'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
 export default function ProfilePage(): React.JSX.Element {
   const router = useRouter()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
+  const ensureDefault = useEnsureDefaultStarship()
+  const ensureAttempted = useRef(false)
 
   useEffect(() => {
-    // Wait until we have authentication and starships data
-    if (authLoading || starshipsLoading) {
-      return
-    }
-
-    // If not authenticated, redirect to login
+    if (authLoading || starshipsLoading) return
     if (!isAuthenticated) {
       router.replace('/login')
       return
     }
-
-    // If user has starships, redirect to the first one
     if (starships && starships.length > 0) {
       router.replace(`/ship/${starships[0].slug}`)
+      return
     }
-    // Else: stay on profile and show "no starships" message (e.g. OAuth users without auto-provisioning)
-  }, [authLoading, starshipsLoading, isAuthenticated, starships, router])
+    if (starships && starships.length === 0 && !ensureAttempted.current) {
+      ensureAttempted.current = true
+      void ensureDefault
+        .mutateAsync()
+        .then(ship => router.replace(`/ship/${ship.slug}`))
+        .catch(() => {
+          ensureAttempted.current = false
+        })
+    }
+  }, [authLoading, starshipsLoading, isAuthenticated, starships, router, ensureDefault])
 
-  // Show loading while checking
-  if (authLoading || starshipsLoading) {
-    return <AuthLoadingScreen message="Loading your profile..." />
+  // Loading or creating workspace
+  if (authLoading || starshipsLoading || (starships?.length === 0 && ensureDefault.isPending)) {
+    return <AuthLoadingScreen message={starships?.length === 0 && ensureDefault.isPending ? 'Creating your workspace...' : 'Loading your profile...'} />
   }
 
-  // No starships: show message (e.g. OAuth-first users; password login auto-provisions)
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="text-center space-y-4">
-        <h1 className="text-2xl font-bold">Welcome to Starships.ai!</h1>
-        <p className="text-muted-foreground">Your account is set up, but you don&apos;t have any starships yet.</p>
-        <p className="text-sm text-muted-foreground">Please contact support to get your first starship created.</p>
+  // Waiting for redirect after ensure (avoid flash of "no starships" message)
+  if (starships?.length === 0 && ensureDefault.isSuccess) {
+    return <AuthLoadingScreen message="Redirecting..." />
+  }
+
+  // No starships and ensure failed (e.g. network error)
+  if (starships && starships.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold">Welcome to Starships.ai!</h1>
+          <p className="text-muted-foreground">Your account is set up, but we couldn&apos;t create a workspace.</p>
+          <p className="text-sm text-muted-foreground">Please try again or contact support.</p>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <AuthLoadingScreen message="Redirecting..." />
 }

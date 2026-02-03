@@ -56,7 +56,15 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
-export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false, maxColumns = 3, hideCardDescription = false, connectButtonLabel }: StarshipConnectorsPanelProps) {
+export function StarshipConnectorsPanel({
+  starshipId,
+  onlyProviders,
+  hideSearch = false,
+  hideDisconnect = false,
+  maxColumns = 3,
+  hideCardDescription = false,
+  connectButtonLabel,
+}: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { data: catalog = [] } = useConnectorCatalog()

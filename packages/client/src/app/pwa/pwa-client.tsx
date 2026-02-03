@@ -36,7 +36,7 @@ function InstallPrompt() {
       </p>
       {isIOS ? (
         <p className="text-sm text-muted-foreground">
-          On iOS, use the share menu in Safari, then select "Add to Home Screen".
+          On iOS, use the share menu in Safari, then select &ldquo;Add to Home Screen&rdquo;.
         </p>
       ) : (
         <p className="text-sm text-muted-foreground">

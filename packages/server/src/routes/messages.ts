@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
+import { ConversationParticipantRepository } from '@starships/models';
 
 const router: Router = Router();
 
@@ -178,6 +179,40 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         id: messageId,
       });
       return;
+    }
+
+    // Thread linking: when a message becomes linked to a child conversation, ensure the child thread
+    // has initial participants per policy:
+    // - linked message author (user or agent)
+    // - thread starter (the authenticated user who performed the link)
+    const linkedConversationId =
+      typeof (bodyValidation as any)?.linkedConversationId === 'string' ? String((bodyValidation as any).linkedConversationId).trim() : '';
+    if (linkedConversationId) {
+      try {
+        const authUserId = req.user?.id as string | undefined;
+        const participantRepo = new ConversationParticipantRepository();
+
+        // 1) Add the message author (author of linked message).
+        const role = typeof (updatedMessage as any)?.role === 'string' ? String((updatedMessage as any).role) : '';
+        if (role === 'user') {
+          const authorUserId = typeof (updatedMessage as any)?.userId === 'string' ? String((updatedMessage as any).userId) : '';
+          if (authorUserId) {
+            await participantRepo.addUserParticipant({ conversationId: linkedConversationId, userId: authorUserId, role: null, createdBy: authUserId ?? null });
+          }
+        } else if (role === 'assistant') {
+          const authorAgentId = typeof (updatedMessage as any)?.agentId === 'string' ? String((updatedMessage as any).agentId) : '';
+          if (authorAgentId) {
+            await participantRepo.addAgentParticipant({ conversationId: linkedConversationId, agentId: authorAgentId, createdBy: authUserId ?? null });
+          }
+        }
+
+        // 2) Add the thread starter (actor who linked the message).
+        if (authUserId) {
+          await participantRepo.addUserParticipant({ conversationId: linkedConversationId, userId: authUserId, role: null, createdBy: authUserId });
+        }
+      } catch {
+        /* best-effort: do not fail linking if participant insertion fails */
+      }
     }
 
     sendSuccess(res, updatedMessage, 200);

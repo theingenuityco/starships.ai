@@ -199,10 +199,11 @@ export class ConversationRepository extends BaseRepository {
 
         // Fetch all linked agents for these conversations in one query.
         const agentRows = await connection.query<Record<string, unknown>>(
-          `SELECT ca.conversation_id, a.*
-           FROM conversation_agents ca
-           INNER JOIN agents a ON a.id = ca.agent_id
-           WHERE ca.conversation_id = ANY($1::text[])
+          `SELECT cp.conversation_id, a.*
+           FROM conversation_participants cp
+           INNER JOIN agents a ON a.id = cp.agent_id
+           WHERE cp.agent_id IS NOT NULL
+             AND cp.conversation_id = ANY($1::text[])
            ORDER BY a.name`,
           [conversationIds]
         );
@@ -289,10 +290,11 @@ export class ConversationRepository extends BaseRepository {
         }
 
         const agentRows = await connection.query<Record<string, unknown>>(
-          `SELECT ca.conversation_id, a.*
-           FROM conversation_agents ca
-           INNER JOIN agents a ON a.id = ca.agent_id
-           WHERE ca.conversation_id = ANY($1::text[])
+          `SELECT cp.conversation_id, a.*
+           FROM conversation_participants cp
+           INNER JOIN agents a ON a.id = cp.agent_id
+           WHERE cp.agent_id IS NOT NULL
+             AND cp.conversation_id = ANY($1::text[])
            ORDER BY a.name`,
           [conversationIds]
         );
@@ -604,14 +606,14 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
-   * Create relationship between conversation and agent using junction table
+   * Create relationship between conversation and agent
    */
   async linkToAgent(conversationId: string, agentId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         await connection.query(
-          `INSERT INTO conversation_agents (conversation_id, agent_id, linked_at)
+          `INSERT INTO conversation_participants (conversation_id, agent_id, created_at)
            VALUES ($1, $2, NOW())
            ON CONFLICT (conversation_id, agent_id) DO NOTHING`,
           [conversationId, agentId]
@@ -623,13 +625,13 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
-   * Remove relationship between conversation and agent from junction table
+   * Remove relationship between conversation and agent
    */
   async unlinkFromAgent(conversationId: string, agentId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.query('DELETE FROM conversation_agents WHERE conversation_id = $1 AND agent_id = $2', [conversationId, agentId]);
+        await connection.query('DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2', [conversationId, agentId]);
       },
       'unlinkFromAgent',
       'Conversation'
@@ -645,8 +647,9 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
           `SELECT a.* FROM agents a
-           INNER JOIN conversation_agents ca ON a.id = ca.agent_id
-           WHERE ca.conversation_id = $1
+           INNER JOIN conversation_participants cp ON a.id = cp.agent_id
+           WHERE cp.conversation_id = $1
+             AND cp.agent_id IS NOT NULL
            ORDER BY a.name`,
           [conversationId]
         );

@@ -5,6 +5,7 @@ import { useCreateDirectMessage, useStarshipDirectMessages, type DirectMessageLi
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { LoadingSpinner } from '@/components/ui/simple-loading'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -210,7 +211,7 @@ export default function DmPeerPage() {
   if (!dmTarget && starshipId && peerStr && !peerStr.toLowerCase().startsWith('u-') && agentsLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading direct message…</div>
+        <LoadingSpinner size="lg">Loading direct message…</LoadingSpinner>
       </div>
     )
   }
@@ -219,7 +220,7 @@ export default function DmPeerPage() {
   if (starshipId && dmTarget && !resolved.conversationId && !resolved.draftOverride) {
     return (
       <div className="h-screen w-full flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading direct message…</div>
+        <LoadingSpinner size="lg">Loading direct message…</LoadingSpinner>
       </div>
     )
   }

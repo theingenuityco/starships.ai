@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
-import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState, type RefObject } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -86,13 +86,12 @@ export function ConversationList({
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
   const slugFromParams = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
   const slug = (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? starshipSlug.trim() : slugFromParams) || ''
   // Current selection can come from either /conversations/:conversationId (DMs) or /channels/:channelSlug (channels).
   const currentConversationId = params.conversationId as string | undefined
   const currentChannelSlug = params.channelSlug as string | undefined
+  const currentDmPeer = (params as any)?.peer as string | undefined
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
@@ -184,21 +183,36 @@ export function ConversationList({
     })
   }, [agentsData, membersData?.members, authUserId, searchQuery])
 
+  const dmPeerKeyForTarget = (t: DmTarget): string => {
+    if (t.kind === 'agent') {
+      const slug = String(t.agent.slug || '').trim()
+      if (slug) return slug
+      const id = String(t.agent.id || '').trim()
+      return id ? `a:${id}` : 'a:unknown'
+    }
+    const uid = String(t.user.userId || '').trim()
+    return `u-${uid}`
+  }
+
+  const dmHrefForTarget = (t: DmTarget): string | null => {
+    if (!slug) return null
+    const peerKey = dmPeerKeyForTarget(t)
+    return `/ship/${slug}/dm/${encodeURIComponent(peerKey)}`
+  }
+
   const renderCompactDmTarget = (t: DmTarget) => {
     const label = t.label
     const isBusy = directMessagesLoading
+    const targetPeerKey = dmPeerKeyForTarget(t)
     const isActive =
-      t.kind === 'agent'
-        ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
-          (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
+      (typeof currentDmPeer === 'string' && currentDmPeer.trim().length > 0 && currentDmPeer.trim().toLowerCase() === targetPeerKey.toLowerCase()) ||
+      (t.kind === 'agent'
+        ? !!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId
+        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
 
-    const conversationId =
-      t.kind === 'agent'
-        ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '')
-        : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
     const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-    const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+    const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
 
     return (
       <div
@@ -232,11 +246,7 @@ export function ConversationList({
             pointerEvents: 'none',
           }}
         >
-          {t.kind === 'agent' ? (
-            <DirectMessageAvatar starshipId={starshipId} agent={t.agent} />
-          ) : (
-            <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
-          )}
+          {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />}
         </div>
         <span
           className={cn(
@@ -253,12 +263,6 @@ export function ConversationList({
         ) : null}
       </div>
     )
-  }
-
-  const handleConversationClick = (conversationId: string) => {
-    if (!slug) return
-    router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
-    onConversationSelect?.(conversationId)
   }
 
   const handleChannelClick = (channelSlug: string) => {
@@ -294,44 +298,19 @@ export function ConversationList({
     return map
   }, [directMessagesData?.directMessages])
 
-  const openDraftDm = (args: { dmType: 'user_agent' | 'user_user'; agentId?: string; peerUserId?: string; peerLabel?: string; peerAvatar?: string }) => {
-    if (!slug) return
-    const sp = new URLSearchParams()
-    sp.set('dm', 'draft')
-    sp.set('dmType', args.dmType)
-    if (args.agentId) sp.set('agentId', args.agentId)
-    if (args.peerUserId) sp.set('peerUserId', args.peerUserId)
-    if (args.peerLabel) sp.set('peerLabel', args.peerLabel)
-    if (args.peerAvatar) sp.set('peerAvatar', args.peerAvatar)
-    router.push(`/ship/${slug}/dm?${sp.toString()}`)
-  }
-
   const handleDmTargetClick = async (t: DmTarget) => {
     // Prevent race conditions: if DMs haven't loaded yet, we don't know whether a DM exists.
     // Clicking during this window can open draft views and later create duplicate DMs.
     if (directMessagesLoading) return
+    const href = dmHrefForTarget(t)
+    if (!href) return
+    router.push(href)
 
-    // If an existing DM conversation exists, open it immediately (shows history).
-    // Otherwise, open a draft DM view (no conversation yet) and create it on first send.
-    if (t.kind === 'agent') {
-      const existing = existingDmConversationIdByAgentId.get(String(t.agent.id))
-      if (existing) {
-        handleConversationClick(existing)
-        return
-      }
-      openDraftDm({ dmType: 'user_agent', agentId: String(t.agent.id) })
-      return
-    }
-
-    const peerId = String(t.user.userId)
-    const existing = existingDmConversationIdByPeerUserId.get(peerId)
-    if (existing) {
-      handleConversationClick(existing)
-      return
-    }
-    const peerLabel = (t.user.displayName || t.user.email || 'User').trim()
-    const peerAvatar = typeof (t.user as any)?.avatar === 'string' ? String((t.user as any).avatar) : ''
-    openDraftDm({ dmType: 'user_user', peerUserId: peerId, peerLabel, peerAvatar: peerAvatar || undefined })
+    // Keep the parent callback behavior for consumers that care about "selection",
+    // even though canonical navigation is now by peer key (not conversationId).
+    const existingConversationId =
+      t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    if (existingConversationId) onConversationSelect?.(existingConversationId)
   }
 
   const createChannelDialog = (
@@ -514,20 +493,13 @@ export function ConversationList({
                               <Icon
                                 name="hash"
                                 weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
-                                className={cn(
-                                  'h-4 w-4',
-                                  isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground'
-                                )}
+                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
                               />
                             </div>
                             <span
                               className={cn(
                                 'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
                               {label}
@@ -668,11 +640,7 @@ export function ConversationList({
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn(
-                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                          'hover:bg-muted/50',
-                          isActive && 'bg-muted/70 shadow-sm'
-                        )}
+                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
                         <Icon
@@ -685,11 +653,7 @@ export function ConversationList({
                             <p
                               className={cn(
                                 'text-sm truncate',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'text-muted-foreground font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                               )}
                             >
                               {label}
@@ -735,14 +699,13 @@ export function ConversationList({
                   const isBusy = directMessagesLoading
                   const label = t.label
                   const isActive =
-                    t.kind === 'agent'
-                      ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
-                        (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
-                  const conversationId =
-                    t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
+                    (typeof currentDmPeer === 'string' && currentDmPeer.trim().length > 0 && currentDmPeer.trim().toLowerCase() === dmPeerKeyForTarget(t).toLowerCase()) ||
+                    (t.kind === 'agent'
+                      ? !!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId
+                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
+                  const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
                   const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-                  const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+                  const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
                   return (
                     <div
                       key={t.key}
@@ -762,14 +725,7 @@ export function ConversationList({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <p
-                            className={cn(
-                              'text-sm truncate',
-                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
-                            )}
-                          >
-                            {label}
-                          </p>
+                          <p className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}>{label}</p>
                           {dmCount > 0 ? (
                             <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                               {dmCount > 99 ? '99+' : String(dmCount)}

@@ -1159,11 +1159,31 @@ export function ConversationMessageList({
     return lastId
   }, [displayMessages])
 
-  // New loading logic:
-  // - turn is active (isResponding)
-  // - assistant hasn't started streaming tokens yet (isAssistantStreaming=false)
-  // - if tools are actively running, tool UI should show its own state
-  const shouldShowGapLoader = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  // Gap loader ("Typing...") logic:
+  // - We only want to show it when the agent is actually going to respond.
+  // - Some turns can briefly enter `active` and then immediately complete with no assistant output
+  //   (e.g. "no-op" routing decisions). If we show immediately, it flashes for a split second.
+  // - To avoid the flash, debounce: only render the gap loader after a short delay.
+  const GAP_LOADER_DELAY_MS = 250
+  const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  const [gapLoaderArmed, setGapLoaderArmed] = useState(false)
+  useEffect(() => {
+    if (!isAwaitingAssistant) {
+      setGapLoaderArmed(false)
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(() => {
+      if (!cancelled) setGapLoaderArmed(true)
+    }, GAP_LOADER_DELAY_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [isAwaitingAssistant, activeTurnId])
+
+  // Show while awaiting first assistant text OR between tool results and next assistant text.
+  const shouldShowGapLoader = Boolean(isAwaitingAssistant && gapLoaderArmed)
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {

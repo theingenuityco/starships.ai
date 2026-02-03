@@ -20,11 +20,13 @@ import { useCancelDowngradeStarship } from '@/hooks/useCancelDowngradeStarship'
 
 export interface StarshipUpgradeSectionProps {
   starshipId: string
-  /** Optional class for the outer Card (e.g. onboarding uses bg-card/30 to match step 3 modal) */
+  /** Optional class for the outer Card (e.g. onboarding uses bg-transparent) */
   cardClassName?: string
+  /** If true, hide the "Change your ship class..." description (e.g. onboarding step 4) */
+  hideDescription?: boolean
 }
 
-export function StarshipUpgradeSection({ starshipId, cardClassName }: StarshipUpgradeSectionProps): React.JSX.Element | null {
+export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescription }: StarshipUpgradeSectionProps): React.JSX.Element | null {
   const enabled = Boolean(starshipId)
   const { data: starship } = useStarship(starshipId, enabled)
   const { data: plans } = useSubscriptionPlans(true)
@@ -127,7 +129,9 @@ export function StarshipUpgradeSection({ starshipId, cardClassName }: StarshipUp
           <Icon name="layers" className="h-4 w-4 text-primary" />
           Upgrade starship
         </CardTitle>
-        <CardDescription className="text-sm">Change your ship class and included limits.</CardDescription>
+        {!hideDescription && (
+          <CardDescription className="text-sm">Change your ship class and included limits.</CardDescription>
+        )}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-4">
         {Array.isArray(plans) && plans.length > 0 ? (

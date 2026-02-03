@@ -36,11 +36,12 @@ export default function OnboardingPage() {
   const router = useRouter()
   const { user, userId, isAuthenticated, isLoading: authLoading } = useAuth()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId)
-  const primaryStarship = starships[0]
+  // Prefer an owned starship for onboarding so existing owners who were invited elsewhere still see the full wizard for their workspace
+  const primaryStarship = starships.find(s => s.ownerId === userId) ?? starships[0]
 
   const [step, setStep] = useState(1)
   const [starshipName, setStarshipName] = useState('')
-  const [inviteEmails, setInviteEmails] = useState('')
+  const [inviteEmailRows, setInviteEmailRows] = useState<string[]>([''])
 
   const updateStarship = useUpdateStarship()
   const createInvite = useCreateStarshipInvite(primaryStarship?.id ?? '')
@@ -55,6 +56,8 @@ export default function OnboardingPage() {
 
   const isWizardComplete = user?.wizardOnboardingCompleted ?? false
   const hasStarship = primaryStarship != null
+  /** User joined via invite (member, not owner) — show short "You've joined" instead of full wizard */
+  const isJoiner = Boolean(hasStarship && userId && primaryStarship?.ownerId && primaryStarship.ownerId !== userId)
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return
@@ -81,15 +84,30 @@ export default function OnboardingPage() {
     setStep(2)
   }, [starshipName, primaryStarship, updateStarship])
 
-  const parseEmails = useCallback((raw: string): string[] => {
-    return raw
-      .split(/[\s,]+/)
-      .map(e => e.trim().toLowerCase())
-      .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((e || '').trim().toLowerCase())
+
+  const addInviteEmailRow = useCallback(() => {
+    setInviteEmailRows(prev => [...prev, ''])
   }, [])
 
+  const removeInviteEmailRow = useCallback((index: number) => {
+    setInviteEmailRows(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const setInviteEmailAt = useCallback((index: number, value: string) => {
+    setInviteEmailRows(prev => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }, [])
+
+  const inviteEmailsParsed = useCallback((): string[] => {
+    return inviteEmailRows.map(e => e.trim().toLowerCase()).filter(e => e && validEmail(e))
+  }, [inviteEmailRows])
+
   const handleStep2Next = useCallback(async () => {
-    const emails = parseEmails(inviteEmails)
+    const emails = inviteEmailsParsed()
     if (emails.length > 0 && primaryStarship?.id) {
       for (const email of emails) {
         try {
@@ -100,7 +118,7 @@ export default function OnboardingPage() {
       }
     }
     setStep(3)
-  }, [inviteEmails, primaryStarship?.id, createInvite, parseEmails])
+  }, [inviteEmailsParsed, primaryStarship?.id, createInvite])
 
   const handleStep3Next = useCallback(() => {
     setStep(4)
@@ -134,6 +152,34 @@ export default function OnboardingPage() {
     return null
   }
 
+  /** Joiner flow: minimal "You've joined" screen, no rename/invite/agents/upgrade steps */
+  if (isJoiner) {
+    const starshipDisplayName = primaryStarship?.name?.trim() || 'your team'
+    return (
+      <StarTheme theme="dark">
+        <div className="min-h-[100dvh] bg-black relative overflow-hidden flex flex-col">
+          <AuthMarketingPanel className="fixed inset-0" />
+          <div className="fixed inset-0 bg-black/40 z-[1]" aria-hidden />
+          <header className="flex items-center gap-2 px-8 pt-6 relative z-10">
+            <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+            <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
+          </header>
+          <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
+            <div className={`w-full mx-auto min-w-0 ${CONTENT_MAX_W}`}>
+              <h1 className="text-3xl font-bold tracking-tight">You&apos;ve joined {starshipDisplayName}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">You&apos;re all set. Go to the workspace to collaborate and use agents.</p>
+              <div className="mt-8">
+                <Button onClick={handleFinish} disabled={completeWizard.isPending} className={BTN_PRIMARY}>
+                  {completeWizard.isPending ? 'Starting…' : 'Get started'}
+                </Button>
+              </div>
+            </div>
+          </main>
+        </div>
+      </StarTheme>
+    )
+  }
+
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-black relative overflow-hidden flex flex-col">
@@ -154,7 +200,7 @@ export default function OnboardingPage() {
             {step === 1 && (
               <div className="mt-6 space-y-6">
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">What do you want to call your workspace?</h1>
+                  <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
                   <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
                 </div>
                 <div className={`space-y-2 ${INPUT_MAX_W}`}>
@@ -175,26 +221,41 @@ export default function OnboardingPage() {
                   <h1 className="text-3xl font-bold tracking-tight">Who else is on the {primaryStarship?.name ?? 'starship'} team?</h1>
                   <p className="mt-2 text-sm text-muted-foreground">Add colleagues by email.</p>
                 </div>
-                <div className={`space-y-2 ${INPUT_MAX_W}`}>
-                  <Label htmlFor="invite-emails">Email addresses</Label>
-                  <textarea
-                    id="invite-emails"
-                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={inviteEmails}
-                    onChange={e => setInviteEmails(e.target.value)}
-                    placeholder="e.g. ellis@company.com, maria@company.com"
-                  />
+                <div className={`space-y-3 ${INPUT_MAX_W}`}>
+                  <Label>Email addresses</Label>
+                  <ul className="grid grid-cols-1 gap-3">
+                    {inviteEmailRows.map((email, idx) => (
+                      <li key={idx} className="flex items-center gap-2">
+                        <Input type="email" value={email} onChange={e => setInviteEmailAt(idx, e.target.value)} placeholder="colleague@company.com" className="flex-1" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => removeInviteEmailRow(idx)}
+                          disabled={inviteEmailRows.length <= 1}
+                          aria-label="Remove email"
+                        >
+                          <Icon name="x" className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button type="button" variant="outline" size="sm" onClick={addInviteEmailRow} className="gap-1">
+                    <Icon name="plus" className="w-3.5 h-3.5" />
+                    Add another
+                  </Button>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
                   <Button variant="ghost" size="sm" onClick={() => setStep(1)} className={BTN_NAV_GHOST}>
                     Back
                   </Button>
                   <div className="flex items-center gap-2">
-                    <Button onClick={handleStep2Next} disabled={createInvite.isPending} className={BTN_PRIMARY}>
-                      Next
-                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
                       Skip this step
+                    </Button>
+                    <Button onClick={handleStep2Next} disabled={createInvite.isPending} className={BTN_PRIMARY}>
+                      Next
                     </Button>
                   </div>
                 </div>
@@ -212,7 +273,7 @@ export default function OnboardingPage() {
                 ) : curatedTemplates.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
                 ) : (
-                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-lg border border-border/60 bg-card/30 p-2 -mx-2">
+                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-lg p-2 -mx-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-2">
                       {curatedTemplates.map(template => (
                         <AgentTemplateCard
@@ -245,7 +306,7 @@ export default function OnboardingPage() {
 
                 {primaryStarship?.id && (
                   <div className="mt-4">
-                    <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-card/30 border-border/60" />
+                    <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none" hideDescription />
                   </div>
                 )}
 

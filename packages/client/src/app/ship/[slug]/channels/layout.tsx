@@ -577,9 +577,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
             const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
             const title = snippet ? `Thread: ${snippet}` : 'New thread'
-            // #region agent log H1
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1',location:'packages/client/src/app/ship/[slug]/channels/layout.tsx:onOpenThread',message:'Draft thread title derived',data:{hasLinkedMessage:Boolean(linkedMessage),inputLen:rawInput.length,sanitizedLen:raw.length,hasToken:rawInput.includes('<@'),hasAtMention:/(\s|^)@/.test(rawInput),sanitizedHasAt:/(\s|^)@/.test(raw),titleLen:title.length},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             setThreadDraftTitle(title)
             pendingThreadStateRef.current = {
               threadKey: 'draft',

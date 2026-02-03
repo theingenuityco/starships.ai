@@ -70,7 +70,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
         {/* Gaia-focused actions */}
         <div className="flex flex-col items-stretch gap-3 sm:w-64">
           <Button asChild size="lg" disabled={!starshipId} className="whitespace-nowrap">
-            <Link href={gaiaAgentId ? `/ship/${slug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(gaiaAgentId)}` : `/ship/${slug}`}>
+            <Link href={gaiaAgentId ? `/ship/${slug}/dm/${encodeURIComponent(`a:${gaiaAgentId}`)}` : `/ship/${slug}`}>
               <Icon name="sparkles" className="h-5 w-5" />
               <span className="ml-1">Create with Gaia</span>
             </Link>

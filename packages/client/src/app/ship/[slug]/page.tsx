@@ -36,7 +36,7 @@ export default function StarshipOverviewPage({ params }: { params: Promise<{ slu
     // instead of redirecting into channels (which should never receive `agent`).
     const agent = (searchParams.get('agent') || '').trim()
     if (agent) {
-      router.replace(`/ship/${slug}/conversations?agent=${encodeURIComponent(agent)}`)
+      router.replace(`/ship/${slug}/dm/${encodeURIComponent(agent)}`)
       return
     }
 

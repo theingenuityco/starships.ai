@@ -41,6 +41,17 @@ interface ConversationInterfaceProps {
   onOpenThread?: (args: { conversationId: string | null; defaultAgent: AgentModel | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
   initialAgentId?: string
   starshipSlug?: string
+  /**
+   * Optional override for "draft DM" mode.
+   * When provided, this bypasses reading `?dm=draft...` from the URL so routes like `/dm/<peer>` can stay clean.
+   */
+  draftDirectMessageTargetOverride?: {
+    dmType: 'user_agent' | 'user_user'
+    agentId?: string | null
+    peerUserId?: string | null
+    peerLabel?: string | null
+    peerAvatar?: string | null
+  } | null
 }
 
 // Helper function to extract the most recent agent ID from messages
@@ -103,7 +114,15 @@ function isUIAction(v: unknown): v is ConversationStreamUIAction {
 
 // onboarding_connectors ui_action removed (connector suggestions are no longer driven by UI actions)
 
-export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, onOpenThread, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
+export function ConversationInterface({
+  starshipId,
+  conversationId: externalConversationId,
+  onConversationChange,
+  onOpenThread,
+  initialAgentId,
+  starshipSlug,
+  draftDirectMessageTargetOverride,
+}: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { data: authUser } = useAuthUser()
   const router = useRouter()
@@ -127,7 +146,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
 
-  const draftDm = useMemo(() => {
+  const draftDmFromUrl = useMemo(() => {
     const dm = (searchParams.get('dm') || '').trim()
     if (dm !== 'draft') return null
     const dmTypeRaw = (searchParams.get('dmType') || '').trim()
@@ -144,6 +163,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
     return { dmType, agentId: null, peerUserId: peerUserId || null, peerLabel: peerLabel || null, peerAvatar: peerAvatar || null } as const
   }, [searchParams])
+
+  const draftDm = useMemo(() => {
+    // Prefer explicit override (used by `/dm/<peer>` routes), else fall back to URL-based mode.
+    if (draftDirectMessageTargetOverride) {
+      const dmType = draftDirectMessageTargetOverride.dmType
+      if (dmType === 'user_agent') {
+        const agentId = String(draftDirectMessageTargetOverride.agentId || '').trim()
+        if (!agentId) return null
+        return { dmType, agentId, peerUserId: null, peerLabel: null, peerAvatar: null } as const
+      }
+      const peerUserId = String(draftDirectMessageTargetOverride.peerUserId || '').trim()
+      if (!peerUserId) return null
+      const peerLabel = String(draftDirectMessageTargetOverride.peerLabel || '').trim()
+      const peerAvatar = String(draftDirectMessageTargetOverride.peerAvatar || '').trim()
+      return { dmType, agentId: null, peerUserId, peerLabel: peerLabel || null, peerAvatar: peerAvatar || null } as const
+    }
+    return draftDmFromUrl
+  }, [draftDirectMessageTargetOverride, draftDmFromUrl])
 
   // Wrapper to log all agent changes
   const setSelectedAgentWithLogging = useCallback((agent: AgentModel | null) => {

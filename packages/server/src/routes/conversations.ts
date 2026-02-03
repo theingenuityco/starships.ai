@@ -19,6 +19,7 @@ import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
   ConversationMemberRepository,
+  ConversationParticipantRepository,
   ConversationWidgetRepository,
   DirectMessageRepository,
   getConnection,
@@ -743,15 +744,24 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             const prevCompletion = typeof pu.completionTokens === 'number' ? pu.completionTokens : 0;
             const prevTotal = typeof pu.totalTokens === 'number' ? pu.totalTokens : Number(prevPrompt) + Number(prevCompletion);
             const prevCost = typeof pu.cost === 'number' && Number.isFinite(pu.cost) ? pu.cost : 0;
-            const nextAt = typeof d?.at === 'string' ? String(d.at) : typeof prev?.at === 'string' ? String(prev.at) : new Date().toISOString();
+            const nextAt =
+              typeof d?.at === 'string' ? String(d.at) : typeof prev?.at === 'string' ? String(prev.at) : new Date().toISOString();
 
             map.set(tid, {
               ...prev,
               // Prefer latest timestamp for display/debug.
               at: nextAt,
               // Prefer richer metadata as we observe it.
-              ...(typeof prev?.agentId === 'string' ? { agentId: prev.agentId } : typeof d?.agentId === 'string' ? { agentId: d.agentId } : null),
-              ...(typeof prev?.agentName === 'string' ? { agentName: prev.agentName } : typeof d?.agentName === 'string' ? { agentName: d.agentName } : null),
+              ...(typeof prev?.agentId === 'string'
+                ? { agentId: prev.agentId }
+                : typeof d?.agentId === 'string'
+                  ? { agentId: d.agentId }
+                  : null),
+              ...(typeof prev?.agentName === 'string'
+                ? { agentName: prev.agentName }
+                : typeof d?.agentName === 'string'
+                  ? { agentName: d.agentName }
+                  : null),
               ...(typeof prev?.model === 'string' ? { model: prev.model } : typeof d?.model === 'string' ? { model: d.model } : null),
               usage: {
                 promptTokens: Number(prevPrompt) + Number(promptTokens),
@@ -953,7 +963,16 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Get conversation agents to determine participants
       const agents = await conversationService.getConversationAgents(conversationId);
-      const participants = agents.map((agent) => agent.id);
+      // Participants should include BOTH linked agents + human users, derived from unified participant store.
+      const participantRepo = new ConversationParticipantRepository();
+      const participantRows = await participantRepo.listByConversation(conversationId).catch(() => []);
+      const userIds = Array.isArray(participantRows)
+        ? participantRows.map((p) => (p as any)?.userId).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+        : [];
+      const agentIds = Array.isArray(participantRows)
+        ? participantRows.map((p) => (p as any)?.agentId).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+        : [];
+      const participants = Array.from(new Set([...agentIds, ...userIds]));
 
       // Structure response to match client expectations
       const state = conversation?.state || {};

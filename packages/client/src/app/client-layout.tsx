@@ -143,6 +143,16 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => clearTimeout(t)
   }, [])
 
+  // Redirect already-logged-in users who haven't completed the wizard (e.g. existing users after migration).
+  // Must run unconditionally (before any early return) to satisfy Rules of Hooks.
+  useEffect(() => {
+    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage || isMarketplace) return
+    if (user.wizardOnboardingCompleted) return
+    if (starshipsLoading) return
+    if (!primaryStarship) return
+    router.replace('/onboarding')
+  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, isMarketplace, starshipsLoading, primaryStarship, router])
+
   if (isPublicSimplePage) {
     // Public pages - no authentication required
     return (
@@ -230,15 +240,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       </StarTheme>
     )
   }
-
-  // Redirect already-logged-in users who haven't completed the wizard (e.g. existing users after migration)
-  useEffect(() => {
-    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage || isMarketplace) return
-    if (user.wizardOnboardingCompleted) return
-    if (starshipsLoading) return
-    if (!primaryStarship) return
-    router.replace('/onboarding')
-  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, isMarketplace, starshipsLoading, primaryStarship, router])
 
   // Hide navigation only on landing page
   const shouldHideNavigation = isDashboard

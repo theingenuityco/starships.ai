@@ -2,19 +2,24 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { Orbitron } from 'next/font/google'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships, useUpdateStarship, useStarshipAgents } from '@/hooks/useStarships'
+import { useUserStarships, useUpdateStarship } from '@/hooks/useStarships'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
-import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Icon from '@/components/primitives/Icon'
-import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
-import type { AgentTemplateModel } from '@starships/protocol'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
+import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
+import api, { type FetchResponse } from '@/lib/api'
+import type { AgentTemplateModel, ApiResponse, CreateStarshipInviteResponse } from '@starships/protocol'
+import { toast } from 'sonner'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 const TOTAL_STEPS = 4
 
@@ -30,12 +35,10 @@ export default function OnboardingPage() {
 
   const updateStarship = useUpdateStarship()
   const createInvite = useCreateStarshipInvite(primaryStarship?.id ?? '')
-  const createAgent = useCreateAgentFromTemplate()
   const completeWizard = useCompleteWizardOnboarding()
 
   const { data: allTemplates = [], isLoading: templatesLoading } = useAgentTemplates(undefined, !!primaryStarship?.id && step === 3)
-  const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id ?? '', !!(primaryStarship?.id && step === 3))
-  const curatedTemplates = allTemplates.slice(0, 4)
+  const curatedTemplates: AgentTemplateModel[] = allTemplates.slice(0, 4)
 
   useEffect(() => {
     if (primaryStarship?.name) setStarshipName(primaryStarship.name)
@@ -62,15 +65,22 @@ export default function OnboardingPage() {
   const handleStep1Next = useCallback(async () => {
     const name = starshipName.trim()
     if (!name || !primaryStarship) return
-    await updateStarship.mutateAsync({ starshipId: primaryStarship.id, updates: { name } })
+    const currentName = (primaryStarship.name ?? '').trim()
+    if (name !== currentName) {
+      await updateStarship.mutateAsync({ starshipId: primaryStarship.id, updates: { name } })
+    }
     setStep(2)
   }, [starshipName, primaryStarship, updateStarship])
 
-  const handleStep2Next = useCallback(async () => {
-    const emails = inviteEmails
+  const parseEmails = useCallback((raw: string): string[] => {
+    return raw
       .split(/[\s,]+/)
-      .map((e) => e.trim().toLowerCase())
-      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      .map(e => e.trim().toLowerCase())
+      .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+  }, [])
+
+  const handleStep2Next = useCallback(async () => {
+    const emails = parseEmails(inviteEmails)
     if (emails.length > 0 && primaryStarship?.id) {
       for (const email of emails) {
         try {
@@ -81,23 +91,43 @@ export default function OnboardingPage() {
       }
     }
     setStep(3)
-  }, [inviteEmails, primaryStarship?.id, createInvite])
+  }, [inviteEmails, primaryStarship?.id, createInvite, parseEmails])
+
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!primaryStarship?.id) return
+    const emails = parseEmails(inviteEmails)
+    // Need at least one email: backend creates a per-email invite link
+    if (emails.length === 0) {
+      toast.info('Add at least one email above, then click "Invite link" to copy a join link for that person.')
+      return
+    }
+
+    try {
+      const response: FetchResponse<ApiResponse<CreateStarshipInviteResponse>> = await api.post(`/api/v1/starships/${primaryStarship.id}/invites`, {
+        email: emails[0],
+        role: 'collaborator',
+      })
+      const data = response.data.data
+      const url = data?.inviteUrl
+      if (!url) {
+        toast.error('Invite link unavailable.')
+        return
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url)
+        toast.success('Invite link copied to clipboard')
+      } else {
+        toast.success('Invite link generated', { description: url })
+      }
+    } catch (error) {
+      toast.error('Failed to generate invite link.')
+    }
+  }, [inviteEmails, parseEmails, primaryStarship?.id])
 
   const handleStep3Next = useCallback(() => {
     setStep(4)
   }, [])
-
-  const handleDeployAgent = useCallback(
-    async (template: AgentTemplateModel) => {
-      if (!primaryStarship?.id || !primaryStarship?.slug) return
-      await createAgent.mutateAsync({
-        templateId: template.id,
-        starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
-      })
-    },
-    [primaryStarship, createAgent]
-  )
 
   const handleFinish = useCallback(async () => {
     await completeWizard.mutateAsync()
@@ -107,11 +137,6 @@ export default function OnboardingPage() {
       router.push('/marketplace')
     }
   }, [completeWizard, primaryStarship?.slug, router])
-
-  const isAlreadyDeployed = useCallback(
-    (templateId: string) => deployedAgents.some((a) => a.sourceTemplateId === templateId),
-    [deployedAgents]
-  )
 
   if (authLoading || !isAuthenticated || (hasStarship && starshipsLoading)) {
     return (
@@ -130,163 +155,132 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
-      <div className="mx-auto w-full max-w-lg flex-1 px-6 py-12">
-        <p className="text-xs text-muted-foreground">Step {step} of {TOTAL_STEPS}</p>
+      {/* Top-left Starships brand (match landing / PublicHeader) */}
+      <header className="flex items-center gap-2 px-8 pt-6">
+        <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+        <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
+      </header>
 
-        {step === 1 && (
-          <div className="mt-6 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">What do you want to call your starship?</h1>
-              <p className="mt-1 text-muted-foreground">
-                Choose a name your team will recognise—like your company or project.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="starship-name">Starship name</Label>
-              <Input
-                id="starship-name"
-                value={starshipName}
-                onChange={(e) => setStarshipName(e.target.value)}
-                placeholder="e.g. Acme Corp"
-                maxLength={100}
-                className="max-w-md"
-              />
-            </div>
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending}>
-                {updateStarship.isPending ? 'Saving...' : 'Next'}
-              </Button>
-            </div>
-          </div>
-        )}
+      <main className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-3xl">
+          <p className="text-xs text-muted-foreground">
+            Step {step} of {TOTAL_STEPS}
+          </p>
 
-        {step === 2 && (
-          <div className="mt-6 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                Who else is on the {primaryStarship?.name ?? 'starship'} team?
-              </h1>
-              <p className="mt-1 text-muted-foreground">
-                Invite colleagues by email. They&apos;ll get a link to join this starship.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-emails">Email addresses (optional)</Label>
-              <textarea
-                id="invite-emails"
-                className="flex min-h-[100px] w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={inviteEmails}
-                onChange={(e) => setInviteEmails(e.target.value)}
-                placeholder="e.g. ellis@company.com, maria@company.com"
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3 pt-4">
-              <Button onClick={handleStep2Next} disabled={createInvite.isPending}>
-                Next
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setStep(3)}>
-                Skip this step
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="mt-6 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Add an AI teammate (optional)</h1>
-              <p className="mt-1 text-muted-foreground">
-                Deploy an agent to your starship. You can add more from the marketplace later.
-              </p>
-            </div>
-            {templatesLoading ? (
-              <p className="text-sm text-muted-foreground">Loading agents...</p>
-            ) : (
-              <div className="grid gap-3">
-                {curatedTemplates.map((template) => {
-                  const already = isAlreadyDeployed(template.id)
-                  return (
-                    <Card key={template.id} className="overflow-hidden">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <MarketplaceAvatar
-                              imageUrl={template.avatarUrl || null}
-                              label={template.name}
-                              seed={template.name || 'AI'}
-                              sizeClassName="h-10 w-10"
-                              shapeClassName="rounded-full"
-                              ringClassName="ring-1 ring-border/40"
-                              showTintWhenMissing={false}
-                              showInsetRing={false}
-                              fallbackTextClassName="text-xs font-semibold text-muted-foreground"
-                            />
-                            <div className="min-w-0">
-                              <CardTitle className="text-base">{template.name}</CardTitle>
-                              {template.description && (
-                                <CardDescription className="mt-0.5 line-clamp-2">
-                                  {template.description}
-                                </CardDescription>
-                              )}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant={already ? 'secondary' : 'default'}
-                            disabled={already || createAgent.isPending}
-                            onClick={() => handleDeployAgent(template)}
-                          >
-                            {already ? (
-                              <>
-                                <Icon name="check-circle" className="h-4 w-4 mr-1" />
-                                Added
-                              </>
-                            ) : (
-                              'Add'
-                            )}
-                          </Button>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  )
-                })}
+          {step === 1 && (
+            <div className="mt-6 space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">What do you want to call your workspace?</h1>
+                <p className="mt-2 text-sm text-muted-foreground max-w-xl">Choose a name your team will recognise—like your company or project.</p>
               </div>
-            )}
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleStep3Next}>Next</Button>
+              <div className="space-y-2 max-w-xl">
+                <Label htmlFor="starship-name">Starship name</Label>
+                <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
+              </div>
+              <div className="flex items-center justify-end pt-6">
+                <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending}>
+                  {updateStarship.isPending ? 'Saving…' : 'Next'}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === 4 && (
-          <div className="mt-6 space-y-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Your starship is ready!</h1>
-              <p className="mt-1 text-muted-foreground">
-                You can explore agents, connect apps, and talk to Aria in channels or DMs.
-              </p>
+          {step === 2 && (
+            <div className="mt-6 space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Who else is on the {primaryStarship?.name ?? 'starship'} team?</h1>
+                <p className="mt-2 text-sm text-muted-foreground max-w-xl">Invite colleagues by email. They&apos;ll get a link to join this starship.</p>
+              </div>
+              <div className="space-y-2 max-w-xl">
+                <Label htmlFor="invite-emails">Email addresses (optional)</Label>
+                <textarea
+                  id="invite-emails"
+                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={inviteEmails}
+                  onChange={e => setInviteEmails(e.target.value)}
+                  placeholder="e.g. ellis@company.com, maria@company.com"
+                />
+              </div>
+              <div className="mt-6 rounded-lg border border-border/60 bg-card/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="h-9 order-1 sm:order-none">
+                  Back
+                </Button>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:justify-normal order-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleCopyInviteLink} disabled={!primaryStarship?.id} className="h-9 inline-flex items-center gap-2 shrink-0">
+                    <Icon name="link" className="h-4 w-4 shrink-0" />
+                    Invite link
+                  </Button>
+                  <Button size="sm" onClick={handleStep2Next} disabled={createInvite.isPending} className="h-9 shrink-0">
+                    Next
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="h-9 shrink-0">
+                    Skip this step
+                  </Button>
+                </div>
+              </div>
             </div>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground text-sm">
-              <li>Explore agents from the marketplace</li>
-              <li>Connect Gmail, Slack, and more</li>
-              <li>Chat with Aria in #lobby or in DMs</li>
-            </ul>
-            <div className="flex justify-end pt-4">
-              <Button onClick={() => handleFinish()} disabled={completeWizard.isPending}>
-                {completeWizard.isPending ? 'Finishing...' : 'Go to my starship'}
-              </Button>
-            </div>
-          </div>
-        )}
+          )}
 
-        {step > 1 && step < 4 && (
-          <div className="mt-8">
-            <Button variant="ghost" size="sm" onClick={() => setStep((s) => s - 1)}>
-              Back
-            </Button>
-          </div>
-        )}
-      </div>
+          {step === 3 && (
+            <div className="mt-6 flex flex-col max-w-4xl w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+              <div className="shrink-0">
+                <h1 className="text-3xl font-bold tracking-tight">Add an AI teammate (recommended)</h1>
+                <p className="mt-2 text-sm text-muted-foreground max-w-xl"> You can add more agents from the marketplace later.</p>
+              </div>
+              {templatesLoading ? (
+                <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
+              ) : curatedTemplates.length === 0 ? (
+                <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
+              ) : (
+                <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-lg border border-border/60 bg-card/30 p-2 -mx-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-2">
+                    {curatedTemplates.map(template => (
+                      <AgentTemplateCard
+                        key={template.id}
+                        template={template}
+                        targetStarshipId={primaryStarship?.id}
+                        onClick={() => window.open(`/marketplace/agents/${encodeURIComponent(template.slug)}`, '_blank', 'noopener,noreferrer')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3 pt-4 shrink-0 border-t border-border/40 mt-4">
+                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="h-9">
+                  Back
+                </Button>
+                <Button onClick={handleStep3Next} className="h-9">
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="mt-6 space-y-6">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
+                <p className="mt-2 text-sm text-muted-foreground max-w-xl">You can continue with the free tier and upgrade anytime.</p>
+              </div>
+
+              {primaryStarship?.id && (
+                <div className="mt-4">
+                  <StarshipUpgradeSection starshipId={primaryStarship.id} />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-6">
+                <Button variant="ghost" size="sm" onClick={() => setStep(3)}>
+                  Back
+                </Button>
+                <Button onClick={() => handleFinish()} disabled={completeWizard.isPending}>
+                  {completeWizard.isPending ? 'Finishing…' : 'Complete'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   )
 }

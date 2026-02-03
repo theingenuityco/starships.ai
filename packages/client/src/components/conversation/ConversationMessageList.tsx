@@ -257,6 +257,7 @@ function LinkedConversationCard({
         'w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3',
         isActiveThread && 'border-primary/60 bg-primary/5 ring-1 ring-primary/20'
       )}
+      data-thread-linked-conversation-id={linkedConversationId ?? undefined}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -1171,6 +1172,14 @@ export function ConversationMessageList({
 
     const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
     if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
+      // When the thread pane opens, we intentionally perform a targeted scroll to the linked thread card.
+      // Suppress the generic "snap to bottom" in the MAIN pane to avoid overriding that scroll.
+      const suppressForThreadOpen = Boolean(enableChannelMessageThreads && activeThreadConversationId)
+      if (suppressForThreadOpen) {
+        bottomSnapStateRef.current.didSnapOnceContentExists = true
+        return
+      }
+
       // IMPORTANT:
       // Tailwind `scroll-smooth` (scroll-behavior: smooth) can cause even scrollTop assignment to animate.
       // Temporarily disable smooth behavior so the initial anchor is instantaneous.
@@ -1197,25 +1206,40 @@ export function ConversationMessageList({
     if (!messageId) return
 
     const container = scrollContainerRef.current
-    const el = messageRefs.current[messageId]
-    if (!container || !el) return
+    if (!container) return
+
+    // Prefer scrolling the *thread card* into view (it sits below the message content),
+    // because centering a very tall message can still leave the card near the bottom edge.
+    const cardEl = container.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null
+    const el = cardEl ?? messageRefs.current[messageId]
+    if (!el) return
 
     // Defer to next frame so layout reflow from pane resize is applied.
     requestAnimationFrame(() => {
       const c = scrollContainerRef.current
-      const node = messageRefs.current[messageId]
+      const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
       if (!c || !node) return
 
       const cRect = c.getBoundingClientRect()
       const r = node.getBoundingClientRect()
       const pad = 16
       const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
-      if (!fullyVisible) {
+      // On thread-open we prefer centering the thread card even if it's already visible,
+      // to avoid it drifting out of view after the pane shrink/reflow.
+      if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
+        // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
+        // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
         try {
-          node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          const currentTop = c.scrollTop
+          const deltaTop = r.top - cRect.top
+          const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
+          const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
+          const nextTop = Math.max(0, Math.min(maxTop, desired))
+          c.scrollTo({ top: nextTop, behavior: 'smooth' })
         } catch {
           /* ignore */
         }
+      } else {
       }
       lastAutoScrollThreadIdRef.current = tid
     })
@@ -1233,13 +1257,19 @@ export function ConversationMessageList({
     // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
     //
     if (shouldStickToBottom) {
+      // During thread-open, avoid overriding the targeted "scroll linked card into view" behavior in the main pane.
+      if (enableChannelMessageThreads && activeThreadConversationId && lastAutoScrollThreadIdRef.current !== activeThreadConversationId) {
+        return
+      }
       const messagesIncreased = displayMessages.length > lastMessageCountRef.current
       const requestedBehavior: ScrollBehavior = messagesIncreased ? 'auto' : isActivelyStreaming ? 'auto' : 'smooth'
 
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
-        scrollContainerRef.current.scrollTo({
+        const c2 = scrollContainerRef.current
+        const targetTop = c2.scrollHeight
+        c2.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
           // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
           behavior: requestedBehavior,

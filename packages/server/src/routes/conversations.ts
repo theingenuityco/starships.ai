@@ -1705,7 +1705,9 @@ router.post(
 
       const isInternal = isInternalScheduleRequest(req);
 
-      // Preflight billing gate: block when wallet credits are insufficient for a user message
+      // Preflight routing + billing gate:
+      // - Only charge fixed credits when the message will actually run an agent.
+      // - Only block on insufficient balance when we intend to charge.
       const conversationService = new ConversationService();
 
       // Verify conversation exists
@@ -1744,6 +1746,29 @@ router.post(
         }
       }
 
+      // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
+      // Do this BEFORE persisting/debiting so we don't charge for an invalid request.
+      if (agentId && !isInternal) {
+        const agentService = new AgentService();
+        const agent = await agentService.getAgent(agentId);
+
+        if (!agent) {
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
+          return;
+        }
+
+        // Verify user owns the agent's starship
+        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agentId, res))) {
+          return;
+        }
+
+        // Verify agent belongs to the same starship as the conversation
+        if (agent.starshipId !== conversation.starshipId) {
+          sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
+          return;
+        }
+      }
+
       // Resolve starship and wallet, then enforce non-zero balance
       const starship = await conversationService.getConversationStarship(conversationId);
       if (!starship) {
@@ -1754,48 +1779,56 @@ router.post(
         return;
       }
 
-      const walletService = new WalletService();
-      const wallet = await walletService.getByStarshipId(starship.id);
-
-      if (!wallet) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
-          starshipId: starship.id,
-        });
-        return;
-      }
-
-      const currentCredits = Number(wallet.balance) || 0;
       const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
-      if (currentCredits < requiredCredits) {
-        sendError(
-          res,
-          'INSUFFICIENT_FUNDS',
-          `Insufficient credits. ${requiredCredits} credits required per message. Please add credits from Billing to continue.`,
-          402,
-          {
-            currentCredits: wallet.balance,
-            requiredCredits: requiredCredits.toFixed(6),
-          }
-        );
-        return;
+      const willTriggerAgent = await conversationService.willTriggerAgentExecution({ conversationId, content, agentId });
+
+      let wallet: { id: string; balance: string } | null = null;
+      if (willTriggerAgent) {
+        const walletService = new WalletService();
+        wallet = await walletService.getByStarshipId(starship.id);
+
+        if (!wallet) {
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
+            starshipId: starship.id,
+          });
+          return;
+        }
+
+        const currentCredits = Number(wallet.balance) || 0;
+        if (currentCredits < requiredCredits) {
+          sendError(
+            res,
+            'INSUFFICIENT_FUNDS',
+            `Insufficient credits. ${requiredCredits} credits required for an agent-triggering message. Please add credits from Billing to continue.`,
+            402,
+            {
+              currentCredits: wallet.balance,
+              requiredCredits: requiredCredits.toFixed(6),
+            }
+          );
+          return;
+        }
       }
 
       // Starship-level concurrency gate (Scout=1, Frigate=2).
       // IMPORTANT: acquire this before persisting/charging the user message.
       const leaseService = new StarshipTurnLeaseService();
       let turnLeaseId: string | undefined;
-      try {
-        turnLeaseId = await leaseService.acquire({
-          starshipId: starship.id,
-          conversationId,
-          maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
-        });
-      } catch (e) {
-        handleError(e, res, 'acquiring starship concurrency slot');
-        return;
+      if (willTriggerAgent) {
+        try {
+          turnLeaseId = await leaseService.acquire({
+            starshipId: starship.id,
+            conversationId,
+            maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
+          });
+        } catch (e) {
+          handleError(e, res, 'acquiring starship concurrency slot');
+          return;
+        }
       }
 
-      // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
+      // Persist the user message first (we need messageId for idempotent charging).
+      // If this message will run an agent, debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
       // Multi-human support: persist author identity on the message so shared conversations/channels
@@ -1818,52 +1851,40 @@ router.post(
         ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
 
-      const billingService = new BillingService();
-      try {
-        await billingService.debitForUserMessage({
-          walletId: wallet.id,
-          starshipId: starship.id,
-          conversationId,
-          messageId: userMessage.id,
-        });
-      } catch (e) {
-        // Best-effort cleanup: remove message if we couldn't charge it.
+      if (willTriggerAgent) {
+        const billingService = new BillingService();
         try {
-          await messageService.deleteMessage(userMessage.id);
-        } catch {
-          /* ignore cleanup failure */
-        }
-        if (e instanceof InsufficientFundsError) {
-          sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient credits. Please add credits from Billing to continue.', 402, {
-            currentCredits: wallet.balance,
-            requiredCredits: requiredCredits.toFixed(6),
+          if (!wallet) throw new Error('WALLET_REQUIRED_FOR_BILLING');
+          await billingService.debitForUserMessage({
+            walletId: wallet.id,
+            starshipId: starship.id,
+            conversationId,
+            messageId: userMessage.id,
           });
+        } catch (e) {
+          // Best-effort cleanup: remove message if we couldn't charge it.
+          try {
+            await messageService.deleteMessage(userMessage.id);
+          } catch (cleanupErr) {
+            console.error('[BILLING] Failed to delete unpaid user message after billing failure', {
+              conversationId,
+              messageId: userMessage.id,
+              starshipId: starship.id,
+              walletId: wallet?.id,
+              userId: authUserId,
+              error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+            });
+          }
+          if (e instanceof InsufficientFundsError) {
+            sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient credits. Please add credits from Billing to continue.', 402, {
+              currentCredits: wallet?.balance ?? '0',
+              requiredCredits: requiredCredits.toFixed(6),
+            });
+            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+            return;
+          }
           if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-          return;
-        }
-        if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-        throw e;
-      }
-
-      // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
-      if (agentId && !isInternal) {
-        const agentService = new AgentService();
-        const agent = await agentService.getAgent(agentId);
-
-        if (!agent) {
-          sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
-          return;
-        }
-
-        // Verify user owns the agent's starship
-        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agentId, res))) {
-          return;
-        }
-
-        // Verify agent belongs to the same starship as the conversation
-        if (agent.starshipId !== starship.id) {
-          sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
-          return;
+          throw e;
         }
       }
 

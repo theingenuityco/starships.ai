@@ -178,4 +178,3 @@ export function playNotificationChime(opts?: { volume?: number }) {
     // Ignore (autoplay restrictions, device issues, etc.)
   }
 }
-

@@ -1,13 +1,13 @@
 'use client'
 
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
-import { useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useCreateDirectMessage, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type DmTarget = { dmType: 'user_agent'; agentId: string; agentSlug: string | null } | { dmType: 'user_user'; peerUserId: string }
 
@@ -80,7 +80,12 @@ export default function DmPeerPage() {
 
   const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(starshipId, Boolean(starshipId))
   const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
-  const { data: directMessagesData, isLoading: dmsLoading } = useStarshipDirectMessages(starshipId, Boolean(starshipId))
+  const { data: directMessagesData, isLoading: dmsLoading, isFetching: dmsFetching, isError: dmsIsError } = useStarshipDirectMessages(starshipId, Boolean(starshipId))
+  const createDirectMessage = useCreateDirectMessage()
+
+  // Fallback: if listing DMs fails, resolve via the idempotent create/return endpoint.
+  const [fallbackConversationId, setFallbackConversationId] = useState<string | null>(null)
+  const didAttemptFallbackResolveRef = useRef(false)
 
   const dmTarget = useMemo(() => {
     const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
@@ -90,8 +95,47 @@ export default function DmPeerPage() {
     return parseDmPeer(peer, list)
   }, [peer, agentsData, agentsLoading])
 
+  useEffect(() => {
+    if (!starshipId) return
+    if (!dmTarget) return
+    if (!dmsIsError) return
+    if (fallbackConversationId) return
+    if (didAttemptFallbackResolveRef.current) return
+
+    didAttemptFallbackResolveRef.current = true
+    ;(async () => {
+      try {
+        const data =
+          dmTarget.dmType === 'user_agent'
+            ? await createDirectMessage.mutateAsync({ starshipId, agentId: dmTarget.agentId })
+            : await createDirectMessage.mutateAsync({ starshipId, peerUserId: dmTarget.peerUserId })
+        const cid = data?.conversationId ? String(data.conversationId) : ''
+        if (cid) setFallbackConversationId(cid)
+      } catch {
+        // If this fails too, we keep the UI in a "resolving" state rather than incorrectly showing a draft.
+      }
+    })()
+  }, [createDirectMessage, dmTarget, dmsIsError, fallbackConversationId, starshipId])
+
   const resolved = useMemo(() => {
     if (!dmTarget) return { conversationId: null as string | null, draftOverride: null as any }
+
+    // If we don't yet know the starship id, we cannot reliably check for an existing DM.
+    // Treat as "resolving" rather than falling back to draft.
+    if (!starshipId) return { conversationId: null as string | null, draftOverride: null as any }
+
+    // Avoid showing an incorrect "draft DM" state while the DM list is still loading.
+    // NOTE: `isFetching` can be true during background refetch even when we already have cached data.
+    // Only block on fetching when we do not yet have any DM list data to resolve from.
+    if (dmsLoading) return { conversationId: null as string | null, draftOverride: null as any }
+    if (dmsFetching && !directMessagesData) return { conversationId: null as string | null, draftOverride: null as any }
+
+    // If the DM list errored but the fallback resolver succeeded, use it.
+    if (fallbackConversationId) return { conversationId: fallbackConversationId, draftOverride: null as any }
+
+    // If the query is disabled/uninitialized (no data) and no error, stay in "resolving" mode.
+    if (!directMessagesData && !dmsIsError) return { conversationId: null as string | null, draftOverride: null as any }
+
     const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
 
     if (dmTarget.dmType === 'user_agent') {
@@ -132,7 +176,7 @@ export default function DmPeerPage() {
             peerAvatar: avatar || null,
           } as const),
     }
-  }, [dmTarget, directMessagesData?.directMessages, membersAndInvites])
+  }, [dmTarget, starshipId, directMessagesData, directMessagesData?.directMessages, dmsLoading, dmsFetching, dmsIsError, fallbackConversationId, membersAndInvites])
 
   // Ensure the ship-level stream provider is pointed at the resolved DM conversation.
   // `/ship/[slug]/layout.tsx` doesn't know about `/dm/<peer>`, so without this the stream context
@@ -155,6 +199,15 @@ export default function DmPeerPage() {
   if (!dmTarget && !dmsLoading && !agentsLoading) {
     if (slug) router.replace(`/ship/${slug}`)
     return null
+  }
+
+  // If we're still resolving whether this DM already exists, don't show a misleading draft UI.
+  if (starshipId && dmTarget && !resolved.conversationId && !resolved.draftOverride) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading direct message…</div>
+      </div>
+    )
   }
 
   if (!starshipId) return null

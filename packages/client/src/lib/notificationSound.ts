@@ -40,7 +40,10 @@ function getPooledAudio(src: string): HTMLAudioElement {
   const a = new Audio(src)
   a.preload = 'auto'
   fileAudioPool.push(a)
-  if (fileAudioPool.length > 4) fileAudioPool = fileAudioPool.slice(-4)
+  if (fileAudioPool.length > 4) {
+    // Mutate in place to avoid stale references in long-running sessions.
+    fileAudioPool.splice(0, fileAudioPool.length - 4)
+  }
   return a
 }
 

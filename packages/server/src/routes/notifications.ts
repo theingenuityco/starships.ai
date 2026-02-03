@@ -101,7 +101,8 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       }
 
       while (!closed && !res.writableEnded && !res.destroyed) {
-        const batch = await bus.read(params.starshipId, authUserId, cursor, { blockMs: 25_000, count: 200 }, redisReader);
+        // Keep per-connection work bounded (avoid long blocking reads + huge batches).
+        const batch = await bus.read(params.starshipId, authUserId, cursor, { blockMs: 5_000, count: 50 }, redisReader);
         if (!batch || batch.length === 0) continue;
         for (const item of batch) {
           cursor = item.id;
@@ -120,6 +121,14 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
             closed = true;
             break;
           }
+        }
+
+        // Heartbeat comment for proxies / long-lived connections.
+        // (Also gives us a low-cost check that the socket is still writable.)
+        try {
+          res.write(`:ping\n\n`);
+        } catch {
+          closed = true;
         }
       }
       return;
@@ -268,13 +277,46 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
 
     // Resolve starshipId from conversation for access checks + notification state updates
     const db = getConnection();
-    const convoRow = await db.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.conversationId]);
+    const convoRow = await db.queryOne<{ starship_id: string }>(
+      'SELECT starship_id FROM conversations WHERE id = $1',
+      [params.conversationId]
+    );
     const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
     if (!starshipId) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404);
       return;
     }
     if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+
+    // Authorization: ensure user can access this conversation (private channels / DMs / shared convos).
+    // NOTE: starship membership alone is not sufficient for private channels and DMs.
+    const dm = await db.queryOne<{ dm_type: string; user_id: string | null; user_a_id: string | null; user_b_id: string | null }>(
+      'SELECT dm_type, user_id, user_a_id, user_b_id FROM direct_messages WHERE conversation_id = $1',
+      [params.conversationId]
+    );
+    if (dm) {
+      const t = String(dm.dm_type || '');
+      const dmUserId = dm.user_id ? String(dm.user_id) : '';
+      const a = dm.user_a_id ? String(dm.user_a_id) : '';
+      const b = dm.user_b_id ? String(dm.user_b_id) : '';
+      const ok = t === 'user_agent' ? dmUserId === authUserId : t === 'user_user' ? authUserId === a || authUserId === b : false;
+      if (!ok) {
+        sendError(res, 'ACCESS_DENIED', 'User is not a participant in this direct message', 403);
+        return;
+      }
+    } else {
+      const ch = await db.queryOne<{ is_private: boolean }>('SELECT is_private FROM channels WHERE conversation_id = $1', [params.conversationId]);
+      if (ch?.is_private) {
+        const member = await db.queryOne<{ ok: boolean }>(
+          'SELECT true as ok FROM conversation_members WHERE conversation_id = $1 AND user_id = $2 LIMIT 1',
+          [params.conversationId, authUserId]
+        );
+        if (!member?.ok) {
+          sendError(res, 'ACCESS_DENIED', 'User is not a member of this private channel', 403);
+          return;
+        }
+      }
+    }
 
     const last = await db.queryOne<{ id: string; created_at: string }>(
       `SELECT id, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
@@ -347,15 +389,30 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       last_read_at: string | null;
     }>(
       `
-      WITH ids AS (
-        SELECT UNNEST($3::text[]) AS conversation_id
-      ),
-      scoped AS (
-        SELECT i.conversation_id
-          FROM ids i
-          INNER JOIN conversations c
-            ON c.id = i.conversation_id
-           AND c.starship_id = $1::text
+      WITH scoped AS (
+        SELECT c.id AS conversation_id
+          FROM conversations c
+          LEFT JOIN channels ch ON ch.conversation_id = c.id
+          LEFT JOIN direct_messages dm ON dm.conversation_id = c.id
+         WHERE c.starship_id = $1::text
+           AND c.id = ANY($3::text[])
+           AND (
+             -- DM access
+             (dm.conversation_id IS NOT NULL AND (
+               (dm.dm_type = 'user_agent' AND dm.user_id = $2::text)
+               OR (dm.dm_type = 'user_user' AND ($2::text = dm.user_a_id OR $2::text = dm.user_b_id))
+             ))
+             OR
+             -- Channel access: public OR private membership
+             (ch.conversation_id IS NOT NULL AND (
+               ch.is_private = false
+               OR EXISTS (SELECT 1 FROM conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = $2::text LIMIT 1)
+             ))
+             OR
+             -- Other conversation types: owner or explicit member
+             -- Note: conversations table has no owner column; starship access is enforced above.
+             (dm.conversation_id IS NULL AND ch.conversation_id IS NULL)
+           )
       ),
       last_msg AS (
         SELECT m.conversation_id, MAX(m.created_at) AS last_message_at

@@ -74,7 +74,8 @@ export class NotificationStreamBus {
     opts?: { maxLenApprox?: number }
   ): Promise<PublishResult> {
     const key = this.streamKey(starshipId, userId);
-    const maxLen = typeof opts?.maxLenApprox === 'number' && opts.maxLenApprox > 0 ? Math.floor(opts.maxLenApprox) : 20_000;
+    // Keep retention bounded per user to protect Redis memory under load.
+    const maxLen = typeof opts?.maxLenApprox === 'number' && opts.maxLenApprox > 0 ? Math.floor(opts.maxLenApprox) : 2_000;
     const payload = JSON.stringify(evt);
     const raw = await this.redis.call('XADD', key, 'MAXLEN', '~', String(maxLen), '*', 'evt', payload);
     const streamId = NotificationStreamBus.toStringSafe(raw);
@@ -115,8 +116,9 @@ export class NotificationStreamBus {
     redisOverride?: RedisClient
   ): Promise<Array<{ id: string; evt: NotificationStreamEvent }>> {
     const key = this.streamKey(starshipId, userId);
-    const blockMs = typeof opts?.blockMs === 'number' && opts.blockMs >= 0 ? opts.blockMs : 25_000;
-    const count = typeof opts?.count === 'number' && opts.count > 0 ? Math.floor(opts.count) : 200;
+    // Avoid long blocking reads + huge batches to reduce per-connection server load.
+    const blockMs = typeof opts?.blockMs === 'number' && opts.blockMs >= 0 ? opts.blockMs : 5_000;
+    const count = typeof opts?.count === 'number' && opts.count > 0 ? Math.floor(opts.count) : 50;
     let raw: unknown;
     try {
       const client = redisOverride ?? this.redis;

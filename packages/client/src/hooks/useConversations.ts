@@ -1610,7 +1610,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     const prevPrompt = Number(prev?.usage?.promptTokens ?? 0)
     const prevCompletion = Number(prev?.usage?.completionTokens ?? 0)
-    const prevTotal = Number(prev?.usage?.totalTokens ?? (prevPrompt + prevCompletion))
+    const prevTotal = Number(prev?.usage?.totalTokens ?? prevPrompt + prevCompletion)
     const prevCost = typeof prev?.usage?.cost === 'number' && Number.isFinite(prev.usage.cost) ? Number(prev.usage.cost) : 0
     const nextCost = typeof cost === 'number' && Number.isFinite(cost) ? cost : 0
 

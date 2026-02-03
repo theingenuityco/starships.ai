@@ -9,7 +9,41 @@ import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import api from '@/lib/api'
+
+function sanitizeThreadTitleSnippetFromMessageContent(
+  input: string,
+  maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }
+): string {
+  // Thread titles are plain text snippets. Do not carry mention tokens into the title:
+  // - Avoid decoding `<@a:...>` / `<@u:...>` to names in the header/nav.
+  // - Avoid accidental notifications/UX confusion from `@mentions` in titles.
+  const agentLabelById = maps?.agentLabelById
+  const userLabelById = maps?.userLabelById
+
+  const s = String(input || '')
+    // Structured mention tokens emitted by the composer (agents + users).
+    // Convert to plain-text @Name (NOT a structured token) so it renders correctly but doesn't "decode" via token parsing.
+    .replace(/<@a:([^>\s]+)>/gi, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const label = id && agentLabelById ? agentLabelById.get(id) : null
+      return `@${label || 'Agent'}`
+    })
+    .replace(/<@u:([^>\s]+)>/gi, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const label = id && userLabelById ? userLabelById.get(id) : null
+      return `@${label || 'User'}`
+    })
+    // Strip any other structured mention tokens defensively.
+    .replace(/<@[^>\n]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return s
+}
 
 export default function ChannelsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -154,6 +188,33 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: agentsData } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipData?.id ?? '', Boolean(starshipData?.id))
+
+  const agentLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
+    for (const a of list) {
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      if (!id) continue
+      const label = formatAgentDisplayName(a as any)
+      m.set(id, String(label || '').trim() || String((a as any)?.name || (a as any)?.slug || 'Agent'))
+    }
+    return m
+  }, [agentsData])
+
+  const userLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
+    for (const it of list) {
+      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+      if (!id) continue
+      const label = String(it?.displayName || it?.email || '').trim()
+      if (!label) continue
+      m.set(id, label)
+    }
+    return m
+  }, [membersAndInvites])
 
   const normalizedChannelSlug = useMemo(
     () =>
@@ -512,11 +573,13 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
             const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
             setThreadDraftParentConversationId(parent || activeConversationId || null)
-            const raw = String((linkedMessage as any)?.content ?? '')
-              .trim()
-              .replace(/\s+/g, ' ')
+            const rawInput = String((linkedMessage as any)?.content ?? '')
+            const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
             const title = snippet ? `Thread: ${snippet}` : 'New thread'
+            // #region agent log H1
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1',location:'packages/client/src/app/ship/[slug]/channels/layout.tsx:onOpenThread',message:'Draft thread title derived',data:{hasLinkedMessage:Boolean(linkedMessage),inputLen:rawInput.length,sanitizedLen:raw.length,hasToken:rawInput.includes('<@'),hasAtMention:/(\s|^)@/.test(rawInput),sanitizedHasAt:/(\s|^)@/.test(raw),titleLen:title.length},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             setThreadDraftTitle(title)
             pendingThreadStateRef.current = {
               threadKey: 'draft',

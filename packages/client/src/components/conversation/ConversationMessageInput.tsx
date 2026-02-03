@@ -689,6 +689,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               if (override) return override
               return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent!)}`
             })()
+            // #region agent log H2
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2',location:'packages/client/src/components/conversation/ConversationMessageInput.tsx:createConversation',message:'CreateConversation title selected',data:{isThreadCreate:Boolean(isThreadCreate),hasOverride:Boolean(typeof newConversationTitleOverride==='string'&&newConversationTitleOverride.trim().length>0),titleLen:title.length,titleHasToken:title.includes('<@'),titleHasAt:/(\s|^)@/.test(title),parentIdLen:isThreadCreate?String(newConversationParentConversationId||'').trim().length:0},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             const newConversation = await createConversation.mutateAsync(
               isThreadCreate
                 ? effectiveAgent
@@ -898,6 +901,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
+        // #region agent log H5
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5',location:'packages/client/src/components/conversation/ConversationMessageInput.tsx:sendMessage',message:'About to send user message',data:{conversationIdLen:String(currentConversationId||'').length,contentLen:String(contentToSend||'').length,contentHasToken:String(contentToSend||'').includes('<@a:'),contentHasUserToken:String(contentToSend||'').includes('<@u:'),contentHasAt:/(\s|^)@/.test(String(contentToSend||'')),shouldPersistOnly:Boolean(shouldPersistOnly),isThreadContext:Boolean(isThreadContext),isMentionOnlyThread:Boolean(isMentionOnlyThread)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         void sendMessageFn({
           conversationId: currentConversationId!,
           ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),

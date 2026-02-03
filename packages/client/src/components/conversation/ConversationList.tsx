@@ -193,38 +193,22 @@ export function ConversationList({
           (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
         : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
 
-    const conversationId =
-      t.kind === 'agent'
-        ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '')
-        : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
     const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-    const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+    const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
 
     return (
       <div
         key={t.key}
         className={cn(
           'group relative rounded-lg flex items-center gap-3 w-full min-h-[40px] cursor-pointer px-3 py-2 border border-transparent transition-colors',
-          isActive
-            ? 'text-primary bg-primary/10'
-            : hasUnread
-              ? 'text-foreground hover:bg-muted/50'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          isActive ? 'text-primary bg-primary/10' : hasUnread ? 'text-foreground hover:bg-muted/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
           isBusy && 'opacity-70 pointer-events-none'
         )}
         onClick={() => handleDmTargetClick(t)}
       >
-        {t.kind === 'agent' ? (
-          <DirectMessageAvatar starshipId={starshipId} agent={t.agent} />
-        ) : (
-          <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
-        )}
-        <span
-          className={cn(
-            'truncate min-w-0 flex-1 text-[13px]',
-            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground font-medium'
-          )}
-        >
+        {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />}
+        <span className={cn('truncate min-w-0 flex-1 text-[13px]', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground font-medium')}>
           {label}
         </span>
         {dmCount > 0 ? (
@@ -495,20 +479,13 @@ export function ConversationList({
                               <Icon
                                 name="hash"
                                 weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
-                                className={cn(
-                                  'h-4 w-4',
-                                  isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground'
-                                )}
+                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
                               />
                             </div>
                             <span
                               className={cn(
                                 'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
                               {label}
@@ -649,11 +626,7 @@ export function ConversationList({
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn(
-                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                          'hover:bg-muted/50',
-                          isActive && 'bg-muted/70 shadow-sm'
-                        )}
+                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
                         <Icon
@@ -666,11 +639,7 @@ export function ConversationList({
                             <p
                               className={cn(
                                 'text-sm truncate',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'text-muted-foreground font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                               )}
                             >
                               {label}
@@ -720,10 +689,9 @@ export function ConversationList({
                       ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
                         (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
                       : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
-                  const conversationId =
-                    t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
+                  const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
                   const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-                  const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+                  const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
                   return (
                     <div
                       key={t.key}
@@ -743,12 +711,7 @@ export function ConversationList({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p
-                            className={cn(
-                              'text-[13px] truncate font-medium leading-snug',
-                              isActive ? 'text-primary' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground'
-                            )}
-                          >
+                          <p className={cn('text-[13px] truncate font-medium leading-snug', isActive ? 'text-primary' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground')}>
                             {label}
                           </p>
                           {dmCount > 0 ? (

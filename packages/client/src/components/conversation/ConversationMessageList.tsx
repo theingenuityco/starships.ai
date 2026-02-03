@@ -1532,6 +1532,11 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
+  // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
+  // On first paint, `renderMessages` can be empty while the stream query is loading; at that moment
+  // `hasMoreBefore` is also not yet meaningful, which makes the hero incorrectly render.
+  const isHydratingInitialMessages = Boolean(!messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && renderMessages.length === 0)
+
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
   const isAtConversationStart = (() => {
@@ -1542,9 +1547,9 @@ export function ConversationMessageList({
     return renderMessages.length === 0
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
   // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0

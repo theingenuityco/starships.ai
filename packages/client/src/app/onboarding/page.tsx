@@ -15,13 +15,22 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
-import api, { type FetchResponse } from '@/lib/api'
-import type { AgentTemplateModel, ApiResponse, CreateStarshipInviteResponse } from '@starships/protocol'
-import { toast } from 'sonner'
+import { StarTheme } from '@/components/theme-context'
+import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
+import type { AgentTemplateModel } from '@starships/protocol'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 const TOTAL_STEPS = 4
+
+/** Shared content width for steps 1, 2, 4; step 3 uses wider layout. */
+const CONTENT_MAX_W = 'max-w-3xl'
+const CONTENT_MAX_W_STEP3 = 'max-w-4xl'
+/** Consistent input/field width across steps. */
+const INPUT_MAX_W = 'max-w-xl'
+/** Primary nav button (Next/Complete) min width and height. */
+const BTN_PRIMARY = 'min-w-[100px] h-10'
+const BTN_NAV_GHOST = 'h-10'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -93,38 +102,6 @@ export default function OnboardingPage() {
     setStep(3)
   }, [inviteEmails, primaryStarship?.id, createInvite, parseEmails])
 
-  const handleCopyInviteLink = useCallback(async () => {
-    if (!primaryStarship?.id) return
-    const emails = parseEmails(inviteEmails)
-    // Need at least one email: backend creates a per-email invite link
-    if (emails.length === 0) {
-      toast.info('Add at least one email above, then click "Invite link" to copy a join link for that person.')
-      return
-    }
-
-    try {
-      const response: FetchResponse<ApiResponse<CreateStarshipInviteResponse>> = await api.post(`/api/v1/starships/${primaryStarship.id}/invites`, {
-        email: emails[0],
-        role: 'collaborator',
-      })
-      const data = response.data.data
-      const url = data?.inviteUrl
-      if (!url) {
-        toast.error('Invite link unavailable.')
-        return
-      }
-
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url)
-        toast.success('Invite link copied to clipboard')
-      } else {
-        toast.success('Invite link generated', { description: url })
-      }
-    } catch (error) {
-      toast.error('Failed to generate invite link.')
-    }
-  }, [inviteEmails, parseEmails, primaryStarship?.id])
-
   const handleStep3Next = useCallback(() => {
     setStep(4)
   }, [])
@@ -140,12 +117,16 @@ export default function OnboardingPage() {
 
   if (authLoading || !isAuthenticated || (hasStarship && starshipsLoading)) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Icon name="rocket" className="h-10 w-10 text-primary animate-pulse" />
-          <p className="text-muted-foreground">Loading...</p>
+      <StarTheme theme="dark">
+        <div className="min-h-[100dvh] bg-black relative overflow-hidden flex items-center justify-center">
+          <AuthMarketingPanel className="fixed inset-0" />
+          <div className="fixed inset-0 bg-black/40 z-[1]" aria-hidden />
+          <div className="flex flex-col items-center gap-4 relative z-10">
+            <Icon name="rocket" className="h-10 w-10 text-primary animate-pulse" />
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
         </div>
-      </div>
+      </StarTheme>
     )
   }
 
@@ -154,16 +135,19 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background">
-      {/* Top-left Starships brand (match landing / PublicHeader) */}
-      <header className="flex items-center gap-2 px-8 pt-6">
-        <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
-        <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
-      </header>
+    <StarTheme theme="dark">
+      <div className="min-h-[100dvh] bg-black relative overflow-hidden flex flex-col">
+        <AuthMarketingPanel className="fixed inset-0" />
+        <div className="fixed inset-0 bg-black/40 z-[1]" aria-hidden />
+        {/* Top-left Starships brand (match landing / PublicHeader) */}
+        <header className="flex items-center gap-2 px-8 pt-6 relative z-10">
+          <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+          <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
+        </header>
 
-      <main className="flex flex-1 items-center justify-center px-4 py-10">
-        <div className="w-full max-w-3xl">
-          <p className="text-xs text-muted-foreground">
+        <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
+        <div className={`w-full mx-auto min-w-0 ${step === 3 ? CONTENT_MAX_W_STEP3 : CONTENT_MAX_W}`}>
+          <p className="text-xs text-muted-foreground mb-1">
             Step {step} of {TOTAL_STEPS}
           </p>
 
@@ -171,14 +155,14 @@ export default function OnboardingPage() {
             <div className="mt-6 space-y-6">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">What do you want to call your workspace?</h1>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl">Choose a name your team will recognise—like your company or project.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
               </div>
-              <div className="space-y-2 max-w-xl">
+              <div className={`space-y-2 ${INPUT_MAX_W}`}>
                 <Label htmlFor="starship-name">Starship name</Label>
                 <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
               </div>
               <div className="flex items-center justify-end pt-6">
-                <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending}>
+                <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending} className={BTN_PRIMARY}>
                   {updateStarship.isPending ? 'Saving…' : 'Next'}
                 </Button>
               </div>
@@ -189,9 +173,9 @@ export default function OnboardingPage() {
             <div className="mt-6 space-y-6">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Who else is on the {primaryStarship?.name ?? 'starship'} team?</h1>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl">Invite colleagues by email. They&apos;ll get a link to join this starship.</p>
+                <p className="mt-2 text-sm text-muted-foreground">Invite colleagues by email. They&apos;ll get a link to join this starship.</p>
               </div>
-              <div className="space-y-2 max-w-xl">
+              <div className={`space-y-2 ${INPUT_MAX_W}`}>
                 <Label htmlFor="invite-emails">Email addresses (optional)</Label>
                 <textarea
                   id="invite-emails"
@@ -201,19 +185,15 @@ export default function OnboardingPage() {
                   placeholder="e.g. ellis@company.com, maria@company.com"
                 />
               </div>
-              <div className="mt-6 rounded-lg border border-border/60 bg-card/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className="h-9 order-1 sm:order-none">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
+                <Button variant="ghost" size="sm" onClick={() => setStep(1)} className={BTN_NAV_GHOST}>
                   Back
                 </Button>
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:justify-normal order-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleCopyInviteLink} disabled={!primaryStarship?.id} className="h-9 inline-flex items-center gap-2 shrink-0">
-                    <Icon name="link" className="h-4 w-4 shrink-0" />
-                    Invite link
-                  </Button>
-                  <Button size="sm" onClick={handleStep2Next} disabled={createInvite.isPending} className="h-9 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleStep2Next} disabled={createInvite.isPending} className={BTN_PRIMARY}>
                     Next
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className="h-9 shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
                     Skip this step
                   </Button>
                 </div>
@@ -222,10 +202,10 @@ export default function OnboardingPage() {
           )}
 
           {step === 3 && (
-            <div className="mt-6 flex flex-col max-w-4xl w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+            <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
               <div className="shrink-0">
                 <h1 className="text-3xl font-bold tracking-tight">Add an AI teammate (recommended)</h1>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl"> You can add more agents from the marketplace later.</p>
+                <p className="mt-2 text-sm text-muted-foreground">You can add more agents from the marketplace later.</p>
               </div>
               {templatesLoading ? (
                 <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
@@ -245,11 +225,11 @@ export default function OnboardingPage() {
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between gap-3 pt-4 shrink-0 border-t border-border/40 mt-4">
-                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="h-9">
+              <div className="flex items-center justify-between gap-3 pt-4 shrink-0 mt-4">
+                <Button variant="ghost" size="sm" onClick={() => setStep(2)} className={BTN_NAV_GHOST}>
                   Back
                 </Button>
-                <Button onClick={handleStep3Next} className="h-9">
+                <Button onClick={handleStep3Next} className={BTN_PRIMARY}>
                   Next
                 </Button>
               </div>
@@ -260,20 +240,20 @@ export default function OnboardingPage() {
             <div className="mt-6 space-y-6">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
-                <p className="mt-2 text-sm text-muted-foreground max-w-xl">You can continue with the free tier and upgrade anytime.</p>
+                <p className="mt-2 text-sm text-muted-foreground">You can continue with the free tier and upgrade anytime.</p>
               </div>
 
               {primaryStarship?.id && (
                 <div className="mt-4">
-                  <StarshipUpgradeSection starshipId={primaryStarship.id} />
+                  <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-card/30 border-border/60" />
                 </div>
               )}
 
               <div className="flex items-center justify-between pt-6">
-                <Button variant="ghost" size="sm" onClick={() => setStep(3)}>
+                <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
                   Back
                 </Button>
-                <Button onClick={() => handleFinish()} disabled={completeWizard.isPending}>
+                <Button onClick={() => handleFinish()} disabled={completeWizard.isPending} className={BTN_PRIMARY}>
                   {completeWizard.isPending ? 'Finishing…' : 'Complete'}
                 </Button>
               </div>
@@ -281,6 +261,7 @@ export default function OnboardingPage() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </StarTheme>
   )
 }

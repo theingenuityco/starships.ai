@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 
 import { useStarship, STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
@@ -19,9 +20,11 @@ import { useCancelDowngradeStarship } from '@/hooks/useCancelDowngradeStarship'
 
 export interface StarshipUpgradeSectionProps {
   starshipId: string
+  /** Optional class for the outer Card (e.g. onboarding uses bg-card/30 to match step 3 modal) */
+  cardClassName?: string
 }
 
-export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionProps): React.JSX.Element | null {
+export function StarshipUpgradeSection({ starshipId, cardClassName }: StarshipUpgradeSectionProps): React.JSX.Element | null {
   const enabled = Boolean(starshipId)
   const { data: starship } = useStarship(starshipId, enabled)
   const { data: plans } = useSubscriptionPlans(true)
@@ -118,7 +121,7 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
   }
 
   return (
-    <Card className={PROFILE_SECTION_CARD_CLASS}>
+    <Card className={cn(PROFILE_SECTION_CARD_CLASS, cardClassName)}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="layers" className="h-4 w-4 text-primary" />

@@ -32,6 +32,7 @@ import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type TurnUsageForRing = {
   turnId: string
@@ -1535,7 +1536,13 @@ export function ConversationMessageList({
   // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
   // On first paint, `renderMessages` can be empty while the stream query is loading; at that moment
   // `hasMoreBefore` is also not yet meaningful, which makes the hero incorrectly render.
-  const isHydratingInitialMessages = Boolean(!messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && renderMessages.length === 0)
+  //
+  // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
+  // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
+  // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
+  const isHydratingInitialMessages = Boolean(
+    !messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+  )
 
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
@@ -1556,6 +1563,43 @@ export function ConversationMessageList({
   // Search input UI intentionally disabled for now.
   const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
+
+  const InitialMessageSkeletons = useCallback(() => {
+    // Skeleton rows should match the real "app layout" message rows:
+    // left avatar slot (40px) + monospace display name + markdown content (no right-aligned bubbles).
+    const skLine = 'bg-foreground/5 dark:bg-foreground/10'
+    const skAvatar = 'bg-foreground/5 dark:bg-foreground/10 ring-1 ring-border/30'
+    const Row = ({ variant, topMarginClass }: { variant: 'assistant' | 'user'; topMarginClass: string }) => {
+      const nameWidthClass = variant === 'assistant' ? 'w-40' : 'w-28'
+      return (
+        <div className={cn('flex justify-start w-full', topMarginClass)}>
+          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+            <div className="flex-shrink-0 mt-1" style={{ width: 40, height: 40 }} aria-hidden="true">
+              <Skeleton className={cn('w-10 h-10 rounded-full', skAvatar)} />
+            </div>
+            <div className="min-w-0 flex-1 w-full pt-0.5">
+              <div className="mb-1.5">
+                <Skeleton className={cn('h-4', nameWidthClass, skLine)} />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className={cn('h-4 w-[82%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[68%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[54%]', skLine)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="pb-6">
+        <Row variant="assistant" topMarginClass="mt-6" />
+        <Row variant="user" topMarginClass="mt-4" />
+        <Row variant="assistant" topMarginClass="mt-4" />
+      </div>
+    )
+  }, [])
 
   return (
     <div className={cn('h-full min-h-0 flex flex-col', className)}>
@@ -1675,22 +1719,26 @@ export function ConversationMessageList({
           )}
 
           <div className="mt-auto">
-            {showChannelHero ? (
-              <ChannelHero
-                channelName={channelName}
-                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {showDirectMessageHero ? (
-              <DirectMessageHero
-                title={resolvedEmptyHeroTitle}
-                participant={resolvedEmptyHeroParticipant ?? null}
-                avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {renderMessages.map((message, idx) => {
+            {isHydratingInitialMessages ? (
+              <InitialMessageSkeletons />
+            ) : (
+              <>
+                {showChannelHero ? (
+                  <ChannelHero
+                    channelName={channelName}
+                    conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {showDirectMessageHero ? (
+                  <DirectMessageHero
+                    title={resolvedEmptyHeroTitle}
+                    participant={resolvedEmptyHeroParticipant ?? null}
+                    avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {renderMessages.map((message, idx) => {
               const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
               const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
               const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
@@ -1854,7 +1902,9 @@ export function ConversationMessageList({
                   </div>
                 </Fragment>
               )
-            })}
+                })}
+              </>
+            )}
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (

@@ -1564,7 +1564,7 @@ export function ConversationMessageList({
   const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
-  const InitialMessageSkeletons = useCallback(() => {
+  function InitialMessageSkeletons() {
     // Skeleton rows should match the real "app layout" message rows:
     // left avatar slot (40px) + monospace display name + markdown content (no right-aligned bubbles).
     const skLine = 'bg-foreground/5 dark:bg-foreground/10'
@@ -1599,7 +1599,7 @@ export function ConversationMessageList({
         <Row variant="assistant" topMarginClass="mt-4" />
       </div>
     )
-  }, [])
+  }
 
   return (
     <div className={cn('h-full min-h-0 flex flex-col', className)}>

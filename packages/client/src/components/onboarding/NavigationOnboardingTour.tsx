@@ -222,6 +222,13 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
               maxWidth: '90vw',
             }}
           >
+            {/* Skip - top left */}
+            <div className="absolute top-3 left-4">
+              <Button variant="ghost" size="sm" onClick={skipTour} disabled={isCompleting} className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground -ml-1">
+                Skip
+              </Button>
+            </div>
+
             {/* Pointer - pointing left to navigation item */}
             {popupPosition.pointerTop !== undefined && (
               <div
@@ -249,15 +256,10 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
 
               {/* Footer */}
               <div className="flex items-center justify-between pt-2 border-t border-border">
-                {/* Step indicator and Skip - bottom left */}
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">
-                    {currentStep}/{totalSteps}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={skipTour} disabled={isCompleting} className="text-xs text-muted-foreground h-auto py-0 px-0 hover:text-foreground">
-                    Skip tour (don&apos;t show again)
-                  </Button>
-                </div>
+                {/* Step indicator - bottom left */}
+                <span className="text-xs text-muted-foreground">
+                  {currentStep}/{totalSteps}
+                </span>
 
                 {/* Navigation buttons - bottom right */}
                 <div className="flex items-center gap-2">

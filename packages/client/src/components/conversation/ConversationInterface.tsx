@@ -9,7 +9,6 @@ import { ForumChannelView } from '@/components/conversation/ForumChannelView'
 import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
 import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
 import type { SearchResult } from '@/components/conversation/conversationSearch'
-import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -100,12 +99,6 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
   }
 
   return null
-}
-
-function pickDefaultAgent(agents: AgentModel[]): AgentModel | null {
-  if (!Array.isArray(agents) || agents.length === 0) return null
-  const aria = agents.find(a => typeof a?.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
-  return aria ?? agents[0] ?? null
 }
 
 function isUIAction(v: unknown): v is ConversationStreamUIAction {
@@ -225,7 +218,6 @@ export function ConversationInterface({
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
-  const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
 
   // Discord-style search: use context when available (navbar search), else local state
   const searchContext = useConversationSearch()
@@ -336,20 +328,6 @@ export function ConversationInterface({
     return { id, pendingCount: Number(best.pendingCount) || 0, agentName }
   }, [childPendingApprovals, conversationAgentNameById])
 
-  // Build suggestion cards from the selected agent's preview/example prompts
-  const agentSuggestionCards = useMemo(() => {
-    if (!selectedAgent) return []
-    const a: any = selectedAgent as any
-    const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
-    if (!Array.isArray(list)) return []
-    const prompts = (list as string[]).filter(Boolean)
-    return prompts.map((text, idx) => ({
-      id: `${selectedAgent.id}:${idx}`,
-      agent: selectedAgent,
-      text,
-    }))
-  }, [selectedAgent])
-
   // Starter hero greetings – personalized (first name only), concise, one chosen per mount
   const displayName = useMemo(() => {
     const full = authUser?.name?.trim()
@@ -380,11 +358,6 @@ export function ConversationInterface({
     const n = (starshipData as any)?.name
     return typeof n === 'string' && n.trim().length > 0 ? n.trim() : 'your starship'
   }, [starshipData])
-
-  // For collapsed view, show only the first few prompts for the selected agent
-  const collapsedSuggestionCards = useMemo(() => {
-    return agentSuggestionCards.slice(0, 3)
-  }, [agentSuggestionCards])
 
   // Gate the heavy "conversation layout" (message list + docked input) more carefully:
   // - Existing conversations (loaded directly via route) should show immediately.
@@ -673,65 +646,6 @@ export function ConversationInterface({
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
 
-  // Set default agent (prefer aria*) ONLY on initial mount - use stable deps to avoid re-runs
-  useEffect(() => {
-    // Don't run if already set
-    if (hasSetInitialDefaultAgentRef.current) {
-      return
-    }
-
-    // If user has ever set any agent (including via @mention), don't override
-    if (hasEverSetAnyAgentRef.current) {
-      return
-    }
-
-    // CRITICAL: If user just selected an agent, don't override
-    if (userSelectedAgentRef.current) {
-      return
-    }
-
-    // If URL provided an initial agent, don't apply fallback
-    if (initialAgentId) {
-      return
-    }
-
-    // If an agent is already selected, do not override
-    if (selectedAgent) {
-      return
-    }
-
-    // CRITICAL: Don't apply Gaia fallback for existing conversations
-    // Let message restoration handle agent selection from stored messages
-    if (currentConversationId) {
-      return
-    }
-
-    // ALSO check the external prop to catch race conditions
-    if (externalConversationId) {
-      return
-    }
-
-    // Wait for agents to load
-    if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) {
-      return
-    }
-
-    const fallback = pickDefaultAgent(starshipAgentsData as any)
-
-    if (fallback && typeof fallback.id === 'string') {
-      // Set flags BEFORE state update to prevent re-runs
-      hasSetInitialDefaultAgentRef.current = true
-      hasEverSetAnyAgentRef.current = true
-      lastAutoSelectedAgentIdRef.current = fallback.id
-
-      setSelectedAgentWithLogging(fallback)
-    }
-    // CRITICAL: currentConversationId and externalConversationId are NOT in dependencies
-    // to prevent re-running when conversation is created or URL changes
-    // We check them in the effect body instead
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [starshipAgentsData, setSelectedAgentWithLogging, initialAgentId, selectedAgent])
-
   // Keep guard ref in sync with agent changes
   useEffect(() => {
     if (selectedAgent?.id) {
@@ -976,7 +890,8 @@ export function ConversationInterface({
           onCreateDraftThread={() => {
             // Open a draft thread in the thread pane without persisting a conversation yet.
             // The conversation is created on the first message send from the thread composer.
-            const defaultAgent = selectedAgent ?? pickDefaultAgent(starshipAgentsData as AgentModel[])
+            // Default agent selection is dynamic; do not force a global default here.
+            const defaultAgent = selectedAgent ?? null
             onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
           }}
         />
@@ -1134,12 +1049,6 @@ export function ConversationInterface({
 
             {/* Starter layout: Agent select, Message input, Suggested prompts — stable mount (use CSS to show/hide). */}
             <div className={cn('flex flex-col gap-6')} key="composer-stack">
-              <div className={cn(showMessagesArea && 'hidden')} key="agent-selector">
-                <div className="flex items-center justify-start gap-3">
-                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
-                </div>
-              </div>
-
               <div key="message-input">
                 {childWithPendingApprovalResolved && (
                   <ChildConversationApprovalCallout
@@ -1174,51 +1083,6 @@ export function ConversationInterface({
                   onAgentChange={handleAgentChange}
                   starshipSlug={starshipSlug}
                 ></ConversationMessageInput>
-              </div>
-
-              <div className={cn((showMessagesArea || agentSuggestionCards.length < 3) && 'hidden')} key="suggestions">
-                <div className="mb-1 flex items-center justify-start">
-                  {agentSuggestionCards.length > 3 ? (
-                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                      {showAllSuggestions ? (
-                        <>
-                          Show fewer
-                          <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
-                        </>
-                      ) : (
-                        <>
-                          Example Prompts
-                          <Icon name="chevron-down" className="h-3 w-3" />
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <p className="text-xs font-medium text-primary">Example Prompts</p>
-                  )}
-                </div>
-                <ul className="space-y-3">
-                  {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          try {
-                            // Prefill the message input without inserting sticky mentions
-                            messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
-                            messageInputRef.current?.focusInput?.()
-                          } catch {}
-                        }}
-                        className="group flex w-full rounded-2xl bg-card border border-border/60 shadow-sm px-3 py-2.5 text-left transition-all duration-200 hover:border-primary/30 hover:-translate-y-0.5"
-                      >
-                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
-                          <span className="mr-1 text-base align-top text-primary/70">“</span>
-                          {item.text}
-                          <span className="ml-1 text-base align-baseline text-primary/70">”</span>
-                        </p>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </div>
           </div>

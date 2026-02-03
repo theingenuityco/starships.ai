@@ -144,6 +144,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   // Redirect already-logged-in users who haven't completed the wizard (e.g. existing users after migration).
+  // Any flow that sends the user into the app (e.g. to /ship/...) must call wizard/complete and refetch auth first;
+  // see: onboarding (handleFinish, handleJoinWithInviteLink) and accept-invite page.
   // Must run unconditionally (before any early return) to satisfy Rules of Hooks.
   useEffect(() => {
     if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage || isMarketplace) return

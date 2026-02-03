@@ -134,7 +134,7 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
       <CardContent className="flex flex-1 flex-col gap-4">
         {Array.isArray(plans) && plans.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full min-w-0">
               {[...plans]
                 .sort((a, b) => {
                   const ar = shipClassOrder[a.shipClass] ?? 999

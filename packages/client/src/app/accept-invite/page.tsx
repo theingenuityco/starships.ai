@@ -2,8 +2,10 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/hooks/useAuth'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAuth, AUTH_QUERY_KEYS } from '@/hooks/useAuth'
 import { useAcceptStarshipInvite } from '@/hooks/useStarshipInvites'
+import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -16,6 +18,7 @@ type InvitePreviewResponse = {
 
 export default function AcceptInvitePage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   // Canonical param is `invite` (no backwards compatibility with `token`).
   const inviteToken = (searchParams.get('invite') || '').trim()
@@ -23,6 +26,7 @@ export default function AcceptInvitePage() {
 
   const { isAuthenticated, isLoading, user, userEmail } = useAuth()
   const acceptInvite = useAcceptStarshipInvite(user?.id)
+  const completeWizard = useCompleteWizardOnboarding()
 
   const [attempted, setAttempted] = useState(false)
   const [preview, setPreview] = useState<InvitePreviewResponse | null>(null)
@@ -96,13 +100,16 @@ export default function AcceptInvitePage() {
     setAttempted(true)
     void acceptInvite
       .mutateAsync(inviteToken)
-      .then(starship => {
+      .then(async starship => {
+        // Mark wizard complete so client-layout does not redirect back to /onboarding.
+        await completeWizard.mutateAsync()
+        await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
         router.replace(`/ship/${encodeURIComponent(starship.slug)}`)
       })
       .catch(() => {
         // errors are surfaced via toast; keep page visible for retry
       })
-  }, [inviteToken, previewLoading, previewError, preview, userEmail, isAuthenticated, attempted, acceptInvite, router])
+  }, [inviteToken, previewLoading, previewError, preview, userEmail, isAuthenticated, attempted, acceptInvite, completeWizard, queryClient, router])
 
   const canRetry = Boolean(inviteToken) && isAuthenticated && !acceptInvite.isPending
 

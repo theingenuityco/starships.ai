@@ -1,12 +1,15 @@
 'use client'
 
+import Image from 'next/image'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
-import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
 import { useStarshipAgents, useDeleteAgent } from '@/hooks/useAgents'
+import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 export interface OnboardingAgentCardProps {
   template: AgentTemplateModel
@@ -21,6 +24,8 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
   const createAgentMutation = useCreateAgentFromTemplate()
   const deleteAgentMutation = useDeleteAgent()
   const { data: deployedAgents = [] } = useStarshipAgents(targetStarshipId, !!targetStarshipId)
+  const { data: requiredConnectors = [] } = useRequiredConnectors(template.id, !!template.id)
+  const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
 
   const deployedAgent = deployedAgents.find(agent => agent.sourceTemplateId === template.id)
   const isAlreadyDeployed = !!deployedAgent
@@ -78,6 +83,34 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
     </Button>
   )
 
+  const connectorBadges =
+    requiredConnectors.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+        {requiredConnectors.map(({ provider, name }) => {
+          const showLogo = !hiddenLogos[provider]
+          const logoSrc = getConnectorLogoSrc(provider)
+          return (
+            <div
+              key={provider}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40"
+              title={name}
+            >
+              {showLogo ? (
+                <Image
+                  src={logoSrc}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                  onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                />
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    ) : null
+
   if (!compact) {
     return (
       <div className="flex flex-col rounded-xl border border-border/40 bg-card/10 p-5 gap-4">
@@ -101,6 +134,7 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-[17px] leading-tight truncate">{displayName || 'Unnamed agent'}</div>
             {displayRole ? <div className="text-sm text-muted-foreground truncate mt-0.5">{displayRole}</div> : null}
+            {connectorBadges}
           </div>
           {addRemoveButton}
         </div>
@@ -131,6 +165,7 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[17px] leading-tight truncate">{displayName || 'Unnamed agent'}</div>
           {displayRole ? <div className="text-sm text-muted-foreground truncate mt-0.5">{displayRole}</div> : null}
+          {connectorBadges}
         </div>
         {addRemoveButton}
       </div>

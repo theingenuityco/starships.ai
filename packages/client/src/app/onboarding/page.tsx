@@ -2,16 +2,18 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { Orbitron } from 'next/font/google'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, AUTH_QUERY_KEYS } from '@/hooks/useAuth'
 import { useUserStarships, useUpdateStarship } from '@/hooks/useStarships'
-import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
+import { useCreateStarshipInvite, useAcceptStarshipInvite } from '@/hooks/useStarshipInvites'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAgentTemplates, useRequiredConnectorsForTemplates } from '@/hooks/useTemplates'
 import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { OnboardingAgentCard } from '@/components/onboarding/OnboardingAgentCard'
@@ -21,13 +23,38 @@ import { StarTheme } from '@/components/theme-context'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 import type { AgentTemplateModel } from '@starships/protocol'
 
+/** Same shape as accept-invite preview API response. */
+type InvitePreviewResponse = {
+  invitedEmail: string
+  role: 'admin' | 'collaborator'
+  expiresAt: string
+  starship: { id: string; slug: string; name: string }
+}
+
+/** Extract invite token from pasted text: full URL (accept-invite?invite=...) or raw token. */
+function parseInviteToken(input: string): string {
+  const raw = (input || '').trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(raw)
+    const token = url.searchParams.get('invite')
+    if (token) return token.trim()
+  } catch {
+    // not a URL
+  }
+  return raw
+}
+
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 const TOTAL_STEPS = 5
 
-/** Shared content width for steps 1, 2, 5; steps 3–4 use wider layout. */
+/** Shared content width for steps 1, 2. */
 const CONTENT_MAX_W = 'max-w-3xl'
+/** Steps 3–4: agent picker and connectors. */
 const CONTENT_MAX_W_STEP3_4 = 'max-w-4xl'
+/** Step 5: upgrade cards fill width nearly. */
+const CONTENT_MAX_W_STEP5 = 'max-w-5xl'
 /** Consistent input/field width across steps. */
 const INPUT_MAX_W = 'max-w-xl'
 /** Primary nav button (Next/Complete) min width and height. */
@@ -36,7 +63,8 @@ const BTN_NAV_GHOST = 'h-10'
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { user, userId, isAuthenticated, isLoading: authLoading } = useAuth()
+  const queryClient = useQueryClient()
+  const { user, userId, userEmail, isAuthenticated, isLoading: authLoading } = useAuth()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId)
   // Prefer an owned starship for onboarding so existing owners who were invited elsewhere still see the full wizard for their workspace
   const primaryStarship = starships.find(s => s.ownerId === userId) ?? starships[0]
@@ -44,11 +72,18 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [starshipName, setStarshipName] = useState('')
   const [inviteEmailRows, setInviteEmailRows] = useState<string[]>([''])
+  /** Step 1 tab: create/name workspace vs join with invite link. */
+  const [step1Tab, setStep1Tab] = useState<'create' | 'join'>('create')
+  const [inviteLinkInput, setInviteLinkInput] = useState('')
+  const [joinPreview, setJoinPreview] = useState<InvitePreviewResponse | null>(null)
+  const [joinPreviewLoading, setJoinPreviewLoading] = useState(false)
+  const [joinPreviewError, setJoinPreviewError] = useState<string | null>(null)
   /** Template IDs of agents the user added on step 3 (used to show required connectors on step 4). */
   const [deployedTemplateIds, setDeployedTemplateIds] = useState<string[]>([])
 
   const updateStarship = useUpdateStarship()
   const createInvite = useCreateStarshipInvite(primaryStarship?.id ?? '')
+  const acceptInvite = useAcceptStarshipInvite(userId)
   const completeWizard = useCompleteWizardOnboarding()
 
   const { data: allTemplates = [], isLoading: templatesLoading } = useAgentTemplates(undefined, !!primaryStarship?.id && step === 3)
@@ -102,6 +137,48 @@ export default function OnboardingPage() {
     }
     setStep(2)
   }, [starshipName, primaryStarship, updateStarship])
+
+  const handleJoinWithInviteLink = useCallback(async () => {
+    const token = parseInviteToken(inviteLinkInput)
+    if (!token) {
+      setJoinPreviewError('Please paste an invite link from your email.')
+      return
+    }
+    setJoinPreviewError(null)
+    setJoinPreview(null)
+    setJoinPreviewLoading(true)
+    try {
+      const r = await fetch('/api/v1/starship-invites/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      const json = await r.json().catch(() => null)
+      if (!r.ok || !json?.data) {
+        throw new Error(json?.error?.message || 'Invalid or expired invite link.')
+      }
+      const preview = json.data as InvitePreviewResponse
+      setJoinPreview(preview)
+
+      const invitedEmail = (preview.invitedEmail || '').trim().toLowerCase()
+      const currentEmail = (userEmail || '').trim().toLowerCase()
+      if (invitedEmail && currentEmail && invitedEmail !== currentEmail) {
+        const returnUrl = `/accept-invite?invite=${encodeURIComponent(token)}`
+        router.replace(`/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`)
+        return
+      }
+
+      const starship = await acceptInvite.mutateAsync(token)
+      // Mark wizard complete so client-layout does not redirect back to /onboarding.
+      await completeWizard.mutateAsync()
+      await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
+      router.replace(`/ship/${encodeURIComponent(starship.slug)}`)
+    } catch (e: unknown) {
+      setJoinPreviewError(e instanceof Error ? e.message : 'Invalid or expired invite link.')
+    } finally {
+      setJoinPreviewLoading(false)
+    }
+  }, [inviteLinkInput, userEmail, acceptInvite, completeWizard, queryClient, router])
 
   const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((e || '').trim().toLowerCase())
 
@@ -157,12 +234,13 @@ export default function OnboardingPage() {
 
   const handleFinish = useCallback(async () => {
     await completeWizard.mutateAsync()
+    await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
     if (primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}`)
     } else {
       router.push('/marketplace')
     }
-  }, [completeWizard, primaryStarship?.slug, router])
+  }, [completeWizard, queryClient, primaryStarship?.slug, router])
 
   if (authLoading || !isAuthenticated || (hasStarship && starshipsLoading)) {
     return (
@@ -223,26 +301,68 @@ export default function OnboardingPage() {
         </header>
 
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
-          <div className={`w-full mx-auto min-w-0 ${step === 3 || step === 4 ? CONTENT_MAX_W_STEP3_4 : CONTENT_MAX_W}`}>
+          <div className={`w-full mx-auto min-w-0 ${step === 5 ? CONTENT_MAX_W_STEP5 : step === 3 || step === 4 ? CONTENT_MAX_W_STEP3_4 : CONTENT_MAX_W}`}>
             <p className="text-xs text-muted-foreground mb-1">
               Step {step} of {TOTAL_STEPS}
             </p>
 
             {step === 1 && (
               <div className="mt-6 space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
-                </div>
-                <div className={`space-y-2 ${INPUT_MAX_W}`}>
-                  <Label htmlFor="starship-name">Starship name</Label>
-                  <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
-                </div>
-                <div className="flex items-center justify-end pt-6">
-                  <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending} className={BTN_PRIMARY}>
-                    {updateStarship.isPending ? 'Saving…' : 'Next'}
-                  </Button>
-                </div>
+                <Tabs value={step1Tab} onValueChange={v => setStep1Tab(v === 'join' ? 'join' : 'create')} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 p-0 h-11 bg-muted/30 rounded-lg">
+                    <TabsTrigger value="create" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                      New Workspace
+                    </TabsTrigger>
+                    <TabsTrigger value="join" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                      Join with invite link
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="create" className="mt-6 space-y-6">
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight">Name your workspace</h2>
+                      <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
+                    </div>
+                    <div className={`space-y-2 ${INPUT_MAX_W}`}>
+                      <Label htmlFor="starship-name">Starship name</Label>
+                      <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
+                    </div>
+                    <div className="flex items-center justify-end pt-2">
+                      <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending} className={BTN_PRIMARY}>
+                        {updateStarship.isPending ? 'Saving…' : 'Next'}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="join" className="mt-6 space-y-6">
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight">Join with invite link</h2>
+                      <p className="mt-2 text-sm text-muted-foreground">Paste the invite link to join your team&apos;s starship.</p>
+                    </div>
+                    <div className={`space-y-2 ${INPUT_MAX_W}`}>
+                      <Label htmlFor="invite-link">Invite link</Label>
+                      <Input
+                        id="invite-link"
+                        value={inviteLinkInput}
+                        onChange={e => {
+                          setInviteLinkInput(e.target.value)
+                          setJoinPreviewError(null)
+                        }}
+                        placeholder="https://…/accept-invite?invite=…"
+                        className="font-mono text-sm"
+                      />
+                      {joinPreviewError ? <p className="text-sm text-destructive">{joinPreviewError}</p> : null}
+                      {joinPreview ? (
+                        <p className="text-sm text-muted-foreground">
+                          Joining <span className="font-medium text-foreground">{joinPreview.starship.name}</span>…
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center justify-end pt-2">
+                      <Button onClick={handleJoinWithInviteLink} disabled={!inviteLinkInput.trim() || joinPreviewLoading || acceptInvite.isPending} className={BTN_PRIMARY}>
+                        {joinPreviewLoading || acceptInvite.isPending ? 'Joining…' : 'Join'}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
 
@@ -250,10 +370,9 @@ export default function OnboardingPage() {
               <div className="mt-6 space-y-6">
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">Add colleagues by email.</p>
+                  <p className="mt-2 text-sm text-muted-foreground">Who else is on the {primaryStarship?.name ?? 'starship'} team?</p>
                 </div>
                 <div className={`space-y-3 ${INPUT_MAX_W}`}>
-                  <Label>Email addresses</Label>
                   <ul className="grid grid-cols-1 gap-3">
                     {inviteEmailRows.map((email, idx) => (
                       <li key={idx} className="flex items-center gap-2">
@@ -369,8 +488,8 @@ export default function OnboardingPage() {
                 </div>
 
                 {primaryStarship?.id && (
-                  <div className="mt-4">
-                    <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none" hideDescription />
+                  <div className="mt-4 w-full min-w-0">
+                    <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none w-full" hideDescription />
                   </div>
                 )}
 

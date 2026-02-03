@@ -626,6 +626,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // (This covers "thread started from a user message" and other edge cases.)
       const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isDraftUserUserDm && !isMentionOnlyThread && !effectiveAgent)
 
+      // Best-effort routing preview:
+      // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
+      // This prevents a brief "agent is typing" flash for messages that the server will persist without agent execution
+      // (e.g. user mentions like <@u:...> in a default-agent thread).
+      const willTriggerAgentBestEffort = (() => {
+        if (isDraftUserUserDm) return false
+        if (shouldPersistOnly) return false
+
+        const raw = String(messageToSend || '')
+        const hasUserMentionToken = raw.includes('<@u:')
+        // Mirror server mention behavior loosely:
+        // - Structured agent mention tokens: <@a:AGENT_ID>
+        // - Legacy @slug mentions (strip structured tokens first)
+        const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
+        const legacyMentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
+        const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
+
+        // Mention-only contexts only run when at least one agent is mentioned.
+        if (isChannelConversation || isMentionOnlyThread) return hasAgentMention
+
+        // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
+        if (hasUserMentionToken && !hasAgentMention) return false
+
+        // Otherwise: if we have an effective agent (explicit or fallback) or an agent mention, expect execution.
+        return Boolean(effectiveAgent || hasAgentMention)
+      })()
+
       // Validation for agent and starship
       if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm && !shouldPersistOnly) {
         resetFlags()
@@ -800,16 +827,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               const last = next.length > 0 ? next[next.length - 1] : null
               const prev = next.length > 1 ? next[next.length - 2] : null
               const already =
-                last?.type === 'turn_started' &&
-                last?.payload?.local === true &&
-                prev?.type === 'append' &&
-                prev?.message?.role === 'user' &&
-                typeof prev?.message?.id === 'string' &&
-                String(prev.message.id).startsWith('temp-user-') &&
-                String(prev?.message?.content ?? '') === String(contentToSend)
+                // Case A: seeded append + turn_started
+                (last?.type === 'turn_started' &&
+                  last?.payload?.local === true &&
+                  prev?.type === 'append' &&
+                  prev?.message?.role === 'user' &&
+                  typeof prev?.message?.id === 'string' &&
+                  String(prev.message.id).startsWith('temp-user-') &&
+                  String(prev?.message?.content ?? '') === String(contentToSend)) ||
+                // Case B: seeded append only (no local turn_started)
+                (last?.type === 'append' &&
+                  last?.message?.role === 'user' &&
+                  typeof last?.message?.id === 'string' &&
+                  String(last.message.id).startsWith('temp-user-') &&
+                  String(last?.message?.content ?? '') === String(contentToSend))
               if (already) return next
               next.push({ type: 'append', message: tempUser })
-              next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+              if (willTriggerAgentBestEffort) {
+                next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+              }
               return next
             })
           } catch {}

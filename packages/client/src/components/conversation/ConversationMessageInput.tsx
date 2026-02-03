@@ -183,9 +183,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const CREDITS_PER_MESSAGE = 10
     const LOW_WARNING_THRESHOLD = 50 // ~5 messages left
     const balanceNum = Number(wallet?.balance ?? '0')
-    // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
-    const hasFunds = canManageBilling ? balanceNum >= CREDITS_PER_MESSAGE : true
-    const showLowBalanceWarning = Boolean(canManageBilling && conversationId && !isLoading && hasFunds && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Determine current ship slug for billing URL
     const billingHref = `/ship/${starshipSlug}/settings/billing`
@@ -296,6 +293,40 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const isMentionOnlyThread = Boolean(isThreadConversation && linkedAgentCount > 2)
     const isThreadDraft = Boolean(typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)
     const isThreadContext = Boolean(isThreadConversation || isThreadDraft)
+
+    // Credits gating: only require balance when the draft will actually trigger an agent.
+    // (Server is authoritative; this is best-effort UX to avoid blocking human-only messages.)
+    const draftHasAgentMention = useMemo(() => {
+      const raw = String(message || '')
+      if (!raw.trim()) return false
+      // Preferred: structured agent mentions emitted by the composer.
+      if (raw.includes('<@a:')) return true
+      // Back-compat: plain-text @mentions. Mirror the server's mention token shapes loosely.
+      const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
+      const mentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
+      return mentionRe.test(legacyText)
+    }, [message])
+
+    const requiresCreditsForDraft = useMemo(() => {
+      // user↔user DMs are human-only (no agent run => no fixed message charge)
+      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
+      if (isDraftUserUserDm) return false
+
+      // Mention-only contexts: only charge when an agent is explicitly mentioned.
+      if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
+
+      // Normal conversations: charge when there's either a mention or a linked fallback agent.
+      // (Mirrors the server: hasMention || linkedAgentCount > 0)
+      if (draftHasAgentMention) return true
+      const linkedCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
+      return linkedCount > 0
+    }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
+
+    // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
+    const hasFunds = canManageBilling ? (!requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE) : true
+    const showLowBalanceWarning = Boolean(
+      canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD
+    )
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -1858,7 +1889,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">Low credits</p>
                 <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">
-                  You’re running low on credits. Each message costs {CREDITS_PER_MESSAGE} credits—add more to avoid interruptions.
+                  You’re running low on credits. Each agent-triggering message costs {CREDITS_PER_MESSAGE} credits—add more to avoid interruptions.
                 </p>
               </div>
               <div className="flex-shrink-0">
@@ -1873,7 +1904,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Professional insufficient credits indicator */}
-        {canManageBilling && !hasFunds && !isLoading && conversationId && (
+        {canManageBilling && requiresCreditsForDraft && !hasFunds && !isLoading && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
@@ -1888,7 +1919,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">Insufficient credits</p>
-                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">You need at least {CREDITS_PER_MESSAGE} credits to send a message. Please add credits to keep chatting.</p>
+                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
+                  You need at least {CREDITS_PER_MESSAGE} credits to send an agent-triggering message. Please add credits to keep chatting.
+                </p>
               </div>
               <div className="flex-shrink-0">
                 <Link href={billingHref}>

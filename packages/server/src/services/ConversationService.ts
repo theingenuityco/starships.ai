@@ -1550,10 +1550,36 @@ export class ConversationService {
       agentQueue = [];
       noAgentToRun = true;
     } else {
+      // Explicit agent selection (client-provided agentId):
+      // - Supported for normal (non-channel) conversations/threads where a default agent is allowed.
+      // - NOT used for channels or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
+      const explicitAgentId = typeof data.agentId === 'string' ? data.agentId.trim() : '';
+      if (explicitAgentId && !isChannel && !isMentionOnlyThread) {
+        const explicitAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === explicitAgentId);
+        if (explicitAgent) {
+          // Ensure the agent is linked so subsequent turns have a stable fallback.
+          if (!conversationAgents.find((x) => x.id === explicitAgent.id)) {
+            try {
+              await this.conversationRepository.linkToAgent(data.conversationId, explicitAgent.id);
+              conversationAgents = await this.getConversationAgents(data.conversationId);
+            } catch (err) {
+              console.warn('[ConversationService] Failed to auto-link explicit agent', {
+                conversationId: data.conversationId,
+                agentId: explicitAgent.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+          agentQueue = [explicitAgent];
+          noAgentToRun = false;
+        }
+      }
+
       // Build initial target agents from @mentions in the incoming message.
       // - For channels: mention-only; no fallback agent.
       // - For normal conversations: fallback to the first linked agent.
       // - For threads with >2 agents: mention-only; no fallback agent.
+      if (agentQueue.length === 0) {
       const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
       // Auto-link mentioned agents not yet linked
       let linkedAny = false;
@@ -1577,6 +1603,7 @@ export class ConversationService {
 
       agentQueue = initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
       noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+      }
     }
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
@@ -1814,6 +1841,75 @@ export class ConversationService {
       // Clear attribution and suppression, emit a single completion
       this.currentAgentForConversation.delete(data.conversationId);
       this.suppressCompleteFor.delete(data.conversationId);
+    }
+  }
+
+  /**
+   * Determine whether an incoming user message will trigger any agent execution.
+   *
+   * Used for billing + UX gating: we only charge fixed "per user message" credits
+   * when the message will actually run an agent.
+   *
+   * IMPORTANT:
+   * - This is intentionally side-effect free (it does NOT auto-link mentioned agents).
+   * - Server remains authoritative; this is a best-effort routing preview.
+   */
+  async willTriggerAgentExecution(params: { conversationId: string; content: string; agentId?: string | null }): Promise<boolean> {
+    try {
+      const conversationId = String(params.conversationId || '').trim();
+      const content = typeof params.content === 'string' ? params.content : '';
+      const explicitAgentId = typeof params.agentId === 'string' ? params.agentId.trim() : '';
+      if (!conversationId) return false;
+
+      const [conversation, starship] = await Promise.all([
+        this.getConversationById(conversationId).catch(() => null),
+        this.getConversationStarship(conversationId).catch(() => null),
+      ]);
+      if (!conversation || !starship) return false;
+
+      const channelRepo = new ChannelRepository();
+      const dmRepo = new DirectMessageRepository();
+
+      const [channel, dm, conversationAgents, allStarshipAgents] = await Promise.all([
+        channelRepo.findByConversationId(conversationId).catch(() => null),
+        dmRepo.findByConversationId(conversationId).catch(() => null),
+        this.getConversationAgents(conversationId).catch(() => [] as AgentModel[]),
+        this.agentRepository.findByStarship(starship.id).catch(() => [] as AgentModel[]),
+      ]);
+
+      const isChannel = Boolean(channel);
+      const isUserUserDm = (dm as { dmType?: unknown } | null)?.dmType === 'user_user';
+      if (isUserUserDm) return false;
+
+      const isThread = Boolean((conversation as { parentConversationId?: string | null }).parentConversationId);
+      const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0;
+      const isMentionOnlyThread = Boolean(isThread && !isChannel && linkedAgentCount > 2);
+
+      // Mentions are resolved against the full starship agent list (not only currently-linked agents).
+      const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
+      const hasMention = mentioned.length > 0;
+
+      // Mention-only contexts only trigger when at least one agent is mentioned.
+      if (isChannel || isMentionOnlyThread) return hasMention;
+
+      // Normal conversations:
+      // - If an explicit agentId is provided (client selects an agent), treat it as intent to trigger execution.
+      // - Otherwise fallback to linked agent count.
+      if (explicitAgentId) {
+        const existsOnStarship = Array.isArray(allStarshipAgents)
+          ? allStarshipAgents.some((a) => String(a?.id || '').trim() === explicitAgentId)
+          : false;
+        if (existsOnStarship) return true;
+      }
+
+      // Otherwise: mentions or fallback linked agent.
+      return hasMention || linkedAgentCount > 0;
+    } catch (err) {
+      console.warn('[ConversationService] willTriggerAgentExecution failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Fail closed: if we can't determine routing, do not claim an agent will run.
+      return false;
     }
   }
 

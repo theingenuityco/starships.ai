@@ -303,7 +303,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (raw.includes('<@a:')) return true
       // Back-compat: plain-text @mentions. Mirror the server's mention token shapes loosely.
       const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
-      const mentionRe = /(^|\s)@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
+      const mentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
       return mentionRe.test(legacyText)
     }, [message])
 
@@ -315,9 +315,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Mention-only contexts: only charge when an agent is explicitly mentioned.
       if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
 
-      // Normal conversations: a message will run an agent (mentions or fallback).
-      return true
-    }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention])
+      // Normal conversations: charge when there's either a mention or a linked fallback agent.
+      // (Mirrors the server: hasMention || linkedAgentCount > 0)
+      if (draftHasAgentMention) return true
+      const linkedCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
+      return linkedCount > 0
+    }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
 
     // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
     const hasFunds = canManageBilling ? (!requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE) : true

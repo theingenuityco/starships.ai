@@ -1550,10 +1550,36 @@ export class ConversationService {
       agentQueue = [];
       noAgentToRun = true;
     } else {
+      // Explicit agent selection (client-provided agentId):
+      // - Supported for normal (non-channel) conversations/threads where a default agent is allowed.
+      // - NOT used for channels or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
+      const explicitAgentId = typeof data.agentId === 'string' ? data.agentId.trim() : '';
+      if (explicitAgentId && !isChannel && !isMentionOnlyThread) {
+        const explicitAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === explicitAgentId);
+        if (explicitAgent) {
+          // Ensure the agent is linked so subsequent turns have a stable fallback.
+          if (!conversationAgents.find((x) => x.id === explicitAgent.id)) {
+            try {
+              await this.conversationRepository.linkToAgent(data.conversationId, explicitAgent.id);
+              conversationAgents = await this.getConversationAgents(data.conversationId);
+            } catch (err) {
+              console.warn('[ConversationService] Failed to auto-link explicit agent', {
+                conversationId: data.conversationId,
+                agentId: explicitAgent.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+          agentQueue = [explicitAgent];
+          noAgentToRun = false;
+        }
+      }
+
       // Build initial target agents from @mentions in the incoming message.
       // - For channels: mention-only; no fallback agent.
       // - For normal conversations: fallback to the first linked agent.
       // - For threads with >2 agents: mention-only; no fallback agent.
+      if (agentQueue.length === 0) {
       const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
       // Auto-link mentioned agents not yet linked
       let linkedAny = false;
@@ -1577,6 +1603,7 @@ export class ConversationService {
 
       agentQueue = initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
       noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+      }
     }
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
@@ -1827,10 +1854,11 @@ export class ConversationService {
    * - This is intentionally side-effect free (it does NOT auto-link mentioned agents).
    * - Server remains authoritative; this is a best-effort routing preview.
    */
-  async willTriggerAgentExecution(params: { conversationId: string; content: string }): Promise<boolean> {
+  async willTriggerAgentExecution(params: { conversationId: string; content: string; agentId?: string | null }): Promise<boolean> {
     try {
       const conversationId = String(params.conversationId || '').trim();
       const content = typeof params.content === 'string' ? params.content : '';
+      const explicitAgentId = typeof params.agentId === 'string' ? params.agentId.trim() : '';
       if (!conversationId) return false;
 
       const [conversation, starship] = await Promise.all([
@@ -1853,10 +1881,6 @@ export class ConversationService {
       const isUserUserDm = (dm as { dmType?: unknown } | null)?.dmType === 'user_user';
       if (isUserUserDm) return false;
 
-      // For non-channel conversations, the runtime requires at least one linked agent (fallback).
-      // If none exist, we won't run any agent (ConversationService will throw later).
-      if (!isChannel && (!Array.isArray(conversationAgents) || conversationAgents.length < 1)) return false;
-
       const isThread = Boolean((conversation as { parentConversationId?: string | null }).parentConversationId);
       const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0;
       const isMentionOnlyThread = Boolean(isThread && !isChannel && linkedAgentCount > 2);
@@ -1868,7 +1892,17 @@ export class ConversationService {
       // Mention-only contexts only trigger when at least one agent is mentioned.
       if (isChannel || isMentionOnlyThread) return hasMention;
 
-      // Normal conversations: any message triggers (mentions or fallback agent).
+      // Normal conversations:
+      // - If an explicit agentId is provided (client selects an agent), treat it as intent to trigger execution.
+      // - Otherwise fallback to linked agent count.
+      if (explicitAgentId) {
+        const existsOnStarship = Array.isArray(allStarshipAgents)
+          ? allStarshipAgents.some((a) => String(a?.id || '').trim() === explicitAgentId)
+          : false;
+        if (existsOnStarship) return true;
+      }
+
+      // Otherwise: mentions or fallback linked agent.
       return hasMention || linkedAgentCount > 0;
     } catch (err) {
       console.warn('[ConversationService] willTriggerAgentExecution failed', {

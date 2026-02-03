@@ -1780,7 +1780,7 @@ router.post(
       }
 
       const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
-      const willTriggerAgent = await conversationService.willTriggerAgentExecution({ conversationId, content });
+      const willTriggerAgent = await conversationService.willTriggerAgentExecution({ conversationId, content, agentId });
 
       let wallet: { id: string; balance: string } | null = null;
       if (willTriggerAgent) {
@@ -1865,8 +1865,15 @@ router.post(
           // Best-effort cleanup: remove message if we couldn't charge it.
           try {
             await messageService.deleteMessage(userMessage.id);
-          } catch {
-            /* ignore cleanup failure */
+          } catch (cleanupErr) {
+            console.error('[BILLING] Failed to delete unpaid user message after billing failure', {
+              conversationId,
+              messageId: userMessage.id,
+              starshipId: starship.id,
+              walletId: wallet?.id,
+              userId: authUserId,
+              error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+            });
           }
           if (e instanceof InsufficientFundsError) {
             sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient credits. Please add credits from Billing to continue.', 402, {

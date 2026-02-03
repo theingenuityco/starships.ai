@@ -73,6 +73,7 @@ export default function DmPeerPage() {
   const params = useParams<{ slug: string; peer: string }>()
   const slug = params.slug
   const peer = params.peer
+  const peerStr = String(peer || '').trim()
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
 
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
@@ -89,9 +90,12 @@ export default function DmPeerPage() {
 
   const dmTarget = useMemo(() => {
     const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
-    const peerStr = String(peer || '').trim()
     // Avoid misclassifying agent slugs as user ids while the agents list is still loading.
-    if (peerStr && !peerStr.toLowerCase().startsWith('u-') && agentsLoading) return null
+    // Only block on the ambiguous form (bare `<agentSlug>`). Explicit prefixes can be parsed without agent data.
+    const lower = peerStr.toLowerCase()
+    const isExplicitUser = lower.startsWith('u-')
+    const isExplicitAgent = lower.startsWith('a:') || lower.startsWith('a-')
+    if (peerStr && !isExplicitUser && !isExplicitAgent && agentsLoading) return null
     return parseDmPeer(peer, list)
   }, [peer, agentsData, agentsLoading])
 
@@ -199,6 +203,16 @@ export default function DmPeerPage() {
   if (!dmTarget && !dmsLoading && !agentsLoading) {
     if (slug) router.replace(`/ship/${slug}`)
     return null
+  }
+
+  // If we're on an agent DM route using the bare `<agentSlug>` form, `dmTarget` is intentionally null until
+  // the agents list loads. During that window, do NOT render the generic conversation starter/empty state.
+  if (!dmTarget && starshipId && peerStr && !peerStr.toLowerCase().startsWith('u-') && agentsLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading direct message…</div>
+      </div>
+    )
   }
 
   // If we're still resolving whether this DM already exists, don't show a misleading draft UI.

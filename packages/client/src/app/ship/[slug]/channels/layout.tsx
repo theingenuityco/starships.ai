@@ -9,6 +9,7 @@ import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import api from '@/lib/api'
 
 export default function ChannelsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -243,6 +244,41 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       }
     }
   }, [threadKey])
+
+  useEffect(() => {
+    // Refresh-safe pin hydration:
+    // The thread pane's "pinned first message" is normally passed via ephemeral state when the user clicks
+    // a message. On refresh, that state is lost, so re-derive it by:
+    // - loading the thread conversation to get its parentConversationId
+    // - scanning the parent conversation messages for the message whose linkedConversationId points to this thread
+    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
+    if (!threadId) return
+    if (isDraftThreadOpen) return
+    if (threadPinnedFirstMessage) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
+        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
+        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
+        if (!parentId) return
+
+        const msgsResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/messages`, { params: { limit: 200 } })
+        const payload = (msgsResp as any)?.data?.data ?? (msgsResp as any)?.data ?? null
+        const msgs = Array.isArray(payload?.messages) ? (payload.messages as any[]) : []
+        const pinned = msgs.find(m => String((m as any)?.linkedConversationId ?? '').trim() === threadId) ?? null
+        if (cancelled) return
+        if (pinned) setThreadPinnedFirstMessage(pinned as any)
+      } catch {
+        // ignore (best-effort hydration)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [threadConversationId, isDraftThreadOpen, threadPinnedFirstMessage])
 
   const handleThreadCreated = useCallback(
     (cid: string) => {

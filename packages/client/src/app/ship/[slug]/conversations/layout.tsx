@@ -10,6 +10,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import api from '@/lib/api'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -214,6 +215,37 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       }
     }
   }, [threadKey])
+
+  useEffect(() => {
+    // Refresh-safe pin hydration (see ChannelsLayout for rationale).
+    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
+    if (!threadId) return
+    if (isDraftThreadOpen) return
+    if (threadPinnedFirstMessage) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
+        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
+        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
+        if (!parentId) return
+
+        const msgsResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/messages`, { params: { limit: 200 } })
+        const payload = (msgsResp as any)?.data?.data ?? (msgsResp as any)?.data ?? null
+        const msgs = Array.isArray(payload?.messages) ? (payload.messages as any[]) : []
+        const pinned = msgs.find(m => String((m as any)?.linkedConversationId ?? '').trim() === threadId) ?? null
+        if (cancelled) return
+        if (pinned) setThreadPinnedFirstMessage(pinned as any)
+      } catch {
+        // ignore (best-effort hydration)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [threadConversationId, isDraftThreadOpen, threadPinnedFirstMessage])
 
   const handleThreadCreated = useCallback(
     (cid: string) => {

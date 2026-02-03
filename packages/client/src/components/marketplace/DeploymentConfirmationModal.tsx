@@ -126,14 +126,14 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
       <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden p-6">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="flex-shrink-0">
+            <DialogHeader className="flex-shrink-0 mb-4">
               <DialogTitle className="flex items-center gap-2">
                 <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
                 {isAgent ? `Deploy to ${starshipName}` : 'Installation'}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5 pb-4">
               {/* Template Info – alignment like marketplace profile: avatar, name + role, tags row, then description */}
               <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
                 <div className="flex items-start gap-4 min-w-0">
@@ -157,9 +157,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                   )}
                   <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-lg leading-tight truncate">{template.name}</h4>
-                    {isAgent && (template as AgentTemplateModel).role ? (
-                      <p className="mt-0.5 text-sm text-muted-foreground truncate">{(template as AgentTemplateModel).role}</p>
-                    ) : null}
+                    {isAgent && (template as AgentTemplateModel).role ? <p className="mt-0.5 text-sm text-muted-foreground truncate">{(template as AgentTemplateModel).role}</p> : null}
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs capitalize">
                         {template.category}
@@ -182,13 +180,20 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
               {/* Connect App – always full section */}
               {isAgent && requiredConnectors.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-3 my-4">
                   <div className="flex items-center gap-2">
                     <Icon name="plug" className="h-4 w-4 text-primary" />
-                    <div className="text-sm font-semibold">Connect App</div>
+                    <div className="text-sm font-semibold">Connect Apps</div>
                   </div>
                   {starshipId ? (
-                    <ConnectorSuggestionCard starshipId={starshipId} providers={requiredConnectors.map(c => c.provider)} hideSearch={true} hideDisconnect={false} compactCard connectButtonLabel="Connect" />
+                    <ConnectorSuggestionCard
+                      starshipId={starshipId}
+                      providers={requiredConnectors.map(c => c.provider)}
+                      hideSearch={true}
+                      hideDisconnect={false}
+                      compactCard
+                      connectButtonLabel="Connect"
+                    />
                   ) : (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-3">
                       <p className="text-sm text-muted-foreground">
@@ -225,7 +230,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
               {/* Capabilities – always visible with color dot + name; edit icon reveals permission dropdowns */}
               {isAgent && assignedToolSlugs.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 my-4">
                   <div className="flex items-center gap-2">
                     <Icon name="wrench" className="h-4 w-4 text-primary" />
                     <div className="text-sm font-semibold">Capabilities</div>
@@ -331,7 +336,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
               ) : null}
             </div>
 
-            <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4 justify-end">
+            <DialogFooter className="flex-shrink-0 gap-2 pt-5 border-t border-border/50 mt-5 justify-end">
               <Button type="button" onClick={handleConfirm} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? (
                   <>

@@ -322,72 +322,86 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     const isManaged = authType === 'platform_jwt'
     const showLogo = !!provider && !hiddenLogos[provider]
 
+    const connectButton = (
+      <Button
+        size="sm"
+        variant="ghost"
+        className={`${CONNECTOR_CTA_BUTTON_CLASS} group min-w-[140px] justify-center shrink-0`}
+        onClick={() => {
+          if (isManaged) return
+          if (isOauthConnectable) return void handleConnect(provider)
+          if (isApiKeyConnectable) return openApiKeyDialog(provider)
+          if (isBasicConnectable) return openBasicDialog(provider)
+        }}
+        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
+      >
+        <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
+        {isManaged
+          ? 'Managed by platform'
+          : isOauthConnectable
+            ? isConnected
+              ? 'Reconnect'
+              : (connectButtonLabel ?? `Connect ${label}`)
+            : isApiKeyConnectable
+              ? isConnected
+                ? 'Update API key'
+                : 'Connect with API key'
+              : isBasicConnectable
+                ? isConnected
+                  ? 'Update credentials'
+                  : 'Connect with Basic auth'
+                : 'Not connectable'}
+      </Button>
+    )
+
+    const disconnectButton = canDisconnect ? (
+      <Button
+        size="sm"
+        variant="outline"
+        className="min-w-[140px] shrink-0 hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
+        onClick={() => openDisconnectConfirm(provider)}
+        disabled={disconnectMutation.isPending}
+      >
+        Disconnect
+      </Button>
+    ) : null
+
     return (
       <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
         <Card className="group relative overflow-hidden h-full flex flex-col rounded-xl bg-slate-100/50 dark:bg-zinc-800/35 border border-slate-200/50 dark:border-zinc-600/30 shadow-sm dark:shadow-black/5 transition-colors duration-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/50 hover:border-slate-200/70 dark:hover:border-zinc-600/45">
-          <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3">
+          <CardHeader className={hideCardDescription ? 'py-4 px-5 relative z-10' : 'pb-3 relative z-10 pt-5 space-y-3'}>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-3 min-w-0">
                 {showLogo && (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
                     <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                   </div>
                 )}
-                <div className="flex h-10 flex-col justify-center">
-                  <span className="text-lg leading-tight">{label}</span>
+                <div className="flex flex-col justify-center min-w-0">
+                  <span className="text-lg leading-tight truncate">{label}</span>
                   <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
-                    <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
                     <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
                   </div>
                 </div>
               </CardTitle>
+              {hideCardDescription ? (
+                <div className="flex items-center gap-2 shrink-0">
+                  {connectButton}
+                  {disconnectButton}
+                </div>
+              ) : null}
             </div>
             {!hideCardDescription && <p className="text-sm text-muted-foreground">{catalogItem.description}</p>}
           </CardHeader>
-          <CardContent className={`relative z-10 pt-0 pb-5 ${!hideCardDescription ? 'mt-auto' : ''}`}>
-            <div className="flex gap-2 justify-end">
-              <Button
-                size="sm"
-                variant="ghost"
-                className={`${CONNECTOR_CTA_BUTTON_CLASS} group min-w-[140px] justify-center`}
-                onClick={() => {
-                  if (isManaged) return
-                  if (isOauthConnectable) return void handleConnect(provider)
-                  if (isApiKeyConnectable) return openApiKeyDialog(provider)
-                  if (isBasicConnectable) return openBasicDialog(provider)
-                }}
-                disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
-              >
-                <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
-                {isManaged
-                  ? 'Managed by platform'
-                  : isOauthConnectable
-                    ? isConnected
-                      ? 'Reconnect'
-                      : (connectButtonLabel ?? `Connect ${label}`)
-                    : isApiKeyConnectable
-                      ? isConnected
-                        ? 'Update API key'
-                        : 'Connect with API key'
-                      : isBasicConnectable
-                        ? isConnected
-                          ? 'Update credentials'
-                          : 'Connect with Basic auth'
-                        : 'Not connectable'}
-              </Button>
-              {canDisconnect && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => openDisconnectConfirm(provider)}
-                  disabled={disconnectMutation.isPending}
-                >
-                  Disconnect
-                </Button>
-              )}
-            </div>
-          </CardContent>
+          {!hideCardDescription && (
+            <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
+              <div className="flex gap-2 justify-end">
+                {connectButton}
+                {disconnectButton}
+              </div>
+            </CardContent>
+          )}
         </Card>
       </motion.div>
     )

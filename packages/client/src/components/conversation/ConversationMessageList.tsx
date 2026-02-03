@@ -352,8 +352,13 @@ function LinkedConversationCard({
           {/* Participants (overlapping avatars) */}
           {participantItems.length > 0 && (
             <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
-              <div className="flex items-center -space-x-2">
-                {participantItems.slice(0, 3).map(p => {
+              {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
+              <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
+                {participantItems
+                  .slice(0, 3)
+                  .slice()
+                  .reverse()
+                  .map(p => {
                   if (p.kind === 'agent') {
                     const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                     return (

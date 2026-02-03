@@ -7,6 +7,7 @@ import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
+import { NotificationSoundBootstrap } from '@/components/global/NotificationSoundBootstrap'
 
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
@@ -141,6 +142,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     // Public pages - no authentication required
     return (
       <div className="h-full w-full">
+        <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
         {children}
       </div>
@@ -153,6 +155,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     if (!isAuthenticated) {
       return (
         <StarTheme>
+          <NotificationSoundBootstrap />
           <EmailChangeToastHandler />
           <div className="relative min-h-[100dvh] bg-background">
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
@@ -166,6 +169,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
     return (
       <StarTheme>
+        <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}
@@ -214,6 +218,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <JwtAuthGate>
       <StarTheme>
+        <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
           {/* Sidebar Navigation - conditionally rendered */}

@@ -72,13 +72,21 @@ export function MarketplaceAvatar({
       {!hasImage && showTintWhenMissing ? <div className={cn('absolute inset-0', tintClassName)} /> : null}
       {hasImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt={rawLabel || 'Avatar'} className="relative z-10 h-full w-full object-cover" />
+        <img
+          src={img}
+          alt={rawLabel || 'Avatar'}
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
+          decoding="async"
+          className="relative z-10 h-full w-full object-cover"
+        />
       ) : (
         <div className="relative z-10 h-full w-full flex items-center justify-center">
           <span className={fallbackTextClassName}>{initials || 'AI'}</span>
         </div>
       )}
-      {showInsetRing ? <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" /> : null}
+      {/* Avoid an inner border on "empty" (missing-image) avatars. */}
+      {showInsetRing && hasImage ? <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" /> : null}
     </div>
   )
 }

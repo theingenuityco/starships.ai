@@ -467,6 +467,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     (agentSlug: string | null) => {
       // Only update query param on the starter view (no conversation id yet)
       if (currentConversationIdRef.current || externalConversationId) return
+      // `agent` query param is DM-only. Never write it while rendering inside channel (or other) routes.
+      if (!pathname.includes('/conversations')) return
       try {
         const sp = new URLSearchParams(searchParams?.toString() || '')
         if (agentSlug && agentSlug.trim().length > 0) sp.set('agent', agentSlug)
@@ -952,7 +954,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <ConversationSummaryBar
                 conversationId={currentConversationId}
                 starshipId={starshipId}
-                titlePrefix={isChannelConversation ? <Icon name="hash" className="h-5 w-5" /> : null}
+                titlePrefix={isChannelConversation ? <Icon name="hash" weight="bold" className="h-5 w-5" /> : null}
                 fallbackTitle={
                   draftDm
                     ? draftDm.dmType === 'user_agent'
@@ -1041,7 +1043,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                           }
                       : null
                   }
-                  bottomPaddingPx={inputHeight + 24}
+                  bottomPaddingPx={inputHeight + 12}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                   submittedQuery={submittedQuery.trim() || undefined}

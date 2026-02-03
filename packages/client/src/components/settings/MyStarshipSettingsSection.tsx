@@ -273,7 +273,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                             {typeof userAvatar === 'string' && userAvatar.trim() ? <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" /> : null}
                             <AvatarFallback className="rounded-full text-[9px] leading-none">{(userName || 'You').slice(0, 1).toUpperCase()}</AvatarFallback>
                           </Avatar>
-                          <PresenceIndicator kind="online" active={Boolean(userId && presence.isUserOnline(userId))} size="sm" />
+                          {userId ? <PresenceIndicator kind={presence.isUserOnline(userId) ? 'online' : 'offline'} active={true} size="sm" /> : null}
                         </div>
                         <span className="text-xs font-medium">{userName || 'You'}</span>
                       </div>
@@ -426,7 +426,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                     {typeof m.avatar === 'string' && m.avatar.trim() ? <AvatarImage src={m.avatar.trim()} alt={label} referrerPolicy="no-referrer" /> : null}
                                     <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
                                   </Avatar>
-                                  <PresenceIndicator kind="online" active={Boolean(m.userId && presence.isUserOnline(m.userId))} size="sm" />
+                                  {m.userId ? <PresenceIndicator kind={presence.isUserOnline(m.userId) ? 'online' : 'offline'} active={true} size="sm" /> : null}
                                 </div>
                                 <div className="min-w-0">
                                   <div className="text-sm font-medium truncate">{label}</div>

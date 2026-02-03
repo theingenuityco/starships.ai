@@ -34,7 +34,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
-import { Avatar } from '@/components/ui/avatar'
+import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import api, { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
@@ -42,6 +42,7 @@ import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
 import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
@@ -191,6 +192,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Load agents for @mention parsing
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
+    const { data: membersData } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
+    const memberUsers: StarshipMemberListItem[] = useMemo(() => {
+      const list = (membersData as any)?.members
+      return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
+    }, [membersData])
     const mentionAvatarAttachmentIds = useMemo(() => {
       return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
         .map(a => (a as any)?.avatarAttachmentId as string | undefined)
@@ -201,6 +207,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
+    const membersRef = useRef<StarshipMemberListItem[]>([])
+    useEffect(() => {
+      const latest = Array.isArray(memberUsers) ? memberUsers : []
+      if (latest.length > 0) membersRef.current = latest
+    }, [memberUsers])
     useEffect(() => {
       const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
@@ -536,17 +547,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : (selectedAgent ?? null)
       let contentToSend = messageToSend
       if (!isDraftUserUserDm) {
-        // Also support plain-text leading @handle for safety
-        const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-        if (mentionMatch && starshipAgents.length > 0) {
-          const handle = mentionMatch[1]
-          const lower = handle.toLowerCase()
-          const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+        // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
+        const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
+        if (tokenMatch && starshipAgents.length > 0) {
+          const id = String(tokenMatch[1] || '').trim()
+          const matched = id ? starshipAgents.find(a => String(a.id) === id) : null
           if (matched) {
             effectiveAgent = matched
-            // Do NOT strip the leading mention; keep it in the message content
-            // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
             if (!isThreadContext && onAgentChange) onAgentChange(matched)
+          }
+        } else {
+          // Back-compat: plain-text leading @handle
+          const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
+          if (mentionMatch && starshipAgents.length > 0) {
+            const handle = mentionMatch[1]
+            const lower = handle.toLowerCase()
+            const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+            if (matched) {
+              effectiveAgent = matched
+              // Do NOT strip the leading mention; keep it in the message content
+              // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
+              if (!isThreadContext && onAgentChange) onAgentChange(matched)
+            }
           }
         }
       } else {
@@ -994,7 +1016,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [hasActualContent, setHasActualContent] = useState(false)
 
     // Require balance; server also enforces funds.
-    const hasTargetAgent = isChannelConversation ? true : isMentionOnlyThread ? message.trim().startsWith('@') : Boolean(selectedAgent) || message.trim().startsWith('@')
+    const hasLeadingMentionToken = (() => {
+      const t = String(message || '').trim()
+      return t.startsWith('<@a:') || t.startsWith('@')
+    })()
+    const hasTargetAgent = isChannelConversation ? true : isMentionOnlyThread ? hasLeadingMentionToken : Boolean(selectedAgent) || hasLeadingMentionToken
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
@@ -1006,8 +1032,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       active,
       onHover,
     }: {
-      items: AgentModel[]
-      command: (agent: AgentModel) => void
+      items: Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }>
+      command: (item: { id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }) => void
       anchorRect: DOMRect | null
       active: number
       onHover: (i: number) => void
@@ -1045,12 +1071,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           style={style}
           className="w-[min(420px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1"
           role="listbox"
-          aria-label="Agent suggestions"
+          aria-label="Mention suggestions"
         >
-          {(Array.isArray(items) ? items : []).map((agent: AgentModel, idx: number) => (
+          {(Array.isArray(items) ? items : []).map((item, idx: number) => {
+            const kind = (item as any)?.kind === 'user' ? 'user' : 'agent'
+            const agent = kind === 'agent' ? ((item as any).agent as AgentModel | undefined) : undefined
+            const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
+            const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
+            const key = `${kind}:${String((item as any)?.id || '')}`
+            return (
             <button
-              key={agent.id}
-              id={`mention-option-${agent.id}`}
+              key={key}
+              id={`mention-option-${key}`}
               ref={idx === active ? activeItemRef : null}
               type="button"
               tabIndex={-1}
@@ -1064,7 +1096,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onMouseDown={e => {
                 e.preventDefault()
                 e.stopPropagation()
-                command(agent)
+                command(item)
               }}
               onPointerDown={e => {
                 e.preventDefault()
@@ -1073,18 +1105,23 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={e => {
                 e.preventDefault()
                 e.stopPropagation()
-                command(agent)
+                command(item)
               }}
             >
               <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                <AgentAvatar seed={agent.name} imageUrl={mentionAvatarUrlById.get((agent as any).avatarAttachmentId)} size={28} />
+                {kind === 'user' && user?.avatar ? (
+                  <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
+                ) : (
+                  <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
+                )}
               </Avatar>
               <div className="min-w-0">
-                <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
-                {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
+                <div className="font-medium leading-5">{label}</div>
+                {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
               </div>
             </button>
-          ))}
+          )
+          })}
         </div>
       )
     }
@@ -1092,14 +1129,32 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const mentionSuggestion = {
       char: '@',
       allowSpaces: false,
-      items: ({ query }: any) =>
-        ((mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || [])
+      items: ({ query }: any) => {
+        const q = String(query || '').toLowerCase()
+        const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
+        const users = membersRef.current || []
+        const agentItems = (Array.isArray(agents) ? agents : [])
           .filter(a => {
-            const q = String(query || '').toLowerCase()
-            return !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
+            if (!q) return true
+            return a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
           })
           .slice(0, 8)
-          .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), agent: a })),
+          .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), kind: 'agent' as const, agent: a }))
+        const userItems = (Array.isArray(users) ? users : [])
+          .filter(u => {
+            if (!q) return true
+            const name = String(u.displayName || '').toLowerCase()
+            const email = String(u.email || '').toLowerCase()
+            return name.includes(q) || email.includes(q)
+          })
+          .slice(0, 8)
+          .map(u => {
+            const id = String((u as any).userId || '')
+            const label = String(u.displayName || u.email || 'User')
+            return { id, label, kind: 'user' as const, user: u }
+          })
+        return [...agentItems, ...userItems].filter(i => Boolean(i.id)).slice(0, 8)
+      },
       render: () => {
         let component: ReactRenderer | null = null
         let popup: any = null
@@ -1141,7 +1196,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
         const handleDocKeyDown = (e: KeyboardEvent) => {
           if (!lastProps) return
-          const items = (lastProps.items as Array<{ id: string; label: string; agent?: AgentModel }>) || []
+          const items = (lastProps.items as Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }>) || []
           if (!items.length) return
           const pageSize = Math.max(1, Math.min(5, items.length))
           const key = e.key
@@ -1199,15 +1254,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 } catch {}
                 // Update selected agent (mirror mouse selection)
                 try {
+                  const kind = (choice as any)?.kind
                   const id = (choice as any)?.id
                   const label = (choice as any)?.label
-                  let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                  if (!agent && label) {
-                    const lower = String(label).toLowerCase()
-                    agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
-                  }
-                  if (agent) {
-                    onAgentChange?.(agent)
+                  if (kind === 'agent') {
+                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                    if (!agent && label) {
+                      const lower = String(label).toLowerCase()
+                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                    }
+                    if (agent) onAgentChange?.(agent)
                   }
                 } catch {}
               } catch {}
@@ -1229,24 +1285,23 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             component = new ReactRenderer(MentionList as any, {
               props: {
-                items: (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean),
+                items: (props.items as any[]).filter(Boolean),
                 active,
                 onHover: (i: number) => {
                   active = i
                   component?.updateProps({ ...component.props, active })
                 },
-                command: (agent: AgentModel) => {
-                  const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: formatAgentDisplayName(agent) }
-                  // Insert/replace with the mention node
+                command: (item: any) => {
+                  const realItem = (props.items as any[]).find(i => i.id === item?.id && i.kind === item?.kind) || item
                   props.command(realItem)
                   try {
                     cleanupTrailingQueryAfterMention(props.editor, lastQuery)
                   } catch {}
-                  // Then update selected agent and mark as user-driven choice
+                  // Then update selected agent (agents only)
                   try {
-                    const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || agent
-                    if (onAgentChange) {
-                      onAgentChange(selected)
+                    if (realItem?.kind === 'agent') {
+                      const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || null
+                      if (selected && onAgentChange) onAgentChange(selected)
                     }
                   } catch {}
                 },
@@ -1279,7 +1334,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             lastProps = props
             lastQuery = String(props?.query || '')
 
-            const newItems = (props.items as Array<{ id: string; label: string; agent?: AgentModel }>).map(i => i.agent || (agentsRef.current || []).find(a => a.id === i.id)).filter(Boolean)
+            const newItems = (props.items as any[]).filter(Boolean)
 
             // Reset active to the first filtered item when query changes or when active is out of bounds
             if (lastQuery !== prevQuery || active < 0 || active >= newItems.length) {
@@ -1296,7 +1351,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           onKeyDown(props: any) {
             const event = props.event
             const key = event.key
-            const items = props.items as Array<{ id: string; label: string; agent?: AgentModel }>
+            const items = props.items as Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }>
             if (!items || items.length === 0) return false
 
             const pageSize = Math.max(1, Math.min(5, items.length))
@@ -1347,16 +1402,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   } catch {}
                   // Update selected agent state (mirror mouse path)
                   try {
-                    const id = (choice as any)?.id
-                    const label = (choice as any)?.label
+                  const kind = (choice as any)?.kind
+                  const id = (choice as any)?.id
+                  const label = (choice as any)?.label
+                  if (kind === 'agent') {
                     let agent = (agentsRef.current || []).find(a => a.id === id) || null
                     if (!agent && label) {
                       const lower = String(label).toLowerCase()
                       agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
                     }
-                    if (agent) {
-                      onAgentChange?.(agent)
-                    }
+                    if (agent) onAgentChange?.(agent)
+                  }
                   } catch {}
                 } catch (err) {
                   try {
@@ -1410,8 +1466,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const MentionNodeView = ({ node }: any) => {
       const id = node?.attrs?.id
       const label = node?.attrs?.label
-      const agent = (agentsRef.current || []).find(a => a.id === id)
-      const display = agent?.name || label || id || ''
+      const kind = node?.attrs?.kind
+      const agent = kind === 'agent' ? (agentsRef.current || []).find(a => a.id === id) : null
+      const user = kind === 'user' ? (membersRef.current || []).find(u => String((u as any).userId || '') === String(id || '')) : null
+      const display = agent?.name || user?.displayName || user?.email || label || id || ''
       return (
         <NodeViewWrapper as="span" className="inline text-foreground" data-mention-node>
           <span
@@ -1437,7 +1495,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             }}
           >
             <span className="flex-shrink-0 h-4 w-4 rounded-sm overflow-hidden">
-              <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
+              {kind === 'user' && user?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.avatar} alt={display} className="h-4 w-4 object-cover" />
+              ) : (
+                <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
+              )}
             </span>
             <span className="font-medium text-base">@{display}</span>
           </span>
@@ -1529,19 +1592,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         Placeholder.configure({ placeholder: () => placeholderRef.current }),
         Mention.extend({
           selectable: false,
+          addAttributes() {
+            return {
+              ...(((this as any).parent?.() as Record<string, unknown>) || {}),
+              kind: {
+                default: 'agent',
+              },
+            }
+          },
           addNodeView() {
             return ReactNodeViewRenderer(MentionNodeView as any)
           },
         }).configure({
           // Mentions behave like normal atomic nodes (user can delete them).
           deleteTriggerWithBackspace: true,
-          // Force display as @name by resolving the agent name from id if needed
+          // Serialize mentions into stable tokens so `editor.getText()` preserves IDs:
+          // - users: <@u:USER_ID>
+          // - agents: <@a:AGENT_ID>
           renderText: ({ options, node }: any) => {
             const id = node?.attrs?.id
-            const label = node?.attrs?.label
-            const agent = (agentsRef.current || []).find(a => a.id === id)
-            const display = agent?.name || label || id || ''
-            return `${options.suggestion.char}${display}`
+            const kind = node?.attrs?.kind
+            if (kind === 'user') return `<@u:${String(id || '')}>`
+            return `<@a:${String(id || '')}>`
           },
           suggestion: mentionSuggestion,
         }),

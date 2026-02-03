@@ -1992,6 +1992,7 @@ const MemoizedMessageBubble = memo(
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
       const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
       const showUserOnline = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline?.(messageUserId))
+      const showUserPresenceDot = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline)
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
@@ -2066,7 +2067,7 @@ const MemoizedMessageBubble = memo(
                         )}
                       </AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={showUserOnline} />
+                    <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                   </div>
                 </div>
               )}
@@ -2126,19 +2127,13 @@ const MemoizedMessageBubble = memo(
                       ) : null}
                       <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
                         {fallbackVariant === 'user-icon' ? (
-                          <Icon
-                            name="user"
-                            iconOverride={{ type: 'phosphor', component: 'User' }}
-                            weight="bold"
-                            size={isHero ? 20 : isDelegation ? 14 : 16}
-                            className="text-primary"
-                          />
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                         ) : (
                           initialsFromName(effectiveUserName || effectiveUserEmail)
                         )}
                       </AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={showUserOnline} />
+                    <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                   </div>
                 </div>
               </>
@@ -2175,7 +2170,7 @@ const MemoizedMessageBubble = memo(
                       )}
                     </AvatarFallback>
                   </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} />
+                  <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                 </div>
               </div>
             )}
@@ -2561,8 +2556,20 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
-            <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
+          <div
+            className={cn(
+              // Match `MarketplaceAvatar` missing-image styling (DM agent avatar fallback).
+              'relative overflow-hidden flex-shrink-0',
+              sizeClassName,
+              'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center'
+            )}
+          >
+            {/* Channel-specific tint/pattern (intentionally different from DM avatar). */}
+            <div
+              className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(59,130,246,0.26),transparent_58%),radial-gradient(circle_at_80%_75%,rgba(16,185,129,0.14),transparent_52%)]"
+              aria-hidden="true"
+            />
+            <Icon name="hash" className="relative z-10 h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">

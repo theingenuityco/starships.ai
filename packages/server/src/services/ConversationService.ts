@@ -1538,6 +1538,9 @@ export class ConversationService {
     const dmRepo = new DirectMessageRepository();
     const dm = await dmRepo.findByConversationId(contextConversationId).catch(() => null);
     const isUserUserDm = dm?.dmType === 'user_user';
+    const isUserAgentDm = dm?.dmType === 'user_agent';
+    const dmAgentId = isUserAgentDm && dm?.agentId ? String(dm.agentId).trim() : '';
+    const restrictAgentMentionsToDmPeer = Boolean(isUserAgentDm && dmAgentId);
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
     let isMentionOnlyThread = Boolean(isThread && !isChannelRoot && conversationAgents.length >= 2);
@@ -1554,13 +1557,17 @@ export class ConversationService {
       const userTokenCountPre = (content.match(/<@u:[^>\s]+>/gi) || []).length;
       const hasUserMentions = userTokenCountPre > 0;
       // If any agent is explicitly mentioned, we should route by mention (mentions take precedence over explicitAgentId fallback).
-      const mentionedAgentsPre = this.extractMentionedAgents(content, allStarshipAgents);
+      const mentionedAgentsPreAll = this.extractMentionedAgents(content, allStarshipAgents);
+      const mentionedAgentsPre = restrictAgentMentionsToDmPeer
+        ? mentionedAgentsPreAll.filter((a) => a.id === dmAgentId)
+        : mentionedAgentsPreAll;
       const hasAgentMentions = Array.isArray(mentionedAgentsPre) && mentionedAgentsPre.length > 0;
 
       // Explicit agent selection (client-provided agentId):
       // - Supported for normal conversations and threads (including threads under channels) where a default agent is allowed.
       // - NOT used for channel root conversations or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
-      const explicitAgentId = typeof data.agentId === 'string' ? data.agentId.trim() : '';
+      const explicitAgentIdRaw = typeof data.agentId === 'string' ? data.agentId.trim() : '';
+      const explicitAgentId = restrictAgentMentionsToDmPeer ? dmAgentId : explicitAgentIdRaw;
       // IMPORTANT: explicitAgentId is lower priority than explicit mentions, and must not trigger when the message contains user mentions.
       if (explicitAgentId && !isChannelRoot && !isMentionOnlyThread && !hasUserMentions && !hasAgentMentions) {
         const explicitAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === explicitAgentId);
@@ -1588,36 +1595,44 @@ export class ConversationService {
       // - For normal conversations: fallback to the first linked agent.
       // - For threads with 2+ agents: mention-only; no fallback agent.
       if (agentQueue.length === 0) {
-      const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
-      // Auto-link mentioned agents not yet linked
-      let linkedAny = false;
-      for (const a of initialTargetsUnlinked) {
-        if (!conversationAgents.find((x) => x.id === a.id)) {
-          await this.conversationRepository.linkToAgent(data.conversationId, a.id);
-          linkedAny = true;
+        const initialTargetsUnlinkedAll = this.extractMentionedAgents(data.content, allStarshipAgents);
+        const initialTargetsUnlinked = restrictAgentMentionsToDmPeer
+          ? initialTargetsUnlinkedAll.filter((a) => a.id === dmAgentId)
+          : initialTargetsUnlinkedAll;
+        // Auto-link mentioned agents not yet linked
+        let linkedAny = false;
+        for (const a of initialTargetsUnlinked) {
+          if (!conversationAgents.find((x) => x.id === a.id)) {
+            await this.conversationRepository.linkToAgent(data.conversationId, a.id);
+            linkedAny = true;
+          }
         }
-      }
-      // Refresh agents after linking so counts/order are accurate for routing rules.
-      if (linkedAny) {
-        conversationAgents = await this.getConversationAgents(data.conversationId);
-      }
+        // Refresh agents after linking so counts/order are accurate for routing rules.
+        if (linkedAny) {
+          conversationAgents = await this.getConversationAgents(data.conversationId);
+        }
 
-      isMentionOnlyThread = Boolean(isThread && !isChannelRoot && conversationAgents.length >= 2);
-      const initialTargets = isChannelRoot
-        ? initialTargetsUnlinked
-        : initialTargetsUnlinked.length > 0
+        isMentionOnlyThread = Boolean(isThread && !isChannelRoot && conversationAgents.length >= 2);
+        const initialTargets = isChannelRoot
           ? initialTargetsUnlinked
-          : this.extractMentionedAgents(data.content, conversationAgents);
+          : initialTargetsUnlinked.length > 0
+            ? initialTargetsUnlinked
+            : (() => {
+                const fromLinked = this.extractMentionedAgents(data.content, conversationAgents);
+                return restrictAgentMentionsToDmPeer ? fromLinked.filter((a) => a.id === dmAgentId) : fromLinked;
+              })();
 
-      const fallbackAgent = conversationAgents[0];
-      // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
-      // This allows people to talk to each other in agent-backed threads without triggering an agent run.
-      const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
-      const allowFallback = !isChannelRoot && !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
-      agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
-      // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
-      // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
-      noAgentToRun = ((isChannelRoot || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) || (blockFallbackDueToUserMentions && agentQueue.length === 0);
+        const fallbackAgent = conversationAgents[0];
+        // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
+        // This allows people to talk to each other in agent-backed threads without triggering an agent run.
+        const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
+        const allowFallback = !isChannelRoot && !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
+        agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
+        // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
+        // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
+        noAgentToRun =
+          ((isChannelRoot || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) ||
+          (blockFallbackDueToUserMentions && agentQueue.length === 0);
       }
     }
 

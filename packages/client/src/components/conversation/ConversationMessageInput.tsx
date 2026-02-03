@@ -12,6 +12,7 @@ import {
   useConversationDetail,
   useConversationAgents,
   usePendingToolApprovals,
+  useStarshipDirectMessages,
   useStarshipChannels,
   useLinkMessageToConversation,
   useUpdateConversationState,
@@ -142,6 +143,64 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (!Array.isArray(channels)) return false
       return channels.some((c: any) => String(c?.conversationId || '') === cid)
     }, [channelsData, conversationId])
+
+    // DM context (used for mention restrictions)
+    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelConversation))
+    type DmMentionAllowed = { kind: 'agent' | 'user' | null; id: string | null }
+    const dmMentionAllowedRef = useRef<DmMentionAllowed>({ kind: null, id: null })
+    useEffect(() => {
+      let kind: DmMentionAllowed['kind'] = null
+      let id: string | null = null
+
+      // Draft DM (no conversation yet): we already know the target
+      if (!conversationId && draftDirectMessageTarget) {
+        if (draftDirectMessageTarget.dmType === 'user_agent') {
+          const aid = String(draftDirectMessageTarget.agentId || '').trim()
+          if (aid) {
+            kind = 'agent'
+            id = aid
+          }
+        } else if (draftDirectMessageTarget.dmType === 'user_user') {
+          const uid = String(draftDirectMessageTarget.peerUserId || '').trim()
+          if (uid) {
+            kind = 'user'
+            id = uid
+          }
+        }
+      }
+
+      // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+      if (!id && conversationId) {
+        const cid = String(conversationId || '').trim()
+        const list = (directMessagesData as any)?.directMessages
+        const items = Array.isArray(list) ? (list as any[]) : []
+        const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+        const dm = match?.dm
+        if (dm && typeof dm === 'object') {
+          const dmType = String((dm as any).dmType || '')
+          if (dmType === 'user_agent') {
+            const aid = String((dm as any).agentId || '').trim()
+            if (aid) {
+              kind = 'agent'
+              id = aid
+            }
+          } else if (dmType === 'user_user') {
+            const peerFromList = String(match?.peerUser?.id || '').trim()
+            const a = String((dm as any).userAId || '').trim()
+            const b = String((dm as any).userBId || '').trim()
+            const me = String(userId || '').trim()
+            const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+            const peerId = peerFromList || derivedPeer
+            if (peerId) {
+              kind = 'user'
+              id = peerId
+            }
+          }
+        }
+      }
+
+      dmMentionAllowedRef.current = { kind, id }
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, userId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -323,10 +382,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
 
     // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
-    const hasFunds = canManageBilling ? (!requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE) : true
-    const showLowBalanceWarning = Boolean(
-      canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD
-    )
+    const hasFunds = canManageBilling ? !requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE : true
+    const showLowBalanceWarning = Boolean(canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -1221,47 +1278,47 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
             const key = `${kind}:${String((item as any)?.id || '')}`
             return (
-            <button
-              key={key}
-              id={`mention-option-${key}`}
-              ref={idx === active ? activeItemRef : null}
-              type="button"
-              tabIndex={-1}
-              role="option"
-              aria-selected={idx === active}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
-              )}
-              onMouseEnter={() => onHover(idx)}
-              onMouseDown={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                command(item)
-              }}
-              onPointerDown={e => {
-                e.preventDefault()
-                e.stopPropagation()
-              }}
-              onClick={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                command(item)
-              }}
-            >
-              <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                {kind === 'user' && user?.avatar ? (
-                  <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
-                ) : (
-                  <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
+              <button
+                key={key}
+                id={`mention-option-${key}`}
+                ref={idx === active ? activeItemRef : null}
+                type="button"
+                tabIndex={-1}
+                role="option"
+                aria-selected={idx === active}
+                className={cn(
+                  'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
+                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
                 )}
-              </Avatar>
-              <div className="min-w-0">
-                <div className="font-medium leading-5">{label}</div>
-                {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
-              </div>
-            </button>
-          )
+                onMouseEnter={() => onHover(idx)}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  command(item)
+                }}
+                onPointerDown={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onClick={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  command(item)
+                }}
+              >
+                <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
+                  {kind === 'user' && user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
+                  ) : (
+                    <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
+                  )}
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="font-medium leading-5">{label}</div>
+                  {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
+                </div>
+              </button>
+            )
           })}
         </div>
       )
@@ -1272,10 +1329,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       allowSpaces: false,
       items: ({ query }: any) => {
         const q = String(query || '').toLowerCase()
+        const dmAllowed = dmMentionAllowedRef.current
+        const dmKind = dmAllowed?.kind ?? null
+        const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
+        const restrictToSingleDmPeer = Boolean(dmKind && dmId)
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
         const agentItems = (Array.isArray(agents) ? agents : [])
           .filter(a => {
+            if (restrictToSingleDmPeer) {
+              if (dmKind !== 'agent') return false
+              if (String(a?.id || '') !== String(dmId)) return false
+            }
             if (!q) return true
             return a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
           })
@@ -1283,6 +1348,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), kind: 'agent' as const, agent: a }))
         const userItems = (Array.isArray(users) ? users : [])
           .filter(u => {
+            if (restrictToSingleDmPeer) {
+              if (dmKind !== 'user') return false
+              const uid = String((u as any)?.userId || '').trim()
+              if (!uid || uid !== String(dmId)) return false
+            }
             if (!q) return true
             const name = String(u.displayName || '').toLowerCase()
             const email = String(u.email || '').toLowerCase()
@@ -1543,17 +1613,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   } catch {}
                   // Update selected agent state (mirror mouse path)
                   try {
-                  const kind = (choice as any)?.kind
-                  const id = (choice as any)?.id
-                  const label = (choice as any)?.label
-                  if (kind === 'agent') {
-                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                    if (!agent && label) {
-                      const lower = String(label).toLowerCase()
-                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                    const kind = (choice as any)?.kind
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    if (kind === 'agent') {
+                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                      if (!agent && label) {
+                        const lower = String(label).toLowerCase()
+                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      }
+                      if (agent) onAgentChange?.(agent)
                     }
-                    if (agent) onAgentChange?.(agent)
-                  }
                   } catch {}
                 } catch (err) {
                   try {

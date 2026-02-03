@@ -5,7 +5,12 @@ import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 type ParsedMentions = { userIds: string[]; agentIds: string[] };
 
 function parseMentionTokens(content: string): ParsedMentions {
-  const text = typeof content === 'string' ? content : '';
+  let text = typeof content === 'string' ? content : '';
+  // Guard: avoid regex scanning extremely large payloads (DoS risk).
+  // Messages are normally small; this just caps worst-case work.
+  if (text.length > 20_000) {
+    text = text.slice(0, 20_000);
+  }
   const userIds = new Set<string>();
   const agentIds = new Set<string>();
 

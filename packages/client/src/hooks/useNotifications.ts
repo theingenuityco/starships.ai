@@ -31,6 +31,8 @@ type StreamChunk =
   | { type: 'error'; error: unknown }
 
 const playedNotificationIdsByStarship = new Map<string, Set<string>>()
+const MAX_TRACKED_STARSHIPS = 10
+const MAX_TRACKED_IDS_PER_STARSHIP = 500
 function shouldPlayForNotification(n: NotificationModel): boolean {
   const typ = String((n as any)?.type || '')
   // Current UI treats only these as unread-notification types.
@@ -265,12 +267,23 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
         set = new Set<string>()
         playedNotificationIdsByStarship.set(sid, set)
       }
+      // Refresh insertion order (so least-recently-used starships can be dropped).
+      playedNotificationIdsByStarship.delete(sid)
+      playedNotificationIdsByStarship.set(sid, set)
+
+      // Cap total number of starships tracked in a long-lived session.
+      while (playedNotificationIdsByStarship.size > MAX_TRACKED_STARSHIPS) {
+        const oldestKey = playedNotificationIdsByStarship.keys().next().value as string | undefined
+        if (!oldestKey) break
+        playedNotificationIdsByStarship.delete(oldestKey)
+      }
+
       if (set.has(id)) continue
       set.add(id)
 
       // Prevent unbounded growth if the tab is open for a long time.
-      if (set.size > 500) {
-        const keep = new Set(Array.from(set).slice(-250))
+      if (set.size > MAX_TRACKED_IDS_PER_STARSHIP) {
+        const keep = new Set(Array.from(set).slice(-Math.floor(MAX_TRACKED_IDS_PER_STARSHIP / 2)))
         playedNotificationIdsByStarship.set(sid, keep)
       }
 

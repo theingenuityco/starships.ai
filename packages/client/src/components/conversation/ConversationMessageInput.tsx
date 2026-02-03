@@ -721,9 +721,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return fromConv ?? null
       }
 
-      // Resolve agent to send to: context-driven (channel/dm/thread), then allow explicit leading @mention to override
-      // where applicable.
-      let effectiveAgent: AgentModel | null | undefined = null
+      // Resolve agent to send to:
+      // - Default to the UI-selected agent for non-mention contexts (e.g. draft threads opened from an agent message).
+      // - Then apply context rules (channel/DM/thread) and allow explicit leading @mention to override where applicable.
+      let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
       let contentToSend = messageToSend
       if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.

@@ -246,9 +246,20 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   const handleThreadCreated = useCallback(
     (cid: string) => {
-      setThreadConversationIdInUrl(cid)
+      // Persist the "pinned first message" across the draft -> real thread transition.
+      // Otherwise, when the `thread` query param updates from `draft` -> `<cid>`, the
+      // `threadKey` effect will clear the pinned message and it disappears.
+      const nextThreadKey = String(cid)
+      pendingThreadStateRef.current = {
+        threadKey: nextThreadKey,
+        threadAgent: threadAgent ?? null,
+        pinnedFirstMessage: threadPinnedFirstMessage ?? null,
+        draftParentConversationId: null,
+        draftTitle: null,
+      }
+      setThreadConversationIdInUrl(nextThreadKey)
     },
-    [setThreadConversationIdInUrl]
+    [setThreadConversationIdInUrl, threadAgent, threadPinnedFirstMessage]
   )
 
   const handleCloseThread = useCallback(() => {

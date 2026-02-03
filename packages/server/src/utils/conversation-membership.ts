@@ -110,4 +110,3 @@ export async function enforceDirectMessageMembership(args: {
     return false;
   }
 }
-

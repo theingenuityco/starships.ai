@@ -28,7 +28,9 @@ export async function up(client: Client): Promise<void> {
       );
     `);
 
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_conversation_participants_conversation_id ON conversation_participants(conversation_id);`);
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_conversation_participants_conversation_id ON conversation_participants(conversation_id);`
+    );
     await client.query(`CREATE INDEX IF NOT EXISTS idx_conversation_participants_user_id ON conversation_participants(user_id);`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_conversation_participants_agent_id ON conversation_participants(agent_id);`);
 
@@ -83,4 +85,3 @@ export async function down(client: Client): Promise<void> {
   }
   await client.query('COMMIT');
 }
-

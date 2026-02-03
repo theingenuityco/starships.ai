@@ -403,9 +403,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     const thread = (searchParams.get('thread') || '').trim()
     if (thread) next.set('thread', thread)
     const qs = next.toString()
-    const href = qs
-      ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
-      : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
+    const href = qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return

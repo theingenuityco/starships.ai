@@ -631,7 +631,10 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.query('DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2', [conversationId, agentId]);
+        await connection.query('DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2', [
+          conversationId,
+          agentId,
+        ]);
       },
       'unlinkFromAgent',
       'Conversation'

@@ -235,10 +235,12 @@ export function ConversationSummaryBar({
         const label =
           userName ||
           (userId === String(authUserId || '') ? String(authUserName || authUserEmail || '') : '') ||
-          (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '') ||
+          fromDirectory?.displayName?.trim() ||
+          fromDirectory?.email?.trim() ||
+          '' ||
           (userId ? `User ${userId.slice(0, 6)}` : 'User')
         const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
-        const avatarUrl = userAvatar || (fromDirectory?.avatar?.trim() || '')
+        const avatarUrl = userAvatar || fromDirectory?.avatar?.trim() || ''
         upsert({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) }, seenAt)
       }
 
@@ -272,10 +274,7 @@ export function ConversationSummaryBar({
           upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, 0)
         } else {
           const fromDirectory = memberByUserId.get(id)
-          const labelRaw =
-            id === String(authUserId || '')
-              ? String(authUserName || authUserEmail || '')
-              : (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '')
+          const labelRaw = id === String(authUserId || '') ? String(authUserName || authUserEmail || '') : fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || ''
           const label = labelRaw || `User ${id.slice(0, 6)}`
           const key = `human:${id}`
           const avatarUrl = typeof fromDirectory?.avatar === 'string' ? fromDirectory.avatar.trim() : ''
@@ -368,8 +367,7 @@ export function ConversationSummaryBar({
 
       return items.length > 0 ? items : participantItemsFromConversation
     }
-    const base =
-      Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : participantItemsFromConversation
+    const base = Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : participantItemsFromConversation
 
     const inferredFromParentDm = (() => {
       const items: ConversationParticipantItem[] = []
@@ -400,19 +398,14 @@ export function ConversationSummaryBar({
               ? String(dm.userBId)
               : null
       const peerLabel =
-        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
-        (typeof peer?.email === 'string' && peer.email.trim()) ||
-        (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
+        (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
       const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
       addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
 
       return items
     })()
 
-    const hint = [
-      ...(Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []),
-      ...inferredFromParentDm,
-    ]
+    const hint = [...(Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []), ...inferredFromParentDm]
     if (hint.length === 0) return base
 
     const out: ConversationParticipantItem[] = []
@@ -432,17 +425,7 @@ export function ConversationSummaryBar({
       out.push(p)
     }
     return out.length > 0 ? out : base
-  }, [
-    authUserAvatar,
-    authUserEmail,
-    authUserId,
-    authUserName,
-    dmItem,
-    parentDmItem,
-    participantItemsFromConversation,
-    participantsHint,
-    participantsOverride,
-  ])
+  }, [authUserAvatar, authUserEmail, authUserId, authUserName, dmItem, parentDmItem, participantItemsFromConversation, participantsHint, participantsOverride])
 
   const participantsLabel = useMemo(() => {
     const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
@@ -564,7 +547,7 @@ export function ConversationSummaryBar({
     const dmAgent: any = (dmItem as any)?.agent
     const dmType = typeof dm?.dmType === 'string' ? String(dm.dmType) : null
     const dmAgentLabel = dmType === 'user_agent' && dmAgent ? formatAgentDisplayName(dmAgent) : null
-    const effectiveTitle = dmAgentLabel || (normalizedTitle || null)
+    const effectiveTitle = dmAgentLabel || normalizedTitle || null
     return {
       conversationId: String(conversationId || ''),
       rawTitle,
@@ -850,20 +833,20 @@ export function ConversationSummaryBar({
                               if (p.kind === 'agent') {
                                 const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                 return (
-                                    <div key={p.key} className="relative h-5 w-5">
-                                      <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
-                                      </div>
+                                  <div key={p.key} className="relative h-5 w-5">
+                                    <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
                                     </div>
+                                  </div>
                                 )
                               }
                               return (
-                                  <div key={p.key} className="relative h-5 w-5">
-                                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                    </Avatar>
-                                  </div>
+                                <div key={p.key} className="relative h-5 w-5">
+                                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                  </Avatar>
+                                </div>
                               )
                             })}
                           </div>

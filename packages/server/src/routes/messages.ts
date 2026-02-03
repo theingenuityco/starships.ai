@@ -197,18 +197,32 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         if (role === 'user') {
           const authorUserId = typeof (updatedMessage as any)?.userId === 'string' ? String((updatedMessage as any).userId) : '';
           if (authorUserId) {
-            await participantRepo.addUserParticipant({ conversationId: linkedConversationId, userId: authorUserId, role: null, createdBy: authUserId ?? null });
+            await participantRepo.addUserParticipant({
+              conversationId: linkedConversationId,
+              userId: authorUserId,
+              role: null,
+              createdBy: authUserId ?? null,
+            });
           }
         } else if (role === 'assistant') {
           const authorAgentId = typeof (updatedMessage as any)?.agentId === 'string' ? String((updatedMessage as any).agentId) : '';
           if (authorAgentId) {
-            await participantRepo.addAgentParticipant({ conversationId: linkedConversationId, agentId: authorAgentId, createdBy: authUserId ?? null });
+            await participantRepo.addAgentParticipant({
+              conversationId: linkedConversationId,
+              agentId: authorAgentId,
+              createdBy: authUserId ?? null,
+            });
           }
         }
 
         // 2) Add the thread starter (actor who linked the message).
         if (authUserId) {
-          await participantRepo.addUserParticipant({ conversationId: linkedConversationId, userId: authUserId, role: null, createdBy: authUserId });
+          await participantRepo.addUserParticipant({
+            conversationId: linkedConversationId,
+            userId: authUserId,
+            role: null,
+            createdBy: authUserId,
+          });
         }
       } catch {
         /* best-effort: do not fail linking if participant insertion fails */

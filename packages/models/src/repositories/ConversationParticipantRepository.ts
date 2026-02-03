@@ -126,4 +126,3 @@ export class ConversationParticipantRepository extends BaseRepository {
     );
   }
 }
-

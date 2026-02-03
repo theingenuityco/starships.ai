@@ -164,6 +164,22 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     )
   }
 
+  // Profile page (create workspace / redirect) - full page, no sidebar, so new users
+  // never see the app chrome (e.g. Direct messages) while "Redirecting..." is shown.
+  if (pathname === '/profile') {
+    return (
+      <JwtAuthGate>
+        <StarTheme>
+          <NotificationSoundBootstrap />
+          <EmailChangeToastHandler />
+          <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
+            <main className="relative min-h-full w-full">{children}</main>
+          </div>
+        </StarTheme>
+      </JwtAuthGate>
+    )
+  }
+
   // Wizard onboarding - full page, no sidebar (authenticated only via JwtAuthGate)
   if (pathname === '/onboarding') {
     return (

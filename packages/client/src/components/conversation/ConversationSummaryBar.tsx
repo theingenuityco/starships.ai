@@ -9,6 +9,7 @@ import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { cn } from '@/lib/utils'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -42,6 +43,14 @@ interface ConversationSummaryBarProps {
    * When set, these participants will be used for the header avatars/list.
    */
   participantsOverride?: ConversationParticipantItem[] | null
+  /**
+   * Optional extra participants that should be included in the header list, merged with
+   * the derived participants (deduped by `key`).
+   *
+   * Useful for thread panes where the "linked/pinned" message author may not have posted
+   * in the thread conversation yet, so message-sampling would miss them.
+   */
+  participantsHint?: ConversationParticipantItem[] | null
 }
 
 interface ConversationAgent {
@@ -90,12 +99,30 @@ export function ConversationSummaryBar({
   fallbackTitle,
   fallbackSubtitle,
   participantsOverride,
+  participantsHint,
 }: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const { isInstanceAdmin, userId: authUserId, userName: authUserName, userEmail: authUserEmail, userAvatar: authUserAvatar } = useAuth()
   const showTokens = expertMode
   const showCost = expertMode && isInstanceAdmin
   const { isUserOnline } = useStarshipPresence(starshipId, Boolean(starshipId))
+
+  // Starship member directory (for resolving userId -> displayName/avatar in participant lists)
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
+  const memberByUserId = useMemo(() => {
+    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
+    const m = new Map<string, { displayName?: string | null; email?: string | null; avatar?: string | null }>()
+    for (const it of list) {
+      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+      if (!id) continue
+      m.set(id, {
+        displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
+        email: typeof it?.email === 'string' ? String(it.email) : null,
+        avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
+      })
+    }
+    return m
+  }, [membersAndInvites])
 
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
@@ -109,6 +136,20 @@ export function ConversationSummaryBar({
     if (!cid || !Array.isArray(list) || list.length === 0) return null
     return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
   }, [dmListData?.directMessages, conversationId])
+
+  // Threads are child conversations; if the parent is a DM, we still want to show the DM participants
+  // in the thread header even before the peer has posted inside the thread.
+  const parentConversationId = useMemo(() => {
+    const raw = (currentConversation as any)?.parentConversationId ?? (currentConversation as any)?.parent_conversation_id
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v || null
+  }, [currentConversation])
+  const parentDmItem = useMemo<DirectMessageListItem | null>(() => {
+    const pid = String(parentConversationId || '')
+    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
+    if (!pid || !Array.isArray(list) || list.length === 0) return null
+    return list.find(x => String((x as any)?.dm?.conversationId || '') === pid) || null
+  }, [dmListData?.directMessages, parentConversationId])
 
   const dmDebug = useMemo(() => {
     const dm: any = dmItem?.dm as any
@@ -190,9 +231,15 @@ export function ConversationSummaryBar({
         const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
         const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
 
-        const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
+        const fromDirectory = userId ? memberByUserId.get(userId) : null
+        const label =
+          userName ||
+          (userId === String(authUserId || '') ? String(authUserName || authUserEmail || '') : '') ||
+          (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '') ||
+          (userId ? `User ${userId.slice(0, 6)}` : 'User')
         const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
-        upsert({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) }, seenAt)
+        const avatarUrl = userAvatar || (fromDirectory?.avatar?.trim() || '')
+        upsert({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) }, seenAt)
       }
 
       if (role === 'assistant') {
@@ -204,6 +251,36 @@ export function ConversationSummaryBar({
         const fromList = agentId ? (agents as any[]).find(a => String((a as any)?.id || '') === agentId) : null
         const avatarAttachmentId = typeof (fromList as any)?.avatarAttachmentId === 'string' ? String((fromList as any).avatarAttachmentId).trim() : ''
         upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, seenAt)
+      }
+    }
+
+    // Stable participants list from server (includes conversation member userIds and linked agentIds).
+    // This is critical for user↔user threads: the peer user may not have posted in the thread yet,
+    // so message sampling would only include the current user.
+    const participants = Array.isArray((participantsPreview as any)?.participants) ? (((participantsPreview as any).participants as any[]) ?? []) : []
+    if (participants.length > 0) {
+      for (const raw of participants) {
+        const id = typeof raw === 'string' ? raw.trim() : ''
+        if (!id) continue
+        const isAgent = (agents as any[]).some(a => String((a as any)?.id || '').trim() === id)
+        if (isAgent) {
+          const fromList = (agents as any[]).find(a => String((a as any)?.id || '').trim() === id) as any
+          const label = String(fromList?.name || fromList?.slug || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')).trim() || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
+          const key = `agent:${id || label}`
+          const seed = String(fromList?.name || fromList?.slug || id || label).trim() || label
+          const avatarAttachmentId = typeof fromList?.avatarAttachmentId === 'string' ? String(fromList.avatarAttachmentId).trim() : ''
+          upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, 0)
+        } else {
+          const fromDirectory = memberByUserId.get(id)
+          const labelRaw =
+            id === String(authUserId || '')
+              ? String(authUserName || authUserEmail || '')
+              : (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '')
+          const label = labelRaw || `User ${id.slice(0, 6)}`
+          const key = `human:${id}`
+          const avatarUrl = typeof fromDirectory?.avatar === 'string' ? fromDirectory.avatar.trim() : ''
+          upsert({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) }, 0)
+        }
       }
     }
 
@@ -229,7 +306,7 @@ export function ConversationSummaryBar({
     })
 
     return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ConversationParticipantItem[]
-  }, [agents, participantsPreview])
+  }, [agents, authUserEmail, authUserId, authUserName, memberByUserId, participantsPreview])
 
   const effectiveParticipantItems = useMemo(() => {
     // For DMs, always show both participants (even with 0 messages / before either has spoken).
@@ -291,9 +368,81 @@ export function ConversationSummaryBar({
 
       return items.length > 0 ? items : participantItemsFromConversation
     }
-    if (Array.isArray(participantsOverride) && participantsOverride.length > 0) return participantsOverride
-    return participantItemsFromConversation
-  }, [authUserAvatar, authUserEmail, authUserId, authUserName, dmItem, participantItemsFromConversation, participantsOverride])
+    const base =
+      Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : participantItemsFromConversation
+
+    const inferredFromParentDm = (() => {
+      const items: ConversationParticipantItem[] = []
+      const dm: any = (parentDmItem as any)?.dm
+      if (!dm) return items
+      if (dm?.dmType !== 'user_user') return items
+
+      const addHuman = (args: { id?: string | null; label?: string | null; avatarUrl?: string | null }) => {
+        const id = typeof args.id === 'string' ? args.id.trim() : ''
+        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
+        const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
+        const label = labelRaw || (id ? `User ${id.slice(0, 6)}` : 'User')
+        const key = id ? `human:${id}` : label ? `human:name:${label}` : `human:unknown:${label}`
+        items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+      }
+
+      // Current user
+      addHuman({ id: authUserId ?? null, label: authUserName ?? authUserEmail ?? null, avatarUrl: authUserAvatar ?? null })
+
+      // Peer (from parent DM item)
+      const peer: any = (parentDmItem as any)?.peerUser
+      const peerId =
+        typeof peer?.id === 'string'
+          ? String(peer.id)
+          : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '')
+            ? String(dm.userAId)
+            : typeof dm?.userBId === 'string'
+              ? String(dm.userBId)
+              : null
+      const peerLabel =
+        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
+        (typeof peer?.email === 'string' && peer.email.trim()) ||
+        (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
+      const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
+      addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
+
+      return items
+    })()
+
+    const hint = [
+      ...(Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []),
+      ...inferredFromParentDm,
+    ]
+    if (hint.length === 0) return base
+
+    const out: ConversationParticipantItem[] = []
+    const seen = new Set<string>()
+    for (const p of base) {
+      if (!p || typeof (p as any).key !== 'string') continue
+      const k = String((p as any).key)
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(p)
+    }
+    for (const p of hint) {
+      if (!p || typeof (p as any).key !== 'string') continue
+      const k = String((p as any).key)
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(p)
+    }
+    return out.length > 0 ? out : base
+  }, [
+    authUserAvatar,
+    authUserEmail,
+    authUserId,
+    authUserName,
+    dmItem,
+    parentDmItem,
+    participantItemsFromConversation,
+    participantsHint,
+    participantsOverride,
+  ])
 
   const participantsLabel = useMemo(() => {
     const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)

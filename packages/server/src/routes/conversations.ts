@@ -19,6 +19,7 @@ import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
   ConversationMemberRepository,
+  ConversationParticipantRepository,
   ConversationWidgetRepository,
   DirectMessageRepository,
   getConnection,
@@ -953,7 +954,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Get conversation agents to determine participants
       const agents = await conversationService.getConversationAgents(conversationId);
-      const participants = agents.map((agent) => agent.id);
+      // Participants should include BOTH linked agents + human users, derived from unified participant store.
+      const participantRepo = new ConversationParticipantRepository();
+      const participantRows = await participantRepo.listByConversation(conversationId).catch(() => []);
+      const userIds = Array.isArray(participantRows)
+        ? participantRows
+            .map((p) => (p as any)?.userId)
+            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+        : [];
+      const agentIds = Array.isArray(participantRows)
+        ? participantRows
+            .map((p) => (p as any)?.agentId)
+            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+        : [];
+      const participants = Array.from(new Set([...agentIds, ...userIds]));
 
       // Structure response to match client expectations
       const state = conversation?.state || {};

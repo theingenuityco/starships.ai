@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { sendError } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
-import { ChannelRepository, ConversationMemberRepository, DirectMessageRepository } from '@starships/models';
+import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository } from '@starships/models';
 
 /**
  * Enforce private channel membership (conversation-backed channels).
@@ -10,7 +10,7 @@ import { ChannelRepository, ConversationMemberRepository, DirectMessageRepositor
  * Starship collaborators can see starship resources, but private channels are more restrictive:
  * - instance admin can always access
  * - starship owner can access (ONLY when the channel belongs to that starship)
- * - otherwise require a row in `conversation_members`
+ * - otherwise require a row in `conversation_participants` (user participant)
  *
  * IMPORTANT:
  * Always pass the conversation's authoritative starshipId. This prevents authorization
@@ -47,8 +47,8 @@ export async function enforcePrivateChannelMembership(args: {
     const starship = await starshipService.getStarship(channel.starshipId).catch(() => null);
     if (starship && String(starship.ownerId) === String(args.userId)) return true;
 
-    const memberRepo = new ConversationMemberRepository();
-    const ok = await memberRepo.isMember(args.userId, args.conversationId);
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (!ok) {
       sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
         resource: 'channel',
@@ -74,7 +74,7 @@ export async function enforcePrivateChannelMembership(args: {
  *
  * Starship collaborators can see starship resources, but DMs are always restricted:
  * - instance admin can always access
- * - otherwise require a row in `conversation_members`
+ * - otherwise require a row in `conversation_participants` (user participant)
  */
 export async function enforceDirectMessageMembership(args: {
   conversationId: string;
@@ -90,8 +90,8 @@ export async function enforceDirectMessageMembership(args: {
     // Instance admin bypass
     if (isInstanceAdmin(args.req.user)) return true;
 
-    const memberRepo = new ConversationMemberRepository();
-    const ok = await memberRepo.isMember(args.userId, args.conversationId);
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (!ok) {
       sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
         resource: 'direct_message',

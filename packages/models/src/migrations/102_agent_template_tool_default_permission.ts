@@ -1,7 +1,7 @@
 import type { Client } from 'pg';
 
 /**
- * Migration 099: Add default_permission column to agent_template_tool_templates
+ * Migration 102: Add default_permission column to agent_template_tool_templates
  *
  * Stores the publisher's tool permission (allow/ask/deny) as the default when
  * users deploy the agent template from the marketplace.
@@ -28,3 +28,4 @@ export async function down(client: Client): Promise<void> {
   `;
   await client.query(sql);
 }
+

@@ -24,6 +24,7 @@ export { EmailChangeTokenEntity } from './entities/EmailChangeTokenEntity';
 export { StarshipMemberEntity } from './entities/StarshipMemberEntity';
 export { StarshipInviteTokenEntity } from './entities/StarshipInviteTokenEntity';
 export { ConversationMemberEntity } from './entities/ConversationMemberEntity';
+export { ConversationParticipantEntity } from './entities/ConversationParticipantEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
 export { ToolEntity } from './entities/ToolEntity';
 export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
@@ -62,6 +63,7 @@ export { EmailChangeTokenRepository } from './repositories/EmailChangeTokenRepos
 export { StarshipMemberRepository } from './repositories/StarshipMemberRepository';
 export { StarshipInviteTokenRepository } from './repositories/StarshipInviteTokenRepository';
 export { ConversationMemberRepository } from './repositories/ConversationMemberRepository';
+export { ConversationParticipantRepository } from './repositories/ConversationParticipantRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { ToolRepository } from './repositories/ToolRepository';
 export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';

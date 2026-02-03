@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import { useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useNotificationsStream, useUnreadByConversationIds } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -59,13 +60,14 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
 
 function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: boolean }) {
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
+  const hasPresence = typeof online === 'boolean'
   return (
     <div className="relative">
       <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
-      <PresenceIndicator kind="online" active={Boolean(online)} size="xs" />
+      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
   )
 }
@@ -94,6 +96,7 @@ export function ConversationList({
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
+  const { unread: notifUnread } = useNotificationsStream(starshipId, true)
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const { isUserOnline } = useStarshipPresence(starshipId, true)
@@ -111,6 +114,27 @@ export function ConversationList({
     }
     return set
   }, [directMessagesData?.directMessages])
+
+  // Slack-style unread state for channel/DM list items
+  const conversationIdsForUnread = useMemo(() => {
+    const ids: string[] = []
+    const chans = (channelsData as any)?.channels
+    if (Array.isArray(chans)) {
+      for (const c of chans) {
+        const cid = typeof c?.conversationId === 'string' ? String(c.conversationId) : ''
+        if (cid) ids.push(cid)
+      }
+    }
+    const dms = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
+    for (const item of dms) {
+      const dm: any = (item as any)?.dm
+      const cid = typeof dm?.conversationId === 'string' ? String(dm.conversationId) : ''
+      if (cid) ids.push(cid)
+    }
+    return Array.from(new Set(ids))
+  }, [channelsData, directMessagesData?.directMessages])
+  const { data: unreadMapData } = useUnreadByConversationIds(starshipId, conversationIdsForUnread, true)
+  const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as Record<string, { hasUnread: boolean }> | undefined
 
   const createChannel = useCreateChannel()
   const { userId: authUserId } = useAuthContext()
@@ -169,12 +193,23 @@ export function ConversationList({
           (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
         : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
 
+    const conversationId =
+      t.kind === 'agent'
+        ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '')
+        : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
+    const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+
     return (
       <div
         key={t.key}
         className={cn(
           'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
-          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
+          isActive
+            ? 'text-primary bg-primary/10 border-transparent'
+            : hasUnread
+              ? 'text-foreground border-transparent hover:bg-muted'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
           isBusy && 'opacity-70 pointer-events-none'
         )}
         style={{
@@ -197,9 +232,25 @@ export function ConversationList({
             pointerEvents: 'none',
           }}
         >
-          {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
+          {t.kind === 'agent' ? (
+            <DirectMessageAvatar starshipId={starshipId} agent={t.agent} />
+          ) : (
+            <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
+          )}
         </div>
-        <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
+        <span
+          className={cn(
+            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+          )}
+        >
+          {label}
+        </span>
+        {dmCount > 0 ? (
+          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+            {dmCount > 99 ? '99+' : String(dmCount)}
+          </span>
+        ) : null}
       </div>
     )
   }
@@ -368,7 +419,7 @@ export function ConversationList({
               onboardingHighlight === 'channels' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8">
+            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -426,12 +477,19 @@ export function ConversationList({
                             .toLowerCase()
                         : ch.conversationId === currentConversationId
                       const label = ch.name || ch.slug
+                      const cid = String(ch.conversationId || '')
+                      const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
+                      const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
                       return (
                         <div key={ch.conversationId}>
                           <div
                             className={cn(
                               'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
-                              isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                              isActive
+                                ? 'text-primary bg-primary/10 border-transparent'
+                                : hasUnread
+                                  ? 'text-foreground border-transparent hover:bg-muted'
+                                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                             )}
                             style={{
                               justifyContent: 'flex-start',
@@ -453,9 +511,32 @@ export function ConversationList({
                                 pointerEvents: 'none',
                               }}
                             >
-                              <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                              <Icon
+                                name="hash"
+                                weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
+                                className={cn(
+                                  'h-4 w-4',
+                                  isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground'
+                                )}
+                              />
                             </div>
-                            <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
+                            <span
+                              className={cn(
+                                'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+                                isActive
+                                  ? 'text-primary font-medium'
+                                  : hasUnread || mentionCount > 0
+                                    ? 'text-foreground font-bold'
+                                    : 'font-medium'
+                              )}
+                            >
+                              {label}
+                            </span>
+                            {mentionCount > 0 ? (
+                              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                {mentionCount > 99 ? '99+' : String(mentionCount)}
+                              </span>
+                            ) : null}
                           </div>
 
                           {/* Forum channels render threads in the main panel (no nested sidebar list). */}
@@ -468,7 +549,7 @@ export function ConversationList({
             ) : null}
           </div>
 
-          <div className="h-4" />
+          <div className="my-3 border-t border-border/60" />
 
           {/* Direct messages - takes remaining space below Channels */}
           <div
@@ -477,7 +558,7 @@ export function ConversationList({
               onboardingHighlight === 'directMessages' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8">
+            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -581,20 +662,47 @@ export function ConversationList({
                         .toLowerCase()
                     : ch.conversationId === currentConversationId
                   const label = ch.name || ch.slug
+                  const cid = String(ch.conversationId || '')
+                  const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
+                  const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                        className={cn(
+                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
+                          'hover:bg-muted/50',
+                          isActive && 'bg-muted/70 shadow-sm'
+                        )}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
-                        <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                        <Icon
+                          name="hash"
+                          weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
+                          className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
+                            <p
+                              className={cn(
+                                'text-sm truncate',
+                                isActive
+                                  ? 'text-primary font-medium'
+                                  : hasUnread || mentionCount > 0
+                                    ? 'text-foreground font-bold'
+                                    : 'text-muted-foreground font-medium'
+                              )}
+                            >
+                              {label}
+                            </p>
                             <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
                         </div>
+                        {mentionCount > 0 ? (
+                          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                            {mentionCount > 99 ? '99+' : String(mentionCount)}
+                          </span>
+                        ) : null}
                       </div>
 
                       {/* Forum channels render threads in the main panel (no nested sidebar list). */}
@@ -604,6 +712,8 @@ export function ConversationList({
               </div>
             )}
           </div>
+
+          <div className="my-3 border-t border-border/60" />
 
           <div className="mb-4">
             <div className="px-2 mb-2 flex items-center justify-between">
@@ -629,6 +739,10 @@ export function ConversationList({
                       ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
                         (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
                       : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
+                  const conversationId =
+                    t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
+                  const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
+                  const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
                   return (
                     <div
                       key={t.key}
@@ -636,6 +750,7 @@ export function ConversationList({
                         'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
                         'hover:bg-muted/50',
                         isActive && 'bg-primary/10 text-primary',
+                        !isActive && hasUnread && 'text-foreground',
                         isBusy && 'opacity-70 pointer-events-none'
                       )}
                       onClick={() => handleDmTargetClick(t)}
@@ -647,7 +762,19 @@ export function ConversationList({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
+                          <p
+                            className={cn(
+                              'text-sm truncate',
+                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+                            )}
+                          >
+                            {label}
+                          </p>
+                          {dmCount > 0 ? (
+                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                              {dmCount > 99 ? '99+' : String(dmCount)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>

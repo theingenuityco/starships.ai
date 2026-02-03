@@ -241,6 +241,21 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: SENTRY_DSN_SERVER
+            - name: VAPID_SUBJECT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: VAPID_SUBJECT
+            - name: VAPID_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: VAPID_PUBLIC_KEY
+            - name: VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: VAPID_PRIVATE_KEY
             # OAuth (GitHub OAuth App for login)
             - name: GH_OAUTH_CLIENT_ID
               valueFrom:

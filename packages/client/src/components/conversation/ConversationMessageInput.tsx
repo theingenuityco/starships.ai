@@ -556,35 +556,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // CRITICAL: Check if already blocked (synchronous ref check first)
       if (!messageToSend || sending || disabled || isStreamingEffective || streamingRef.current) return
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run-thread-agentless-1',
-          hypothesisId: 'H1',
-          location: 'ConversationMessageInput.tsx:handleSubmit:entry',
-          message: 'composer submit entry',
-          data: {
-            conversationId: typeof conversationId === 'string' ? conversationId : null,
-            isChannelConversation,
-            isThreadConversation,
-            isThreadDraft,
-            isThreadContext,
-            isMentionOnlyThread,
-            linkedAgentCount,
-            conversationAgentsLen: Array.isArray(conversationAgents) ? conversationAgents.length : null,
-            selectedAgentPresent: Boolean(selectedAgent?.id),
-            messageLen: messageToSend.length,
-            hasLeadingMentionToken: /^\s*(<@a:|@)/.test(messageToSend),
-            conversationHasParentIdField: Boolean((conversation as any)?.parentConversationId),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion agent log
-
       // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
@@ -655,60 +626,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // (This covers "thread started from a user message" and other edge cases.)
       const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isDraftUserUserDm && !isMentionOnlyThread && !effectiveAgent)
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run-thread-agentless-1',
-          hypothesisId: 'H1',
-          location: 'ConversationMessageInput.tsx:handleSubmit:agent_resolve',
-          message: 'agent resolved + persist-only decision',
-          data: {
-            effectiveAgentPresent: Boolean((effectiveAgent as any)?.id),
-            shouldPersistOnly,
-            isDraftUserUserDm,
-            isThreadConversation,
-            isThreadDraft,
-            isThreadContext,
-            isMentionOnlyThread,
-            linkedAgentCount,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion agent log
-
       // Validation for agent and starship
       if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm && !shouldPersistOnly) {
         resetFlags()
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'run-thread-agentless-1',
-            hypothesisId: 'H1',
-            location: 'ConversationMessageInput.tsx:handleSubmit:blocked_no_agent',
-            message: 'blocked: no effective agent',
-            data: {
-              isChannelConversation,
-              isDraftUserUserDm,
-              isThreadConversation,
-              isThreadDraft,
-              isThreadContext,
-              isMentionOnlyThread,
-              linkedAgentCount,
-              conversationAgentsLen: Array.isArray(conversationAgents) ? conversationAgents.length : null,
-              selectedAgentPresent: Boolean(selectedAgent?.id),
-              conversationHasParentIdField: Boolean((conversation as any)?.parentConversationId),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion agent log
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
         })
@@ -761,27 +681,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // EXCEPTION: child conversations (threads) may be created agent-less for human-only threads.
             if (!effectiveAgent && !isThreadCreate) {
               resetFlags()
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  sessionId: 'debug-session',
-                  runId: 'run-thread-agentless-1',
-                  hypothesisId: 'H4',
-                  location: 'ConversationMessageInput.tsx:handleSubmit:create_conversation_blocked',
-                  message: 'blocked: creating non-thread conversation without agent',
-                  data: {
-                    isThreadCreate,
-                    isThreadContext,
-                    isThreadDraft,
-                    isThreadConversation,
-                    linkedAgentCount,
-                  },
-                  timestamp: Date.now(),
-                }),
-              }).catch(() => {})
-              // #endregion agent log
               toast.error('Select an agent', { description: 'Please select an agent to chat.' })
               return
             }
@@ -959,25 +858,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         // Human-only thread message: persist without invoking ConversationService/agent execution.
         if (shouldPersistOnly) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: 'debug-session',
-              runId: 'run-thread-agentless-1',
-              hypothesisId: 'H3',
-              location: 'ConversationMessageInput.tsx:handleSubmit:persist_only',
-              message: 'persist-only branch',
-              data: {
-                conversationId: currentConversationId!,
-                createdNewConversation,
-                attachmentCount: attachmentIdsToSend.length,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion agent log
           try {
             const resp = await api.post('/api/v1/messages', {
               role: 'user',
@@ -1101,29 +981,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Validation for agent and starship
         if (!selectedAgent) {
           resetFlags()
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: 'debug-session',
-              runId: 'run-thread-agentless-1',
-              hypothesisId: 'H2',
-              location: 'ConversationMessageInput.tsx:handleSuggestionSubmit:blocked_no_selected_agent',
-              message: 'suggestion blocked: no selectedAgent',
-              data: {
-                conversationId: typeof conversationId === 'string' ? conversationId : null,
-                isThreadConversation,
-                isThreadDraft,
-                isThreadContext,
-                isMentionOnlyThread,
-                linkedAgentCount,
-                suggestionLen: typeof suggestionText === 'string' ? suggestionText.length : null,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion agent log
           toast.error('Select an agent', { description: 'Please select an agent to chat.' })
           return
         }

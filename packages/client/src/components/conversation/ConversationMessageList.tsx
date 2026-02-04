@@ -735,6 +735,24 @@ export function ConversationMessageList({
     [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
   )
 
+  const resolveAgentPresentationFromAgent = useCallback(
+    (agent: ConversationAgent | null | undefined) => {
+      if (!agent) return null
+      const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
+      const nameFallback =
+        (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') ||
+        (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') ||
+        (typeof (agent as any)?.id === 'string' ? `Agent ${String((agent as any).id).slice(0, 6)}` : '')
+      const displayName = (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
+      const slugRaw = typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : ''
+      const slug = slugRaw || undefined
+      const avatarAttachmentId = typeof (agent as any)?.avatarAttachmentId === 'string' ? String((agent as any).avatarAttachmentId).trim() : ''
+      const avatarUrl = agentAvatarUrlOverride ?? (avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) : undefined)
+      return { displayName: displayName || 'Assistant', slug, avatarUrl }
+    },
+    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, fallbackAgentDisplayName]
+  )
+
   const handleThreadAction = useCallback(
     async (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => {
       const sid = typeof starshipId === 'string' ? starshipId : ''
@@ -1244,6 +1262,82 @@ export function ConversationMessageList({
     const withoutPinned = filtered.filter(m => m.id !== pinnedId)
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
+
+  const gapLoaderPresentation = useMemo(() => {
+    if (!activeTurnId) return null
+
+    // 1) Best: `turn.usage` tells us the actual agent for this turn (when available).
+    const usage = activeTurnId && turnUsageByTurnId && typeof turnUsageByTurnId === 'object' ? (turnUsageByTurnId as any)[activeTurnId] : null
+    const usageAgentId = typeof usage?.agentId === 'string' ? String(usage.agentId).trim() : ''
+    const usageAgentName = typeof usage?.agentName === 'string' ? String(usage.agentName).trim() : ''
+    if (usageAgentId) {
+      const agent = agentById.get(usageAgentId) ?? null
+      const p = resolveAgentPresentationFromAgent(agent)
+      if (p) return { ...p, strategy: 'turn.usage.agentId' as const, mentionAgentId: '' }
+    }
+    if (usageAgentName) {
+      return { displayName: usageAgentName, slug: undefined, avatarUrl: undefined, strategy: 'turn.usage.agentName' as const, mentionAgentId: '' }
+    }
+
+    // 2) Next-best: parse the last user message for an agent mention (<@a:AGENT_ID> or legacy @slug)
+    const lastUser = [...renderMessages].reverse().find(m => (m as any)?.role === 'user') as ExtendedMessage | undefined
+    const lastUserContent = typeof (lastUser as any)?.content === 'string' ? String((lastUser as any).content) : ''
+    const tokenMatch = lastUserContent.match(/^\s*<@a:([^>\s]+)>/)
+    const legacyText = lastUserContent.replace(/<@[^>\n]+>/g, ' ')
+    const legacyMentionMatch = legacyText.match(/^\s*@([A-Za-z0-9._-]{1,100})/i)
+    const mentionAgentId = tokenMatch ? String(tokenMatch[1] || '').trim() : ''
+    const mentionHandle = legacyMentionMatch ? String(legacyMentionMatch[1] || '').trim() : ''
+    if (mentionAgentId) {
+      const agent = agentById.get(mentionAgentId) ?? null
+      const p = resolveAgentPresentationFromAgent(agent)
+      if (p) return { ...p, strategy: 'lastUser.<@a:id>' as const, mentionAgentId }
+    }
+    if (mentionHandle) {
+      const lower = mentionHandle.toLowerCase()
+      const agent =
+        conversationAgents.find(a => {
+          const slug = typeof (a as any)?.slug === 'string' ? String((a as any).slug).toLowerCase() : ''
+          const name = typeof (a as any)?.name === 'string' ? String((a as any).name).toLowerCase() : ''
+          return (slug && slug === lower) || (name && name === lower)
+        }) ?? null
+      const p = resolveAgentPresentationFromAgent(agent)
+      if (p) return { ...p, strategy: 'lastUser.@handle' as const, mentionAgentId: '' }
+    }
+
+    // 3) Fallback: previous logic (last assistant / fallback agent)
+    const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
+    const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+    return {
+      displayName: (p.displayName || fallbackAgentDisplayName || 'Assistant').trim() || 'Assistant',
+      slug: p.slug,
+      avatarUrl: p.avatarUrl,
+      strategy: 'fallback' as const,
+      mentionAgentId: '',
+    }
+  }, [activeTurnId, agentById, conversationAgents, fallbackAgentDisplayName, renderMessages, resolveAgentPresentationFromAgent, resolveAssistantPresentation, turnUsageByTurnId])
+
+  const gapLoaderLoggedKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!shouldShowGapLoader) {
+      gapLoaderLoggedKeyRef.current = null
+      return
+    }
+    const key = `${String(conversationId ?? 'none')}|${String(activeTurnId ?? 'none')}|${String(activeTurnStatus ?? 'none')}`
+    if (gapLoaderLoggedKeyRef.current === key) return
+    gapLoaderLoggedKeyRef.current = key
+  }, [
+    activeTurnId,
+    activeTurnStatus,
+    conversationId,
+    fallbackAgentDisplayName,
+    isAssistantStreaming,
+    isAwaitingAssistant,
+    isAwaitingToolResults,
+    renderMessages,
+    resolveAssistantPresentation,
+    shouldShowGapLoader,
+    turnUsageByTurnId,
+  ])
 
   const activeThreadParentMessageId = useMemo(() => {
     const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
@@ -1816,7 +1910,27 @@ export function ConversationMessageList({
                   const isFirstMessage = idx === 0
                   const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
                   const isCurrentMatch = message.id === currentMatchMessageId
-                  const assistant = resolveAssistantPresentation(message)
+                  let assistant = resolveAssistantPresentation(message)
+                  const streamish =
+                    message.role === 'assistant' && (message as any)?.streaming === true && typeof (message as any)?.id === 'string' && String((message as any).id).startsWith('stream-')
+                  const msgTurnId = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                  if (streamish && activeTurnId && msgTurnId && msgTurnId === activeTurnId && gapLoaderPresentation) {
+                    const base =
+                      assistant ||
+                      ({
+                        displayName: (fallbackAgentDisplayName || 'Assistant').trim() || 'Assistant',
+                        slug: undefined,
+                        avatarUrl: undefined,
+                        modelId: undefined,
+                        maxTokens: undefined,
+                      } as const)
+                    assistant = {
+                      ...base,
+                      displayName: gapLoaderPresentation.displayName,
+                      slug: gapLoaderPresentation.slug,
+                      avatarUrl: gapLoaderPresentation.avatarUrl,
+                    }
+                  }
 
                   return (
                     <Fragment key={message.id}>
@@ -1934,7 +2048,7 @@ export function ConversationMessageList({
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (
-              <div className="flex justify-start">
+              <div className={cn('flex justify-start w-full', sizeVariant === 'delegation' ? 'mt-2' : 'mt-4')}>
                 {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
                   <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
                     <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
@@ -1946,19 +2060,34 @@ export function ConversationMessageList({
                     </div>
                   </div>
                 ) : (
-                  <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                      {(() => {
-                        const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
-                        const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
-                        return <AgentAvatar seed={p.displayName || 'AI'} imageUrl={p.avatarUrl} size={40} rounded />
-                      })()}
-                    </div>
+                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+                    {(() => {
+                      // Must match `AgentAvatarWithTurnUsageRing`'s `pad` so gap loader aligns with normal assistant rows in expert mode.
+                      const usageRingPadPx = 3
+                      const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
+                      const avatarSlotPx = 40 + avatarSlotPadPx
+                      const p = gapLoaderPresentation || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                      return (
+                        <div className="flex-shrink-0 mt-1" style={{ width: avatarSlotPx, height: avatarSlotPx }}>
+                          <AgentAvatarWithTurnUsageRing
+                            seed={p.displayName || 'AI'}
+                            imageUrl={p.avatarUrl}
+                            modelIdOverride={null}
+                            tokenLimitOverride={null}
+                            size={40}
+                            rounded
+                            enabled={Boolean(expertMode)}
+                            usage={null}
+                            busy={true}
+                            className="mx-auto"
+                          />
+                        </div>
+                      )
+                    })()}
                     <div className="min-w-0 flex-1 pt-0.5">
-                      <div className="mb-1 text-sm font-bold text-foreground">
+                      <div className="mb-0 text-sm font-bold text-foreground">
                         {(() => {
-                          const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
-                          const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                          const p = gapLoaderPresentation || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
                           const label = (p.displayName || fallbackAgentDisplayName || 'Assistant').trim()
                           const slug = p.slug
                           return typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof slug === 'string' && slug.trim().length > 0 ? (
@@ -2400,6 +2529,12 @@ const MemoizedMessageBubble = memo(
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
       const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const authorLabel = (() => {
+        if (!isAuthedUserMessage) return userDisplayName
+        const detail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
+        if (detail && detail.toLowerCase() !== 'you') return `You (${detail})`
+        return 'You'
+      })()
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
@@ -2500,10 +2635,10 @@ const MemoizedMessageBubble = memo(
                 <div className="mb-0 text-sm font-bold font-mono text-foreground">
                   {userProfileHref ? (
                     <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                      {userDisplayName}
+                      {authorLabel}
                     </Link>
                   ) : (
-                    <span>{userDisplayName}</span>
+                    <span>{authorLabel}</span>
                   )}
                 </div>
               )}

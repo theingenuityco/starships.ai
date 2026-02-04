@@ -39,9 +39,23 @@ function shouldPlayForNotification(n: NotificationModel): boolean {
   return typ === 'dm' || typ === 'mention'
 }
 
-export function useNotificationsStream(starshipId: string | null, enabled: boolean = true) {
+export function useNotificationsStream(
+  starshipId: string | null,
+  enabled: boolean = true,
+  opts?: {
+    /**
+     * When provided, notification sounds will be suppressed ONLY when:
+     * - the app/tab is foreground AND
+     * - the incoming notification is for this active conversation.
+     *
+     * (In background, sound still plays.)
+     */
+    activeConversationId?: string | null
+  }
+) {
   const queryClient = useQueryClient()
   const activeGuardRef = useRef<AbortController | null>(null)
+  const activeConversationId = useMemo(() => String(opts?.activeConversationId || '').trim() || null, [opts?.activeConversationId])
 
   function makeSSEAsyncIterable(sid: string, token: string | null, signal?: AbortSignal): AsyncIterable<StreamChunk> {
     const cursorKey = `notif:${sid}:cursor`
@@ -226,73 +240,6 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
     return list
   }, [chunks.length, snapshot])
 
-  // Play a short notification sound for newly appended notifications.
-  // Important: this hook can be mounted in multiple places; dedupe globally by notification id.
-  const lastProcessedIdxRef = useRef(0)
-  const initRef = useRef(false)
-  useEffect(() => {
-    // Reset when switching starships or disabling.
-    initRef.current = false
-    lastProcessedIdxRef.current = 0
-  }, [starshipId, enabled])
-
-  useEffect(() => {
-    if (!starshipId || !enabled) return
-
-    // On first mount, don't replay historical chunks; just start tracking from "now".
-    if (!initRef.current) {
-      initRef.current = true
-      lastProcessedIdxRef.current = chunks.length
-      return
-    }
-
-    const start = Math.max(0, lastProcessedIdxRef.current)
-    if (chunks.length <= start) {
-      lastProcessedIdxRef.current = chunks.length
-      return
-    }
-
-    for (let i = start; i < chunks.length; i++) {
-      const c: any = chunks[i] as any
-      if (c?.type !== 'notification.append' || !c?.data?.notification) continue
-      const n = c.data.notification as NotificationModel
-      if (!shouldPlayForNotification(n)) continue
-
-      const sid = String(starshipId)
-      const id = String((n as any)?.id ?? '')
-      if (!id) continue
-
-      let set = playedNotificationIdsByStarship.get(sid)
-      if (!set) {
-        set = new Set<string>()
-        playedNotificationIdsByStarship.set(sid, set)
-      }
-      // Refresh insertion order (so least-recently-used starships can be dropped).
-      playedNotificationIdsByStarship.delete(sid)
-      playedNotificationIdsByStarship.set(sid, set)
-
-      // Cap total number of starships tracked in a long-lived session.
-      while (playedNotificationIdsByStarship.size > MAX_TRACKED_STARSHIPS) {
-        const oldestKey = playedNotificationIdsByStarship.keys().next().value as string | undefined
-        if (!oldestKey) break
-        playedNotificationIdsByStarship.delete(oldestKey)
-      }
-
-      if (set.has(id)) continue
-      set.add(id)
-
-      // Prevent unbounded growth if the tab is open for a long time.
-      if (set.size > MAX_TRACKED_IDS_PER_STARSHIP) {
-        const keep = new Set(Array.from(set).slice(-Math.floor(MAX_TRACKED_IDS_PER_STARSHIP / 2)))
-        playedNotificationIdsByStarship.set(sid, keep)
-      }
-
-      playNotificationChime()
-    }
-
-    lastProcessedIdxRef.current = chunks.length
-  }, [chunks.length, enabled, starshipId])
-
   const markSeen = useMutation({
     mutationFn: async (args?: { before?: string | null }) => {
       const sid = String(starshipId || '')
@@ -327,6 +274,169 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
       })
     },
   })
+
+  // Play a short notification sound for newly appended notifications.
+  // Important: this hook can be mounted in multiple places; dedupe globally by notification id.
+  const lastProcessedIdxRef = useRef(0)
+  const initRef = useRef(false)
+  useEffect(() => {
+    // Reset when switching starships or disabling.
+    initRef.current = false
+    lastProcessedIdxRef.current = 0
+  }, [starshipId, enabled])
+
+  // Auto-mark notifications read for the active conversation while in foreground.
+  //
+  // Why:
+  // We intentionally suppress DM badges while the user is already viewing that DM.
+  // However, notification rows can be created slightly after the message arrives (race),
+  // so if we only mark-read based on message stream timing, unread can accumulate invisibly
+  // and then "reappear" as a badge when the user navigates away.
+  const autoMarkIdxRef = useRef(0)
+  const autoMarkInitRef = useRef(false)
+  const lastAutoMarkAtRef = useRef<number>(0)
+  useEffect(() => {
+    autoMarkInitRef.current = false
+    autoMarkIdxRef.current = 0
+    lastAutoMarkAtRef.current = 0
+  }, [starshipId, enabled])
+
+  useEffect(() => {
+    if (!starshipId || !enabled) return
+    if (!activeConversationId) return
+
+    const isForeground = (): boolean => {
+      try {
+        if (typeof document === 'undefined') return true
+        if (document.visibilityState && document.visibilityState !== 'visible') return false
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false
+        return true
+      } catch {
+        return true
+      }
+    }
+
+    // On first mount, don't act on historical chunks.
+    if (!autoMarkInitRef.current) {
+      autoMarkInitRef.current = true
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    const start = Math.max(0, autoMarkIdxRef.current)
+    if (chunks.length <= start) {
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    const foreground = isForeground()
+    if (!foreground) {
+      // In background, we *do not* auto-mark read; user hasn't actually viewed the new message.
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    for (let i = start; i < chunks.length; i++) {
+      const c: any = chunks[i] as any
+      if (c?.type !== 'notification.append' || !c?.data?.notification) continue
+      const n = c.data.notification as NotificationModel
+      if (!shouldPlayForNotification(n)) continue
+
+      const notifConversationId = String((n as any)?.conversationId || '').trim()
+      if (!notifConversationId) continue
+      if (notifConversationId !== activeConversationId) {
+        continue
+      }
+
+      // Throttle: many notifications can arrive in a burst; one mark-read clears the conversation.
+      const now = Date.now()
+      if (now - lastAutoMarkAtRef.current < 750) continue
+      lastAutoMarkAtRef.current = now
+      void markRead.mutateAsync({ conversationId: notifConversationId }).catch(() => undefined)
+      // After scheduling mark-read, we can stop scanning this batch.
+      break
+    }
+
+    autoMarkIdxRef.current = chunks.length
+  }, [activeConversationId, chunks.length, enabled, starshipId, markRead])
+
+  useEffect(() => {
+    if (!starshipId || !enabled) return
+
+    const isForeground = (): boolean => {
+      try {
+        if (typeof document === 'undefined') return true
+        if (document.visibilityState && document.visibilityState !== 'visible') return false
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false
+        return true
+      } catch {
+        return true
+      }
+    }
+
+    // On first mount, don't replay historical chunks; just start tracking from "now".
+    if (!initRef.current) {
+      initRef.current = true
+      lastProcessedIdxRef.current = chunks.length
+      return
+    }
+
+    const start = Math.max(0, lastProcessedIdxRef.current)
+    if (chunks.length <= start) {
+      lastProcessedIdxRef.current = chunks.length
+      return
+    }
+
+    for (let i = start; i < chunks.length; i++) {
+      const c: any = chunks[i] as any
+      if (c?.type !== 'notification.append' || !c?.data?.notification) continue
+      const n = c.data.notification as NotificationModel
+      if (!shouldPlayForNotification(n)) continue
+
+      // Sound UX:
+      // - Always play if the tab/app is in the background.
+      // - Only suppress when the app is foreground AND the user is already viewing the conversation
+      //   that the notification is for (handled by passing an activeConversationId from call sites).
+      const foreground = isForeground()
+      const notifConversationId = String((n as any)?.conversationId || '').trim()
+      if (foreground && notifConversationId && activeConversationId && notifConversationId === activeConversationId) {
+        continue
+      }
+
+      const sid = String(starshipId)
+      const id = String((n as any)?.id ?? '')
+      if (!id) continue
+
+      let set = playedNotificationIdsByStarship.get(sid)
+      if (!set) {
+        set = new Set<string>()
+        playedNotificationIdsByStarship.set(sid, set)
+      }
+      // Refresh insertion order (so least-recently-used starships can be dropped).
+      playedNotificationIdsByStarship.delete(sid)
+      playedNotificationIdsByStarship.set(sid, set)
+
+      // Cap total number of starships tracked in a long-lived session.
+      while (playedNotificationIdsByStarship.size > MAX_TRACKED_STARSHIPS) {
+        const oldestKey = playedNotificationIdsByStarship.keys().next().value as string | undefined
+        if (!oldestKey) break
+        playedNotificationIdsByStarship.delete(oldestKey)
+      }
+
+      if (set.has(id)) continue
+      set.add(id)
+
+      // Prevent unbounded growth if the tab is open for a long time.
+      if (set.size > MAX_TRACKED_IDS_PER_STARSHIP) {
+        const keep = new Set(Array.from(set).slice(-Math.floor(MAX_TRACKED_IDS_PER_STARSHIP / 2)))
+        playedNotificationIdsByStarship.set(sid, keep)
+      }
+
+      playNotificationChime()
+    }
+
+    lastProcessedIdxRef.current = chunks.length
+  }, [activeConversationId, chunks.length, enabled, starshipId])
 
   return {
     notifications,

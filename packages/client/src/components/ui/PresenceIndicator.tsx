@@ -35,21 +35,13 @@ export function PresenceIndicator({
     placement === 'inset'
       ? 'absolute bottom-0 right-0 -translate-x-0.5 -translate-y-0.5 z-50 pointer-events-none'
       : 'absolute bottom-0 right-0 translate-x-[16%] translate-y-[16%] z-50 pointer-events-none'
-  const color =
-    kind === 'busy'
-      ? 'bg-amber-500 dark:bg-amber-400'
-      : kind === 'offline'
-        ? 'bg-muted-foreground dark:bg-muted-foreground'
-        : 'bg-emerald-500 dark:bg-emerald-400'
+  const color = kind === 'busy' ? 'bg-amber-500 dark:bg-amber-400' : kind === 'offline' ? 'bg-border dark:bg-muted-foreground' : 'bg-emerald-500 dark:bg-emerald-400'
 
   return (
     <span className={cn(pos, className)} aria-label={kind} title={kind}>
       <span
         // Solid fill + solid outline (no opacity/alpha) so it stays fully opaque everywhere.
-        className={cn(
-          'inline-block rounded-full ring-2 ring-background outline outline-1 outline-border',
-          color,
-        )}
+        className={cn('inline-block rounded-full ring-2 ring-background outline outline-1 outline-border', color)}
         style={{
           width: sizePx,
           height: sizePx,

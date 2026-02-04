@@ -1910,6 +1910,9 @@ router.post(
       // If sync is requested, wait for the full turn to complete and return the full conversation with messages
       if (sync) {
         try {
+          const tzHeader = req.headers['x-user-timezone'];
+          const userTimezone =
+            typeof tzHeader === 'string' ? tzHeader : Array.isArray(tzHeader) ? (tzHeader[0] as string | undefined) : undefined;
           await conversationService.addConversationMessage(
             {
               conversationId,
@@ -1921,7 +1924,7 @@ router.post(
               ...(modalities && modalities.length > 0 && { modalities }),
               ...(imageConfig && { imageConfig }),
             },
-            { authContext: req.authContext },
+            { authContext: req.authContext, userTimezone },
             { preCreatedUserMessage: userMessage, turnLeaseId }
           );
 
@@ -1966,6 +1969,9 @@ router.post(
       }
 
       // Default behavior: fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
+      const tzHeader = req.headers['x-user-timezone'];
+      const userTimezone =
+        typeof tzHeader === 'string' ? tzHeader : Array.isArray(tzHeader) ? (tzHeader[0] as string | undefined) : undefined;
       conversationService
         .addConversationMessage(
           {
@@ -1978,7 +1984,7 @@ router.post(
             ...(modalities && modalities.length > 0 && { modalities }),
             ...(imageConfig && { imageConfig }),
           },
-          { authContext: req.authContext },
+          { authContext: req.authContext, userTimezone },
           { preCreatedUserMessage: userMessage, turnLeaseId }
         )
         .catch((error) => {

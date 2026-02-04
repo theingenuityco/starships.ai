@@ -90,13 +90,15 @@ export class Engine {
 
   private sanitizeItemsForRecording(items: Array<ExecutionItem | null | undefined>): ExecutionItem[] {
     const list = Array.isArray(items) ? items : [];
-    return list.filter((item): item is ExecutionItem => Boolean(item)).map((item) => ({
-      json: item?.json,
-      pairedItem: item?.pairedItem,
-      error: item?.error,
-      // Always strip binary from recorded results.
-      binary: undefined,
-    }));
+    return list
+      .filter((item): item is ExecutionItem => Boolean(item))
+      .map((item) => ({
+        json: item?.json,
+        pairedItem: item?.pairedItem,
+        error: item?.error,
+        // Always strip binary from recorded results.
+        binary: undefined,
+      }));
   }
 
   private recordNodeResult(execution: Execution, nodeRef: string, items: ExecutionItem[]): void {

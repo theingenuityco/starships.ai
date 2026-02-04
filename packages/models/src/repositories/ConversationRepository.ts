@@ -379,6 +379,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const direction = orderDirection.toUpperCase();
+        const validDirection = direction === 'DESC' ? 'DESC' : 'ASC';
 
         const result = await connection.query<Record<string, unknown>>(
           `
@@ -401,7 +402,7 @@ export class ConversationRepository extends BaseRepository {
             GROUP BY message_id
           ) r ON r.message_id = m.id
           WHERE m.conversation_id = $1
-          ORDER BY m.created_at ${direction}
+          ORDER BY m.created_at ${validDirection}
           `,
           [conversationId]
         );

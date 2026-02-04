@@ -228,6 +228,8 @@ export function MessageReactions({
                 }
                 contentByEmojiRef.current.set(emoji, el)
               }}
+              role="dialog"
+              aria-label={`Users who reacted with ${emoji}`}
               align="start"
               side="bottom"
               sideOffset={8}

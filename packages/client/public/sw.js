@@ -1,11 +1,32 @@
-self.addEventListener('push', function (event) {
+function parsePushData(event) {
   if (!event.data) {
+    return null
+  }
+  try {
+    return event.data.json()
+  } catch (error) {
+    return {
+      title: 'Starships.ai',
+      body: event.data.text(),
+    }
+  }
+}
+
+self.addEventListener('install', function () {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(self.clients.claim())
+})
+
+self.addEventListener('push', function (event) {
+  const data = parsePushData(event)
+  if (!data) {
     return
   }
-
-  const data = event.data.json()
   const options = {
-    body: data.body,
+    body: data.body || '',
     icon: data.icon || '/web-app-manifest-512x512.png',
     badge: '/web-app-manifest-192x192.png',
     vibrate: [100, 50, 100],
@@ -15,7 +36,8 @@ self.addEventListener('push', function (event) {
     },
   }
 
-  event.waitUntil(self.registration.showNotification(data.title, options))
+  const title = data.title || 'Starships.ai'
+  event.waitUntil(self.registration.showNotification(title, options))
 })
 
 self.addEventListener('notificationclick', function (event) {

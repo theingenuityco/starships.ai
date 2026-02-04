@@ -35,7 +35,12 @@ export class MessageReactionRepository extends BaseRepository {
           `,
           [messageId, userId, emoji]
         );
-        const inserted = typeof (insertRes as any)?.rowCount === 'number' ? Number((insertRes as any).rowCount) : 0;
+        const inserted = (() => {
+          const rowCount = (insertRes as { rowCount?: unknown } | null | undefined)?.rowCount;
+          if (typeof rowCount === 'number') return Number(rowCount);
+          if (typeof rowCount === 'string') return Number(rowCount) || 0;
+          return 0;
+        })();
         if (inserted > 0) return 'added';
 
         // Already existed → remove it (toggle off).
@@ -59,7 +64,7 @@ export class MessageReactionRepository extends BaseRepository {
         if (!messageId) return {};
 
         const connection = this.getConnection();
-        const row = await connection.queryOne<{ reactions: any }>(
+        const row = await connection.queryOne<{ reactions: unknown }>(
           `
             SELECT COALESCE(
               (

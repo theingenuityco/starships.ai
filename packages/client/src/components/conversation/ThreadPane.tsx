@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import type { MessageModel } from '@starships/protocol'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export function ThreadPane(props: {
   starshipId: string
@@ -29,6 +29,8 @@ export function ThreadPane(props: {
 }) {
   const { starshipId, starshipSlug, conversationId, pinnedFirstMessage, draftParentConversationId, draftTitle, onThreadCreated, selectedAgent, onAgentChange, onClose, className } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
+  const inputContainerRef = useRef<HTMLDivElement>(null)
+  const [inputHeight, setInputHeight] = useState<number>(160)
 
   // Safety/repair:
   // Threads are not channels. The server rejects messages for non-channel conversations with 0 linked agents.
@@ -165,6 +167,31 @@ export function ThreadPane(props: {
     return items.length > 0 ? items : null
   }, [effectiveConversationId, pinnedFirstMessage, userAvatar, userEmail, userId, userName])
 
+  // Match the main conversation interface: reserve scroll space for the docked composer so the last
+  // message isn't hidden behind it (and keep the padding consistent with channels).
+  useEffect(() => {
+    const el = inputContainerRef.current
+    if (!el) return
+
+    const update = () => {
+      try {
+        const rect = el.getBoundingClientRect()
+        setInputHeight(Math.ceil(rect.height))
+      } catch {
+        // ignore
+      }
+    }
+
+    update()
+    const ro = new ResizeObserver(() => update())
+    ro.observe(el)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [effectiveConversationId])
+
   return (
     <ConversationStreamProvider conversationId={effectiveConversationId} starshipId={starshipId}>
       <div className={cn('flex flex-col h-full min-h-0 w-full min-w-0', className)}>
@@ -199,11 +226,17 @@ export function ThreadPane(props: {
         />
 
         <div className="flex-1 min-h-0">
-          <ConversationMessageList conversationId={effectiveConversationId} starshipId={starshipId} bottomPaddingPx={180} pinnedFirstMessage={pinnedFirstMessage ?? null} contentWidth="full" />
+          <ConversationMessageList
+            conversationId={effectiveConversationId}
+            starshipId={starshipId}
+            bottomPaddingPx={inputHeight + 12}
+            pinnedFirstMessage={pinnedFirstMessage ?? null}
+            contentWidth="full"
+          />
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}
-        <div className="px-4 pb-4 pt-2">
+        <div ref={inputContainerRef} className="px-4 pb-4 pt-2">
           <div className="w-full pointer-events-auto opacity-100 relative" data-message-input>
             <ConversationMessageInput
               selectedAgent={selectedAgent}

@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
-import { Avatar } from '@/components/ui/avatar'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -122,70 +121,74 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
       <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden p-6">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="flex-shrink-0">
+            <DialogHeader className="flex-shrink-0 mb-4">
               <DialogTitle className="flex items-center gap-2">
                 <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
-                Confirm {isAgent ? 'Deployment' : 'Installation'}
+                {isAgent ? `Deploy to ${starshipName}` : 'Installation'}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5">
-              {/* Template Info */}
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5 pb-4">
+              {/* Template Info – alignment like marketplace profile: avatar, name + role, tags row, then description */}
               <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
-                <div className="flex items-start gap-3 min-w-0">
+                <div className="flex items-start gap-4 min-w-0">
                   {isAgent ? (
                     <MarketplaceAvatar
                       imageUrl={avatarUrl || null}
                       label={template.name}
                       seed={template.name || 'AI'}
-                      sizeClassName="h-10 w-10"
-                      shapeClassName="rounded-full"
+                      sizeClassName="h-20 w-20"
+                      shapeClassName="rounded-2xl"
                       ringClassName="ring-1 ring-border/40"
                       shadowClassName="shadow-sm"
                       showTintWhenMissing={false}
                       showInsetRing={false}
-                      fallbackTextClassName="text-xs font-semibold text-muted-foreground"
+                      fallbackTextClassName="text-base font-semibold text-muted-foreground"
                     />
                   ) : (
-                    <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
-                      <div className="text-lg">🔧</div>
+                    <div className="flex-shrink-0 p-2 rounded-2xl bg-primary/20 h-20 w-20 flex items-center justify-center">
+                      <div className="text-xl">🔧</div>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4 className="font-semibold text-sm leading-tight truncate">{template.name}</h4>
-                        <div className="mt-1 flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {template.category}
-                          </Badge>
-                          {isAgent && (template as AgentTemplateModel).version ? (
-                            <Badge variant="outline" className="text-xs font-mono">
-                              v{(template as AgentTemplateModel).version}
-                            </Badge>
-                          ) : null}
-                          {isAgent && (template as AgentTemplateModel).model ? (
-                            <Badge variant="outline" className="text-xs font-mono">
-                              {(template as AgentTemplateModel).model}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
+                    <h4 className="font-bold text-lg leading-tight truncate">{template.name}</h4>
+                    {isAgent && (template as AgentTemplateModel).role ? <p className="mt-0.5 text-sm text-muted-foreground truncate">{(template as AgentTemplateModel).role}</p> : null}
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {template.category}
+                      </Badge>
+                      {isAgent && (template as AgentTemplateModel).version ? (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          v{(template as AgentTemplateModel).version}
+                        </Badge>
+                      ) : null}
+                      {isAgent && (template as AgentTemplateModel).model ? (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {(template as AgentTemplateModel).model}
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                 </div>
                 {template.description ? <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{template.description}</p> : null}
               </div>
 
-              {/* Required connectors (agent templates) – same UI as suggest-connectors tool */}
+              {/* Connect App – always full section */}
               {isAgent && requiredConnectors.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-3 my-4">
                   <div className="flex items-center gap-2">
                     <Icon name="plug" className="h-4 w-4 text-primary" />
-                    <div className="text-sm font-semibold">Required connectors</div>
+                    <div className="text-sm font-semibold">Connect Apps</div>
                   </div>
                   {starshipId ? (
-                    <ConnectorSuggestionCard starshipId={starshipId} providers={requiredConnectors.map(c => c.provider)} hideSearch={true} hideDisconnect={false} />
+                    <ConnectorSuggestionCard
+                      starshipId={starshipId}
+                      providers={requiredConnectors.map(c => c.provider)}
+                      hideSearch={true}
+                      hideDisconnect={false}
+                      compactCard
+                      connectButtonLabel="Connect"
+                    />
                   ) : (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-3">
                       <p className="text-sm text-muted-foreground">
@@ -212,22 +215,20 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                 </div>
               )}
 
-              {/* Additional Info */}
+              {/* Tool: API key notice */}
               {!isAgent && (template as ToolTemplateModel).requiresApiKey && (
                 <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <Icon name="alert-triangle" className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  <Icon name="alert-triangle" className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
                   <span className="text-sm text-yellow-800 dark:text-yellow-200">This tool requires an API key to function properly.</span>
                 </div>
               )}
 
-              {/* Capabilities (tool permissions) */}
+              {/* Capabilities – always visible with color dot + name + permission dropdown */}
               {isAgent && assignedToolSlugs.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Icon name="wrench" className="h-4 w-4 text-primary" />
-                      <div className="text-sm font-semibold">Capabilities</div>
-                    </div>
+                <div className="space-y-3 my-4">
+                  <div className="flex items-center gap-2">
+                    <Icon name="wrench" className="h-4 w-4 text-primary" />
+                    <div className="text-sm font-semibold">Capabilities</div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -313,10 +314,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
               ) : null}
             </div>
 
-            <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-                Cancel
-              </Button>
+            <DialogFooter className="flex-shrink-0 gap-2 pt-5 border-t border-border/50 mt-5 justify-end">
               <Button type="button" onClick={handleConfirm} disabled={isProcessing} className="min-w-[120px]">
                 {isProcessing ? (
                   <>

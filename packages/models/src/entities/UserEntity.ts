@@ -7,7 +7,19 @@
 
 import type { UserModel, AuthMethod } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError, IsArray, IsEnum } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  validate,
+  ValidationError,
+  IsArray,
+  IsEnum,
+} from 'class-validator';
 
 /**
  * Custom transformers for the UserEntity
@@ -177,6 +189,11 @@ export class UserEntity implements UserModel {
   @IsBoolean()
   navigationOnboardingCompleted?: boolean;
 
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  wizardOnboardingCompleted?: boolean;
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -234,7 +251,7 @@ export class UserEntity implements UserModel {
    * Helper method to check if user is OAuth-only
    */
   isOAuthOnly(): boolean {
-    return !this.hasPassword && this.authMethods.some(m => m !== 'password');
+    return !this.hasPassword && this.authMethods.some((m) => m !== 'password');
   }
 
   /**
@@ -248,7 +265,7 @@ export class UserEntity implements UserModel {
    * Helper method to check if user has hybrid authentication (password + OAuth)
    */
   isHybridAuth(): boolean {
-    return this.hasPassword && this.authMethods.some(m => m !== 'password');
+    return this.hasPassword && this.authMethods.some((m) => m !== 'password');
   }
 
   /**

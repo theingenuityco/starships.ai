@@ -287,6 +287,29 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 // USER STARSHIPS ENDPOINTS
 // ============================================================================
 
+// POST /users/me/ensure-default-starship - Ensure user has at least one starship (create default if none).
+// Used when user has no starships (e.g. new signup); invite-joiners never need this.
+router.post('/users/me/ensure-default-starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+    const userId = req.user!.id;
+    const starshipService = new StarshipService();
+    const accessible = await starshipService.getStarshipsForUser(userId);
+    let ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
+    if (!ship) {
+      ship = await StarshipService.createDefaultStarship(userId);
+      try {
+        await StarshipService.createInitialAgents(userId, ship.id);
+      } catch (agentError) {
+        // Log but still return the new starship; agents can be added later from marketplace
+      }
+    }
+    sendSuccess(res, { starship: ship }, 200);
+  } catch (error) {
+    handleError(error, res, 'ensure default starship');
+  }
+});
+
 // GET /users/:id/starships - Get user's starships (OpenAPI pattern)
 router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -393,37 +416,42 @@ router.post('/users/:id/email/change', jwtAuthMiddleware, rateLimiters.sensitive
 });
 
 // POST /users/:id/email/change/resend - Resend email change verification email
-router.post('/users/:id/email/change/resend', jwtAuthMiddleware, rateLimiters.sensitive, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
+router.post(
+  '/users/:id/email/change/resend',
+  jwtAuthMiddleware,
+  rateLimiters.sensitive,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!checkAuth(req, res)) return;
 
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
-    if (!paramValidation) return;
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+      if (!paramValidation) return;
 
-    // Authorization: Users can only resend their own email change
-    if (req.params.id !== req.user?.id) {
-      sendError(res, 'ACCESS_DENIED', 'You can only resend your own email change', 403);
-      return;
+      // Authorization: Users can only resend their own email change
+      if (req.params.id !== req.user?.id) {
+        sendError(res, 'ACCESS_DENIED', 'You can only resend your own email change', 403);
+        return;
+      }
+
+      const userService = new UserService();
+      const pendingChange = await userService.getPendingEmailChange(req.params.id);
+
+      if (!pendingChange) {
+        sendError(res, 'VALIDATION_ERROR', 'No pending email change found', 400);
+        return;
+      }
+
+      // Initiate email change - this atomically cancels old tokens and creates a new one
+      // Fix: Don't call cancelEmailChange separately to avoid race condition where
+      // cancel succeeds but initiate fails, leaving user without a pending change
+      await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
+
+      sendSuccess(res, { message: 'Email change verification email resent successfully.' });
+    } catch (error) {
+      handleError(error, res, 'resending email change verification email');
     }
-
-    const userService = new UserService();
-    const pendingChange = await userService.getPendingEmailChange(req.params.id);
-
-    if (!pendingChange) {
-      sendError(res, 'VALIDATION_ERROR', 'No pending email change found', 400);
-      return;
-    }
-
-    // Initiate email change - this atomically cancels old tokens and creates a new one
-    // Fix: Don't call cancelEmailChange separately to avoid race condition where
-    // cancel succeeds but initiate fails, leaving user without a pending change
-    await userService.initiateEmailChange(req.params.id, pendingChange.newEmail);
-
-    sendSuccess(res, { message: 'Email change verification email resent successfully.' });
-  } catch (error) {
-    handleError(error, res, 'resending email change verification email');
   }
-});
+);
 
 // POST /users/:id/email/change/cancel - Cancel email change
 router.post('/users/:id/email/change/cancel', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -495,6 +523,20 @@ router.post('/users/me/onboarding/navigation/complete', jwtAuthMiddleware, async
     sendSuccess(res, user);
   } catch (error) {
     handleError(error, res, 'marking navigation onboarding as completed');
+  }
+});
+
+// POST /users/me/onboarding/wizard/complete - Mark wizard onboarding as completed
+router.post('/users/me/onboarding/wizard/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const userService = new UserService();
+    const user = await userService.markWizardOnboardingCompleted(req.user!.id);
+
+    sendSuccess(res, user);
+  } catch (error) {
+    handleError(error, res, 'marking wizard onboarding as completed');
   }
 });
 

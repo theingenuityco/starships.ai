@@ -32,6 +32,7 @@ import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type TurnUsageForRing = {
   turnId: string
@@ -173,14 +174,16 @@ function LinkedConversationCard({
   starshipId?: string
   isUserOnline?: (userId: string) => boolean
 }) {
-  const { data: conversation } = useConversationDetail(linkedConversationId)
-  const { data: agents = [] } = useConversationAgents(linkedConversationId)
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
+  const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
   const { userId: authUserId } = useAuth()
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+  const title =
+    rawTitle ||
+    (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
@@ -188,7 +191,7 @@ function LinkedConversationCard({
     const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
     return Array.from(new Set(ids))
   }, [agentList])
-  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const { data: avatarAttachments = [], isLoading: isLoadingAvatarAttachments } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   // Starship member directory (resolve userId -> displayName/avatar for participant list)
@@ -210,7 +213,7 @@ function LinkedConversationCard({
 
   // Include human participants by sampling recent message authors.
   // The conversation detail endpoint does not currently include members/users.
-  const { data: participantsPreview } = useQuery({
+  const { data: participantsPreview, isLoading: isLoadingParticipantsPreview } = useQuery({
     queryKey: ['conversations', 'participants-preview', linkedConversationId],
     enabled: Boolean(linkedConversationId),
     queryFn: async () => {
@@ -329,6 +332,8 @@ function LinkedConversationCard({
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
 
+  const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
+
   // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
   // between renders when `linkedConversationId` flips from null -> string.
   if (!linkedConversationId) return null
@@ -350,38 +355,46 @@ function LinkedConversationCard({
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Participants (overlapping avatars) */}
-          {participantItems.length > 0 && (
+          {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
             <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
               {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
               <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
-                {participantItems
-                  .slice(0, 3)
-                  .slice()
-                  .reverse()
-                  .map(p => {
-                  if (p.kind === 'agent') {
-                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                    return (
-                      <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={p.key} className="h-7 w-7">
-                      <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                      </Avatar>
-                    </div>
-                  )
-                })}
+                {shouldShowAvatarPlaceholders ? (
+                  <>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/60 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/50 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/40 animate-pulse" aria-hidden="true" />
+                  </>
+                ) : (
+                  participantItems
+                    .slice(0, 3)
+                    .slice()
+                    .reverse()
+                    .map(p => {
+                      if (p.kind === 'agent') {
+                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                        return (
+                          <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={p.key} className="h-7 w-7">
+                          <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )
+                    })
+                )}
               </div>
               {participantItems.length > 3 ? (
                 <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span>
               ) : null}
             </div>
-          )}
+          ) : null}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
         </div>
       </div>
@@ -1159,11 +1172,31 @@ export function ConversationMessageList({
     return lastId
   }, [displayMessages])
 
-  // New loading logic:
-  // - turn is active (isResponding)
-  // - assistant hasn't started streaming tokens yet (isAssistantStreaming=false)
-  // - if tools are actively running, tool UI should show its own state
-  const shouldShowGapLoader = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  // Gap loader ("Typing...") logic:
+  // - We only want to show it when the agent is actually going to respond.
+  // - Some turns can briefly enter `active` and then immediately complete with no assistant output
+  //   (e.g. "no-op" routing decisions). If we show immediately, it flashes for a split second.
+  // - To avoid the flash, debounce: only render the gap loader after a short delay.
+  const GAP_LOADER_DELAY_MS = 250
+  const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  const [gapLoaderArmed, setGapLoaderArmed] = useState(false)
+  useEffect(() => {
+    if (!isAwaitingAssistant) {
+      setGapLoaderArmed(false)
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(() => {
+      if (!cancelled) setGapLoaderArmed(true)
+    }, GAP_LOADER_DELAY_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [isAwaitingAssistant, activeTurnId])
+
+  // Show while awaiting first assistant text OR between tool results and next assistant text.
+  const shouldShowGapLoader = Boolean(isAwaitingAssistant && gapLoaderArmed)
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
@@ -1500,6 +1533,17 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
+  // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
+  // On first paint, `renderMessages` can be empty while the stream query is loading; at that moment
+  // `hasMoreBefore` is also not yet meaningful, which makes the hero incorrectly render.
+  //
+  // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
+  // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
+  // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
+  const isHydratingInitialMessages = Boolean(
+    !messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+  )
+
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
   const isAtConversationStart = (() => {
@@ -1510,15 +1554,52 @@ export function ConversationMessageList({
     return renderMessages.length === 0
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
   // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
   const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
+
+  function InitialMessageSkeletons() {
+    // Skeleton rows should match the real "app layout" message rows:
+    // left avatar slot (40px) + monospace display name + markdown content (no right-aligned bubbles).
+    const skLine = 'bg-foreground/5 dark:bg-foreground/10'
+    const skAvatar = 'bg-foreground/5 dark:bg-foreground/10 ring-1 ring-border/30'
+    const Row = ({ variant, topMarginClass }: { variant: 'assistant' | 'user'; topMarginClass: string }) => {
+      const nameWidthClass = variant === 'assistant' ? 'w-40' : 'w-28'
+      return (
+        <div className={cn('flex justify-start w-full', topMarginClass)}>
+          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+            <div className="flex-shrink-0 mt-1" style={{ width: 40, height: 40 }} aria-hidden="true">
+              <Skeleton className={cn('w-10 h-10 rounded-full', skAvatar)} />
+            </div>
+            <div className="min-w-0 flex-1 w-full pt-0.5">
+              <div className="mb-1.5">
+                <Skeleton className={cn('h-4', nameWidthClass, skLine)} />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className={cn('h-4 w-[82%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[68%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[54%]', skLine)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="pb-6">
+        <Row variant="assistant" topMarginClass="mt-6" />
+        <Row variant="user" topMarginClass="mt-4" />
+        <Row variant="assistant" topMarginClass="mt-4" />
+      </div>
+    )
+  }
 
   return (
     <div className={cn('h-full min-h-0 flex flex-col', className)}>
@@ -1638,22 +1719,26 @@ export function ConversationMessageList({
           )}
 
           <div className="mt-auto">
-            {showChannelHero ? (
-              <ChannelHero
-                channelName={channelName}
-                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {showDirectMessageHero ? (
-              <DirectMessageHero
-                title={resolvedEmptyHeroTitle}
-                participant={resolvedEmptyHeroParticipant ?? null}
-                avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {renderMessages.map((message, idx) => {
+            {isHydratingInitialMessages ? (
+              <InitialMessageSkeletons />
+            ) : (
+              <>
+                {showChannelHero ? (
+                  <ChannelHero
+                    channelName={channelName}
+                    conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {showDirectMessageHero ? (
+                  <DirectMessageHero
+                    title={resolvedEmptyHeroTitle}
+                    participant={resolvedEmptyHeroParticipant ?? null}
+                    avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {renderMessages.map((message, idx) => {
               const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
               const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
               const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
@@ -1817,7 +1902,9 @@ export function ConversationMessageList({
                   </div>
                 </Fragment>
               )
-            })}
+                })}
+              </>
+            )}
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (

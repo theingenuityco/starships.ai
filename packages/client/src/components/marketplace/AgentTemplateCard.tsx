@@ -1,16 +1,18 @@
 'use client'
 
+import Image from 'next/image'
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
 import { useStarship, useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
+import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -38,6 +40,8 @@ interface AgentTemplateCardProps {
 export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId }: AgentTemplateCardProps) {
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
+  const { data: requiredConnectors = [] } = useRequiredConnectors(template.id, !!template.id)
 
   // Get current user and their starships for deployment
   const { userId, isAuthenticated } = useAuth()
@@ -204,6 +208,19 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
           <div className="min-w-0">
             <div className="text-lg font-semibold leading-tight truncate">{displayName || 'Unnamed agent'}</div>
             {displayRole ? <div className="mt-1 text-sm text-muted-foreground truncate">{displayRole}</div> : null}
+            {requiredConnectors.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {requiredConnectors.map(({ provider, name }) => {
+                  const showLogo = !hiddenLogos[provider]
+                  const logoSrc = getConnectorLogoSrc(provider)
+                  return (
+                    <div key={provider} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
+                      {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -212,9 +229,9 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                 {template.category}
               </Badge>
             ) : null}
-            {template.version ? (
+            {template.model ? (
               <Badge variant="outline" className="font-mono text-xs border-border/60 bg-background/40">
-                v{template.version}
+                {template.model}
               </Badge>
             ) : null}
           </div>

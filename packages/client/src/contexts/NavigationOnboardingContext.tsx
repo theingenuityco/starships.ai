@@ -12,6 +12,7 @@ interface NavigationOnboardingContextValue {
   startOnboarding: () => void
   nextStep: () => void
   previousStep: () => void
+  skipTour: () => void
   isCompleting: boolean
 }
 

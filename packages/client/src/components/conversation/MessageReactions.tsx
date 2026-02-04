@@ -202,7 +202,7 @@ export function MessageReactions({
                   'h-6 px-2 py-0 rounded-full text-xs font-medium gap-1',
                   viewerReacted
                     ? 'bg-primary/15 text-primary border border-primary/20 hover:bg-primary/20 hover:text-primary hover:border-primary/30'
-                    : 'bg-muted/50 hover:bg-muted/60',
+                    : 'bg-muted/50 hover:bg-muted',
                   isEmojiPending ? 'opacity-70' : ''
                 )}
                 disabled={disabled || isEmojiPending || !userId}

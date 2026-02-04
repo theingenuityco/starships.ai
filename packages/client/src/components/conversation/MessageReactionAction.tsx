@@ -11,7 +11,21 @@ import { useMemo, useState } from 'react'
 
 const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '🎉', '😮', '😢', '👀'] as const
 
-export function MessageReactionAction({ conversationId, messageId, disabled, className }: { conversationId: string; messageId: string; disabled?: boolean; className?: string }) {
+export function MessageReactionAction({
+  conversationId,
+  messageId,
+  disabled,
+  className,
+  triggerStyle = 'icon',
+  popoverAlign = 'end',
+}: {
+  conversationId: string
+  messageId: string
+  disabled?: boolean
+  className?: string
+  triggerStyle?: 'icon' | 'pill'
+  popoverAlign?: 'start' | 'end' | 'center'
+}) {
   const [open, setOpen] = useState(false)
   const [customEmoji, setCustomEmoji] = useState('')
   const toggle = useToggleMessageReaction()
@@ -40,11 +54,26 @@ export function MessageReactionAction({ conversationId, messageId, disabled, cla
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className={cn('h-7 w-7', className)} disabled={!canReact} aria-label={triggerLabel} title={triggerLabel}>
-          <Icon name="smiley" className="h-4 w-4" />
-        </Button>
+        {triggerStyle === 'pill' ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className={cn('h-6 px-2 py-0 rounded-full text-xs font-medium gap-1 bg-muted/50', className)}
+            disabled={!canReact}
+            aria-label={triggerLabel}
+            title={triggerLabel}
+          >
+            <Icon name="smiley" className="h-4 w-4" />
+            <span className="leading-none">+</span>
+          </Button>
+        ) : (
+          <Button type="button" variant="ghost" size="icon" className={cn('h-7 w-7', className)} disabled={!canReact} aria-label={triggerLabel} title={triggerLabel}>
+            <Icon name="smiley" className="h-4 w-4" />
+          </Button>
+        )}
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-2">
+      <PopoverContent align={popoverAlign} className="w-72 p-2">
         <div className="flex flex-wrap gap-1 mb-2">
           {DEFAULT_REACTIONS.map(e => (
             <Button key={e} type="button" variant="secondary" size="sm" className="h-8 w-8 p-0 text-lg" onClick={() => doToggle(e)}>

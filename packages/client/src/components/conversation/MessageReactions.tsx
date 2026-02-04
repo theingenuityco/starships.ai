@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useToggleMessageReaction } from '@/hooks/useConversations'
-import { useMemo } from 'react'
+import { MessageReactionAction } from './MessageReactionAction'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type ReactionsMap = Record<string, string[]>
 
@@ -82,6 +83,79 @@ export function MessageReactions({
     return m
   }, [membersAndInvites])
 
+  const [openEmoji, setOpenEmoji] = useState<string | null>(null)
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const triggerByEmojiRef = useRef<Map<string, HTMLButtonElement | null>>(new Map())
+  const contentByEmojiRef = useRef<Map<string, HTMLDivElement | null>>(new Map())
+
+  const clearHoverTimers = useCallback(() => {
+    if (hoverCloseTimerRef.current) {
+      clearTimeout(hoverCloseTimerRef.current)
+      hoverCloseTimerRef.current = null
+    }
+  }, [])
+
+  const isWithinAnyReactionPopoverTarget = useCallback((node: Node | null) => {
+    if (!node) return false
+    for (const el of triggerByEmojiRef.current.values()) {
+      if (el && el.contains(node)) return true
+    }
+    for (const el of contentByEmojiRef.current.values()) {
+      if (el && el.contains(node)) return true
+    }
+    return false
+  }, [])
+
+  const openPopoverFor = useCallback(
+    (emoji: string) => {
+      clearHoverTimers()
+      setOpenEmoji(prev => (prev === emoji ? prev : emoji))
+    },
+    [clearHoverTimers]
+  )
+
+  const closePopover = useCallback(
+    (delayMs = 180) => {
+      if (!openEmoji) return
+      if (hoverCloseTimerRef.current) return
+      hoverCloseTimerRef.current = setTimeout(() => {
+        hoverCloseTimerRef.current = null
+        setOpenEmoji(null)
+      }, delayMs)
+    },
+    [openEmoji]
+  )
+
+  const handleTriggerPointerLeave = useCallback(
+    (e: React.PointerEvent, emoji: string) => {
+      const next = e.relatedTarget as Node | null
+      const contentEl = contentByEmojiRef.current.get(emoji) ?? null
+      if (next && contentEl && contentEl.contains(next)) return
+      // Moving between reaction pills should not trigger a close (prevents flicker).
+      if (isWithinAnyReactionPopoverTarget(next)) return
+      closePopover(220)
+    },
+    [closePopover, isWithinAnyReactionPopoverTarget]
+  )
+
+  const handleContentPointerLeave = useCallback(
+    (e: React.PointerEvent, emoji: string) => {
+      const next = e.relatedTarget as Node | null
+      const triggerEl = triggerByEmojiRef.current.get(emoji) ?? null
+      if (next && triggerEl && triggerEl.contains(next)) return
+      // Moving to another reaction pill (or its popover) should not trigger a close.
+      if (isWithinAnyReactionPopoverTarget(next)) return
+      closePopover(220)
+    },
+    [closePopover, isWithinAnyReactionPopoverTarget]
+  )
+
+  useEffect(() => {
+    return () => {
+      clearHoverTimers()
+    }
+  }, [clearHoverTimers])
+
   const doToggle = (emojiRaw: string) => {
     const emoji = String(emojiRaw || '').trim()
     if (disabled) return
@@ -105,7 +179,15 @@ export function MessageReactions({
         const idsForDisplay = userIds.slice().reverse() // newest last in DB, but we display newest first
 
         return (
-          <Popover key={emoji}>
+          <Popover
+            key={emoji}
+            open={openEmoji === emoji}
+            modal={false}
+            onOpenChange={next => {
+              // We open on hover (not click). However, allow Radix-driven closes (escape/outside click).
+              if (!next) setOpenEmoji(prev => (prev === emoji ? null : prev))
+            }}
+          >
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -118,29 +200,58 @@ export function MessageReactions({
                 )}
                 disabled={disabled || (isPending && pendingEmoji === emoji) || !userId}
                 onClick={() => doToggle(emoji)}
+                onPointerEnter={e => {
+                  triggerByEmojiRef.current.set(emoji, e.currentTarget)
+                  openPopoverFor(emoji)
+                }}
+                onPointerLeave={e => handleTriggerPointerLeave(e, emoji)}
+                onFocus={() => openPopoverFor(emoji)}
                 aria-label={`React with ${emoji}`}
               >
                 <span className="text-sm leading-none">{emoji}</span>
                 <span className="leading-none">{count}</span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-64 p-2">
-              <div className="text-xs font-medium text-muted-foreground mb-2">{emoji} reacted by</div>
-              <div className="max-h-56 overflow-auto space-y-1">
+            <PopoverContent
+              ref={el => {
+                // Track content per emoji so hover leave can reliably detect trigger↔content transitions across portals.
+                if (!el) {
+                  contentByEmojiRef.current.delete(emoji)
+                  return
+                }
+                contentByEmojiRef.current.set(emoji, el)
+              }}
+              align="start"
+              side="bottom"
+              sideOffset={8}
+              className="w-64 p-1 bg-popover text-popover-foreground border border-border shadow-xl rounded-xl"
+              onOpenAutoFocus={e => e.preventDefault()}
+              onCloseAutoFocus={e => e.preventDefault()}
+              onPointerEnter={() => openPopoverFor(emoji)}
+              onPointerLeave={e => handleContentPointerLeave(e, emoji)}
+              onFocus={() => openPopoverFor(emoji)}
+            >
+              <div className="px-2 py-2 font-normal">
+                <div className="text-sm font-medium leading-tight truncate text-foreground">Reactions {emoji}</div>
+              </div>
+              <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
                 {idsForDisplay.map(uid => {
                   const m = memberByUserId.get(uid)
                   const label = (m?.displayName || m?.email || uid.slice(0, 8)).toString()
                   const avatar = typeof m?.avatar === 'string' ? m.avatar : null
                   return (
-                    <div key={uid} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted/50">
-                      <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                        {avatar ? <AvatarImage src={avatar} alt={label} referrerPolicy="no-referrer" crossOrigin="anonymous" /> : null}
-                        <AvatarFallback className="text-[10px]">{initialsFromName(label)}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{label}</div>
+                    <div
+                      key={uid}
+                      className="group relative rounded-lg flex items-center gap-2 w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-default text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
+                    >
+                      <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+                        <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                          {avatar ? <AvatarImage src={avatar} alt={label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                          <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(label)}</AvatarFallback>
+                        </Avatar>
                       </div>
-                      {uid === userId ? <div className="text-[10px] text-muted-foreground">you</div> : null}
+                      <span className="min-w-0 truncate">{label}</span>
+                      {uid === userId ? <div className="ml-auto text-[10px] text-muted-foreground">you</div> : null}
                     </div>
                   )
                 })}
@@ -149,6 +260,17 @@ export function MessageReactions({
           </Popover>
         )
       })}
+      {/* Inline "add reaction" badge only when reactions already exist */}
+      {entries.length > 0 ? (
+        <MessageReactionAction
+          conversationId={conversationId}
+          messageId={messageId}
+          disabled={disabled}
+          triggerStyle="pill"
+          popoverAlign="start"
+          className="h-6"
+        />
+      ) : null}
     </div>
   )
 }

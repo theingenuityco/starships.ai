@@ -769,25 +769,6 @@ export function useToggleMessageReaction() {
         const a = typeof lastReactions === 'object' && lastReactions ? JSON.stringify(lastReactions) : ''
         const b = JSON.stringify(args.reactions || {})
         if (a === b) {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: 'debug-session',
-              runId: 'repro4',
-              hypothesisId: 'H11',
-              location: 'useConversations.ts:useToggleMessageReaction:appendReactionsChunk',
-              message: 'dedupe_skip_append',
-              data: {
-                messageIdPrefix: String(args.messageId || '').slice(0, 8),
-                reactionsKeys: Object.keys(args.reactions || {}).slice(0, 10),
-                baseLen: base.length,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion
           return base
         }
       }
@@ -834,85 +815,16 @@ export function useToggleMessageReaction() {
 
       const key = CONVERSATION_QUERY_KEYS.messages(conversationId)
       const prev = queryClient.getQueryData(key)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'repro3',
-          hypothesisId: 'H7',
-          location: 'useConversations.ts:useToggleMessageReaction:onMutate',
-          message: 'before_setQueryData',
-          data: {
-            conversationIdPrefix: conversationId.slice(0, 8),
-            messageIdPrefix: messageId.slice(0, 8),
-            emoji,
-            prevIsArray: Array.isArray(prev),
-            prevLen: Array.isArray(prev) ? prev.length : null,
-            prevLastType: Array.isArray(prev) && prev.length > 0 ? String((prev as any[])[prev.length - 1]?.type ?? '') : null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
 
       queryClient.setQueryData(key, (old: any) => {
         const chunks = Array.isArray(old) ? old : []
         const current = findCurrentReactions(chunks, messageId)
         const next = toggleLocal(current, emoji)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'repro4',
-            hypothesisId: 'H11',
-            location: 'useConversations.ts:useToggleMessageReaction:onMutate',
-            message: 'computed_reactions_toggle',
-            data: {
-              messageIdPrefix: messageId.slice(0, 8),
-              emoji,
-              oldLen: chunks.length,
-              currentKeys: Object.keys(current || {}).slice(0, 10),
-              nextKeys: Object.keys(next || {}).slice(0, 10),
-              currentCount: Object.values(current || {}).reduce((n: number, arr: any) => n + (Array.isArray(arr) ? arr.length : 0), 0),
-              nextCount: Object.values(next || {}).reduce((n: number, arr: any) => n + (Array.isArray(arr) ? arr.length : 0), 0),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         // IMPORTANT:
         // Append a synthetic stream event so `chunksRevisionKey` changes and the UI re-reduces immediately.
         // Mutating nested fields inside existing chunks can be missed by memoization keyed to length/last-chunk.
         return appendReactionsChunk(old, { conversationId, messageId, reactions: next })
       })
-      // #region agent log
-      try {
-        const next = queryClient.getQueryData(key) as any
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'repro3',
-            hypothesisId: 'H7',
-            location: 'useConversations.ts:useToggleMessageReaction:onMutate',
-            message: 'after_setQueryData',
-            data: {
-              nextIsArray: Array.isArray(next),
-              nextLen: Array.isArray(next) ? next.length : null,
-              nextLastType: Array.isArray(next) && next.length > 0 ? String((next as any[])[next.length - 1]?.type ?? '') : null,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-      } catch {
-        /* ignore */
-      }
-      // #endregion
 
       return { conversationId, key, prev }
     },
@@ -1782,33 +1694,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return ''
   })()
   const chunksRevisionKey = `${conversationId ?? 'none'}|${chunksLen}|${lastChunkSig}|${lastChunkDataSig}`
-  // #region agent log
-  try {
-    if (lastChunksRevisionKeyLoggedRef.current !== chunksRevisionKey) {
-      lastChunksRevisionKeyLoggedRef.current = chunksRevisionKey
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'repro3',
-          hypothesisId: 'H7',
-          location: 'useConversations.ts:useConversationStreamed',
-          message: 'chunks_revision_key_changed',
-          data: {
-            conversationIdPrefix: String(conversationId ?? '').slice(0, 8),
-            chunksLen,
-            lastChunkSig,
-            lastChunkDataSig,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    }
-  } catch {
-    /* ignore */
-  }
-  // #endregion
 
   // Queue for message.append chunks that are delayed due to animation
   const queuedAppendChunksRef = useRef<StreamedChunk[]>([])

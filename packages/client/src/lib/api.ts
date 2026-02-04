@@ -54,10 +54,6 @@ class FetchClient {
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     try {
-      // Attach the browser's IANA timezone to every request (best-effort).
-      // This helps the server format conversation timestamps for the LLM in the user's timezone.
-      const browserTimeZone = typeof window !== 'undefined' && typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone || '' : ''
-
       // Apply request interceptors
       let config: RequestConfig = {
         ...options,
@@ -65,7 +61,6 @@ class FetchClient {
         headers: {
           ...this.baseHeaders,
           ...((options.headers as Record<string, string>) || {}),
-          ...(browserTimeZone ? { 'x-user-timezone': browserTimeZone } : {}),
         },
         signal: controller.signal,
       }

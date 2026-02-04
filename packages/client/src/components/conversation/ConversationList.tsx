@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
-import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState, type RefObject } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -49,9 +49,9 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
   const previewUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
-    <div className="relative flex-shrink-0">
-      <Avatar className="h-8 w-8 rounded-full ring-1 ring-border/40">
-        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={32} rounded />
+    <div className="relative">
+      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
       </Avatar>
       <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
     </div>
@@ -62,10 +62,10 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
   const hasPresence = typeof online === 'boolean'
   return (
-    <div className="relative flex-shrink-0">
-      <Avatar className="h-8 w-8 rounded-full ring-1 ring-border/40">
+    <div className="relative">
+      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{fallback}</AvatarFallback>
+        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
@@ -86,13 +86,12 @@ export function ConversationList({
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
   const slugFromParams = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
   const slug = (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? starshipSlug.trim() : slugFromParams) || ''
   // Current selection can come from either /conversations/:conversationId (DMs) or /channels/:channelSlug (channels).
   const currentConversationId = params.conversationId as string | undefined
   const currentChannelSlug = params.channelSlug as string | undefined
+  const currentDmPeer = (params as any)?.peer as string | undefined
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
@@ -184,14 +183,32 @@ export function ConversationList({
     })
   }, [agentsData, membersData?.members, authUserId, searchQuery])
 
+  const dmPeerKeyForTarget = (t: DmTarget): string => {
+    if (t.kind === 'agent') {
+      const slug = String(t.agent.slug || '').trim()
+      if (slug) return slug
+      const id = String(t.agent.id || '').trim()
+      return id ? `a:${id}` : 'a:unknown'
+    }
+    const uid = String(t.user.userId || '').trim()
+    return `u-${uid}`
+  }
+
+  const dmHrefForTarget = (t: DmTarget): string | null => {
+    if (!slug) return null
+    const peerKey = dmPeerKeyForTarget(t)
+    return `/ship/${slug}/dm/${encodeURIComponent(peerKey)}`
+  }
+
   const renderCompactDmTarget = (t: DmTarget) => {
     const label = t.label
     const isBusy = directMessagesLoading
+    const targetPeerKey = dmPeerKeyForTarget(t)
     const isActive =
-      t.kind === 'agent'
-        ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
-          (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
+      (typeof currentDmPeer === 'string' && currentDmPeer.trim().length > 0 && currentDmPeer.trim().toLowerCase() === targetPeerKey.toLowerCase()) ||
+      (t.kind === 'agent'
+        ? !!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId
+        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
 
     const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
     const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
@@ -201,29 +218,51 @@ export function ConversationList({
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center gap-3 w-full min-h-[40px] cursor-pointer px-3 py-2 border border-transparent transition-colors',
-          isActive ? 'text-primary bg-primary/10' : hasUnread ? 'text-foreground hover:bg-muted/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+          'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+          isActive
+            ? 'text-primary bg-primary/10 border-transparent'
+            : hasUnread
+              ? 'text-foreground border-transparent hover:bg-muted'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
           isBusy && 'opacity-70 pointer-events-none'
         )}
+        style={{
+          justifyContent: 'flex-start',
+          transition: 'background-color 0.15s ease',
+          cursor: 'pointer',
+          minHeight: '32px',
+        }}
         onClick={() => handleDmTargetClick(t)}
       >
-        {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />}
-        <span className={cn('truncate min-w-0 flex-1 text-[13px]', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground font-medium')}>
+        <div
+          className="flex-shrink-0"
+          style={{
+            width: '1.25rem',
+            height: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: 0,
+            pointerEvents: 'none',
+          }}
+        >
+          {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />}
+        </div>
+        <span
+          className={cn(
+            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+          )}
+        >
           {label}
         </span>
         {dmCount > 0 ? (
-          <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
             {dmCount > 99 ? '99+' : String(dmCount)}
           </span>
         ) : null}
       </div>
     )
-  }
-
-  const handleConversationClick = (conversationId: string) => {
-    if (!slug) return
-    router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
-    onConversationSelect?.(conversationId)
   }
 
   const handleChannelClick = (channelSlug: string) => {
@@ -259,44 +298,19 @@ export function ConversationList({
     return map
   }, [directMessagesData?.directMessages])
 
-  const openDraftDm = (args: { dmType: 'user_agent' | 'user_user'; agentId?: string; peerUserId?: string; peerLabel?: string; peerAvatar?: string }) => {
-    if (!slug) return
-    const sp = new URLSearchParams()
-    sp.set('dm', 'draft')
-    sp.set('dmType', args.dmType)
-    if (args.agentId) sp.set('agentId', args.agentId)
-    if (args.peerUserId) sp.set('peerUserId', args.peerUserId)
-    if (args.peerLabel) sp.set('peerLabel', args.peerLabel)
-    if (args.peerAvatar) sp.set('peerAvatar', args.peerAvatar)
-    router.push(`/ship/${slug}/dm?${sp.toString()}`)
-  }
-
   const handleDmTargetClick = async (t: DmTarget) => {
     // Prevent race conditions: if DMs haven't loaded yet, we don't know whether a DM exists.
     // Clicking during this window can open draft views and later create duplicate DMs.
     if (directMessagesLoading) return
+    const href = dmHrefForTarget(t)
+    if (!href) return
+    router.push(href)
 
-    // If an existing DM conversation exists, open it immediately (shows history).
-    // Otherwise, open a draft DM view (no conversation yet) and create it on first send.
-    if (t.kind === 'agent') {
-      const existing = existingDmConversationIdByAgentId.get(String(t.agent.id))
-      if (existing) {
-        handleConversationClick(existing)
-        return
-      }
-      openDraftDm({ dmType: 'user_agent', agentId: String(t.agent.id) })
-      return
-    }
-
-    const peerId = String(t.user.userId)
-    const existing = existingDmConversationIdByPeerUserId.get(peerId)
-    if (existing) {
-      handleConversationClick(existing)
-      return
-    }
-    const peerLabel = (t.user.displayName || t.user.email || 'User').trim()
-    const peerAvatar = typeof (t.user as any)?.avatar === 'string' ? String((t.user as any).avatar) : ''
-    openDraftDm({ dmType: 'user_user', peerUserId: peerId, peerLabel, peerAvatar: peerAvatar || undefined })
+    // Keep the parent callback behavior for consumers that care about "selection",
+    // even though canonical navigation is now by peer key (not conversationId).
+    const existingConversationId =
+      t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    if (existingConversationId) onConversationSelect?.(existingConversationId)
   }
 
   const createChannelDialog = (
@@ -553,7 +567,7 @@ export function ConversationList({
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}
@@ -680,15 +694,15 @@ export function ConversationList({
             ) : dmTargets.length === 0 ? (
               <div className="px-2 py-6 text-center text-xs text-muted-foreground">No one to message yet</div>
             ) : (
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {dmTargets.map(t => {
                   const isBusy = directMessagesLoading
                   const label = t.label
                   const isActive =
-                    t.kind === 'agent'
-                      ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
-                        (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
+                    (typeof currentDmPeer === 'string' && currentDmPeer.trim().length > 0 && currentDmPeer.trim().toLowerCase() === dmPeerKeyForTarget(t).toLowerCase()) ||
+                    (t.kind === 'agent'
+                      ? !!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId
+                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
                   const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
                   const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
                   const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
@@ -696,7 +710,7 @@ export function ConversationList({
                     <div
                       key={t.key}
                       className={cn(
-                        'group flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer transition-all min-h-[48px]',
+                        'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
                         'hover:bg-muted/50',
                         isActive && 'bg-primary/10 text-primary',
                         !isActive && hasUnread && 'text-foreground',
@@ -710,12 +724,10 @@ export function ConversationList({
                         <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn('text-[13px] truncate font-medium leading-snug', isActive ? 'text-primary' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground')}>
-                            {label}
-                          </p>
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <p className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}>{label}</p>
                           {dmCount > 0 ? (
-                            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                               {dmCount > 99 ? '99+' : String(dmCount)}
                             </span>
                           ) : null}

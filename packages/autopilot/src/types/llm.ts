@@ -18,6 +18,16 @@ export interface LlmToolCall {
   function: LlmFunctionCall;
 }
 
+/**
+ * Starships message metadata (internal).
+ * Used for provider name mapping and attribution.
+ */
+export type StarshipsMeta = {
+  authorType?: string;
+  authorId?: string;
+  [key: string]: unknown;
+};
+
 // Unified OpenRouter reasoning details
 export type ReasoningDetail =
   | {
@@ -74,6 +84,8 @@ export interface LlmMessage {
   reasoning?: string;
   // Optional unified reasoning details (OpenRouter normalized)
   reasoningDetails?: ReasoningDetail[];
+  // Optional Starships metadata for provider name mapping/attribution.
+  starshipsMeta?: StarshipsMeta;
   // Optional image generation outputs (OpenRouter extension)
   images?: GeneratedImage[];
   /**

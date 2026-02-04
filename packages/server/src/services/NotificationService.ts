@@ -4,6 +4,10 @@ import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
 type ParsedMentions = { userIds: string[]; agentIds: string[] };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const NANOID_RE = /^[a-z0-9_-]{10,64}$/i;
+const isValidMentionId = (id: string): boolean => UUID_RE.test(String(id || '').trim()) || NANOID_RE.test(String(id || '').trim());
+
 function parseMentionTokens(content: string): ParsedMentions {
   let text = typeof content === 'string' ? content : '';
   // Guard: avoid regex scanning extremely large payloads (DoS risk).
@@ -17,16 +21,16 @@ function parseMentionTokens(content: string): ParsedMentions {
   // Token format emitted by the TipTap composer (see plan):
   // - users: <@u:USER_ID>
   // - agents: <@a:AGENT_ID>
-  const userRe = /<@u:([^>\s]+)>/g;
-  const agentRe = /<@a:([^>\s]+)>/g;
+  const userRe = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
+  const agentRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
   let m: RegExpExecArray | null;
   while ((m = userRe.exec(text))) {
     const id = String(m[1] || '').trim();
-    if (id) userIds.add(id);
+    if (id && isValidMentionId(id)) userIds.add(id);
   }
   while ((m = agentRe.exec(text))) {
     const id = String(m[1] || '').trim();
-    if (id) agentIds.add(id);
+    if (id && isValidMentionId(id)) agentIds.add(id);
   }
   return { userIds: Array.from(userIds), agentIds: Array.from(agentIds) };
 }
@@ -77,7 +81,40 @@ export class NotificationService {
       return;
     }
 
-    const { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
+    let { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
+
+    // DMs: only allow mentions of the other participant.
+    // This prevents @mention notifications (and mention indexing) from being used to target arbitrary users/agents from a DM.
+    if (isDm && dm) {
+      const authorUserId = typeof (message as any).userId === 'string' ? String((message as any).userId).trim() : '';
+      const authorAgentId = typeof (message as any).agentId === 'string' ? String((message as any).agentId).trim() : '';
+
+      const allowUserIds = new Set<string>();
+      const allowAgentIds = new Set<string>();
+
+      if (dm.dmType === 'user_user') {
+        // Only allow mentioning the other user in this DM (never self, never third parties).
+        const a = typeof (dm as any).userAId === 'string' ? String((dm as any).userAId).trim() : '';
+        const b = typeof (dm as any).userBId === 'string' ? String((dm as any).userBId).trim() : '';
+        if (authorUserId && a && b) {
+          const other = authorUserId === a ? b : authorUserId === b ? a : '';
+          if (other) allowUserIds.add(other);
+        }
+      } else if (dm.dmType === 'user_agent') {
+        const dmUserId = typeof (dm as any).userId === 'string' ? String((dm as any).userId).trim() : '';
+        const dmAgentId = typeof (dm as any).agentId === 'string' ? String((dm as any).agentId).trim() : '';
+        // If the human authored the message, only allow mentioning the agent (the other participant).
+        if (authorUserId) {
+          if (dmAgentId) allowAgentIds.add(dmAgentId);
+        } else if (authorAgentId) {
+          // If the agent authored the message, only allow mentioning the human (the other participant).
+          if (dmUserId) allowUserIds.add(dmUserId);
+        }
+      }
+
+      if (userIds.length > 0) userIds = userIds.filter((id) => allowUserIds.has(String(id || '').trim()));
+      if (agentIds.length > 0) agentIds = agentIds.filter((id) => allowAgentIds.has(String(id || '').trim()));
+    }
 
     // 1) Insert mention index rows (users + agents)
     const mentionTuples: Array<{ targetType: MentionTargetType; targetId: string }> = [];

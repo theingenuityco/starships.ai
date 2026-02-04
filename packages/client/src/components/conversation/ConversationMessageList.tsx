@@ -181,9 +181,7 @@ function LinkedConversationCard({
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title =
-    rawTitle ||
-    (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+  const title = rawTitle || (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
@@ -232,13 +230,11 @@ function LinkedConversationCard({
 
     // Most-recent speakers first: scan messages newest -> oldest and add participants in encounter order.
     const msgsRaw = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
-    const msgs = msgsRaw
-      .slice()
-      .sort((a, b) => {
-        const aAt = Date.parse(String(a?.createdAt || a?.updatedAt || '')) || 0
-        const bAt = Date.parse(String(b?.createdAt || b?.updatedAt || '')) || 0
-        return bAt - aAt
-      })
+    const msgs = msgsRaw.slice().sort((a, b) => {
+      const aAt = Date.parse(String(a?.createdAt || a?.updatedAt || '')) || 0
+      const bAt = Date.parse(String(b?.createdAt || b?.updatedAt || '')) || 0
+      return bAt - aAt
+    })
 
     for (const m of msgs) {
       const role = String(m?.role ?? '')
@@ -250,14 +246,11 @@ function LinkedConversationCard({
 
         const fromDirectory = userId ? memberByUserId.get(userId) : null
         const label =
-          (userId === String(authUserId || '') ? 'You' : '') ||
-          userName ||
-          (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '') ||
-          (userId ? `User ${userId.slice(0, 6)}` : 'User')
+          (userId === String(authUserId || '') ? 'You' : '') || userName || fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '' || (userId ? `User ${userId.slice(0, 6)}` : 'User')
         const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
         if (seen.has(key)) continue
         seen.add(key)
-        const avatarUrl = userAvatar || (fromDirectory?.avatar?.trim() || '')
+        const avatarUrl = userAvatar || fromDirectory?.avatar?.trim() || ''
         items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
         continue
       }
@@ -295,10 +288,7 @@ function LinkedConversationCard({
           items.push({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) })
         } else {
           const fromDirectory = memberByUserId.get(id)
-          const labelRaw =
-            id === String(authUserId || '')
-              ? 'You'
-              : (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '')
+          const labelRaw = id === String(authUserId || '') ? 'You' : fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || ''
           const label = labelRaw || `User ${id.slice(0, 6)}`
           const key = `human:${id}`
           if (seen.has(key)) continue
@@ -340,10 +330,7 @@ function LinkedConversationCard({
 
   const cardInner = (
     <div
-      className={cn(
-        'w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3',
-        isActiveThread && 'border-primary/60 bg-primary/5 ring-1 ring-primary/20'
-      )}
+      className={cn('w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3', isActiveThread && 'border-primary/60 bg-primary/5 ring-1 ring-primary/20')}
       data-thread-linked-conversation-id={linkedConversationId ?? undefined}
     >
       <div className="flex items-center justify-between gap-3">
@@ -390,9 +377,7 @@ function LinkedConversationCard({
                     })
                 )}
               </div>
-              {participantItems.length > 3 ? (
-                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span>
-              ) : null}
+              {participantItems.length > 3 ? <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span> : null}
             </div>
           ) : null}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
@@ -615,6 +600,23 @@ export function ConversationMessageList({
 
     // user↔user DM: show peer avatar instead of chat icon.
     const dm: any = (dmItem as any)?.dm
+    // user↔agent DM: prefer the DM list's resolved agent (authoritative for this DM).
+    // The conversation "agents" list can include extra agents (e.g. defaults) or be ordered unexpectedly,
+    // which would make the empty-state hero show the wrong agent.
+    if (dm?.dmType === 'user_agent') {
+      const dmAgent: any = (dmItem as any)?.agent ?? null
+      const agentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
+      const agent = dmAgent || (agentId ? (conversationAgents.find(a => String((a as any)?.id || '').trim() === agentId) as any) : null) || null
+      if (agent) {
+        const label = formatAgentDisplayName(agent) || 'Agent'
+        const seed = String(agent?.name || agent?.slug || agent?.id || label)
+        const avatarAttachmentId = typeof agent?.avatarAttachmentId === 'string' ? String(agent.avatarAttachmentId) : null
+        return { kind: 'agent' as const, label, seed, avatarAttachmentId }
+      }
+      // If we can't resolve the DM's agent, prefer "no participant" (generic DM hero)
+      // rather than falling back to conversationAgents[0] (which may be unrelated like Aria).
+      return null
+    }
     if (dm?.dmType === 'user_user') {
       const peer: any = (dmItem as any)?.peerUser
       const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
@@ -641,7 +643,26 @@ export function ConversationMessageList({
   const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
   const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
 
-  const fallbackAgent = conversationAgents[0]
+  // IMPORTANT:
+  // For user↔agent DMs, the streaming placeholder message (`stream-${turnId}`) often arrives without
+  // an `agentId`/`agentName` initially. If we fall back to `conversationAgents[0]`, we can render the
+  // *wrong* agent label during streaming (e.g. "Aria") and then "snap back" once the final persisted
+  // message includes the correct agent metadata. Prefer the DM list's resolved agent instead.
+  const dmAgentFallback = useMemo<ConversationAgent | null>(() => {
+    const dm: any = (dmItem as any)?.dm
+    if (dm?.dmType !== 'user_agent') return null
+
+    const dmAgent: any = (dmItem as any)?.agent ?? null
+    const dmAgentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
+    const fromConversationList = dmAgentId && Array.isArray(conversationAgents) ? ((conversationAgents.find(a => String((a as any)?.id || '').trim() === dmAgentId) as any) ?? null) : null
+
+    return (dmAgent as any) || (fromConversationList as any) || null
+  }, [conversationAgents, dmItem])
+
+  const isUserAgentDm = (dmItem as any)?.dm?.dmType === 'user_agent'
+  // For user↔agent DMs, never fall back to some other agent (e.g. Aria) if we can't resolve the DM agent.
+  // Prefer rendering a generic "Assistant" over showing the wrong name during streaming.
+  const fallbackAgent = isUserAgentDm ? dmAgentFallback : conversationAgents[0]
   const fallbackAgentDisplayName = useMemo(() => {
     if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
     if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
@@ -672,8 +693,10 @@ export function ConversationMessageList({
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
+    const fallbackId = typeof (fallbackAgent as any)?.avatarAttachmentId === 'string' ? String((fallbackAgent as any).avatarAttachmentId).trim() : ''
+    if (fallbackId) ids.push(fallbackId)
     return Array.from(new Set(ids))
-  }, [conversationAgents])
+  }, [conversationAgents, fallbackAgent])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
   const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 
@@ -1294,14 +1317,6 @@ export function ConversationMessageList({
 
     const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
     if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
-      // When the thread pane opens, we intentionally perform a targeted scroll to the linked thread card.
-      // Suppress the generic "snap to bottom" in the MAIN pane to avoid overriding that scroll.
-      const suppressForThreadOpen = Boolean(enableChannelMessageThreads && activeThreadConversationId)
-      if (suppressForThreadOpen) {
-        bottomSnapStateRef.current.didSnapOnceContentExists = true
-        return
-      }
-
       // IMPORTANT:
       // Tailwind `scroll-smooth` (scroll-behavior: smooth) can cause even scrollTop assignment to animate.
       // Temporarily disable smooth behavior so the initial anchor is instantaneous.
@@ -1357,6 +1372,9 @@ export function ConversationMessageList({
           const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
           const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
           const nextTop = Math.max(0, Math.min(maxTop, desired))
+          // Update the "stick to bottom" lock immediately so we don't auto-snap back down
+          // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
+          isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
           c.scrollTo({ top: nextTop, behavior: 'smooth' })
         } catch {
           /* ignore */
@@ -1540,8 +1558,16 @@ export function ConversationMessageList({
   // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
   // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
   // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
+  // IMPORTANT:
+  // The streamed conversation query keeps an SSE connection open; TanStack Query can report `isFetching=true`
+  // for the lifetime of that connection. If we treat `isFetching && messages.length===0` as "still loading",
+  // an empty-but-valid channel will look stuck in a loading state forever.
+  //
+  // Instead, key off whether we have received at least one snapshot event. A snapshot can legitimately contain
+  // zero messages (new channel), which should show the empty hero state.
+  const hasStreamSnapshot = Boolean((stream as any)?.hasSnapshot)
   const isHydratingInitialMessages = Boolean(
-    !messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+    !messagesOverride && stream && !hasStreamSnapshot && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
   )
 
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
@@ -1739,169 +1765,169 @@ export function ConversationMessageList({
                   />
                 ) : null}
                 {renderMessages.map((message, idx) => {
-              const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
-              const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
-              const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
-              const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
-              const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
-              const userKey = (m: any): string | null => {
-                if (!m || String(m?.role ?? '') !== 'user') return null
-                const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-                if (uid) return `id:${uid}`
-                const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
-                if (un) return `name:${un}`
-                const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
-                if (ua) return `avatar:${ua}`
-                // Backward-compat: treat unknown human author as the same person.
-                return 'unknown'
-              }
-              const assistantKey = (m: any): string | null => {
-                if (!m || String(m?.role ?? '') !== 'assistant') return null
-                // Don't treat tool_result rows as part of an assistant "turn" for spacing.
-                if (String(m?.messageType ?? '') === 'tool_result') return null
-                const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
-                if (turnId) return `turn:${turnId}`
-                const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
-                if (agentId) return `agent:${agentId}`
-                const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
-                if (agentName) return `name:${agentName}`
-                return 'unknown'
-              }
-              const prevUserKey = prev ? userKey(prev) : null
-              const currUserKey = userKey(message)
-              const nextUserKey = next ? userKey(next) : null
-              const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
-              const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
-              // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
-              // message chrome so the spacing/padding is consistent (including the first message in the run).
-              const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
-              const prevAssistantKey = prev ? assistantKey(prev) : null
-              const currAssistantKey = assistantKey(message)
-              const nextAssistantKey = next ? assistantKey(next) : null
-              const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
-              const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
-              const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
-              const startsNewGroup = (() => {
-                if (!prev) return false
-                if (message.role === 'assistant') return Boolean(showAssistantAvatar)
-                if (message.role === 'user') return !isConsecutiveUser
-                return prev.role !== message.role
-              })()
-              const isFirstMessage = idx === 0
-              const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
-              const isCurrentMatch = message.id === currentMatchMessageId
-              const assistant = resolveAssistantPresentation(message)
+                  const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+                  const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
+                  const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+                  const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
+                  const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
+                  const userKey = (m: any): string | null => {
+                    if (!m || String(m?.role ?? '') !== 'user') return null
+                    const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+                    if (uid) return `id:${uid}`
+                    const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+                    if (un) return `name:${un}`
+                    const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+                    if (ua) return `avatar:${ua}`
+                    // Backward-compat: treat unknown human author as the same person.
+                    return 'unknown'
+                  }
+                  const assistantKey = (m: any): string | null => {
+                    if (!m || String(m?.role ?? '') !== 'assistant') return null
+                    // Don't treat tool_result rows as part of an assistant "turn" for spacing.
+                    if (String(m?.messageType ?? '') === 'tool_result') return null
+                    const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
+                    if (turnId) return `turn:${turnId}`
+                    const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+                    if (agentId) return `agent:${agentId}`
+                    const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+                    if (agentName) return `name:${agentName}`
+                    return 'unknown'
+                  }
+                  const prevUserKey = prev ? userKey(prev) : null
+                  const currUserKey = userKey(message)
+                  const nextUserKey = next ? userKey(next) : null
+                  const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+                  const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
+                  // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
+                  // message chrome so the spacing/padding is consistent (including the first message in the run).
+                  const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
+                  const prevAssistantKey = prev ? assistantKey(prev) : null
+                  const currAssistantKey = assistantKey(message)
+                  const nextAssistantKey = next ? assistantKey(next) : null
+                  const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
+                  const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
+                  const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
+                  const startsNewGroup = (() => {
+                    if (!prev) return false
+                    if (message.role === 'assistant') return Boolean(showAssistantAvatar)
+                    if (message.role === 'user') return !isConsecutiveUser
+                    return prev.role !== message.role
+                  })()
+                  const isFirstMessage = idx === 0
+                  const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
+                  const isCurrentMatch = message.id === currentMatchMessageId
+                  const assistant = resolveAssistantPresentation(message)
 
-              return (
-                <Fragment key={message.id}>
-                  <div
-                    ref={el => {
-                      messageRefs.current[message.id] = el
-                    }}
-                    data-message-id={message.id}
-                    className={cn(
-                      messageHasMatch && 'rounded-lg transition-colors',
-                      messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
-                      messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
-                    )}
-                  >
-                    <MemoizedMessageBubble
-                      message={message}
-                      agentName={assistant?.displayName}
-                      agentSlug={assistant?.slug}
-                      starshipSlug={starshipSlug}
-                      agentAvatarUrl={assistant?.avatarUrl}
-                      agentModelId={assistant?.modelId}
-                      agentMaxTokens={assistant?.maxTokens}
-                      isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                      starshipId={starshipId}
-                      enableChannelMessageThreads={enableChannelMessageThreads}
-                      onThreadAction={handleThreadAction}
-                      showAssistantAvatar={showAssistantAvatar}
-                      isConsecutiveUser={isConsecutiveUser}
-                      compactUserGroup={compactUserGroup}
-                      compactAssistantGroup={compactAssistantGroup}
-                      startsNewGroup={startsNewGroup}
-                      isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
-                      suppressLinkedConversationCard={suppressLinkedConversationCard}
-                      userNameOverride={userNameOverride}
-                      userEmailOverride={userEmailOverride}
-                      userAvatarUrlOverride={userAvatarUrlOverride}
-                      userAvatarSeedOverride={userAvatarSeedOverride}
-                      userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-                      isAwaitingToolResults={isAwaitingToolResults}
-                      isLastMessage={idx === renderMessages.length - 1}
-                      sizeVariant={sizeVariant}
-                      highlightTerm={normalizedHighlightTerm}
-                      expertMode={expertMode}
-                      activeThreadConversationId={activeThreadConversationId ?? null}
-                      turnUsage={(() => {
-                        if (!expertMode) return null
-                        if (message.role !== 'assistant') return null
-                        const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
-                        if (!tid) return null
-                        const raw = (turnUsageByTurnId?.[tid] ?? null) as any
-                        if (!raw) return null
-                        // Avoid showing partial/in-progress usage for the currently active turn.
-                        // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
-                        // Robust gating:
-                        // - Prefer terminal turn status when we have it.
-                        // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
-                        //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
-                        //   In that case, allow the ring to render once `isResponding` is false.
-                        const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
-                        if (shouldHide) return null
-                        return raw
-                      })()}
-                      isUserOnline={presence.isUserOnline}
-                      isConversationBusy={isConversationBusy}
-                      presenceRevision={presence.dataUpdatedAt}
-                    />
-                    {(() => {
-                      const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
-                      if (widgets.length === 0) return null
-                      return (
-                        <div className="flex justify-start">
-                          <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
-                            {/* Spacer to match avatar width */}
-                            <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-                            <div className="flex-1 w-full">
-                              <div className="space-y-4 mt-3 w-full max-w-none">
-                                {widgets.map(widget => (
-                                  <div key={widget.id} className="w-full max-w-none mb-4">
-                                    {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
-                                    {widget.widgetType !== 'StarshipDetails' && (
-                                      <div className="text-sm w-full mb-4">
-                                        <div className="flex items-baseline gap-1">
-                                          <span className="font-medium">{widget.name}</span>
+                  return (
+                    <Fragment key={message.id}>
+                      <div
+                        ref={el => {
+                          messageRefs.current[message.id] = el
+                        }}
+                        data-message-id={message.id}
+                        className={cn(
+                          messageHasMatch && 'rounded-lg transition-colors',
+                          messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
+                          messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                        )}
+                      >
+                        <MemoizedMessageBubble
+                          message={message}
+                          agentName={assistant?.displayName}
+                          agentSlug={assistant?.slug}
+                          starshipSlug={starshipSlug}
+                          agentAvatarUrl={assistant?.avatarUrl}
+                          agentModelId={assistant?.modelId}
+                          agentMaxTokens={assistant?.maxTokens}
+                          isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                          starshipId={starshipId}
+                          enableChannelMessageThreads={enableChannelMessageThreads}
+                          onThreadAction={handleThreadAction}
+                          showAssistantAvatar={showAssistantAvatar}
+                          isConsecutiveUser={isConsecutiveUser}
+                          compactUserGroup={compactUserGroup}
+                          compactAssistantGroup={compactAssistantGroup}
+                          startsNewGroup={startsNewGroup}
+                          isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                          suppressLinkedConversationCard={suppressLinkedConversationCard}
+                          userNameOverride={userNameOverride}
+                          userEmailOverride={userEmailOverride}
+                          userAvatarUrlOverride={userAvatarUrlOverride}
+                          userAvatarSeedOverride={userAvatarSeedOverride}
+                          userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                          isAwaitingToolResults={isAwaitingToolResults}
+                          isLastMessage={idx === renderMessages.length - 1}
+                          sizeVariant={sizeVariant}
+                          highlightTerm={normalizedHighlightTerm}
+                          expertMode={expertMode}
+                          activeThreadConversationId={activeThreadConversationId ?? null}
+                          turnUsage={(() => {
+                            if (!expertMode) return null
+                            if (message.role !== 'assistant') return null
+                            const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                            if (!tid) return null
+                            const raw = (turnUsageByTurnId?.[tid] ?? null) as any
+                            if (!raw) return null
+                            // Avoid showing partial/in-progress usage for the currently active turn.
+                            // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
+                            // Robust gating:
+                            // - Prefer terminal turn status when we have it.
+                            // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
+                            //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
+                            //   In that case, allow the ring to render once `isResponding` is false.
+                            const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
+                            if (shouldHide) return null
+                            return raw
+                          })()}
+                          isUserOnline={presence.isUserOnline}
+                          isConversationBusy={isConversationBusy}
+                          presenceRevision={presence.dataUpdatedAt}
+                        />
+                        {(() => {
+                          const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                          if (widgets.length === 0) return null
+                          return (
+                            <div className="flex justify-start">
+                              <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
+                                {/* Spacer to match avatar width */}
+                                <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                                <div className="flex-1 w-full">
+                                  <div className="space-y-4 mt-3 w-full max-w-none">
+                                    {widgets.map(widget => (
+                                      <div key={widget.id} className="w-full max-w-none mb-4">
+                                        {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
+                                        {widget.widgetType !== 'StarshipDetails' && (
+                                          <div className="text-sm w-full mb-4">
+                                            <div className="flex items-baseline gap-1">
+                                              <span className="font-medium">{widget.name}</span>
+                                            </div>
+                                            {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
+                                          </div>
+                                        )}
+
+                                        {/* Widget visualization - minimal styling, full width */}
+                                        {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                        <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                          <InlineWidgetRenderer
+                                            widget={{
+                                              widgetType: widget.widgetType,
+                                              props: widget.props,
+                                            }}
+                                            compactMode={true}
+                                            className="w-full"
+                                          />
                                         </div>
-                                        {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                                       </div>
-                                    )}
-
-                                    {/* Widget visualization - minimal styling, full width */}
-                                    {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                                    <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                      <InlineWidgetRenderer
-                                        widget={{
-                                          widgetType: widget.widgetType,
-                                          props: widget.props,
-                                        }}
-                                        compactMode={true}
-                                        className="w-full"
-                                      />
-                                    </div>
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      )
-                    })()}
-                  </div>
-                </Fragment>
-              )
+                          )
+                        })()}
+                      </div>
+                    </Fragment>
+                  )
                 })}
               </>
             )}
@@ -2225,14 +2251,10 @@ const MemoizedMessageBubble = memo(
     const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
     const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
 
-    const directoryUserName = (fromDirectory?.displayName?.trim() || '') || undefined
+    const directoryUserName = fromDirectory?.displayName?.trim() || '' || undefined
     const effectiveUserName = userNameOverride ?? messageUserName ?? directoryUserName ?? (isAuthedUserMessage ? 'You' : undefined)
     const effectiveUserEmail = userEmailOverride ?? undefined
-    const effectiveUserAvatar =
-      userAvatarUrlOverride ??
-      messageUserAvatar ??
-      ((fromDirectory?.avatar?.trim() || '') || undefined) ??
-      undefined
+    const effectiveUserAvatar = userAvatarUrlOverride ?? messageUserAvatar ?? (fromDirectory?.avatar?.trim() || '' || undefined) ?? undefined
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     // Generic: allow any message to link to another conversation (thread preview/index post)
@@ -2377,8 +2399,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
-      const userProfileHref =
-        isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)

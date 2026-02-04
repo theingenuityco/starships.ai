@@ -19,6 +19,7 @@ import {
   LLMResponse,
   LLMUsage,
   LlmMessage,
+  ReasoningDetail,
   LlmToolCall,
   MessageContent,
 } from '@/types/llm';
@@ -26,9 +27,21 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 
 // Gate LLM prompt/arg logging behind a single constant.
-// Defaults to OFF unless explicitly enabled via env var.
-const ENABLE_LLM_LOGGING =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.ENABLE_LLM_LOGGING === 'true';
+//
+// Short-circuit behavior:
+// - In non-production, default to ON (so developers see the exact provider request without extra config).
+// - In production, require explicit opt-in via env var to avoid accidental prompt leakage in logs.
+const ENABLE_LLM_LOGGING = (() => {
+  try {
+    const env = typeof process !== 'undefined' && typeof process.env !== 'undefined' ? process.env : undefined;
+    const nodeEnv = env && typeof env.NODE_ENV === 'string' ? env.NODE_ENV : '';
+    if (nodeEnv !== 'production') return true;
+    return env?.ENABLE_LLM_LOGGING === 'true';
+  } catch {
+    // Safe default: log in dev-like environments
+    return true;
+  }
+})();
 
 // Typed view over the normalized streaming chunk we forward to the ConversationService
 type NormalizedToolCallDelta = {
@@ -189,6 +202,20 @@ export class LLM extends BaseNode<LlmParams> {
       if (name) headerParts.push(`name=${name}`);
       if (toolCallId) headerParts.push(`tool_call_id=${toolCallId}`);
       out.push(headerParts.join(' '));
+
+      // Surface reasoning preservation fields (OpenRouter extension) without printing the full text.
+      // This makes it visible in logs that we are "sending reasoning back".
+      try {
+        const r = typeof (m as { reasoning?: unknown }).reasoning === 'string' ? ((m as { reasoning: string }).reasoning as string) : '';
+        const rd = (m as { reasoning_details?: unknown }).reasoning_details;
+        const rdCount = Array.isArray(rd) ? rd.length : 0;
+        if (role === 'assistant') {
+          if (rdCount > 0) out.push(`[reasoning_details] count=${rdCount}`);
+          if (r.trim().length > 0) out.push(`[reasoning] len=${r.length}`);
+        }
+      } catch {
+        // ignore
+      }
 
       const summarized = this.summarizeContentForLog((m as { content?: unknown })?.content);
       if (typeof summarized === 'string') {
@@ -486,6 +513,20 @@ export class LLM extends BaseNode<LlmParams> {
             messages: Array.isArray(openAiMessagesForRequest) ? (openAiMessagesForRequest as unknown[]) : [],
           });
 
+          const formatReasoningForLog = (value: unknown): string | undefined => {
+            if (value == null) return undefined;
+            try {
+              const raw = typeof value === 'string' ? value : JSON.stringify(value);
+              const trimmed = raw.trim();
+              if (!trimmed) return undefined;
+              // Keep logs bounded (avoid accidental huge payloads).
+              return trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
+            } catch {
+              return undefined;
+            }
+          };
+          const reasoningForLog = formatReasoningForLog(params.reasoning);
+
           const header = [
             '[LLM_PROMPT]',
             `model=${String(params.model)}`,
@@ -494,6 +535,7 @@ export class LLM extends BaseNode<LlmParams> {
             agentId ? `agentId=${agentId}` : null,
             typeof params.temperature === 'number' ? `temperature=${params.temperature}` : null,
             typeof params.maxTokens === 'number' ? `maxTokens=${params.maxTokens}` : null,
+            reasoningForLog ? `reasoning=${reasoningForLog}` : null,
             toolSlugs.length ? `tools=${toolSlugs.join(',')}` : null,
           ]
             .filter(Boolean)
@@ -688,13 +730,65 @@ export class LLM extends BaseNode<LlmParams> {
     return list.map((m) => this.convertMessageToOpenAI(m));
   }
 
+  private sanitizeOpenAIName(name: unknown): string | undefined {
+    if (typeof name !== 'string') return undefined;
+    const raw = name.trim();
+    if (!raw) return undefined;
+    // OpenAI expects <=64 chars and a restricted charset; keep it conservative for OpenRouter too.
+    const safe = raw
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 64);
+    return safe || undefined;
+  }
+
+  private nameFromStarshipsMeta(meta: unknown): string | undefined {
+    if (!meta || typeof meta !== 'object') return undefined;
+    const m = meta as Record<string, unknown>;
+    const authorType = typeof m.authorType === 'string' ? m.authorType : '';
+    const authorId = typeof m.authorId === 'string' ? m.authorId : '';
+    if (!authorId) return undefined;
+    const safeId = this.sanitizeOpenAIName(authorId);
+    if (!safeId) return undefined;
+    const prefix = authorType === 'agent' ? 'a_' : authorType === 'user' ? 'u_' : 'x_';
+    return `${prefix}${safeId}`.slice(0, 64);
+  }
+
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
+    const mRec = m as unknown as Record<string, unknown>;
+    const name = this.nameFromStarshipsMeta(m.starshipsMeta ?? mRec['starshipsMeta']);
+
+    // OpenRouter reasoning preservation extension (only some providers accept these fields).
+    // We attach them only on assistant messages, and downstream host runtimes that can't accept
+    // unknown fields (e.g. Azure OpenAI) must sanitize them out.
+    const reasoningForProvider = (() => {
+      try {
+        if (role !== 'assistant') return {};
+        const details =
+          Array.isArray(m.reasoningDetails) && m.reasoningDetails.length > 0
+            ? m.reasoningDetails
+            : (() => {
+                // Compatibility: some callers may still provide snake_case `reasoning_details`.
+                const snake = mRec['reasoning_details'];
+                if (!Array.isArray(snake) || snake.length === 0) return undefined;
+                return snake.every((x) => x && typeof x === 'object') ? (snake as ReasoningDetail[]) : undefined;
+              })();
+        if (details?.length) {
+          return { reasoning_details: details } satisfies Record<string, unknown>;
+        }
+        const r = typeof m.reasoning === 'string' ? m.reasoning : '';
+        return r.trim().length > 0 ? ({ reasoning: r } satisfies Record<string, unknown>) : {};
+      } catch {
+        return {};
+      }
+    })();
 
     // Helper to get string content (for roles that require string)
     const getStringContent = (): string => {
-      const raw = typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+      const base = typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+      const raw = base;
       if (!raw) return '';
 
       // LAST-LINE-OF-DEFENSE:
@@ -739,7 +833,9 @@ export class LLM extends BaseNode<LlmParams> {
         role: 'assistant',
         content: getStringContent(),
         tool_calls: toolCalls,
-      } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
+        ...(reasoningForProvider as Record<string, unknown>),
+        ...(name ? { name } : {}),
+      } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
     if (role === 'tool') {
@@ -767,10 +863,20 @@ export class LLM extends BaseNode<LlmParams> {
       return message as OpenAI.Chat.ChatCompletionSystemMessageParam;
     }
 
+    // ASSISTANT MESSAGE (no tool calls): must be a string (OpenAI chat schema).
+    if (role === 'assistant') {
+      return {
+        role: 'assistant',
+        content: getStringContent(),
+        ...(reasoningForProvider as Record<string, unknown>),
+        ...(name ? { name } : {}),
+      } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
+    }
+
     // USER MESSAGE: Support multimodal content (images, etc.)
-    // If content is already an array of ContentBlocks, pass directly
-    // OpenAI SDK supports both string and ContentPart[] for user messages
-    return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
+    // If content is already an array of ContentBlocks, pass directly.
+    // OpenAI SDK supports both string and ContentPart[] for user messages.
+    return { role: 'user', content: contentVal, ...(name ? { name } : {}) } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
   /**
@@ -795,6 +901,18 @@ export class LLM extends BaseNode<LlmParams> {
             : JSON.stringify(obj.content ?? '');
 
       const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : undefined;
+      const reasoningDetailsCamel = obj['reasoningDetails'];
+      const reasoningDetailsSnake = obj['reasoning_details'];
+      const reasoningDetailsRaw: unknown[] | undefined =
+        Array.isArray(reasoningDetailsCamel) && reasoningDetailsCamel.length > 0
+          ? (reasoningDetailsCamel as unknown[])
+          : Array.isArray(reasoningDetailsSnake) && reasoningDetailsSnake.length > 0
+            ? (reasoningDetailsSnake as unknown[])
+            : undefined;
+      const reasoningDetails =
+        Array.isArray(reasoningDetailsRaw) && reasoningDetailsRaw.every((x) => x && typeof x === 'object')
+          ? (reasoningDetailsRaw as ReasoningDetail[])
+          : undefined;
 
       let toolCalls: LlmToolCall[] | undefined;
       const toolCallsCanonical = (obj as { toolCalls?: unknown }).toolCalls;
@@ -846,9 +964,15 @@ export class LLM extends BaseNode<LlmParams> {
         role,
         content,
         ...(reasoning ? { reasoning } : {}),
+        ...(reasoningDetails && reasoningDetails.length > 0 ? { reasoningDetails } : {}),
         ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
         ...(toolCallId ? { toolCallId } : {}),
       };
+      // Preserve optional Starships metadata for provider `name` mapping.
+      const sm = obj['starshipsMeta'];
+      if (sm && typeof sm === 'object') {
+        (canonical as unknown as Record<string, unknown>)['starshipsMeta'] = sm;
+      }
       out.push(canonical);
     }
 
@@ -875,6 +999,7 @@ export class LLM extends BaseNode<LlmParams> {
     let lastUsageHadExplicitCost = false;
     let content = '';
     let reasoning = '';
+    let reasoningDetails: ReasoningDetail[] = [];
     let images: GeneratedImage[] = [];
     let toolCalls: Array<{
       id?: string;
@@ -1025,6 +1150,33 @@ export class LLM extends BaseNode<LlmParams> {
 
         // Accumulate reasoning text from OpenRouter reasoning-capable models
         try {
+          const extractReasoningDetails = (node: unknown): ReasoningDetail[] => {
+            if (!node || typeof node !== 'object') return [];
+            const rec = node as Record<string, unknown>;
+            const details = (rec as { reasoning_details?: unknown }).reasoning_details as unknown;
+            if (!Array.isArray(details) || details.length === 0) return [];
+            const out: ReasoningDetail[] = [];
+            for (const d of details as unknown[]) {
+              if (d && typeof d === 'object') out.push(d as ReasoningDetail);
+            }
+            return out;
+          };
+
+          // Preserve full reasoning_details blocks when present (OpenRouter extension).
+          // - Streaming: details appear in delta; append in sequence.
+          // - Non-stream wrapper: details may appear once on message; set as snapshot if we don't already have any.
+          try {
+            const dDelta = extractReasoningDetails((choice as unknown as { delta?: unknown }).delta);
+            if (dDelta.length > 0) {
+              reasoningDetails.push(...dDelta);
+            } else if (reasoningDetails.length === 0) {
+              const dMsg = extractReasoningDetails((choice as unknown as { message?: unknown }).message);
+              if (dMsg.length > 0) reasoningDetails = dMsg;
+            }
+          } catch {
+            /* non-fatal */
+          }
+
           // IMPORTANT: Providers may send BOTH a cumulative snapshot (reasoning.content) AND token deltas (reasoning.tokens),
           // and/or reasoning_details. Concatenating multiple sources doubles the text.
           // Choose exactly one source in priority order:
@@ -1042,6 +1194,10 @@ export class LLM extends BaseNode<LlmParams> {
                   const det = d as Record<string, unknown>;
                   if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.length > 0) {
                     parts.push(det.text);
+                  } else if (det.type === 'reasoning.summary' && typeof det.summary === 'string' && det.summary.length > 0) {
+                    // Some providers/models (e.g. certain OpenAI variants) only return a summary block rather than raw reasoning text.
+                    // Treat it as reasoning so callers can observe "reasoning happened" without requiring full CoT.
+                    parts.push(det.summary);
                   }
                 }
               }
@@ -1352,6 +1508,7 @@ export class LLM extends BaseNode<LlmParams> {
               role: 'assistant' as LLMMessageRole,
               content,
               ...(reasoning ? { reasoning } : {}),
+              ...(reasoningDetails.length > 0 ? { reasoningDetails } : {}),
               ...(images.length > 0 ? { images } : {}),
               ...(parsedToolCalls.length > 0 ? { toolCalls: parsedToolCalls } : {}),
             },

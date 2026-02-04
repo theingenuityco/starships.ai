@@ -1947,6 +1947,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     messages: computedMessages,
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
+    // For streaming queries, `fetchStatus` can remain "fetching" while the SSE connection stays open.
+    // Consumers should use this flag to distinguish "empty but hydrated" from "still waiting on first snapshot".
+    hasSnapshot: Boolean(latestSnapshot.snapshotData),
     isStreaming: isResponding,
     isResponding,
     isAssistantStreaming,

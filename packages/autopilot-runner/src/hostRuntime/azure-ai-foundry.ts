@@ -47,9 +47,7 @@ const summarizeRequestForLogs = (request: LlmHostRequest, providerModelId: strin
 
 const summarizeProviderError = (err: unknown): Record<string, unknown> => {
   const e =
-    err && (typeof err === 'object' || typeof err === 'function')
-      ? (err as Record<string, unknown> & { cause?: unknown })
-      : undefined;
+    err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
   const cause = e?.cause;
   const pick = (x: unknown): Record<string, unknown> => {
     if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
@@ -298,10 +296,7 @@ const buildAnthropicPayload = async (request: LlmHostRequest, providerModelId: s
     outMessages.push({ role: mappedRole, content: blocks });
   }
 
-  let maxTokens =
-    typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens)
-      ? Math.floor(request.maxTokens)
-      : 1024;
+  let maxTokens = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : 1024;
   const payload: Record<string, unknown> = {
     model: providerModelId,
     messages: outMessages,
@@ -356,11 +351,7 @@ const buildAnthropicPayload = async (request: LlmHostRequest, providerModelId: s
   return payload;
 };
 
-async function* streamAnthropicSse(
-  resp: Response,
-  signal: AbortSignal | undefined,
-  canonicalModel: string
-): AsyncIterable<unknown> {
+async function* streamAnthropicSse(resp: Response, signal: AbortSignal | undefined, canonicalModel: string): AsyncIterable<unknown> {
   if (!resp.body) {
     throw new Error('Azure AI Foundry response body missing');
   }
@@ -562,10 +553,7 @@ async function* streamAnthropicSse(
   }
 }
 
-const wrapAnthropicNonStreamAsOneChunk = (
-  completion: Record<string, unknown>,
-  canonicalModel: string
-): AsyncIterable<unknown> => {
+const wrapAnthropicNonStreamAsOneChunk = (completion: Record<string, unknown>, canonicalModel: string): AsyncIterable<unknown> => {
   const toolCalls: Array<{
     id?: string;
     type: 'function';
@@ -637,10 +625,7 @@ const wrapAnthropicNonStreamAsOneChunk = (
   return gen();
 };
 
-const wrapNonStreamAsOneChunk = (
-  completion: Record<string, unknown>,
-  canonicalModel?: string
-): AsyncIterable<unknown> => {
+const wrapNonStreamAsOneChunk = (completion: Record<string, unknown>, canonicalModel?: string): AsyncIterable<unknown> => {
   const choices = Array.isArray(completion.choices) ? completion.choices : [];
   const firstChoice = choices[0] as Record<string, unknown> | undefined;
   const oneChunk = {
@@ -812,7 +797,22 @@ export async function invokeAzureAiFoundry(
 
   const payload: Record<string, unknown> = {
     model: providerModelId,
-    messages: request.messages,
+    // Azure OpenAI chat/completions schema is strict; drop any OpenRouter-specific fields
+    // (e.g., assistant reasoning/reasoning_details) that may be present on messages.
+    messages: Array.isArray(request.messages)
+      ? (request.messages as Array<Record<string, unknown>>).map((m) => {
+          const role = typeof m?.role === 'string' ? m.role : 'user';
+          const content = (m as { content?: unknown })?.content;
+          const out: Record<string, unknown> = { role, content };
+          const name = typeof m?.name === 'string' ? m.name : undefined;
+          if (name) out.name = name;
+          const toolCalls = (m as { tool_calls?: unknown }).tool_calls;
+          if (Array.isArray(toolCalls)) out.tool_calls = toolCalls;
+          const toolCallId = typeof (m as { tool_call_id?: unknown }).tool_call_id === 'string' ? (m as any).tool_call_id : undefined;
+          if (toolCallId) out.tool_call_id = toolCallId;
+          return out;
+        })
+      : request.messages,
   };
 
   if (Array.isArray(modalities) && modalities.length > 0) {

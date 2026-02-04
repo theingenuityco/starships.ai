@@ -157,7 +157,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       // Guarded so uses of this card outside the marketplace don't unexpectedly navigate.
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
         if (agentId) {
-          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
         }

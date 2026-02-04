@@ -12,6 +12,7 @@ import {
   useConversationDetail,
   useConversationAgents,
   usePendingToolApprovals,
+  useStarshipDirectMessages,
   useStarshipChannels,
   useLinkMessageToConversation,
   useUpdateConversationState,
@@ -142,6 +143,107 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (!Array.isArray(channels)) return false
       return channels.some((c: any) => String(c?.conversationId || '') === cid)
     }, [channelsData, conversationId])
+
+    // DM context (used for mention restrictions)
+    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelConversation))
+    type DmMentionAllowed = { kind: 'agent' | 'user' | null; id: string | null }
+    const dmMentionAllowedRef = useRef<DmMentionAllowed>({ kind: null, id: null })
+    useEffect(() => {
+      let kind: DmMentionAllowed['kind'] = null
+      let id: string | null = null
+
+      // Draft DM (no conversation yet): we already know the target
+      if (!conversationId && draftDirectMessageTarget) {
+        if (draftDirectMessageTarget.dmType === 'user_agent') {
+          const aid = String(draftDirectMessageTarget.agentId || '').trim()
+          if (aid) {
+            kind = 'agent'
+            id = aid
+          }
+        } else if (draftDirectMessageTarget.dmType === 'user_user') {
+          const uid = String(draftDirectMessageTarget.peerUserId || '').trim()
+          if (uid) {
+            kind = 'user'
+            id = uid
+          }
+        }
+      }
+
+      // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+      if (!id && conversationId) {
+        const cid = String(conversationId || '').trim()
+        const list = (directMessagesData as any)?.directMessages
+        const items = Array.isArray(list) ? (list as any[]) : []
+        const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+        const dm = match?.dm
+        if (dm && typeof dm === 'object') {
+          const dmType = String((dm as any).dmType || '')
+          if (dmType === 'user_agent') {
+            const aid = String((dm as any).agentId || '').trim()
+            if (aid) {
+              kind = 'agent'
+              id = aid
+            }
+          } else if (dmType === 'user_user') {
+            const peerFromList = String(match?.peerUser?.id || '').trim()
+            const a = String((dm as any).userAId || '').trim()
+            const b = String((dm as any).userBId || '').trim()
+            const me = String(userId || '').trim()
+            const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+            const peerId = peerFromList || derivedPeer
+            if (peerId) {
+              kind = 'user'
+              id = peerId
+            }
+          }
+        }
+      }
+
+      dmMentionAllowedRef.current = { kind, id }
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, userId])
+
+    type ResolvedDmTarget = { dmType: 'user_agent'; agentId: string } | { dmType: 'user_user'; peerUserId: string } | null
+
+    const resolvedDmTarget: ResolvedDmTarget = useMemo(() => {
+      // Draft DM (no conversation yet): we already know the target
+      if (!conversationId && draftDirectMessageTarget) {
+        if (draftDirectMessageTarget.dmType === 'user_agent') {
+          const agentId = String(draftDirectMessageTarget.agentId || '').trim()
+          return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+        }
+        if (draftDirectMessageTarget.dmType === 'user_user') {
+          const peerUserId = String(draftDirectMessageTarget.peerUserId || '').trim()
+          return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+        }
+      }
+
+      // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+      if (conversationId && !isChannelConversation) {
+        const cid = String(conversationId || '').trim()
+        const list = (directMessagesData as any)?.directMessages
+        const items = Array.isArray(list) ? (list as any[]) : []
+        const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+        const dm = match?.dm
+        if (dm && typeof dm === 'object') {
+          const dmType = String((dm as any).dmType || '')
+          if (dmType === 'user_agent') {
+            const agentId = String((dm as any).agentId || '').trim()
+            return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+          }
+          if (dmType === 'user_user') {
+            const peerFromList = String(match?.peerUser?.id || '').trim()
+            const a = String((dm as any).userAId || '').trim()
+            const b = String((dm as any).userBId || '').trim()
+            const me = String(userId || '').trim()
+            const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+            const peerUserId = peerFromList || derivedPeer
+            return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+          }
+        }
+      }
+
+      return null
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelConversation, userId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -287,10 +389,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Thread routing rules:
     // - If the thread pane was opened from a non-assistant message, there may be no default agent selected.
-    // - If a thread has >2 linked agents, it becomes mention-only (no default agent fallback).
+    // - If a thread has 2+ linked agents, it becomes mention-only (no default agent fallback).
     const isThreadConversation = Boolean(conversation?.parentConversationId)
     const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
-    const isMentionOnlyThread = Boolean(isThreadConversation && linkedAgentCount > 2)
+    const isMentionOnlyThread = Boolean(isThreadConversation && linkedAgentCount >= 2)
     const isThreadDraft = Boolean(typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)
     const isThreadContext = Boolean(isThreadConversation || isThreadDraft)
 
@@ -309,8 +411,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const requiresCreditsForDraft = useMemo(() => {
       // user↔user DMs are human-only (no agent run => no fixed message charge)
-      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
-      if (isDraftUserUserDm) return false
+      if (resolvedDmTarget?.dmType === 'user_user') return false
 
       // Mention-only contexts: only charge when an agent is explicitly mentioned.
       if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
@@ -323,10 +424,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
 
     // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
-    const hasFunds = canManageBilling ? (!requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE) : true
-    const showLowBalanceWarning = Boolean(
-      canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD
-    )
+    const hasFunds = canManageBilling ? !requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE : true
+    const showLowBalanceWarning = Boolean(canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -570,41 +669,110 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
 
-      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
-
-      // Resolve agent to send to: prefer explicit leading @handle in content, else selectedAgent.
-      // (No enforcement: the editor content is not mutated/prefilled anymore.)
-      // For mention-only threads, ignore selectedAgent and require a mention every time.
-      let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : (selectedAgent ?? null)
-      let contentToSend = messageToSend
-      if (!isDraftUserUserDm) {
-        // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
-        const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
-        if (tokenMatch && starshipAgents.length > 0) {
-          const id = String(tokenMatch[1] || '').trim()
-          const matched = id ? starshipAgents.find(a => String(a.id) === id) : null
-          if (matched) {
-            effectiveAgent = matched
-            if (!isThreadContext && onAgentChange) onAgentChange(matched)
+      const resolvedDmForSend: ResolvedDmTarget = (() => {
+        // Draft DM (no conversation yet): we already know the target
+        if (!conversationId && draftDirectMessageTarget) {
+          if (draftDirectMessageTarget.dmType === 'user_agent') {
+            const agentId = String(draftDirectMessageTarget.agentId || '').trim()
+            return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
           }
-        } else {
-          // Back-compat: plain-text leading @handle
-          const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-          if (mentionMatch && starshipAgents.length > 0) {
-            const handle = mentionMatch[1]
-            const lower = handle.toLowerCase()
-            const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
-            if (matched) {
-              effectiveAgent = matched
-              // Do NOT strip the leading mention; keep it in the message content
-              // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
-              if (!isThreadContext && onAgentChange) onAgentChange(matched)
+          if (draftDirectMessageTarget.dmType === 'user_user') {
+            const peerUserId = String(draftDirectMessageTarget.peerUserId || '').trim()
+            return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
+          }
+        }
+
+        // Existing DM: resolve from starship DM list (usually already cached by sidebar)
+        if (conversationId && !isChannelConversation) {
+          const cid = String(conversationId || '').trim()
+          const list = (directMessagesData as any)?.directMessages
+          const items = Array.isArray(list) ? (list as any[]) : []
+          const match = items.find(it => String(it?.dm?.conversationId || '') === cid) || null
+          const dm = match?.dm
+          if (dm && typeof dm === 'object') {
+            const dmType = String((dm as any).dmType || '')
+            if (dmType === 'user_agent') {
+              const agentId = String((dm as any).agentId || '').trim()
+              return agentId ? ({ dmType: 'user_agent', agentId } as const) : null
+            }
+            if (dmType === 'user_user') {
+              const peerFromList = String(match?.peerUser?.id || '').trim()
+              const a = String((dm as any).userAId || '').trim()
+              const b = String((dm as any).userBId || '').trim()
+              const me = String(userId || '').trim()
+              const derivedPeer = me && a && b ? (me === a ? b : me === b ? a : '') : ''
+              const peerUserId = peerFromList || derivedPeer
+              return peerUserId ? ({ dmType: 'user_user', peerUserId } as const) : null
             }
           }
         }
-      } else {
+
+        return null
+      })()
+
+      const isUserUserDm = resolvedDmForSend?.dmType === 'user_user'
+
+      const resolveAgentById = (id: string): AgentModel | null => {
+        const aid = String(id || '').trim()
+        if (!aid) return null
+        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        if (fromStarship) return fromStarship
+        const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        return fromConv ?? null
+      }
+
+      // Resolve agent to send to:
+      // - Default to the UI-selected agent for non-mention contexts (e.g. draft threads opened from an agent message).
+      // - Then apply context rules (channel/DM/thread) and allow explicit leading @mention to override where applicable.
+      let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
+      let contentToSend = messageToSend
+      if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
+      } else {
+        // Channels + mention-only threads: do not default; only run when an agent is explicitly mentioned.
+        if (isChannelConversation || isMentionOnlyThread) {
+          effectiveAgent = null
+        }
+
+        // user↔agent DMs: lock to the DM target agent.
+        const dmAgentId = resolvedDmForSend?.dmType === 'user_agent' ? String(resolvedDmForSend.agentId || '').trim() : ''
+        const dmLockedAgent = dmAgentId ? resolveAgentById(dmAgentId) : null
+        if (dmLockedAgent) {
+          effectiveAgent = dmLockedAgent
+        }
+
+        // Threads (non-mention-only): if exactly 1 linked agent, allow it as a fallback.
+        if (!effectiveAgent && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+          const linked = Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []
+          effectiveAgent = linked[0] ?? null
+        }
+
+        // Prefer stable leading agent mention token (<@a:AGENT_ID>) where not locked.
+        // NOTE: even in channel/mention-only contexts, this is how an agent is selected.
+        // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
+        if (!dmLockedAgent) {
+          const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
+          if (tokenMatch && starshipAgents.length > 0) {
+            const id = String(tokenMatch[1] || '').trim()
+            const matched = id ? resolveAgentById(id) : null
+            if (matched) {
+              effectiveAgent = matched
+            }
+          } else {
+            // Back-compat: plain-text leading @handle
+            const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
+            if (mentionMatch && starshipAgents.length > 0) {
+              const handle = mentionMatch[1]
+              const lower = handle.toLowerCase()
+              const matched = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
+              if (matched) {
+                effectiveAgent = matched
+                // Do NOT strip the leading mention; keep it in the message content
+              }
+            }
+          }
+        }
       }
 
       // Thread defaulting:
@@ -613,7 +781,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       //
       // Without this, opening a thread via URL/refresh (or from a non-assistant message) can yield `selectedAgent === null`,
       // which incorrectly blocks sending with "Select an agent" even though the thread already has linked agents.
-      if (!effectiveAgent && !isDraftUserUserDm && isThreadConversation && !isMentionOnlyThread) {
+      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
         const linked = Array.isArray(conversationAgents) ? conversationAgents : []
         if (linked.length > 0) {
           effectiveAgent = linked[0] ?? null
@@ -624,14 +792,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If a thread has *no* agent selected/mentioned and *no* linked agents,
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isDraftUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !isMentionOnlyThread && !effectiveAgent)
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
       // This prevents a brief "agent is typing" flash for messages that the server will persist without agent execution
       // (e.g. user mentions like <@u:...> in a default-agent thread).
       const willTriggerAgentBestEffort = (() => {
-        if (isDraftUserUserDm) return false
+        if (isUserUserDm) return false
         if (shouldPersistOnly) return false
 
         const raw = String(messageToSend || '')
@@ -654,7 +822,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       })()
 
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm && !shouldPersistOnly) {
+      if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -1136,17 +1304,47 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       ]
     )
 
-    // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
-    const promptAgent: AgentModel | null = useMemo(() => {
-      return selectedAgent ?? null
-    }, [selectedAgent])
+    const agentLabelForUI = useCallback((a: AgentModel | null): string | null => {
+      if (!a) return null
+      const n = typeof a.name === 'string' ? a.name.trim() : ''
+      if (n) return n
+      const fallback = formatAgentDisplayName(a as any)
+      return (typeof fallback === 'string' ? fallback.trim() : '') || null
+    }, [])
+
+    const contextAgentForUI: AgentModel | null = useMemo(() => {
+      // Channels are mention-driven; never imply a default agent in the UI.
+      if (isChannelConversation) return null
+
+      // DMs: lock UI hints to the DM target agent when applicable.
+      if (resolvedDmTarget?.dmType === 'user_agent') {
+        const id = resolvedDmTarget.agentId
+        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
+        if (fromStarship) return fromStarship
+        const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
+        return fromConv ?? null
+      }
+
+      // Threads: if exactly 1 linked agent, we can be contextual. Otherwise mention-only or human-only.
+      if (isThreadContext && !isMentionOnlyThread && linkedAgentCount === 1) {
+        const a0 = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : [])[0] ?? null
+        return a0 ?? null
+      }
+
+      return null
+    }, [conversationAgents, isChannelConversation, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
 
     const getPlaceholder = () => {
-      if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
-      if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
-      if (!promptAgent) return isChannelConversation ? 'Message this channel (mention agents with @)' : 'Select an agent to assign a task'
-      // Show placeholder even after the conversation has started.
-      return `Assign a task to ${promptAgent.name}`
+      const label = agentLabelForUI(contextAgentForUI)
+      if (isStreamingEffective) return label ? `${label} is responding...` : 'AI is responding...'
+      if (sending) return label ? `${label} is thinking...` : 'Thinking...'
+
+      if (isChannelConversation) return 'Message this channel (mention agents with @)'
+      if (resolvedDmTarget?.dmType === 'user_agent') return label ? `Message ${label}…` : 'Write a message…'
+      if (resolvedDmTarget?.dmType === 'user_user') return 'Write a message…'
+      if (isMentionOnlyThread) return 'Reply (mention an agent with @)…'
+      if (isThreadContext && label) return `Reply to ${label}…`
+      return 'Write a message…'
     }
 
     // Track if there's actual content beyond just the mention and space
@@ -1159,9 +1357,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     })()
     const hasTargetAgent = isChannelConversation
       ? true
-      : isMentionOnlyThread
-        ? hasLeadingMentionToken
-        : Boolean(selectedAgent) || hasLeadingMentionToken || (isThreadConversation && linkedAgentCount > 0) || (isThreadContext && linkedAgentCount === 0)
+      : resolvedDmTarget?.dmType === 'user_user'
+        ? true
+        : resolvedDmTarget?.dmType === 'user_agent'
+          ? true
+          : isMentionOnlyThread
+            ? hasLeadingMentionToken
+            : hasLeadingMentionToken || (isThreadConversation && linkedAgentCount === 1) || (isThreadContext && linkedAgentCount === 0)
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
@@ -1221,47 +1423,47 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
             const key = `${kind}:${String((item as any)?.id || '')}`
             return (
-            <button
-              key={key}
-              id={`mention-option-${key}`}
-              ref={idx === active ? activeItemRef : null}
-              type="button"
-              tabIndex={-1}
-              role="option"
-              aria-selected={idx === active}
-              className={cn(
-                'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
-              )}
-              onMouseEnter={() => onHover(idx)}
-              onMouseDown={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                command(item)
-              }}
-              onPointerDown={e => {
-                e.preventDefault()
-                e.stopPropagation()
-              }}
-              onClick={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                command(item)
-              }}
-            >
-              <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                {kind === 'user' && user?.avatar ? (
-                  <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
-                ) : (
-                  <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
+              <button
+                key={key}
+                id={`mention-option-${key}`}
+                ref={idx === active ? activeItemRef : null}
+                type="button"
+                tabIndex={-1}
+                role="option"
+                aria-selected={idx === active}
+                className={cn(
+                  'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
+                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
                 )}
-              </Avatar>
-              <div className="min-w-0">
-                <div className="font-medium leading-5">{label}</div>
-                {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
-              </div>
-            </button>
-          )
+                onMouseEnter={() => onHover(idx)}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  command(item)
+                }}
+                onPointerDown={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onClick={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  command(item)
+                }}
+              >
+                <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
+                  {kind === 'user' && user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
+                  ) : (
+                    <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
+                  )}
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="font-medium leading-5">{label}</div>
+                  {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
+                </div>
+              </button>
+            )
           })}
         </div>
       )
@@ -1272,10 +1474,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       allowSpaces: false,
       items: ({ query }: any) => {
         const q = String(query || '').toLowerCase()
+        const dmAllowed = dmMentionAllowedRef.current
+        const dmKind = dmAllowed?.kind ?? null
+        const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
+        const restrictToSingleDmPeer = Boolean(dmKind && dmId)
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
         const agentItems = (Array.isArray(agents) ? agents : [])
           .filter(a => {
+            if (restrictToSingleDmPeer) {
+              if (dmKind !== 'agent') return false
+              if (String(a?.id || '') !== String(dmId)) return false
+            }
             if (!q) return true
             return a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
           })
@@ -1283,6 +1493,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), kind: 'agent' as const, agent: a }))
         const userItems = (Array.isArray(users) ? users : [])
           .filter(u => {
+            if (restrictToSingleDmPeer) {
+              if (dmKind !== 'user') return false
+              const uid = String((u as any)?.userId || '').trim()
+              if (!uid || uid !== String(dmId)) return false
+            }
             if (!q) return true
             const name = String(u.displayName || '').toLowerCase()
             const email = String(u.email || '').toLowerCase()
@@ -1543,17 +1758,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   } catch {}
                   // Update selected agent state (mirror mouse path)
                   try {
-                  const kind = (choice as any)?.kind
-                  const id = (choice as any)?.id
-                  const label = (choice as any)?.label
-                  if (kind === 'agent') {
-                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                    if (!agent && label) {
-                      const lower = String(label).toLowerCase()
-                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                    const kind = (choice as any)?.kind
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    if (kind === 'agent') {
+                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                      if (!agent && label) {
+                        const lower = String(label).toLowerCase()
+                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      }
+                      if (agent) onAgentChange?.(agent)
                     }
-                    if (agent) onAgentChange?.(agent)
-                  }
                   } catch {}
                 } catch (err) {
                   try {
@@ -1651,25 +1866,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, conversationId])
+    const placeholderText = useMemo(() => getPlaceholder(), [getPlaceholder])
     const placeholderRef = useRef<string>(placeholderText)
     useEffect(() => {
       placeholderRef.current = placeholderText
     }, [placeholderText])
 
-    // Extract example prompts from the prompt agent (leading mention > selected agent) if present
+    // Extract example prompts from the context agent if present
     const examplePrompts: string[] = useMemo(() => {
-      const a: any = promptAgent as any
+      const a: any = contextAgentForUI as any
       const list = a?.previewPrompts || a?.examplePrompts || a?.examples || a?.state?.examplePrompts || []
       return Array.isArray(list) ? (list as string[]).filter(Boolean) : []
-    }, [promptAgent])
+    }, [contextAgentForUI])
 
     // Merge with server-fetched agent/template preview prompts if not present
     const [templatePrompts, setTemplatePrompts] = useState<string[]>([])
     useEffect(() => {
       let aborted = false
       setTemplatePrompts([])
-      const a: any = promptAgent as any
+      const a: any = contextAgentForUI as any
       // If agent already has prompts, skip
       if (examplePrompts.length > 0) return
       ;(async () => {
@@ -1712,7 +1927,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return () => {
         aborted = true
       }
-    }, [promptAgent, examplePrompts])
+    }, [contextAgentForUI, examplePrompts])
 
     const inlinePrompts: string[] = useMemo(() => {
       if (examplePrompts.length > 0) return examplePrompts

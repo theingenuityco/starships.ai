@@ -2163,8 +2163,21 @@ export class ConversationService {
             const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
             const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
 
+            const effectiveRole = (() => {
+              const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';
+              if (r !== 'assistant') return r;
+              // Multi-agent conversations: treat other agents' assistant messages as "external" input.
+              // When executing agentModel.id, only that agent's assistant messages remain role=assistant.
+              const msgAgentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : '';
+              if (msgAgentId && msgAgentId !== agentModel.id) return 'user';
+              // Preserve assistant role when toolCalls are present (provider tool-result linkage).
+              const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0;
+              if (hasToolCalls) return 'assistant';
+              return msgAgentId && msgAgentId !== agentModel.id ? 'user' : 'assistant';
+            })();
+
             const baseMessage: LlmMessage = {
-              role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+              role: effectiveRole,
               content: contentWithAttribution,
               ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
             };
@@ -2487,7 +2500,15 @@ export class ConversationService {
           const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
           const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
           const baseMessage: LlmMessage = {
-            role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+            role: (() => {
+              const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';
+              if (r !== 'assistant') return r;
+              const msgAgentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : '';
+              if (msgAgentId && msgAgentId !== agentModel.id) return 'user';
+              const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0;
+              if (hasToolCalls) return 'assistant';
+              return 'assistant';
+            })(),
             content: contentWithAttribution,
             ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
           };

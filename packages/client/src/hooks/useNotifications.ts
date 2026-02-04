@@ -29,6 +29,8 @@ type StreamChunk =
   | { type: 'snapshot'; data: NotificationsSnapshot }
   | { type: 'notification.append'; data: { notification: NotificationModel } }
   | { type: 'notification.state'; data: { unread: UnreadSummary } }
+  | { type: 'notification.mark_read'; data: { conversationId: string | null; at: string } }
+  | { type: 'notification.mark_seen'; data: { before?: string | null; at: string } }
   | { type: 'error'; error: unknown }
 
 const playedNotificationIdsByStarship = new Map<string, Set<string>>()
@@ -252,6 +254,38 @@ export function useNotificationsStream(
         list.splice(0, list.length, ...c.data.notifications)
       }
     }
+
+    // Apply local state mutations (mark read/seen) so the UI reflects server writes immediately.
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'notification.mark_read' && c?.data) {
+        const cid = typeof c.data.conversationId === 'string' ? String(c.data.conversationId).trim() : ''
+        const at = typeof c.data.at === 'string' ? String(c.data.at) : new Date().toISOString()
+        for (let i = 0; i < list.length; i++) {
+          const n = list[i] as any
+          if (!n) continue
+          if (cid && String(n.conversationId || '').trim() !== cid) continue
+          // Mark read implies seen.
+          list[i] = { ...(n as NotificationModel), readAt: (n as any).readAt ?? at, seenAt: (n as any).seenAt ?? at }
+        }
+      }
+      if (c?.type === 'notification.mark_seen' && c?.data) {
+        const before = c.data.before != null ? String(c.data.before) : null
+        const at = typeof c.data.at === 'string' ? String(c.data.at) : new Date().toISOString()
+        const beforeMs = before ? Date.parse(before) : null
+        for (let i = 0; i < list.length; i++) {
+          const n = list[i] as any
+          if (!n) continue
+          if ((n as any).seenAt) continue
+          if (beforeMs != null) {
+            const createdMs = Date.parse(String((n as any).createdAt || ''))
+            if (!Number.isFinite(createdMs) || createdMs > beforeMs) continue
+          }
+          list[i] = { ...(n as NotificationModel), seenAt: at }
+        }
+      }
+    }
+
     return list
   }, [chunks.length, snapshot])
 
@@ -261,12 +295,13 @@ export function useNotificationsStream(
       const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-seen`, { before: args?.before ?? null })
       return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       // Best-effort: update cached state immediately
       const sid = String(starshipId || '')
       if (!sid || !data?.unread) return
       queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
         const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.mark_seen', data: { before: variables?.before ?? null, at: new Date().toISOString() } })
         arr.push({ type: 'notification.state', data: { unread: data.unread } })
         return arr
       })
@@ -279,11 +314,12 @@ export function useNotificationsStream(
       const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-read`, { conversationId: args?.conversationId ?? null })
       return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       const sid = String(starshipId || '')
       if (!sid || !data?.unread) return
       queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
         const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.mark_read', data: { conversationId: variables?.conversationId ?? null, at: new Date().toISOString() } })
         arr.push({ type: 'notification.state', data: { unread: data.unread } })
         return arr
       })

@@ -2529,6 +2529,12 @@ const MemoizedMessageBubble = memo(
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
       const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const authorLabel = (() => {
+        if (!isAuthedUserMessage) return userDisplayName
+        const detail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
+        if (detail && detail.toLowerCase() !== 'you') return `You (${detail})`
+        return 'You'
+      })()
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
@@ -2629,10 +2635,10 @@ const MemoizedMessageBubble = memo(
                 <div className="mb-0 text-sm font-bold font-mono text-foreground">
                   {userProfileHref ? (
                     <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                      {userDisplayName}
+                      {authorLabel}
                     </Link>
                   ) : (
-                    <span>{userDisplayName}</span>
+                    <span>{authorLabel}</span>
                   )}
                 </div>
               )}

@@ -1434,7 +1434,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 aria-selected={idx === active}
                 className={cn(
                   'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
+                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60 dark:hover:bg-muted/70'
                 )}
                 onMouseEnter={() => onHover(idx)}
                 onMouseDown={e => {
@@ -1461,7 +1461,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 </Avatar>
                 <div className="min-w-0">
                   <div className="font-medium leading-5">{label}</div>
-                  {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
                 </div>
               </button>
             )
@@ -1474,43 +1473,98 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       char: '@',
       allowSpaces: false,
       items: ({ query }: any) => {
-        const q = String(query || '').toLowerCase()
+        const q = String(query || '')
+          .toLowerCase()
+          .trim()
+        const me = String(userId || '').trim()
         const dmAllowed = dmMentionAllowedRef.current
         const dmKind = dmAllowed?.kind ?? null
         const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
         const restrictToSingleDmPeer = Boolean(dmKind && dmId)
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
-        const agentItems = (Array.isArray(agents) ? agents : [])
-          .filter(a => {
-            if (restrictToSingleDmPeer) {
-              if (dmKind !== 'agent') return false
-              if (String(a?.id || '') !== String(dmId)) return false
-            }
-            if (!q) return true
-            return a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
+
+        const matchesQuery = (haystacks: string[]) => {
+          if (!q) return true
+          return haystacks.some(h => h.includes(q))
+        }
+        // Prefer "starts with" matches first, then "contains".
+        const matchRank = (haystacks: string[]) => {
+          if (!q) return 0
+          if (haystacks.some(h => h.startsWith(q))) return 0
+          if (haystacks.some(h => h.includes(q))) return 1
+          return 2
+        }
+
+        const items: Array<{
+          id: string
+          label: string
+          kind: 'agent' | 'user'
+          agent?: AgentModel
+          user?: StarshipMemberListItem
+          _kindRank: number
+          _matchRank: number
+        }> = []
+
+        // Humans first
+        for (const u of Array.isArray(users) ? users : []) {
+          if (restrictToSingleDmPeer) {
+            if (dmKind !== 'user') continue
+            const uid = String((u as any)?.userId || '').trim()
+            if (!uid || uid !== String(dmId)) continue
+          }
+          const uid = String((u as any)?.userId || '').trim()
+          if (!uid) continue
+          // Self-mentions are not allowed (do not even suggest them).
+          if (me && uid === me) continue
+
+          const label = String(u.displayName || u.email || 'User').trim() || 'User'
+          const haystacks = [label.toLowerCase(), String(u.email || '').toLowerCase()]
+          if (!matchesQuery(haystacks)) continue
+          items.push({
+            id: uid,
+            label,
+            kind: 'user',
+            user: u,
+            _kindRank: 0,
+            _matchRank: matchRank(haystacks),
           })
+        }
+
+        // Then agents
+        for (const a of Array.isArray(agents) ? agents : []) {
+          if (restrictToSingleDmPeer) {
+            if (dmKind !== 'agent') continue
+            if (String(a?.id || '') !== String(dmId)) continue
+          }
+          const id = String((a as any)?.id || '').trim()
+          if (!id) continue
+          const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
+          const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
+          if (!matchesQuery(haystacks)) continue
+          items.push({
+            id,
+            label,
+            kind: 'agent',
+            agent: a as any,
+            _kindRank: 1,
+            _matchRank: matchRank(haystacks),
+          })
+        }
+
+        items.sort((a, b) => {
+          if (a._kindRank !== b._kindRank) return a._kindRank - b._kindRank // users first
+          if (a._matchRank !== b._matchRank) return a._matchRank - b._matchRank // starts-with first
+          return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+        })
+
+        return items
+          .filter(i => Boolean(i.id))
           .slice(0, 8)
-          .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), kind: 'agent' as const, agent: a }))
-        const userItems = (Array.isArray(users) ? users : [])
-          .filter(u => {
-            if (restrictToSingleDmPeer) {
-              if (dmKind !== 'user') return false
-              const uid = String((u as any)?.userId || '').trim()
-              if (!uid || uid !== String(dmId)) return false
-            }
-            if (!q) return true
-            const name = String(u.displayName || '').toLowerCase()
-            const email = String(u.email || '').toLowerCase()
-            return name.includes(q) || email.includes(q)
+          .map(i => {
+            const { _kindRank: _kr, _matchRank: _mr, ...rest } = i
+            return rest
           })
-          .slice(0, 8)
-          .map(u => {
-            const id = String((u as any).userId || '')
-            const label = String(u.displayName || u.email || 'User')
-            return { id, label, kind: 'user' as const, user: u }
-          })
-        return [...agentItems, ...userItems].filter(i => Boolean(i.id)).slice(0, 8)
       },
       render: () => {
         let component: ReactRenderer | null = null

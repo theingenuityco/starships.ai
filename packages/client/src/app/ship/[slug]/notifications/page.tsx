@@ -98,7 +98,7 @@ export default function NotificationsPage() {
   const starshipId = starship?.id ?? null
 
   const [filter, setFilter] = useState<Filter>('all')
-  const { notifications, unread, isLoading, markRead, markSeen } = useNotificationsStream(starshipId, Boolean(starshipId))
+  const { notifications, unread, isLoading, markRead } = useNotificationsStream(starshipId, Boolean(starshipId))
   const { data: channelsData } = useStarshipChannels(String(starshipId || ''), Boolean(starshipId))
   const { data: dmsData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId))
 
@@ -131,100 +131,115 @@ export default function NotificationsPage() {
   }, [dmsData])
 
   return (
-    <div className="px-6 py-6 max-w-5xl mx-auto">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Notifications</h2>
-          <p className="text-sm text-muted-foreground mt-1">{unread?.totalUnread ? `${unread.totalUnread} unread` : 'All caught up'}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => markSeen()} disabled={isLoading}>
-            Mark all seen
-          </Button>
-          <Button onClick={() => markRead()} disabled={isLoading || !(unread?.totalUnread > 0)}>
-            Mark all read
-          </Button>
+    <div className="relative flex flex-col h-full min-w-0">
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="w-full">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+                <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                    <Icon name="bell" weight="bold" className="h-5 w-5" />
+                  </span>
+                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Notifications</h3>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                  <span className="font-medium leading-none">{unread?.totalUnread ? `${unread.totalUnread} unread` : 'All caught up'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button size="sm" variant="secondary" className="h-8" onClick={() => markRead()} disabled={isLoading || !(unread?.totalUnread > 0)}>
+                  Mark all read
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-2">
-        <Button variant={filter === 'all' ? 'default' : 'secondary'} onClick={() => setFilter('all')}>
-          All
-        </Button>
-        <Button variant={filter === 'mentions' ? 'default' : 'secondary'} onClick={() => setFilter('mentions')}>
-          Mentions
-        </Button>
-        <Button variant={filter === 'dms' ? 'default' : 'secondary'} onClick={() => setFilter('dms')}>
-          Direct messages
-        </Button>
-        <Button variant={filter === 'reactions' ? 'default' : 'secondary'} onClick={() => setFilter('reactions')}>
-          Reactions
-        </Button>
-      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+        <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
+          <div className="flex flex-wrap items-center gap-2 pb-4">
+            <Button size="sm" className="h-8" variant={filter === 'all' ? 'default' : 'secondary'} onClick={() => setFilter('all')}>
+              All
+            </Button>
+            <Button size="sm" className="h-8" variant={filter === 'mentions' ? 'default' : 'secondary'} onClick={() => setFilter('mentions')}>
+              Mentions
+            </Button>
+            <Button size="sm" className="h-8" variant={filter === 'dms' ? 'default' : 'secondary'} onClick={() => setFilter('dms')}>
+              Direct messages
+            </Button>
+            <Button size="sm" className="h-8" variant={filter === 'reactions' ? 'default' : 'secondary'} onClick={() => setFilter('reactions')}>
+              Reactions
+            </Button>
+          </div>
 
-      <div className="mt-6">
-        {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No notifications yet.</div>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map(n => {
-              const isUnread = !n.readAt
-              const location = getConversationLabel({
-                conversationId: n.conversationId,
-                channelByConversationId,
-                dmByConversationId,
-              })
-              const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
-              const timeAgo = safeDistanceToNow(n.createdAt)
-              return (
-                <div
-                  key={n.id}
-                  className={cn(
-                    'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
-                    isUnread && 'ring-1 ring-border'
-                  )}
-                >
-                  <Link
-                    href={location.href}
-                    className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
-                    aria-label={sentence.title}
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No notifications yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(n => {
+                const isUnread = !n.readAt
+                const location = getConversationLabel({
+                  conversationId: n.conversationId,
+                  channelByConversationId,
+                  dmByConversationId,
+                })
+                const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
+                const timeAgo = safeDistanceToNow(n.createdAt)
+                return (
+                  <div
+                    key={n.id}
+                    className={cn(
+                      'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
+                      isUnread && 'ring-1 ring-border'
+                    )}
                   >
-                    <div className="flex items-start gap-3">
-                      <span className={cn('mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border', isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground')}>
-                        <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
-                            {sentence.title}
-                          </span>
-                          {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                          <span className="truncate">{location.secondary ? `${location.primary} · ${location.secondary}` : location.primary}</span>
-                          {timeAgo ? <span aria-label={`Received ${timeAgo}`}>{timeAgo}</span> : null}
+                    <Link
+                      href={location.href}
+                      className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
+                      aria-label={sentence.title}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={cn(
+                            'mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border',
+                            isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground'
+                          )}
+                        >
+                          <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
+                              {sentence.title}
+                            </span>
+                            {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span className="truncate">{location.secondary ? `${location.primary} · ${location.secondary}` : location.primary}</span>
+                            {timeAgo ? <span aria-label={`Received ${timeAgo}`}>{timeAgo}</span> : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Link>
-                  {isUnread ? (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => markRead({ conversationId: n.conversationId })}
-                        aria-label="Mark this notification read"
-                      >
-                        Mark read
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })}
-          </div>
-        )}
+                    </Link>
+                    {isUnread ? (
+                      <div className="flex items-center gap-2">
+                        <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} aria-label="Mark this notification read">
+                          Mark read
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

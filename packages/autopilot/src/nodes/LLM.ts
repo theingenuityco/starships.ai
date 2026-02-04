@@ -1190,6 +1190,10 @@ export class LLM extends BaseNode<LlmParams> {
                   const det = d as Record<string, unknown>;
                   if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.length > 0) {
                     parts.push(det.text);
+                  } else if (det.type === 'reasoning.summary' && typeof det.summary === 'string' && det.summary.length > 0) {
+                    // Some providers/models (e.g. certain OpenAI variants) only return a summary block rather than raw reasoning text.
+                    // Treat it as reasoning so callers can observe "reasoning happened" without requiring full CoT.
+                    parts.push(det.summary);
                   }
                 }
               }

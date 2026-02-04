@@ -625,6 +625,265 @@ export class ConversationService {
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Mention token decoding (LLM prompt only; DB content remains unchanged)
+  // --------------------------------------------------------------------------
+
+  private static collectMentionIdsFromText(content: string): { userIds: Set<string>; agentIds: Set<string> } {
+    let text = typeof content === 'string' ? content : '';
+    // Guard: avoid regex scanning extremely large payloads (DoS risk).
+    if (text.length > 20_000) text = text.slice(0, 20_000);
+    const userIds = new Set<string>();
+    const agentIds = new Set<string>();
+    const userRe = /<@u:([^>\s]+)>/g;
+    const agentRe = /<@a:([^>\s]+)>/g;
+    let m: RegExpExecArray | null;
+    while ((m = userRe.exec(text))) {
+      const id = String(m[1] || '').trim();
+      if (id) userIds.add(id);
+    }
+    while ((m = agentRe.exec(text))) {
+      const id = String(m[1] || '').trim();
+      if (id) agentIds.add(id);
+    }
+    return { userIds, agentIds };
+  }
+
+  private static collectMentionIdsFromMessages(messages: MessageModel[]): { userIds: Set<string>; agentIds: Set<string> } {
+    const userIds = new Set<string>();
+    const agentIds = new Set<string>();
+    for (const msg of Array.isArray(messages) ? messages : []) {
+      const content = typeof (msg as any)?.content === 'string' ? String((msg as any).content) : '';
+      if (!content || (!content.includes('<@u:') && !content.includes('<@a:'))) continue;
+      const parsed = ConversationService.collectMentionIdsFromText(content);
+      parsed.userIds.forEach((id) => userIds.add(id));
+      parsed.agentIds.forEach((id) => agentIds.add(id));
+    }
+    return { userIds, agentIds };
+  }
+
+  private async resolveMentionNameMaps(args: {
+    starshipId: string;
+    userIds: Set<string>;
+    agentIds: Set<string>;
+  }): Promise<{ agentNameById: Map<string, string>; userNameById: Map<string, string> }> {
+    const starshipId = String(args.starshipId || '').trim();
+    const userIds = Array.from(args.userIds || [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean);
+    const agentIds = Array.from(args.agentIds || [])
+      .map((x) => String(x || '').trim())
+      .filter(Boolean);
+
+    const agentNameById = new Map<string, string>();
+    const userNameById = new Map<string, string>();
+    if (!starshipId || (userIds.length === 0 && agentIds.length === 0)) {
+      return { agentNameById, userNameById };
+    }
+
+    const conn = getConnection();
+    const [agentRows, userRows] = await Promise.all([
+      agentIds.length > 0
+        ? conn
+            .query<{ id: string; name: string | null }>(
+              `SELECT id, name
+                 FROM agents
+                WHERE starship_id = $1
+                  AND id = ANY($2::text[])`,
+              [starshipId, agentIds]
+            )
+            .catch(() => [])
+        : Promise.resolve([] as Array<{ id: string; name: string | null }>),
+      userIds.length > 0
+        ? conn
+            .query<{ id: string; display_name: string | null; email: string | null }>(
+              `SELECT u.id,
+                      u.display_name,
+                      u.email
+                 FROM starship_members m
+                 JOIN users u ON u.id = m.user_id
+                WHERE m.starship_id = $1
+                  AND u.id = ANY($2::text[])`,
+              [starshipId, userIds]
+            )
+            .catch(() => [])
+        : Promise.resolve([] as Array<{ id: string; display_name: string | null; email: string | null }>),
+    ]);
+
+    for (const r of Array.isArray(agentRows) ? agentRows : []) {
+      const id = String((r as any)?.id || '').trim();
+      const name = typeof (r as any)?.name === 'string' ? String((r as any).name).trim() : '';
+      if (id && name) agentNameById.set(id, name);
+    }
+    for (const r of Array.isArray(userRows) ? userRows : []) {
+      const id = String((r as any)?.id || '').trim();
+      const displayName = typeof (r as any)?.display_name === 'string' ? String((r as any).display_name).trim() : '';
+      const email = typeof (r as any)?.email === 'string' ? String((r as any).email).trim() : '';
+      const name = displayName || email;
+      if (id && name) userNameById.set(id, name);
+    }
+
+    return { agentNameById, userNameById };
+  }
+
+  private replaceMentionTokensInText(args: {
+    content: string;
+    agentNameById: Map<string, string>;
+    userNameById: Map<string, string>;
+  }): string {
+    const input = String(args.content || '');
+    if (!input) return '';
+    if (!input.includes('<@u:') && !input.includes('<@a:')) return input;
+    return input
+      .replace(/<@a:([^>\s]+)>/g, (_m, idRaw) => {
+        const id = String(idRaw || '').trim();
+        const name = id ? args.agentNameById.get(id) : null;
+        const label = name || id || 'agent';
+        return `@${label}`;
+      })
+      .replace(/<@u:([^>\s]+)>/g, (_m, idRaw) => {
+        const id = String(idRaw || '').trim();
+        const name = id ? args.userNameById.get(id) : null;
+        const label = name || id || 'user';
+        return `@${label}`;
+      });
+  }
+
+  private replaceMentionTokensInContent(args: {
+    content: MessageContent;
+    agentNameById: Map<string, string>;
+    userNameById: Map<string, string>;
+  }): MessageContent {
+    const content = args.content;
+    if (typeof content === 'string') {
+      return this.replaceMentionTokensInText({ content, agentNameById: args.agentNameById, userNameById: args.userNameById });
+    }
+    if (!Array.isArray(content)) return content as any;
+    const blocks = content.slice() as ContentBlock[];
+    let changed = false;
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (!b || typeof b !== 'object') continue;
+      if ((b as any).type !== 'text') continue;
+      const text = typeof (b as any).text === 'string' ? (b as any).text : '';
+      const next = this.replaceMentionTokensInText({ content: text, agentNameById: args.agentNameById, userNameById: args.userNameById });
+      if (next !== text) {
+        blocks[i] = { ...(b as any), text: next } as any;
+        changed = true;
+      }
+    }
+    return changed ? blocks : content;
+  }
+
+  private formatLlmMessageName(message: MessageModel): string | null {
+    const role = String((message as any)?.role || '');
+    if (role !== 'user' && role !== 'assistant') return null;
+
+    const rawAt = typeof (message as any)?.createdAt === 'string' ? String((message as any).createdAt) : '';
+    const at = rawAt && rawAt.trim().length > 0 ? rawAt.trim() : new Date().toISOString();
+
+    const toCompactAt = (iso: string): string => {
+      // 2026-02-04T01:44:08.592Z -> 20260204_014408Z
+      const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+      if (!m) return 't';
+      return `${m[1]}${m[2]}${m[3]}_${m[4]}${m[5]}${m[6]}Z`;
+    };
+
+    const sanitizePart = (s: string, max = 28): string => {
+      const raw = String(s || '').trim();
+      if (!raw) return '';
+      const safe = raw.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/_+/g, '_');
+      return safe.length > max ? safe.slice(0, max) : safe;
+    };
+
+    const compactAt = toCompactAt(at);
+
+    if (role === 'assistant') {
+      const agentName = typeof (message as any)?.agentName === 'string' ? String((message as any).agentName).trim() : '';
+      const agentId = typeof (message as any)?.agentId === 'string' ? String((message as any).agentId).trim() : '';
+      const who = sanitizePart(agentName || agentId || 'agent', 28) || 'agent';
+      return `a_${who}_${compactAt}`.slice(0, 64);
+    }
+
+    const userName = typeof (message as any)?.userName === 'string' ? String((message as any).userName).trim() : '';
+    const userId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
+    const who = sanitizePart(userName || userId || 'user', 28) || 'user';
+    return `u_${who}_${compactAt}`.slice(0, 64);
+  }
+
+  private buildStarshipsMessageMeta(message: MessageModel): { authorType: 'agent' | 'user'; authorId: string; createdAt?: string } | null {
+    const role = String((message as any)?.role || '');
+    if (role !== 'user' && role !== 'assistant') return null;
+
+    const createdAt = typeof (message as any)?.createdAt === 'string' ? String((message as any).createdAt) : undefined;
+
+    if (role === 'assistant') {
+      const agentId = typeof (message as any)?.agentId === 'string' ? String((message as any).agentId).trim() : '';
+      if (!agentId) return null;
+      return { authorType: 'agent', authorId: agentId, ...(createdAt ? { createdAt } : null) };
+    }
+
+    const userId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
+    if (!userId) return null;
+    return { authorType: 'user', authorId: userId, ...(createdAt ? { createdAt } : null) };
+  }
+
+  private stripEchoedAttributionHeadersFromText(text: string): { stripped: number; text: string } {
+    const s = typeof text === 'string' ? text : '';
+    if (!s) return { stripped: 0, text: s };
+    const lines = s.split('\n');
+    let i = 0;
+    // Skip leading blank lines
+    while (i < lines.length && lines[i].trim().length === 0) i++;
+
+    const isHeader = (line: string): boolean => {
+      // Matches: [2026-02-04T01:44:08.592Z] Aria
+      return /^\[\d{4}-\d{2}-\d{2}T[^]]+\]\s+\S+/.test(line);
+    };
+
+    let stripped = 0;
+    while (i < lines.length && isHeader(lines[i])) {
+      stripped++;
+      i++;
+      if (stripped >= 6) break; // guard
+      // Also strip immediate blank lines following header blocks
+      while (i < lines.length && lines[i].trim().length === 0) i++;
+    }
+
+    if (stripped === 0) return { stripped: 0, text: s };
+    const remainder = lines.slice(i).join('\n');
+    return { stripped, text: remainder };
+  }
+
+  private stripEchoedAttributionHeadersFromContent(args: { role: string; content: MessageContent }): {
+    stripped: number;
+    content: MessageContent;
+  } {
+    const role = String(args.role || '');
+    // Only strip assistant messages; users may intentionally paste bracketed timestamps.
+    if (role !== 'assistant') return { stripped: 0, content: args.content };
+    const c = args.content;
+    if (typeof c === 'string') {
+      const res = this.stripEchoedAttributionHeadersFromText(c);
+      return { stripped: res.stripped, content: res.text };
+    }
+    if (!Array.isArray(c)) return { stripped: 0, content: c as any };
+    const blocks = (c as any[]).slice();
+    for (let idx = 0; idx < blocks.length; idx++) {
+      const b = blocks[idx];
+      if (!b || typeof b !== 'object') continue;
+      if ((b as any).type !== 'text') continue;
+      const t = typeof (b as any).text === 'string' ? String((b as any).text) : '';
+      const res = this.stripEchoedAttributionHeadersFromText(t);
+      if (res.stripped > 0) {
+        blocks[idx] = { ...(b as any), text: res.text };
+        return { stripped: res.stripped, content: blocks as any };
+      }
+      return { stripped: 0, content: c };
+    }
+    return { stripped: 0, content: c };
+  }
+
   /**
    * Extract image data URLs from a large text payload (typically tool_result JSON).
    *
@@ -1336,6 +1595,94 @@ export class ConversationService {
     return contentBlocks;
   }
 
+  /**
+   * Inject human/agent attribution + timestamp into the message content sent to the LLM.
+   *
+   * Motivation:
+   * - The DB stores `userName` / `agentName` and `createdAt`, but the LLM previously only received raw `content`.
+   * - Including attribution + time improves multi-participant conversations and makes agent behavior more auditable.
+   *
+   * Notes:
+   * - We only inject metadata for `role=user|assistant` (system/tool messages are left unchanged).
+   * - For multimodal `ContentBlock[]`, we prepend to the FIRST text block (which `buildMessageContent` guarantees).
+   */
+  private injectAttributionIntoContent(message: MessageModel, content: MessageContent): MessageContent {
+    const role = message?.role;
+    if (role !== 'user' && role !== 'assistant') return content;
+
+    const atRaw = typeof message?.createdAt === 'string' && message.createdAt.trim().length > 0 ? message.createdAt : message?.updatedAt;
+    const at = typeof atRaw === 'string' && atRaw.trim().length > 0 ? atRaw.trim() : new Date().toISOString();
+
+    const sender =
+      role === 'user'
+        ? typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0
+          ? String((message as any).userName).trim()
+          : typeof (message as any)?.userId === 'string' && String((message as any).userId).trim().length > 0
+            ? `user:${String((message as any).userId).slice(0, 8)}`
+            : 'User'
+        : typeof (message as any)?.agentName === 'string' && String((message as any).agentName).trim().length > 0
+          ? String((message as any).agentName).trim()
+          : typeof (message as any)?.agentId === 'string' && String((message as any).agentId).trim().length > 0
+            ? `agent:${String((message as any).agentId).slice(0, 8)}`
+            : 'Assistant';
+
+    const senderWithType = `${sender} (${role === 'assistant' ? 'agent' : 'user'})`;
+    const prefix = `[${at}] ${senderWithType}`;
+
+    const firstNonEmptyLine = (text: string): string => {
+      const s = typeof text === 'string' ? text : '';
+      if (!s) return '';
+      const lines = s.split('\n');
+      for (const ln of lines) {
+        if (ln.trim().length > 0) return ln;
+      }
+      return '';
+    };
+
+    // Avoid double-prefixing:
+    // Some assistant outputs may already start with a "[timestamp] Name" line (either because they were
+    // produced before this feature, or because the model echoes the format). If the first non-empty line
+    // already looks like our attribution AND contains the same sender label, do not inject again.
+    //
+    // This keeps prompts clean and prevents runaway repetition over long conversations.
+    const looksLikeBracketTs = (line: string): boolean => /^\[\d{4}-\d{2}-\d{2}T/.test(line);
+    const shouldSkipDueToExisting = (() => {
+      const senderLabel = String(sender || '').trim();
+      const c: any = content as any;
+      if (typeof c === 'string') {
+        const first = firstNonEmptyLine(c);
+        return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
+      }
+      if (Array.isArray(c)) {
+        const firstText = (c as any[]).find((b: any) => b && typeof b === 'object' && b.type === 'text') as any;
+        const txt = firstText && typeof firstText.text === 'string' ? firstText.text : '';
+        const first = firstNonEmptyLine(String(txt || ''));
+        return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
+      }
+      return false;
+    })();
+    void shouldSkipDueToExisting;
+
+    if (typeof content === 'string') {
+      const body = content || '';
+      return body ? `${prefix}\n${body}` : `${prefix}\n`;
+    }
+
+    // Content blocks: prepend to the first text block (preferred) or insert a new one as a fallback.
+    const blocks = Array.isArray(content) ? (content.slice() as ContentBlock[]) : [];
+    if (blocks.length === 0) {
+      return [{ type: 'text', text: `${prefix}\n` }];
+    }
+    const first = blocks[0];
+    if (first && first.type === 'text') {
+      blocks[0] = { ...(first as any), text: `${prefix}\n${(first as any).text || ''}` } as any;
+      return blocks;
+    }
+    // Fallback: ensure the provider sees attribution even if the first block isn't text.
+    blocks.unshift({ type: 'text', text: `${prefix}\n` } as any);
+    return blocks;
+  }
+
   async addConversationMessage(
     data: Message & {
       conversationId: string;
@@ -1764,7 +2111,24 @@ export class ConversationService {
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
+        const metadataInstruction = [
+          '<conversation_message_format>',
+          'Some messages may include a leading attribution header line for logging/traceability only:',
+          '',
+          '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
+          '',
+          'Example header (NOT content):',
+          '  [2026-02-04T01:44:08.592Z] Aria (agent)',
+          '',
+          'Rules:',
+          '- Treat the header line as metadata, not as part of the user/assistant text.',
+          '- NEVER output or echo any lines matching the pattern: /^\\[\\d{4}-\\d{2}-\\d{2}T.*\\] .+$/',
+          '- Your replies must contain only the actual assistant response content.',
+          '</conversation_message_format>',
+        ].join('\n');
+        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]
+          .filter(Boolean)
+          .join('\n\n');
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -1783,16 +2147,33 @@ export class ConversationService {
         };
 
         // Prepare input messages snapshot for this agent (with multimodal content support)
+        const mentionIds = ConversationService.collectMentionIdsFromMessages(messages);
+        const { agentNameById, userNameById } = await this.resolveMentionNameMaps({
+          starshipId: starship.id,
+          userIds: mentionIds.userIds,
+          agentIds: mentionIds.agentIds,
+        });
+
         const llmMessagesCore: LlmMessage[] = await Promise.all(
           messages.map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
+            const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
+            const contentStripped = strippedInfo.content;
+            const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
+            const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
 
             const baseMessage: LlmMessage = {
               role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-              content,
+              content: contentWithAttribution,
               ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
             };
+            try {
+              const meta = this.buildStarshipsMessageMeta(msg);
+              if (meta) (baseMessage as any).starshipsMeta = meta;
+            } catch {
+              /* ignore */
+            }
             if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
               (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
             }
@@ -2092,14 +2473,30 @@ export class ConversationService {
       const llmHistoryLimit = 30;
       const page = await this.getConversationMessagesPage({ conversationId, limit: llmHistoryLimit });
       const messages = page.messages;
+      const mentionIds = ConversationService.collectMentionIdsFromMessages(messages);
+      const { agentNameById, userNameById } = await this.resolveMentionNameMaps({
+        starshipId: starship.id,
+        userIds: mentionIds.userIds,
+        agentIds: mentionIds.agentIds,
+      });
       const llmMessagesCore: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
+          const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
+          const contentStripped = strippedInfo.content;
+          const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
+          const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
           const baseMessage: LlmMessage = {
             role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-            content,
+            content: contentWithAttribution,
             ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
           };
+          try {
+            const meta = this.buildStarshipsMessageMeta(msg);
+            if (meta) (baseMessage as any).starshipsMeta = meta;
+          } catch {
+            /* ignore */
+          }
           if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
             (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
           }
@@ -2149,7 +2546,24 @@ export class ConversationService {
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
+      const metadataInstruction = [
+        '<conversation_message_format>',
+        'Some messages may include a leading attribution header line for logging/traceability only:',
+        '',
+        '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
+        '',
+        'Example header (NOT content):',
+        '  [2026-02-04T01:44:08.592Z] Aria (agent)',
+        '',
+        'Rules:',
+        '- Treat the header line as metadata, not as part of the user/assistant text.',
+        '- NEVER output or echo any lines matching the pattern: /^\\[\\d{4}-\\d{2}-\\d{2}T.*\\] .+$/',
+        '- Your replies must contain only the actual assistant response content.',
+        '</conversation_message_format>',
+      ].join('\n');
+      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]
+        .filter(Boolean)
+        .join('\n\n');
 
       const agentWithTools: AgentParams = {
         ...agentModel,

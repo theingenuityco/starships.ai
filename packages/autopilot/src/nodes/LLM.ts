@@ -26,9 +26,21 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 
 // Gate LLM prompt/arg logging behind a single constant.
-// Defaults to OFF unless explicitly enabled via env var.
-const ENABLE_LLM_LOGGING =
-  typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.ENABLE_LLM_LOGGING === 'true';
+//
+// Short-circuit behavior:
+// - In non-production, default to ON (so developers see the exact provider request without extra config).
+// - In production, require explicit opt-in via env var to avoid accidental prompt leakage in logs.
+const ENABLE_LLM_LOGGING = (() => {
+  try {
+    const env = typeof process !== 'undefined' && typeof process.env !== 'undefined' ? process.env : undefined;
+    const nodeEnv = env && typeof env.NODE_ENV === 'string' ? env.NODE_ENV : '';
+    if (nodeEnv !== 'production') return true;
+    return env?.ENABLE_LLM_LOGGING === 'true';
+  } catch {
+    // Safe default: log in dev-like environments
+    return true;
+  }
+})();
 
 // Typed view over the normalized streaming chunk we forward to the ConversationService
 type NormalizedToolCallDelta = {
@@ -688,9 +700,34 @@ export class LLM extends BaseNode<LlmParams> {
     return list.map((m) => this.convertMessageToOpenAI(m));
   }
 
+  private sanitizeOpenAIName(name: unknown): string | undefined {
+    if (typeof name !== 'string') return undefined;
+    const raw = name.trim();
+    if (!raw) return undefined;
+    // OpenAI expects <=64 chars and a restricted charset; keep it conservative for OpenRouter too.
+    const safe = raw
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 64);
+    return safe || undefined;
+  }
+
+  private nameFromStarshipsMeta(meta: unknown): string | undefined {
+    if (!meta || typeof meta !== 'object') return undefined;
+    const m = meta as Record<string, unknown>;
+    const authorType = typeof m.authorType === 'string' ? m.authorType : '';
+    const authorId = typeof m.authorId === 'string' ? m.authorId : '';
+    if (!authorId) return undefined;
+    const safeId = this.sanitizeOpenAIName(authorId);
+    if (!safeId) return undefined;
+    const prefix = authorType === 'agent' ? 'a_' : authorType === 'user' ? 'u_' : 'x_';
+    return `${prefix}${safeId}`.slice(0, 64);
+  }
+
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
+    const name = this.nameFromStarshipsMeta((m as any).starshipsMeta);
 
     // Helper to get string content (for roles that require string)
     const getStringContent = (): string => {
@@ -739,6 +776,7 @@ export class LLM extends BaseNode<LlmParams> {
         role: 'assistant',
         content: getStringContent(),
         tool_calls: toolCalls,
+        ...(name ? { name } : {}),
       } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
@@ -767,10 +805,19 @@ export class LLM extends BaseNode<LlmParams> {
       return message as OpenAI.Chat.ChatCompletionSystemMessageParam;
     }
 
+    // ASSISTANT MESSAGE (no tool calls): must be a string (OpenAI chat schema).
+    if (role === 'assistant') {
+      return {
+        role: 'assistant',
+        content: getStringContent(),
+        ...(name ? { name } : {}),
+      } as OpenAI.Chat.ChatCompletionAssistantMessageParam;
+    }
+
     // USER MESSAGE: Support multimodal content (images, etc.)
-    // If content is already an array of ContentBlocks, pass directly
-    // OpenAI SDK supports both string and ContentPart[] for user messages
-    return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
+    // If content is already an array of ContentBlocks, pass directly.
+    // OpenAI SDK supports both string and ContentPart[] for user messages.
+    return { role: 'user', content: contentVal, ...(name ? { name } : {}) } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
   /**
@@ -849,6 +896,13 @@ export class LLM extends BaseNode<LlmParams> {
         ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
         ...(toolCallId ? { toolCallId } : {}),
       };
+      // Preserve optional Starships metadata for provider `name` mapping.
+      try {
+        const sm = (obj as any).starshipsMeta;
+        if (sm && typeof sm === 'object') {
+          (canonical as any).starshipsMeta = sm;
+        }
+      } catch {}
       out.push(canonical);
     }
 

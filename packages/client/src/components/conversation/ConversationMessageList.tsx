@@ -1695,7 +1695,7 @@ export function ConversationMessageList({
       const nameWidthClass = variant === 'assistant' ? 'w-40' : 'w-28'
       return (
         <div className={cn('flex justify-start w-full', topMarginClass)}>
-          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2', 'py-0')}>
             <div className="flex-shrink-0 mt-1" style={{ width: 40, height: 40 }} aria-hidden="true">
               <Skeleton className={cn('w-10 h-10 rounded-full', skAvatar)} />
             </div>
@@ -2005,7 +2005,7 @@ export function ConversationMessageList({
                           if (widgets.length === 0) return null
                           return (
                             <div className="flex justify-start">
-                              <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
+                              <div className="flex items-start gap-3 w-full max-w-full -mx-2 px-2">
                                 {/* Spacer to match avatar width */}
                                 <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
                                 <div className="flex-1 w-full">
@@ -2063,7 +2063,7 @@ export function ConversationMessageList({
                     </div>
                   </div>
                 ) : (
-                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2', 'py-0')}>
                     {(() => {
                       // Must match `AgentAvatarWithTurnUsageRing`'s `pad` so gap loader aligns with normal assistant rows in expert mode.
                       const usageRingPadPx = 3
@@ -2570,7 +2570,7 @@ const MemoizedMessageBubble = memo(
           <div
             className={cn(
               // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
-              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2',
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
@@ -2833,7 +2833,7 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
-              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'

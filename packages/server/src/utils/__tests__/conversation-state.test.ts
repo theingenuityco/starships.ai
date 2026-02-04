@@ -49,10 +49,7 @@ describe('conversation-state utilities', () => {
         ],
       };
       const result = resolvePlugins(state, {});
-      expect(result).toEqual([
-        { id: 'web', max_results: 3 },
-        { id: 'valid' },
-      ]);
+      expect(result).toEqual([{ id: 'web', max_results: 3 }, { id: 'valid' }]);
     });
 
     it('should handle conversation state with plugins as null', () => {
@@ -98,6 +95,11 @@ describe('conversation-state utilities', () => {
         modalities: ['text'],
         imageConfig: { aspect_ratio: '1:1' },
         plugins: [{ id: 'web' }],
+        model: 'openai/gpt-5.2',
+        temperature: 0.7,
+        maxTokens: 4000,
+        timeout: 60000,
+        reasoning: { enabled: true, effort: 'medium' },
         otherField: 'value',
       };
       const result = extractPersistableState(executionState);
@@ -107,6 +109,11 @@ describe('conversation-state utilities', () => {
       expect(result).not.toHaveProperty('modalities');
       expect(result).not.toHaveProperty('imageConfig');
       expect(result).not.toHaveProperty('plugins');
+      expect(result).not.toHaveProperty('model');
+      expect(result).not.toHaveProperty('temperature');
+      expect(result).not.toHaveProperty('maxTokens');
+      expect(result).not.toHaveProperty('timeout');
+      expect(result).not.toHaveProperty('reasoning');
     });
 
     it('should return null when only blacklisted fields are present', () => {
@@ -168,4 +175,3 @@ describe('conversation-state utilities', () => {
     });
   });
 });
-

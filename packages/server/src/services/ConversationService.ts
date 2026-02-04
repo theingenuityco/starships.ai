@@ -2102,11 +2102,39 @@ export class ConversationService {
           baseState as Record<string, unknown> | undefined
         );
 
-        // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
-        const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
+        // Exclude plugins and LLM runtime config from baseState and conversationState.
+        // Plugins are set explicitly from resolvePlugins (conversation-level only).
+        // LLM runtime config must be per-agent (agentModel fields), not inherited from conversation state.
+        const {
+          plugins: _agentPlugins,
+          model: _agentStateModel,
+          temperature: _agentStateTemperature,
+          maxTokens: _agentStateMaxTokens,
+          timeout: _agentStateTimeout,
+          reasoning: _agentStateReasoning,
+          ...baseStateWithoutPlugins
+        } = baseState as Record<string, unknown>;
         void _agentPlugins;
-        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
+        void _agentStateModel;
+        void _agentStateTemperature;
+        void _agentStateMaxTokens;
+        void _agentStateTimeout;
+        void _agentStateReasoning;
+        const {
+          plugins: _conversationPlugins,
+          model: _conversationStateModel,
+          temperature: _conversationStateTemperature,
+          maxTokens: _conversationStateMaxTokens,
+          timeout: _conversationStateTimeout,
+          reasoning: _conversationStateReasoning,
+          ...conversationStateWithoutPlugins
+        } = conversationState as Record<string, unknown>;
         void _conversationPlugins;
+        void _conversationStateModel;
+        void _conversationStateTemperature;
+        void _conversationStateMaxTokens;
+        void _conversationStateTimeout;
+        void _conversationStateReasoning;
 
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
@@ -2143,6 +2171,16 @@ export class ConversationService {
             // Explicitly set plugins from resolvePlugins (conversation-level only)
             // If plugins is undefined, omit it (no plugins enabled)
             ...(plugins !== undefined ? { plugins } : {}),
+            // Ensure per-agent LLM config wins over any persisted state.
+            ...(typeof (agentModel as any)?.model === 'string' && String((agentModel as any).model).trim().length > 0
+              ? { model: String((agentModel as any).model).trim() }
+              : {}),
+            ...(typeof (agentModel as any)?.temperature === 'number' ? { temperature: (agentModel as any).temperature } : {}),
+            ...(typeof (agentModel as any)?.maxTokens === 'number' ? { maxTokens: (agentModel as any).maxTokens } : {}),
+            ...(typeof (agentModel as any)?.timeout === 'number' ? { timeout: (agentModel as any).timeout } : {}),
+            ...((agentModel as any)?.reasoning && typeof (agentModel as any).reasoning === 'object'
+              ? { reasoning: (agentModel as any).reasoning }
+              : {}),
           },
         };
 
@@ -2558,11 +2596,39 @@ export class ConversationService {
       // Resolve plugins from conversation state only (agent plugins ignored)
       const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
 
-      // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
-      const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
+      // Exclude plugins and LLM runtime config from baseState and conversationState.
+      // Plugins are set explicitly from resolvePlugins (conversation-level only).
+      // LLM runtime config must be per-agent (agentModel fields), not inherited from conversation state.
+      const {
+        plugins: _agentPluginsContinue,
+        model: _agentStateModelContinue,
+        temperature: _agentStateTemperatureContinue,
+        maxTokens: _agentStateMaxTokensContinue,
+        timeout: _agentStateTimeoutContinue,
+        reasoning: _agentStateReasoningContinue,
+        ...baseStateWithoutPlugins
+      } = baseState as Record<string, unknown>;
       void _agentPluginsContinue;
-      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
+      void _agentStateModelContinue;
+      void _agentStateTemperatureContinue;
+      void _agentStateMaxTokensContinue;
+      void _agentStateTimeoutContinue;
+      void _agentStateReasoningContinue;
+      const {
+        plugins: _conversationPluginsContinue,
+        model: _conversationStateModelContinue,
+        temperature: _conversationStateTemperatureContinue,
+        maxTokens: _conversationStateMaxTokensContinue,
+        timeout: _conversationStateTimeoutContinue,
+        reasoning: _conversationStateReasoningContinue,
+        ...conversationStateWithoutPlugins
+      } = conversationState as Record<string, unknown>;
       void _conversationPluginsContinue;
+      void _conversationStateModelContinue;
+      void _conversationStateTemperatureContinue;
+      void _conversationStateMaxTokensContinue;
+      void _conversationStateTimeoutContinue;
+      void _conversationStateReasoningContinue;
 
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
@@ -2599,6 +2665,16 @@ export class ConversationService {
           // Explicitly set plugins from resolvePlugins (conversation-level only)
           // If plugins is undefined, omit it (no plugins enabled)
           ...(plugins !== undefined ? { plugins } : {}),
+          // Ensure per-agent LLM config wins over any persisted state.
+          ...(typeof (agentModel as any)?.model === 'string' && String((agentModel as any).model).trim().length > 0
+            ? { model: String((agentModel as any).model).trim() }
+            : {}),
+          ...(typeof (agentModel as any)?.temperature === 'number' ? { temperature: (agentModel as any).temperature } : {}),
+          ...(typeof (agentModel as any)?.maxTokens === 'number' ? { maxTokens: (agentModel as any).maxTokens } : {}),
+          ...(typeof (agentModel as any)?.timeout === 'number' ? { timeout: (agentModel as any).timeout } : {}),
+          ...((agentModel as any)?.reasoning && typeof (agentModel as any).reasoning === 'object'
+            ? { reasoning: (agentModel as any).reasoning }
+            : {}),
         },
       };
 

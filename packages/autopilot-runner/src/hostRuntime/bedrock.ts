@@ -16,7 +16,9 @@ export interface InvokeBedrockOptions {
   signal?: AbortSignal;
 }
 
-const redactPresignedUrlForLogs = (raw: string): {
+const redactPresignedUrlForLogs = (
+  raw: string
+): {
   kind: 's3_https' | 'other';
   bucket?: string;
   key?: string;
@@ -59,7 +61,9 @@ export async function invokeBedrock(
   // Extract reasoning config
   const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
   const reasoningRec =
-    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg) ? (reasoningCfg as Record<string, unknown>) : undefined;
+    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg)
+      ? (reasoningCfg as Record<string, unknown>)
+      : undefined;
   const reasoningEnabled = reasoningRec?.enabled === true && reasoningRec?.exclude !== true;
   const computeThinkingBudgetTokens = (): number => {
     if (!reasoningEnabled) return 0;
@@ -74,7 +78,8 @@ export async function invokeBedrock(
             ? 2048
             : 1024; // default/medium
 
-    const maxTokens = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
+    const maxTokens =
+      typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
     // Bedrock/Claude requires maxTokens > budget_tokens, so clamp conservatively.
     if (typeof maxTokens === 'number') {
       if (maxTokens <= 1) {
@@ -249,15 +254,15 @@ export async function invokeBedrock(
   // Docs: Claude on Bedrock extended thinking uses: { thinking: { type: 'enabled', budget_tokens: <int> } }
   try {
     if (thinkingWillBeEnabled) {
-        input.additionalModelRequestFields = {
-          ...(input.additionalModelRequestFields ?? {}),
-          thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
-        };
+      input.additionalModelRequestFields = {
+        ...(input.additionalModelRequestFields ?? {}),
+        thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
+      };
 
-        // Bedrock validation for Claude extended thinking:
-        // - temperature may only be set to 1 when thinking is enabled
-        // - (provider-dependent) avoid sending topP alongside this
-        inferenceConfig.temperature = 1;
+      // Bedrock validation for Claude extended thinking:
+      // - temperature may only be set to 1 when thinking is enabled
+      // - (provider-dependent) avoid sending topP alongside this
+      inferenceConfig.temperature = 1;
     }
   } catch {
     // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
@@ -350,11 +355,7 @@ export async function invokeBedrock(
               const inputTokens = typeof ut.inputTokens === 'number' ? ut.inputTokens : undefined;
               const outputTokens = typeof ut.outputTokens === 'number' ? ut.outputTokens : undefined;
               const totalTokens = typeof ut.totalTokens === 'number' ? ut.totalTokens : undefined;
-              if (
-                typeof inputTokens === 'number' ||
-                typeof outputTokens === 'number' ||
-                typeof totalTokens === 'number'
-              ) {
+              if (typeof inputTokens === 'number' || typeof outputTokens === 'number' || typeof totalTokens === 'number') {
                 bedrockUsage = {
                   ...(typeof inputTokens === 'number' ? { inputTokens } : {}),
                   ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
@@ -428,11 +429,9 @@ export async function invokeBedrock(
               // Bedrock sends the FULL accumulated arguments in each delta, not just the fragment.
               // input can be a string or a structured object; normalize to string for diffing.
               const newAccumulatedArgs =
-                typeof delta.toolUse.input === 'string'
-                  ? delta.toolUse.input
-                  : JSON.stringify(delta.toolUse.input ?? '');
+                typeof delta.toolUse.input === 'string' ? delta.toolUse.input : JSON.stringify(delta.toolUse.input ?? '');
               const previousArgs = toolState.accumulatedArgs || '';
-              
+
               // Compute the delta: only the new portion that wasn't in the previous args
               let argsFragment = '';
               if (newAccumulatedArgs.startsWith(previousArgs)) {
@@ -442,10 +441,10 @@ export async function invokeBedrock(
                 // (shouldn't happen, but handle gracefully)
                 argsFragment = newAccumulatedArgs;
               }
-              
+
               // Update accumulated args for next delta
               toolState.accumulatedArgs = newAccumulatedArgs;
-              
+
               // Only emit if there's new content
               // Use idx (contentBlockIndex) as the tool_calls index to match OpenAI format
               // Each Bedrock tool call has its own contentBlockIndex, which maps to tool_calls[index]
@@ -585,4 +584,3 @@ export async function invokeBedrock(
     throw e;
   }
 }
-

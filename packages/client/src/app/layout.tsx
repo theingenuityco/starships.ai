@@ -90,7 +90,6 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     capable: true,
   },
-  manifest: '/manifest.json',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -742,11 +742,10 @@ export function ConversationList({
                     <div
                       key={t.key}
                       className={cn(
-                        'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
+                        // Match channel row styling (spacing, hover, active background)
+                        'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
                         'hover:bg-muted/50',
-                        isActive && 'bg-primary/10 text-primary',
-                        !isActive && hasUnread && 'text-foreground',
-                        !isActive && !hasUnread && 'text-muted-foreground hover:text-foreground',
+                        isActive && 'bg-muted/70 shadow-sm',
                         isBusy && 'opacity-70 pointer-events-none'
                       )}
                       onClick={() => handleDmTargetClick(t)}
@@ -757,12 +756,12 @@ export function ConversationList({
                         <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1 gap-2">
+                        <div className="flex items-center justify-between gap-2">
                           <p
                             className={cn(
                               'text-sm truncate',
-                              // Color is controlled by the row container; keep only weight here.
-                              isActive ? 'font-medium' : hasUnread ? 'font-bold' : 'font-medium'
+                              // Match channel label styling
+                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                             )}
                           >
                             {label}

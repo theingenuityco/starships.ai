@@ -2,6 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import Icon from '@/components/primitives/Icon'
+import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'motion/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -37,6 +38,9 @@ export function NavigationItem({
   isOnboardingHighlighted = false,
 }: NavigationItemProps) {
   const router = useRouter()
+
+  const hasBadge = typeof badgeCount === 'number' && Number.isFinite(badgeCount) && badgeCount > 0
+  const badgeLabel = hasBadge ? `${badgeCount > 99 ? '99+' : String(badgeCount)} unread` : ''
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -74,15 +78,13 @@ export function NavigationItem({
           pointerEvents: 'none',
         }}
       >
-        <Icon name={icon} className="w-4 h-4" />
+        <Icon name={icon} weight={hasBadge ? 'bold' : 'regular'} className="w-4 h-4" />
       </div>
     )
-  }, [icon])
+  }, [icon, hasBadge])
 
   // Determine if item should be highlighted (either active route or onboarding highlight)
   const shouldHighlight = isActive || isOnboardingHighlighted
-  const hasBadge = typeof badgeCount === 'number' && Number.isFinite(badgeCount) && badgeCount > 0
-  const badgeLabel = hasBadge ? `${badgeCount > 99 ? '99+' : String(badgeCount)} unread` : ''
 
   const motionDiv = (
     <div
@@ -133,7 +135,7 @@ export function NavigationItem({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className="whitespace-nowrap pointer-events-none font-medium ml-1.5"
+            className={cn('whitespace-nowrap pointer-events-none ml-1.5', hasBadge ? 'font-bold' : 'font-medium')}
           >
             {label}
           </motion.span>

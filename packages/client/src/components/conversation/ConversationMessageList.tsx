@@ -1558,7 +1558,17 @@ export function ConversationMessageList({
   // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
   // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
   // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
-  const isHydratingInitialMessages = Boolean(!messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0)
+  // IMPORTANT:
+  // The streamed conversation query keeps an SSE connection open; TanStack Query can report `isFetching=true`
+  // for the lifetime of that connection. If we treat `isFetching && messages.length===0` as "still loading",
+  // an empty-but-valid channel will look stuck in a loading state forever.
+  //
+  // Instead, key off whether we have received at least one snapshot event. A snapshot can legitimately contain
+  // zero messages (new channel), which should show the empty hero state.
+  const hasStreamSnapshot = Boolean((stream as any)?.hasSnapshot)
+  const isHydratingInitialMessages = Boolean(
+    !messagesOverride && stream && !hasStreamSnapshot && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+  )
 
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.

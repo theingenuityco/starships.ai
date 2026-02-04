@@ -137,6 +137,62 @@ export async function invokeBedrock(
   } catch {}
   // #endregion
 
+  // #region agent log
+  try {
+    let assistantMsgs = 0;
+    let assistantMsgsWithReasoningDetails = 0;
+    let assistantReasoningDetailsCount = 0;
+    let assistantReasoningDetailsWithSignature = 0;
+    for (const rm of rawMessages ?? []) {
+      if (!rm || typeof rm !== 'object') continue;
+      const role = (rm as { role?: unknown }).role;
+      if (role !== 'assistant') continue;
+      assistantMsgs += 1;
+      const rdRaw =
+        Array.isArray((rm as any)?.reasoningDetails) && (rm as any).reasoningDetails.length > 0
+          ? ((rm as any).reasoningDetails as unknown[])
+          : Array.isArray((rm as any)?.reasoning_details) && (rm as any).reasoning_details.length > 0
+            ? ((rm as any).reasoning_details as unknown[])
+            : [];
+      if (rdRaw.length > 0) assistantMsgsWithReasoningDetails += 1;
+      assistantReasoningDetailsCount += rdRaw.length;
+      for (const d of rdRaw) {
+        try {
+          if (d && typeof d === 'object') {
+            const rec = d as Record<string, unknown>;
+            if (rec.type === 'reasoning.text') {
+              const sig = rec.signature;
+              if (typeof sig === 'string' && sig.trim().length > 0) assistantReasoningDetailsWithSignature += 1;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'B4',
+        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
+        message: 'Incoming assistant reasoningDetails presence (for replay)',
+        data: {
+          providerModelId,
+          hasAssistantHistory,
+          assistantMsgs,
+          assistantMsgsWithReasoningDetails,
+          assistantReasoningDetailsCount,
+          assistantReasoningDetailsWithSignature,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {}
+  // #endregion
+
   for (const m of rawMessages) {
     if (m.role === 'system') {
       // OpenAI messages may represent system content as a string OR as an array of content parts
@@ -158,6 +214,49 @@ export async function invokeBedrock(
     }
 
     const content: BedrockContentBlock[] = [];
+    // Preserve provider-native reasoning blocks (Bedrock ContentBlock.reasoningContent) when present.
+    // This is required for multi-turn "thinking" replay when Bedrock provides signatures.
+    try {
+      const rdRaw =
+        Array.isArray((m as any)?.reasoningDetails) && (m as any).reasoningDetails.length > 0
+          ? ((m as any).reasoningDetails as unknown[])
+          : Array.isArray((m as any)?.reasoning_details) && (m as any).reasoning_details.length > 0
+            ? ((m as any).reasoning_details as unknown[])
+            : [];
+      if (rdRaw.length > 0) {
+        for (const d of rdRaw) {
+          if (!d || typeof d !== 'object') continue;
+          const det = d as Record<string, unknown>;
+          if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.trim().length > 0) {
+            const signature = typeof det.signature === 'string' && det.signature.trim().length > 0 ? det.signature.trim() : undefined;
+            (content as unknown[]).push({
+              reasoningContent: {
+                reasoningText: {
+                  text: det.text,
+                  ...(signature ? { signature } : {}),
+                },
+              },
+            });
+          } else if (det.type === 'reasoning.encrypted' && typeof det.data === 'string' && det.data.trim().length > 0) {
+            // Map encrypted reasoning payloads (base64) into Bedrock redactedContent.
+            // Note: We do not log or inspect the data for safety.
+            try {
+              const bytes = Buffer.from(det.data, 'base64');
+              (content as unknown[]).push({
+                reasoningContent: {
+                  redactedContent: bytes,
+                },
+              });
+            } catch {
+              // ignore invalid base64
+            }
+          }
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+
     if (typeof m.content === 'string') {
       const trimmed = m.content.trim();
       // Bedrock validation requires non-blank text fields; provide a minimal placeholder
@@ -393,6 +492,7 @@ export async function invokeBedrock(
       };
       const toolUseStates: Record<number, BedrockToolUseState> = {};
       const reasoningStates: Record<number, string> = {};
+      const reasoningSignatures: Record<number, string> = {};
 
       type BedrockDelta = {
         text?: string;
@@ -415,6 +515,8 @@ export async function invokeBedrock(
       let bedrockStopReason: string | undefined;
       let bedrockUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
       let loggedReasoningShape = false;
+      let reasoningContentEvents = 0;
+      let reasoningContentHadSignature = 0;
 
       for await (const event of stream) {
         // Capture stop reason + usage (metadata) when present.
@@ -456,24 +558,29 @@ export async function invokeBedrock(
           if (delta.reasoningContent) {
             const rc = delta.reasoningContent;
             let nextText = '';
+            let eventHasSignature = false;
+            try {
+              if (rc && typeof rc === 'object') {
+                const rco = rc as Record<string, unknown>;
+                const reasoningText = rco.reasoningText;
+                if (reasoningText && typeof reasoningText === 'object') {
+                  const rt = reasoningText as Record<string, unknown>;
+                  eventHasSignature = typeof rt.signature === 'string' && rt.signature.trim().length > 0;
+                } else {
+                  eventHasSignature = typeof rco.signature === 'string' && rco.signature.trim().length > 0;
+                }
+              }
+            } catch {
+              eventHasSignature = false;
+            }
+            reasoningContentEvents += 1;
+            if (eventHasSignature) reasoningContentHadSignature += 1;
+
             // #region agent log
             try {
               if (!loggedReasoningShape) {
                 loggedReasoningShape = true;
                 const keys = rc && typeof rc === 'object' ? Object.keys(rc as Record<string, unknown>).slice(0, 12) : [];
-                let hasSignature = false;
-                try {
-                  if (rc && typeof rc === 'object') {
-                    const rco = rc as Record<string, unknown>;
-                    const reasoningText = rco.reasoningText;
-                    if (reasoningText && typeof reasoningText === 'object') {
-                      const rt = reasoningText as Record<string, unknown>;
-                      hasSignature = typeof rt.signature === 'string' && rt.signature.length > 0;
-                    }
-                  }
-                } catch {
-                  hasSignature = false;
-                }
                 fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -487,7 +594,7 @@ export async function invokeBedrock(
                       providerModelId,
                       reasoningContentType: typeof rc,
                       reasoningContentKeys: keys,
-                      hasSignature,
+                      hasSignature: eventHasSignature,
                     },
                     timestamp: Date.now(),
                   }),
@@ -501,15 +608,22 @@ export async function invokeBedrock(
               } else if (rc && typeof rc === 'object') {
                 const rco = rc as Record<string, unknown>;
                 // Common shapes:
-                // - { reasoningText: { text: string, signature?: string } }
+                // - ReasoningContentBlock: { reasoningText: { text: string, signature?: string } }
+                // - OR ReasoningTextBlock: { text: string, signature?: string }
                 // - { text: string }
                 const reasoningText = (rco as { reasoningText?: unknown }).reasoningText as unknown;
                 if (reasoningText && typeof reasoningText === 'object') {
                   const rt = reasoningText as Record<string, unknown>;
                   if (typeof rt.text === 'string') nextText = rt.text;
+                  if (typeof rt.signature === 'string' && rt.signature.trim().length > 0) {
+                    reasoningSignatures[idx] = rt.signature.trim();
+                  }
                 }
                 if (!nextText && typeof (rco as { text?: unknown }).text === 'string') {
                   nextText = (rco as { text: string }).text;
+                }
+                if (typeof rco.signature === 'string' && rco.signature.trim().length > 0) {
+                  reasoningSignatures[idx] = rco.signature.trim();
                 }
               }
             } catch {
@@ -660,6 +774,95 @@ export async function invokeBedrock(
         // We currently don't need to emit anything for messageStart/contentBlockStop/messageStop
         // because the LLM node infers finishReason when the stream completes and tool calls
         // are reconstructed from the accumulated tool_calls deltas.
+      }
+
+      // #region agent log
+      try {
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'pre-fix',
+            hypothesisId: 'B5',
+            location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
+            message: 'Bedrock stream reasoningContent totals',
+            data: {
+              providerModelId,
+              reasoningContentEvents,
+              reasoningContentHadSignature,
+              stopReason: bedrockStopReason,
+              usage: bedrockUsage,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch {}
+      // #endregion
+
+      // Emit a final snapshot chunk containing reasoning_details so the LLM node can persist
+      // provider-native thinking (including signatures) for replay in future Bedrock turns.
+      try {
+        const indices = Object.keys(reasoningStates)
+          .map((k) => Number(k))
+          .filter((n) => Number.isFinite(n))
+          .sort((a, b) => a - b);
+        const reasoning_details: unknown[] = [];
+        for (const idx of indices) {
+          const text = typeof reasoningStates[idx] === 'string' ? (reasoningStates[idx] as string) : '';
+          if (text.trim().length === 0) continue;
+          const sig = typeof reasoningSignatures[idx] === 'string' ? reasoningSignatures[idx] : undefined;
+          reasoning_details.push({
+            type: 'reasoning.text',
+            text,
+            ...(sig ? { signature: sig } : {}),
+            format: 'anthropic-claude-v1',
+            index: idx,
+          });
+        }
+        if (reasoning_details.length > 0) {
+          // #region agent log
+          try {
+            let withSig = 0;
+            for (const d of reasoning_details as unknown[]) {
+              if (d && typeof d === 'object') {
+                const rec = d as Record<string, unknown>;
+                const sig = rec.signature;
+                if (typeof sig === 'string' && sig.trim().length > 0) withSig += 1;
+              }
+            }
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: 'debug-session',
+                runId: 'pre-fix',
+                hypothesisId: 'B6',
+                location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
+                message: 'Emitting reasoning_details snapshot chunk',
+                data: { providerModelId, count: reasoning_details.length, withSignature: withSig },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {});
+          } catch {}
+          // #endregion
+
+          yield {
+            id: 'bedrock-stream',
+            object: 'chat.completion.chunk',
+            created: Math.floor(Date.now() / 1000),
+            model: canonicalModelId,
+            choices: [
+              {
+                index: 0,
+                delta: { reasoning_details },
+                finish_reason: null,
+              },
+            ],
+          };
+        }
+      } catch {
+        // Non-fatal
       }
 
       // Emit a final synthetic chunk containing usage + finish_reason so downstream accounting records it.

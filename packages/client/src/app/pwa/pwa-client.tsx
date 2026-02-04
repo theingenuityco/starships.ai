@@ -56,6 +56,7 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       setIsSupported(true)
+      console.log('[PWA] Push + ServiceWorker supported in this browser')
       registerServiceWorker().catch((err) => {
         console.error('Service worker registration failed:', err)
         setError('Failed to register service worker.')
@@ -64,11 +65,13 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
   }, [])
 
   async function registerServiceWorker() {
+    console.log('[PWA] Registering service worker /sw.js')
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
       updateViaCache: 'none',
     })
     const sub = await registration.pushManager.getSubscription()
+    console.log('[PWA] Existing subscription from pushManager.getSubscription():', !!sub)
     setSubscription(sub)
   }
 
@@ -80,10 +83,12 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
     }
 
     const registration = await navigator.serviceWorker.ready
+    console.log('[PWA] Subscribing to push with VAPID key present:', !!publicKey)
     const sub = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     })
+    console.log('[PWA] New PushSubscription endpoint:', sub.endpoint)
     setSubscription(sub)
     const serializedSub = JSON.parse(JSON.stringify(sub))
     await subscribeUser(serializedSub)
@@ -92,8 +97,12 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
   async function unsubscribeFromPush() {
     setError(null)
     await subscription?.unsubscribe()
+    console.log('[PWA] Unsubscribed in browser. Had subscription:', !!subscription)
     setSubscription(null)
-    await unsubscribeUser()
+    if (subscription) {
+      const serializedSub = JSON.parse(JSON.stringify(subscription))
+      await unsubscribeUser(serializedSub)
+    }
   }
 
   async function sendTestNotification() {
@@ -102,6 +111,7 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
       setError('Please subscribe first.')
       return
     }
+    console.log('[PWA] Sending test notification for endpoint:', subscription.endpoint)
     await sendNotification(message)
     setMessage('')
   }

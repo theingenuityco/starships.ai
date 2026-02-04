@@ -10,7 +10,7 @@ if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
 }
 
-let subscription: webpush.PushSubscription | null = null
+let subscriptions: webpush.PushSubscription[] = []
 
 function assertVapidConfigured() {
   if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
@@ -28,13 +28,21 @@ function assertVapidConfigured() {
 
 export async function subscribeUser(sub: webpush.PushSubscription) {
   assertVapidConfigured()
-  subscription = sub
+  // De-duplicate by endpoint
+  console.log('[PWA] subscribeUser called for endpoint:', sub.endpoint)
+  subscriptions = [
+    ...subscriptions.filter((s) => s.endpoint !== sub.endpoint),
+    sub,
+  ]
+  console.log('[PWA] Total subscriptions after subscribe:', subscriptions.length)
   // Persist this in your database for production usage.
   return { success: true }
 }
 
-export async function unsubscribeUser() {
-  subscription = null
+export async function unsubscribeUser(sub: webpush.PushSubscription) {
+  console.log('[PWA] unsubscribeUser called for endpoint:', sub.endpoint)
+  subscriptions = subscriptions.filter((s) => s.endpoint !== sub.endpoint)
+  console.log('[PWA] Total subscriptions after unsubscribe:', subscriptions.length)
   // Remove the subscription from your database in production usage.
   return { success: true }
 }
@@ -42,19 +50,46 @@ export async function unsubscribeUser() {
 export async function sendNotification(message: string) {
   assertVapidConfigured()
 
-  if (!subscription) {
-    throw new Error('No subscription available')
+  if (!subscriptions.length) {
+    console.warn('[PWA] sendNotification called with no active subscriptions')
+    throw new Error('No subscriptions available')
   }
 
   try {
-    await webpush.sendNotification(
-      subscription,
-      JSON.stringify({
-        title: 'Starships.ai',
-        body: message,
-        icon: '/web-app-manifest-512x512.png',
-      })
+    const payload = JSON.stringify({
+      title: 'Starships.ai',
+      body: message,
+      icon: '/web-app-manifest-512x512.png',
+    })
+
+    console.log('[PWA] Sending notification to subscriptions:', subscriptions.length)
+
+    const results = await Promise.allSettled(
+      subscriptions.map((sub) => webpush.sendNotification(sub, payload))
     )
+
+    // Drop invalid subscriptions (410 Gone, 404 Not Found, etc.)
+    const alive: webpush.PushSubscription[] = []
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        alive.push(subscriptions[index]!)
+      } else {
+        const status = (result.reason as any)?.statusCode
+        console.warn(
+          '[PWA] Error sending to endpoint',
+          subscriptions[index]?.endpoint,
+          'status:',
+          status
+        )
+        if (status !== 410 && status !== 404) {
+          console.error('Error sending push notification:', result.reason)
+          alive.push(subscriptions[index]!)
+        }
+      }
+    })
+    subscriptions = alive
+    console.log('[PWA] Subscriptions remaining after cleanup:', subscriptions.length)
+
     return { success: true }
   } catch (error) {
     console.error('Error sending push notification:', error)

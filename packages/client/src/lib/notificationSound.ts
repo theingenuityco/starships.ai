@@ -4,6 +4,38 @@ let preferredFileSrc: string | null | undefined = undefined
 let primedFileAudio = false
 let fileAudioPool: HTMLAudioElement[] = []
 
+// Avoid console spam for common autoplay-policy rejections.
+const loggedPlayErrors = new Set<string>()
+const MAX_LOGGED_PLAY_ERRORS = 20
+function logPlayErrorOnce(kind: 'prime' | 'play', src: string | null, err: unknown) {
+  try {
+    const e = err as any
+    const name = typeof e?.name === 'string' ? e.name : ''
+    const message = typeof e?.message === 'string' ? e.message : String(err || '')
+    const key = [kind, src || 'no-src', name || 'no-name', message || 'no-message'].join('|')
+    if (loggedPlayErrors.has(key)) return
+    loggedPlayErrors.add(key)
+    if (loggedPlayErrors.size > MAX_LOGGED_PLAY_ERRORS) {
+      // Best-effort cap: drop oldest-ish by recreating from the tail.
+      const keep = Array.from(loggedPlayErrors).slice(-Math.floor(MAX_LOGGED_PLAY_ERRORS / 2))
+      loggedPlayErrors.clear()
+      keep.forEach(k => loggedPlayErrors.add(k))
+    }
+
+    const isAutoplayBlock = name === 'NotAllowedError' || /didn't interact|not allowed|gesture|autoplay/i.test(message || '')
+
+    const payload = { kind, src, name: name || undefined, message: message || undefined }
+    if (isAutoplayBlock) {
+      // Normal browser behavior; keep it low-noise.
+      console.debug('[notifications] sound blocked by autoplay policy (will work after user interaction)', payload)
+    } else {
+      console.warn('[notifications] failed to play notification sound', payload)
+    }
+  } catch {
+    // Never let logging break the app.
+  }
+}
+
 const NOTIFICATION_SOUND_CANDIDATES = [
   // Add your files here (served from `packages/client/public/` in Next.js)
   { src: '/sounds/notification.aac', mime: 'audio/aac' },
@@ -82,8 +114,9 @@ async function tryPrimeNotificationFileAudio() {
     await a.play()
     a.pause()
     a.currentTime = 0
-  } catch {
-    // ignore; browsers may still block or the asset may not exist yet.
+  } catch (e) {
+    // Best-effort; browsers may still block or the asset may not exist yet.
+    logPlayErrorOnce('prime', src, e)
   }
 }
 
@@ -129,7 +162,11 @@ export function playNotificationChime(opts?: { volume?: number }) {
       const a = getPooledAudio(fileSrc)
       a.volume = volume
       a.currentTime = 0
-      void a.play()
+      // IMPORTANT:
+      // `HTMLAudioElement.play()` returns a Promise and will reject under autoplay policies
+      // (e.g. "user didn't interact with the document first"). Catch to avoid noisy
+      // unhandled promise rejections in the console.
+      void a.play().catch(e => logPlayErrorOnce('play', fileSrc, e))
       return
     } catch {
       // fall through to WebAudio

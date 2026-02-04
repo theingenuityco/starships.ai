@@ -33,6 +33,8 @@ import { useModelContextLength } from '@/hooks/useLlmModels'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MessageReactions } from './MessageReactions'
+import { MessageReactionAction } from './MessageReactionAction'
 
 type TurnUsageForRing = {
   turnId: string
@@ -1693,7 +1695,7 @@ export function ConversationMessageList({
       const nameWidthClass = variant === 'assistant' ? 'w-40' : 'w-28'
       return (
         <div className={cn('flex justify-start w-full', topMarginClass)}>
-          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2', 'py-0')}>
             <div className="flex-shrink-0 mt-1" style={{ width: 40, height: 40 }} aria-hidden="true">
               <Skeleton className={cn('w-10 h-10 rounded-full', skAvatar)} />
             </div>
@@ -1947,6 +1949,7 @@ export function ConversationMessageList({
                       >
                         <MemoizedMessageBubble
                           message={message}
+                          conversationId={conversationId}
                           agentName={assistant?.displayName}
                           agentSlug={assistant?.slug}
                           starshipSlug={starshipSlug}
@@ -2002,7 +2005,7 @@ export function ConversationMessageList({
                           if (widgets.length === 0) return null
                           return (
                             <div className="flex justify-start">
-                              <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
+                              <div className="flex items-start gap-3 w-full max-w-full -mx-2 px-2">
                                 {/* Spacer to match avatar width */}
                                 <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
                                 <div className="flex-1 w-full">
@@ -2060,7 +2063,7 @@ export function ConversationMessageList({
                     </div>
                   </div>
                 ) : (
-                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2', 'py-0')}>
                     {(() => {
                       // Must match `AgentAvatarWithTurnUsageRing`'s `pad` so gap loader aligns with normal assistant rows in expert mode.
                       const usageRingPadPx = 3
@@ -2142,6 +2145,8 @@ interface ExtendedMessage extends MessageModel {
 
 interface ConversationMessageBubbleProps {
   message: ExtendedMessage
+  /** Parent conversation id (required for reaction toggles + optimistic cache patching). */
+  conversationId: string | null
   agentName?: string
   agentSlug?: string
   starshipSlug?: string
@@ -2313,6 +2318,7 @@ function extractWidgetResults(uiActions: unknown): WidgetResult[] {
 const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
     message,
+    conversationId,
     agentName,
     agentSlug,
     starshipSlug,
@@ -2359,6 +2365,7 @@ const MemoizedMessageBubble = memo(
     const isUser = message.role === 'user'
     const { userId: authUserId } = useAuth()
     const sid = typeof starshipId === 'string' ? starshipId : ''
+    const cid = typeof conversationId === 'string' ? conversationId : ''
     const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
     const memberByUserId = useMemo(() => {
       const list = Array.isArray((membersData as any)?.members) ? (((membersData as any).members as any[]) ?? []) : []
@@ -2431,6 +2438,25 @@ const MemoizedMessageBubble = memo(
         </Button>
       )
     }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
+
+    const reactionActionButton = useMemo(() => {
+      const id = typeof message.id === 'string' ? message.id : ''
+      if (!id) return null
+      // Only for persisted messages in a real conversation.
+      if (!cid) return null
+      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      return <MessageReactionAction conversationId={cid} messageId={id} />
+    }, [cid, message.id])
+
+    const messageActionNodes = useMemo(() => {
+      if (!threadActionButton && !reactionActionButton) return null
+      return (
+        <>
+          {reactionActionButton}
+          {threadActionButton}
+        </>
+      )
+    }, [reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2544,7 +2570,7 @@ const MemoizedMessageBubble = memo(
           <div
             className={cn(
               // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
-              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2',
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
@@ -2647,7 +2673,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={true}
-                extraActions={threadActionButton}
+                extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={false}
                 // Always compact (no "normal" padding mode).
@@ -2666,6 +2692,15 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                <MessageReactions
+                  conversationId={cid}
+                  starshipId={starshipId}
+                  messageId={message.id}
+                  reactions={(message as any)?.reactions}
+                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                />
+              )}
               {!suppressLinkedConversationCard && (
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
@@ -2747,7 +2782,7 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive}
-                  extraActions={null}
+                  extraActions={messageActionNodes}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
@@ -2767,6 +2802,15 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
+                {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                  <MessageReactions
+                    conversationId={cid}
+                    starshipId={starshipId}
+                    messageId={message.id}
+                    reactions={(message as any)?.reactions}
+                    disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                  />
+                )}
                 {!suppressLinkedConversationCard && (
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
@@ -2789,7 +2833,7 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
-              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'
@@ -2851,7 +2895,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive}
-                extraActions={threadActionButton}
+                extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
@@ -2870,6 +2914,15 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                <MessageReactions
+                  conversationId={cid}
+                  starshipId={starshipId}
+                  messageId={message.id}
+                  reactions={(message as any)?.reactions}
+                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                />
+              )}
               {!suppressLinkedConversationCard && (
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
@@ -2894,6 +2947,14 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    // Re-render when reactions change (otherwise pills update only when unrelated props change, e.g. presence).
+    {
+      const prevRx = (prevProps.message as any)?.reactions
+      const nextRx = (nextProps.message as any)?.reactions
+      if (prevRx !== nextRx) {
+        return false
+      }
+    }
     // Re-render when expert mode toggles, since it affects avatar ring visibility.
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     // Presence and busy indicators are independent of message content.
@@ -3034,7 +3095,7 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
               aria-hidden="true"
             />
             <Icon name="hash" className="relative z-10 h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
-            <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+            <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
@@ -3110,7 +3171,7 @@ function DirectMessageHeroAvatar({
     return (
       <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
         <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
-        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+        <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10" />
       </div>
     )
   }

@@ -81,6 +81,12 @@ export type ConversationStreamMessageAppend = {
   message: MessageModel;
 };
 
+export type ConversationStreamMessageReactions = {
+  conversationId: string;
+  messageId: string;
+  reactions: Record<string, string[]>;
+};
+
 /**
  * Provider/model usage for a specific LLM call inside a turn.
  *
@@ -176,4 +182,5 @@ export type ConversationStreamEvent =
   | { type: 'assistant.delta'; data: ConversationStreamAssistantDelta }
   | { type: 'assistant.reasoning_delta'; data: ConversationStreamAssistantReasoningDelta }
   | { type: 'message.append'; data: ConversationStreamMessageAppend }
+  | { type: 'message.reactions'; data: ConversationStreamMessageReactions }
   | { type: 'ui_action'; data: ConversationStreamUIAction };

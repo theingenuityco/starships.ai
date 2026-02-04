@@ -53,6 +53,7 @@ export { ChannelRepository } from './repositories/ChannelRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';
 export { MessageRepository } from './repositories/MessageRepository';
+export { MessageReactionRepository } from './repositories/MessageReactionRepository';
 export { MessageMentionRepository } from './repositories/MessageMentionRepository';
 export { NotificationRepository } from './repositories/NotificationRepository';
 export { OAuthAccountRepository } from './repositories/OAuthAccountRepository';

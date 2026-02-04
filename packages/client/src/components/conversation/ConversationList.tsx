@@ -174,6 +174,21 @@ export function ConversationList({
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
   const channels = (channelsData?.channels || []) as ChannelModel[]
+  const channelsForDisplay = useMemo(() => {
+    // Navigation UX: the default channel should always be first.
+    // Server-side default is `#lobby` (see ensureDefaultChannelForStarship).
+    const DEFAULT_CHANNEL_SLUG = 'lobby'
+    const normalize = (s: unknown): string =>
+      String(s ?? '')
+        .trim()
+        .toLowerCase()
+
+    const defaultIndex = channels.findIndex(ch => normalize((ch as any)?.slug) === DEFAULT_CHANNEL_SLUG)
+    if (defaultIndex <= 0) return channels
+
+    const defaultChannel = channels[defaultIndex]
+    return [defaultChannel, ...channels.slice(0, defaultIndex), ...channels.slice(defaultIndex + 1)]
+  }, [channels])
 
   const dmTargets = useMemo<DmTarget[]>(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -205,9 +220,9 @@ export function ConversationList({
         })
       : all
 
-    // Stable ordering: agents first, then humans; alpha within group
+    // Stable ordering: humans first, then agents; alpha within group
     return filtered.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'agent' ? -1 : 1
+      if (a.kind !== b.kind) return a.kind === 'user' ? -1 : 1
       return a.label.localeCompare(b.label)
     })
   }, [agentsData, membersData?.members, authUserId, searchQuery])
@@ -244,6 +259,9 @@ export function ConversationList({
     // UX requirement: don't show an unread badge/highlight for the conversation the user is already viewing.
     const hasUnread = Boolean(!isOpenConversation && conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
     const dmCount = Number(!isOpenConversation && conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+    const reactionCount = Number(!isOpenConversation && conversationId ? ((notifUnread as any)?.reactionUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+    const notifCount = dmCount + reactionCount
+    const hasNotifBadge = notifCount > 0
 
     return (
       <div
@@ -252,7 +270,7 @@ export function ConversationList({
           'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
-            : hasUnread
+            : hasUnread || hasNotifBadge
               ? 'text-foreground border-transparent hover:bg-muted'
               : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
           isBusy && 'opacity-70 pointer-events-none'
@@ -283,14 +301,14 @@ export function ConversationList({
           className={cn(
             'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
             // Color is controlled by the row container (matches `NavigationItem`); keep only weight here.
-            isActive ? 'font-medium' : hasUnread ? 'font-bold' : 'font-medium'
+            isActive ? 'font-medium' : hasUnread || hasNotifBadge ? 'font-bold' : 'font-medium'
           )}
         >
           {label}
         </span>
-        {dmCount > 0 ? (
+        {notifCount > 0 ? (
           <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-            {dmCount > 99 ? '99+' : String(dmCount)}
+            {notifCount > 99 ? '99+' : String(notifCount)}
           </span>
         ) : null}
       </div>
@@ -467,7 +485,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <div id="sidebar-channels-list" className="flex-none overflow-y-auto pr-1 max-h-[40vh]">
+              <ScrollArea id="sidebar-channels-list" className="flex-none max-h-[40vh]">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -478,7 +496,7 @@ export function ConversationList({
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : (
                   <div className="space-y-1">
-                    {channels.map(ch => {
+                    {channelsForDisplay.map(ch => {
                       const isActive = currentChannelSlug
                         ? String(ch.slug || '')
                             .trim()
@@ -491,6 +509,9 @@ export function ConversationList({
                       const cid = String(ch.conversationId || '')
                       const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
                       const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
+                      const reactionCount = Number((notifUnread as any)?.reactionUnreadByConversationId?.[cid] ?? 0) || 0
+                      const notifCount = mentionCount + reactionCount
+                      const hasNotifBadge = notifCount > 0
                       return (
                         <div key={ch.conversationId}>
                           <div
@@ -498,7 +519,7 @@ export function ConversationList({
                               'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
-                                : hasUnread
+                                : hasUnread || hasNotifBadge
                                   ? 'text-foreground border-transparent hover:bg-muted'
                                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                             )}
@@ -524,21 +545,21 @@ export function ConversationList({
                             >
                               <Icon
                                 name="hash"
-                                weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
-                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
+                                weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
+                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
                             </div>
                             <span
                               className={cn(
                                 'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
                               {label}
                             </span>
-                            {mentionCount > 0 ? (
+                            {notifCount > 0 ? (
                               <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-                                {mentionCount > 99 ? '99+' : String(mentionCount)}
+                                {notifCount > 99 ? '99+' : String(notifCount)}
                               </span>
                             ) : null}
                           </div>
@@ -549,7 +570,7 @@ export function ConversationList({
                     })}
                   </div>
                 )}
-              </div>
+              </ScrollArea>
             ) : null}
           </div>
 
@@ -592,16 +613,18 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list" className="min-h-0 flex-1 overflow-y-auto pr-1 flex flex-col">
-                {dmTargets.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-6 px-2">
-                    <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                    <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
-                )}
-              </div>
+              <ScrollArea id="sidebar-direct-messages-list" className="min-h-0 flex-1">
+                <div className="flex flex-col">
+                  {dmTargets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-6 px-2">
+                      <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  )}
+                </div>
+              </ScrollArea>
             ) : null}
           </div>
         </div>
@@ -656,7 +679,7 @@ export function ConversationList({
               <div className="px-2 py-6 text-center text-xs text-muted-foreground">No channels yet</div>
             ) : (
               <div className="space-y-1">
-                {channels.map(ch => {
+                {channelsForDisplay.map(ch => {
                   const isActive = currentChannelSlug
                     ? String(ch.slug || '')
                         .trim()
@@ -669,6 +692,9 @@ export function ConversationList({
                   const cid = String(ch.conversationId || '')
                   const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
                   const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
+                  const reactionCount = Number((notifUnread as any)?.reactionUnreadByConversationId?.[cid] ?? 0) || 0
+                  const notifCount = mentionCount + reactionCount
+                  const hasNotifBadge = notifCount > 0
                   return (
                     <div key={ch.conversationId}>
                       <div
@@ -677,16 +703,13 @@ export function ConversationList({
                       >
                         <Icon
                           name="hash"
-                          weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
-                          className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
+                          weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
+                          className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p
-                              className={cn(
-                                'text-sm truncate',
-                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
-                              )}
+                              className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}
                             >
                               {label}
                             </p>
@@ -694,9 +717,9 @@ export function ConversationList({
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
                         </div>
-                        {mentionCount > 0 ? (
+                        {notifCount > 0 ? (
                           <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-                            {mentionCount > 99 ? '99+' : String(mentionCount)}
+                            {notifCount > 99 ? '99+' : String(notifCount)}
                           </span>
                         ) : null}
                       </div>
@@ -738,6 +761,8 @@ export function ConversationList({
                   const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
                   const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
                   const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+                  const reactionCount = Number(conversationId ? ((notifUnread as any)?.reactionUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+                  const notifCount = dmCount + reactionCount
                   return (
                     <div
                       key={t.key}
@@ -761,16 +786,18 @@ export function ConversationList({
                             className={cn(
                               'text-sm truncate',
                               // Match channel label styling
-                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+                              isActive ? 'text-primary font-medium' : hasUnread || notifCount > 0 ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                             )}
                           >
                             {label}
                           </p>
-                          {dmCount > 0 ? (
-                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-                              {dmCount > 99 ? '99+' : String(dmCount)}
-                            </span>
-                          ) : null}
+                          <div className="flex items-center gap-1">
+                            {notifCount > 0 ? (
+                              <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                {notifCount > 99 ? '99+' : String(notifCount)}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </div>

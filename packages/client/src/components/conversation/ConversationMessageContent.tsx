@@ -947,28 +947,6 @@ export function ConversationMessageContent({
     }
   }
 
-  const handleExportContent = () => {
-    try {
-      const messageText = extractMessageText()
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5) // Remove milliseconds and timezone
-      const filename = `message-${messageId.slice(0, 8)}-${timestamp}.md`
-
-      const blob = new Blob([messageText], { type: 'text/markdown' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-
-      toast.success('Message exported successfully')
-    } catch (error) {
-      toast.error('Failed to export message')
-    }
-  }
-
   const handleCopyCodeBlock = async (code: string, blockId: string) => {
     try {
       await navigator.clipboard.writeText(code)
@@ -1047,16 +1025,13 @@ export function ConversationMessageContent({
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
             {(enableCopy || extraActions) && (
-              <div className="pointer-events-none absolute bottom-0 right-0 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
+              <div className="pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   {extraActions}
                   {enableCopy && (
                     <>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
                         <Icon name="copy" className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                        <Icon name="download" className="h-4 w-4" />
                       </Button>
                     </>
                   )}

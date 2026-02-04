@@ -57,6 +57,8 @@ const map: Record<string, ResolvedIcon> = {
   chat: { type: 'phosphor', component: 'Chat' },
   // Thread / replies
   thread: { type: 'phosphor', component: 'Chats' },
+  // Emoji reactions
+  smiley: { type: 'phosphor', component: 'Smiley' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
   // Stop (square)
@@ -155,7 +157,7 @@ const map: Record<string, ResolvedIcon> = {
 
   // External/action affordances
   'external-link': { type: 'radix', component: 'ExternalLinkIcon' },
-  copy: { type: 'radix', component: 'CopyIcon' },
+  copy: { type: 'phosphor', component: 'CopySimple' },
   book: { type: 'phosphor', component: 'Book' },
   menu: { type: 'radix', component: 'HamburgerMenuIcon' },
   // Social

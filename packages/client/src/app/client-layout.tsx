@@ -10,9 +10,10 @@ import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHan
 import { NotificationSoundBootstrap } from '@/components/global/NotificationSoundBootstrap'
 
 import { motion } from 'motion/react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useUserStarships } from '@/hooks/useStarships'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -45,7 +46,10 @@ interface ClientLayoutProps {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  const { isAuthenticated } = useAuth()
+  const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
+  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
+  const primaryStarship = starships[0]
   const isDashboard = pathname === '/'
   const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
@@ -74,6 +78,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path === '/terms') return 'Terms of Service | Starships.ai'
       if (path === '/privacy') return 'Privacy Policy | Starships.ai'
       if (path === '/profile') return 'Profile | Starships.ai'
+      if (path === '/onboarding') return 'Set up your starship | Starships.ai'
       if (path.startsWith('/connectors/') && path.endsWith('/install')) return 'Connectors | Starships.ai'
 
       // Admin
@@ -138,6 +143,19 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => clearTimeout(t)
   }, [])
 
+  // Redirect already-logged-in users who haven't completed the wizard (e.g. existing users after migration).
+  // Wizard must run before the nav tour; we do not exempt marketplace so users always see the 5-step wizard first.
+  // Any flow that sends the user into the app (e.g. to /ship/...) must call wizard/complete and refetch auth first;
+  // see: onboarding (handleFinish, handleJoinWithInviteLink) and accept-invite page.
+  // Must run unconditionally (before any early return) to satisfy Rules of Hooks.
+  useEffect(() => {
+    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage) return
+    if (user.wizardOnboardingCompleted) return
+    if (starshipsLoading) return
+    if (!primaryStarship) return
+    router.replace('/onboarding')
+  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, starshipsLoading, primaryStarship, router])
+
   if (isPublicSimplePage) {
     // Public pages - no authentication required
     return (
@@ -146,6 +164,37 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <EmailChangeToastHandler />
         {children}
       </div>
+    )
+  }
+
+  // Profile page (create workspace / redirect) - full page, no sidebar, so new users
+  // never see the app chrome (e.g. Direct messages) while "Redirecting..." is shown.
+  if (pathname === '/profile') {
+    return (
+      <JwtAuthGate>
+        <StarTheme>
+          <NotificationSoundBootstrap />
+          <EmailChangeToastHandler />
+          <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
+            <main className="relative min-h-full w-full">{children}</main>
+          </div>
+        </StarTheme>
+      </JwtAuthGate>
+    )
+  }
+
+  // Wizard onboarding - full page, no sidebar (authenticated only via JwtAuthGate)
+  if (pathname === '/onboarding') {
+    return (
+      <JwtAuthGate>
+        <StarTheme>
+          <NotificationSoundBootstrap />
+          <EmailChangeToastHandler />
+          <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
+            <main className="relative min-h-full w-full">{children}</main>
+          </div>
+        </StarTheme>
+      </JwtAuthGate>
     )
   }
 

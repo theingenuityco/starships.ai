@@ -367,7 +367,19 @@ export function ConversationSummaryBar({
 
       return items.length > 0 ? items : participantItemsFromConversation
     }
-    const base = Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : participantItemsFromConversation
+    const rawOverride = Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : null
+    const dedupedOverride =
+      rawOverride != null
+        ? (() => {
+            const seen = new Set<string>()
+            return rawOverride.filter(p => {
+              if (seen.has(p.key)) return false
+              seen.add(p.key)
+              return true
+            })
+          })()
+        : null
+    const base = dedupedOverride != null && dedupedOverride.length > 0 ? dedupedOverride : participantItemsFromConversation
 
     const inferredFromParentDm = (() => {
       const items: ConversationParticipantItem[] = []

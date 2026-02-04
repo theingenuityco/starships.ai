@@ -252,6 +252,28 @@ export class UserService {
   }
 
   /**
+   * Mark wizard onboarding as completed
+   */
+  async markWizardOnboardingCompleted(userId: string): Promise<UserModel> {
+    const existingUser = await this.userRepository.findById(userId);
+    if (!existingUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    const updatedUser = await this.userRepository.update(userId, {
+      wizardOnboardingCompleted: true,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    logger.info('[UserService] Wizard onboarding marked as completed', { userId });
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
    * Authenticate user (for login)
    */
   async authenticateUser(email: string, password: string): Promise<UserModel | null> {
@@ -331,7 +353,9 @@ export class UserService {
       // Prefer most recently updated account with an avatar.
       const sorted = [...accounts].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       const avatar = sorted
-        .map((a) => (a.profileData && typeof (a.profileData as any).avatar === 'string' ? String((a.profileData as any).avatar).trim() : ''))
+        .map((a) =>
+          a.profileData && typeof (a.profileData as any).avatar === 'string' ? String((a.profileData as any).avatar).trim() : ''
+        )
         .find((v) => v.length > 0);
 
       if (avatar) {

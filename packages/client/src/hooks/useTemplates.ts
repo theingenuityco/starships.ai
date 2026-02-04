@@ -1,6 +1,7 @@
+import { useMemo } from 'react'
 import api from '@/lib/api'
 import type { AgentTemplateModel, ToolTemplateModel, ApiResponse } from '@starships/protocol'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -108,15 +109,46 @@ export function useRequiredConnectors(templateId: string, enabled: boolean = tru
   return useQuery({
     queryKey: TEMPLATE_QUERY_KEYS.agentTemplateRequiredConnectors(templateId),
     queryFn: async (): Promise<RequiredConnectorItem[]> => {
-      const response: FetchResponse<ApiResponse<{ requiredConnectors: RequiredConnectorItem[] }>> = await api.get(
-        `/api/v1/agent-templates/${templateId}/required-connectors`
-      )
+      const response: FetchResponse<ApiResponse<{ requiredConnectors: RequiredConnectorItem[] }>> = await api.get(`/api/v1/agent-templates/${templateId}/required-connectors`)
       return response.data.data?.requiredConnectors ?? []
     },
     enabled: !!templateId && enabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   })
+}
+
+/**
+ * Get required connectors for multiple agent templates, merged and deduplicated by provider.
+ * Used e.g. in onboarding to show only connectors needed by the agents the user added.
+ */
+export function useRequiredConnectorsForTemplates(templateIds: string[], enabled: boolean = true) {
+  const queries = useQueries({
+    queries: templateIds.map(id => ({
+      queryKey: TEMPLATE_QUERY_KEYS.agentTemplateRequiredConnectors(id),
+      queryFn: async (): Promise<RequiredConnectorItem[]> => {
+        const response: FetchResponse<ApiResponse<{ requiredConnectors: RequiredConnectorItem[] }>> = await api.get(`/api/v1/agent-templates/${id}/required-connectors`)
+        return response.data.data?.requiredConnectors ?? []
+      },
+      enabled: !!id && enabled,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+    })),
+  })
+  const data = useMemo(() => {
+    const byProvider = new Map<string, RequiredConnectorItem>()
+    for (const q of queries) {
+      const list = q.data ?? []
+      for (const item of list) {
+        if (item?.provider && !byProvider.has(item.provider)) {
+          byProvider.set(item.provider, item)
+        }
+      }
+    }
+    return Array.from(byProvider.values())
+  }, [queries])
+  const isLoading = queries.some(q => q.isLoading)
+  return { data, isLoading }
 }
 
 /**

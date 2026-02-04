@@ -3,32 +3,57 @@
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
-import type { CSSProperties } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 import { forwardRef, useEffect, useMemo, useState } from 'react'
 
-type EmojiMartData = unknown
+type EmojiMartData = Record<string, unknown>
+type CSSVars = CSSProperties & Partial<Record<`--${string}`, string>>
 
-type EmojiMartSelectEvent =
-  | {
-      native?: string
-      emoji?: string
-    }
-  | string
-  | null
-  | undefined
+type EmojiMartSet = 'native' | 'apple' | 'facebook' | 'google' | 'twitter'
+type EmojiMartTheme = 'auto' | 'light' | 'dark'
+type EmojiMartIcons = 'auto' | 'outline' | 'solid'
+type EmojiMartPreviewPosition = 'top' | 'bottom' | 'none'
+type EmojiMartNavPosition = 'top' | 'bottom' | 'none'
+type EmojiMartSearchPosition = 'sticky' | 'static' | 'none'
+type EmojiMartSkinTonePosition = 'preview' | 'search' | 'none'
+
+type EmojiMartEmojiSelectEvent = {
+  native?: string
+  emoji?: string
+  // allow extra fields from emoji-mart without `any`
+  [k: string]: unknown
+}
+
+type EmojiMartPickerProps = {
+  data: EmojiMartData
+  theme?: EmojiMartTheme
+  previewPosition?: EmojiMartPreviewPosition
+  skinTonePosition?: EmojiMartSkinTonePosition
+  dynamicWidth?: boolean
+  onEmojiSelect?: (emoji: EmojiMartEmojiSelectEvent) => void
+  set?: EmojiMartSet
+  emojiSize?: number
+  emojiButtonSize?: number
+  emojiButtonRadius?: string
+  perLine?: number
+  maxFrequentRows?: number
+  navPosition?: EmojiMartNavPosition
+  searchPosition?: EmojiMartSearchPosition
+  icons?: EmojiMartIcons
+  noCountryFlags?: boolean
+}
 
 // next/dynamic defaults to `ComponentType<{}>`; widen props so TS accepts picker props.
-const EmojiMartPicker = dynamic<any>(() => import('@emoji-mart/react').then(m => m.default as any), { ssr: false })
+const EmojiMartPicker = dynamic<EmojiMartPickerProps>(() => import('@emoji-mart/react').then(m => m.default as unknown as ComponentType<EmojiMartPickerProps>), { ssr: false })
 
 export const EmojiPicker = forwardRef<
   HTMLDivElement,
   {
     onEmojiSelect: (emoji: string) => void
-    height?: number
   } & React.HTMLAttributes<HTMLDivElement>
->(function EmojiPicker({ onEmojiSelect, className, height = 320, ...props }, ref) {
+>(function EmojiPicker({ onEmojiSelect, className, ...props }, ref) {
   const { resolvedTheme } = useTheme()
-  const theme = resolvedTheme === 'light' ? 'light' : 'dark'
+  const theme: EmojiMartTheme = resolvedTheme === 'light' ? 'light' : 'dark'
 
   const [data, setData] = useState<EmojiMartData | null>(null)
   const [rgbTokens, setRgbTokens] = useState<{ background: string; input: string; color: string } | null>(null)
@@ -110,8 +135,8 @@ export const EmojiPicker = forwardRef<
     let cancelled = false
     ;(async () => {
       try {
-        const mod: any = await import('@emoji-mart/data')
-        const next = (mod && (mod.default ?? mod)) as EmojiMartData
+        const mod = (await import('@emoji-mart/data')) as unknown as { default: EmojiMartData }
+        const next = mod?.default ?? null
         if (!cancelled) setData(next ?? null)
       } catch {
         if (!cancelled) setData(null)
@@ -123,15 +148,9 @@ export const EmojiPicker = forwardRef<
   }, [])
 
   const handleEmojiSelect = useMemo(() => {
-    return (ev: EmojiMartSelectEvent) => {
-      if (!ev) return
-      if (typeof ev === 'string') {
-        const e = ev.trim()
-        if (e) onEmojiSelect(e)
-        return
-      }
-      const native = typeof (ev as any)?.native === 'string' ? String((ev as any).native).trim() : ''
-      const emoji = typeof (ev as any)?.emoji === 'string' ? String((ev as any).emoji).trim() : ''
+    return (ev: EmojiMartEmojiSelectEvent) => {
+      const native = typeof ev?.native === 'string' ? ev.native.trim() : ''
+      const emoji = typeof ev?.emoji === 'string' ? ev.emoji.trim() : ''
       const out = native || emoji
       if (out) onEmojiSelect(out)
     }
@@ -142,31 +161,31 @@ export const EmojiPicker = forwardRef<
   // We map those to our existing shadcn tokens so the picker matches cards/popovers.
   const themeVars = useMemo(() => {
     const isLight = theme === 'light'
-    const vars: CSSProperties = {
+    const vars: CSSVars = {
       // Core colors
-      ['--rgb-background' as any]: rgbTokens?.background ?? (isLight ? '255, 255, 255' : '15, 15, 15'),
-      ['--rgb-color' as any]: rgbTokens?.color ?? (isLight ? '20, 20, 20' : '242, 242, 242'),
-      ['--rgb-input' as any]: rgbTokens?.input ?? (isLight ? '255, 255, 255' : '0, 0, 0'),
+      '--rgb-background': rgbTokens?.background ?? (isLight ? '255, 255, 255' : '15, 15, 15'),
+      '--rgb-color': rgbTokens?.color ?? (isLight ? '20, 20, 20' : '242, 242, 242'),
+      '--rgb-input': rgbTokens?.input ?? (isLight ? '255, 255, 255' : '0, 0, 0'),
       // Accent: use our existing RGB token if available
-      ['--rgb-accent' as any]: 'var(--primary-rgb)',
+      '--rgb-accent': 'var(--primary-rgb)',
 
       // Borders (Emoji Mart consumes these directly as colors, not rgb triples)
       // Emoji Mart uses `--em-color-border` as the *resting search input background*.
       // Set it to our input background so the search field matches shadcn `Input` styling.
       // (The focus style already uses `--em-rgb-input`.)
-      ['--color-border' as any]: 'rgb(var(--em-rgb-input))',
+      '--color-border': 'rgb(var(--em-rgb-input))',
       // Keep hover/over states aligned with our input border token.
-      ['--color-border-over' as any]: 'hsl(var(--input) / 1)',
+      '--color-border-over': 'hsl(var(--input) / 1)',
 
       // Geometry
-      ['--border-radius' as any]: '0.5rem', // matches `rounded-lg`
+      '--border-radius': '0.5rem', // matches `rounded-lg`
       // Avoid a second "component shadow" since Radix/popovers handle elevation in our UI.
-      ['--shadow' as any]: 'none',
+      '--shadow': 'none',
       // Typography
-      ['--font-family' as any]: fontFamily ?? 'inherit',
+      '--font-family': fontFamily ?? 'inherit',
       // Emoji Mart uses `calc(var(--font-size) - 1px)` for the search input.
       // Set to 15px so the search text lands at 14px (matches our `Input` / `text-sm`).
-      ['--font-size' as any]: '15px',
+      '--font-size': '15px',
     }
     return vars
   }, [fontFamily, rgbTokens, theme])
@@ -179,7 +198,7 @@ export const EmojiPicker = forwardRef<
           'inline-flex items-center justify-center text-xs text-muted-foreground overflow-hidden rounded-lg bg-card ring-1 ring-border/60 dark:ring-border shadow-md',
           className
         )}
-        style={{ height, ...(themeVars as any), ...(props.style ?? {}) }}
+        style={{ ...themeVars, ...(props.style ?? {}) }}
         {...props}
       >
         Loading emojis…
@@ -193,16 +212,16 @@ export const EmojiPicker = forwardRef<
     <div
       ref={ref}
       className={cn('inline-block overflow-hidden rounded-lg bg-card text-popover-foreground ring-1 ring-border/60 dark:ring-border shadow-md', className)}
-      style={{ ...(themeVars as any), ...(styleProp ?? {}) }}
+      style={{ ...themeVars, ...(styleProp ?? {}) }}
       {...restProps}
     >
       <EmojiMartPicker
-        data={data as any}
+        data={data}
         theme={theme}
         previewPosition="none"
         skinTonePosition="search"
         dynamicWidth={false}
-        onEmojiSelect={handleEmojiSelect as any}
+        onEmojiSelect={handleEmojiSelect}
         // Sizing / density
         set="native"
         emojiSize={20}
@@ -215,7 +234,6 @@ export const EmojiPicker = forwardRef<
         // Match our popover vibe a bit (emoji-mart uses inline styles)
         icons="auto"
         noCountryFlags={false}
-        height={height}
       />
     </div>
   )

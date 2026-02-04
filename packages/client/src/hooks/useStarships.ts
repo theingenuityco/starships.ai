@@ -117,10 +117,31 @@ export function useCreateStarship() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to create starship', {
         description: errorMessage,
       })
+    },
+  })
+}
+
+/**
+ * Ensure the current user has at least one starship (creates default if none).
+ * Used on /profile when user has no starships; invite-joiners never need this.
+ */
+export function useEnsureDefaultStarship() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (): Promise<StarshipModel> => {
+      const response: FetchResponse<ApiResponse<{ starship: StarshipModel }>> = await api.post('/api/v1/users/me/ensure-default-starship')
+      return response.data.data.starship
+    },
+    onSuccess: starship => {
+      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.byOwner(starship.ownerId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to create workspace', { description: getSafeErrorMessage(error) })
     },
   })
 }
@@ -151,7 +172,7 @@ export function useUpdateStarship() {
       })
     },
     onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to update starship', {
         description: errorMessage,
       })
@@ -208,7 +229,7 @@ export function useDeleteStarship() {
         })
       }
 
-      const errorMessage = getSafeErrorMessage(error);
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to delete starship', {
         description: errorMessage,
       })

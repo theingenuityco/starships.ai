@@ -49,9 +49,9 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
   const previewUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
-    <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
+    <div className="relative flex-shrink-0">
+      <Avatar className="h-8 w-8 rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={32} rounded />
       </Avatar>
       <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
     </div>
@@ -62,10 +62,10 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
   const hasPresence = typeof online === 'boolean'
   return (
-    <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+    <div className="relative flex-shrink-0">
+      <Avatar className="h-8 w-8 rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
@@ -193,61 +193,26 @@ export function ConversationList({
           (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
         : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
 
-    const conversationId =
-      t.kind === 'agent'
-        ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '')
-        : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
+    const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
     const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-    const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+    const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
 
     return (
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
-          isActive
-            ? 'text-primary bg-primary/10 border-transparent'
-            : hasUnread
-              ? 'text-foreground border-transparent hover:bg-muted'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
+          'group relative rounded-lg flex items-center gap-3 w-full min-h-[40px] cursor-pointer px-3 py-2 border border-transparent transition-colors',
+          isActive ? 'text-primary bg-primary/10' : hasUnread ? 'text-foreground hover:bg-muted/50' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
           isBusy && 'opacity-70 pointer-events-none'
         )}
-        style={{
-          justifyContent: 'flex-start',
-          transition: 'background-color 0.15s ease',
-          cursor: 'pointer',
-          minHeight: '32px',
-        }}
         onClick={() => handleDmTargetClick(t)}
       >
-        <div
-          className="flex-shrink-0"
-          style={{
-            width: '1.25rem',
-            height: '1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: 0,
-            pointerEvents: 'none',
-          }}
-        >
-          {t.kind === 'agent' ? (
-            <DirectMessageAvatar starshipId={starshipId} agent={t.agent} />
-          ) : (
-            <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
-          )}
-        </div>
-        <span
-          className={cn(
-            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
-          )}
-        >
+        {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />}
+        <span className={cn('truncate min-w-0 flex-1 text-[13px]', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground font-medium')}>
           {label}
         </span>
         {dmCount > 0 ? (
-          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+          <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
             {dmCount > 99 ? '99+' : String(dmCount)}
           </span>
         ) : null}
@@ -514,20 +479,13 @@ export function ConversationList({
                               <Icon
                                 name="hash"
                                 weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
-                                className={cn(
-                                  'h-4 w-4',
-                                  isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground'
-                                )}
+                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
                               />
                             </div>
                             <span
                               className={cn(
                                 'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
                               {label}
@@ -595,7 +553,7 @@ export function ConversationList({
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-0.5">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}
@@ -668,11 +626,7 @@ export function ConversationList({
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn(
-                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                          'hover:bg-muted/50',
-                          isActive && 'bg-muted/70 shadow-sm'
-                        )}
+                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
                         <Icon
@@ -685,11 +639,7 @@ export function ConversationList({
                             <p
                               className={cn(
                                 'text-sm truncate',
-                                isActive
-                                  ? 'text-primary font-medium'
-                                  : hasUnread || mentionCount > 0
-                                    ? 'text-foreground font-bold'
-                                    : 'text-muted-foreground font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || mentionCount > 0 ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                               )}
                             >
                               {label}
@@ -730,7 +680,7 @@ export function ConversationList({
             ) : dmTargets.length === 0 ? (
               <div className="px-2 py-6 text-center text-xs text-muted-foreground">No one to message yet</div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {dmTargets.map(t => {
                   const isBusy = directMessagesLoading
                   const label = t.label
@@ -739,15 +689,14 @@ export function ConversationList({
                       ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
                         (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
                       : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
-                  const conversationId =
-                    t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
+                  const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(t.agent.id) || '') : String(existingDmConversationIdByPeerUserId.get(t.user.userId) || '')
                   const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-                  const dmCount = Number(conversationId ? notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0 : 0) || 0
+                  const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
                   return (
                     <div
                       key={t.key}
                       className={cn(
-                        'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
+                        'group flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer transition-all min-h-[48px]',
                         'hover:bg-muted/50',
                         isActive && 'bg-primary/10 text-primary',
                         !isActive && hasUnread && 'text-foreground',
@@ -761,17 +710,12 @@ export function ConversationList({
                         <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1 gap-2">
-                          <p
-                            className={cn(
-                              'text-sm truncate',
-                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
-                            )}
-                          >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={cn('text-[13px] truncate font-medium leading-snug', isActive ? 'text-primary' : hasUnread ? 'text-foreground font-semibold' : 'text-muted-foreground')}>
                             {label}
                           </p>
                           {dmCount > 0 ? (
-                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                               {dmCount > 99 ? '99+' : String(dmCount)}
                             </span>
                           ) : null}

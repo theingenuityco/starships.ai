@@ -57,6 +57,8 @@ const map: Record<string, ResolvedIcon> = {
   chat: { type: 'phosphor', component: 'Chat' },
   // Thread / replies
   thread: { type: 'phosphor', component: 'Chats' },
+  // Emoji reactions
+  smiley: { type: 'phosphor', component: 'Smiley' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
   // Stop (square)

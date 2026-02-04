@@ -589,7 +589,14 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
       const data = (resp as any).data?.data as any
       return {
         notifications: (data?.notifications as NotificationModel[]) ?? [],
-        unread: (data?.unread as UnreadSummary) ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} },
+        unread:
+          (data?.unread as UnreadSummary) ??
+          ({
+            totalUnread: 0,
+            dmUnreadByConversationId: {},
+            mentionUnreadByConversationId: {},
+            reactionUnreadByConversationId: {},
+          } as UnreadSummary),
       }
     },
   })

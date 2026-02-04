@@ -1,10 +1,6 @@
-import { connection } from 'next/server'
-import PwaClient from './pwa-client'
+import { PwaWrapper } from '@/components/pwa-wrapper'
 
-export default async function PwaPage() {
-  await connection()
-  const publicKey = process.env.VAPID_PUBLIC_KEY ?? null
-
+export default function PwaPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 px-6 py-10">
       <header className="space-y-2">
@@ -13,7 +9,7 @@ export default async function PwaPage() {
           Manage installation and push notification settings for the Starships.ai PWA.
         </p>
       </header>
-      <PwaClient publicKey={publicKey} />
+      <PwaWrapper />
     </div>
   )
 }

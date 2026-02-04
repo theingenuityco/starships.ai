@@ -381,9 +381,28 @@ export class ConversationRepository extends BaseRepository {
         const direction = orderDirection.toUpperCase();
 
         const result = await connection.query<Record<string, unknown>>(
-          `SELECT * FROM messages
-           WHERE conversation_id = $1
-           ORDER BY created_at ${direction}`,
+          `
+          SELECT
+            m.*,
+            COALESCE(r.reactions, '{}'::jsonb) AS reactions
+          FROM messages m
+          LEFT JOIN (
+            SELECT
+              message_id,
+              jsonb_object_agg(emoji, user_ids) AS reactions
+            FROM (
+              SELECT
+                message_id,
+                emoji,
+                jsonb_agg(user_id ORDER BY created_at ASC) AS user_ids
+              FROM message_reactions
+              GROUP BY message_id, emoji
+            ) per_emoji
+            GROUP BY message_id
+          ) r ON r.message_id = m.id
+          WHERE m.conversation_id = $1
+          ORDER BY m.created_at ${direction}
+          `,
           [conversationId]
         );
 
@@ -418,22 +437,68 @@ export class ConversationRepository extends BaseRepository {
         const rows = await connection.query<Record<string, unknown>>(
           useCursor
             ? `
-              SELECT *
-              FROM messages
-              WHERE conversation_id = $1
-                AND (
-                  created_at < $2::timestamptz
-                  OR (created_at = $2::timestamptz AND id < $3::text)
-                )
-              ORDER BY created_at DESC, id DESC
-              LIMIT $4
+              WITH page AS (
+                SELECT *
+                FROM messages
+                WHERE conversation_id = $1
+                  AND (
+                    created_at < $2::timestamptz
+                    OR (created_at = $2::timestamptz AND id < $3::text)
+                  )
+                ORDER BY created_at DESC, id DESC
+                LIMIT $4
+              ),
+              reactions_by_message AS (
+                SELECT
+                  message_id,
+                  jsonb_object_agg(emoji, user_ids) AS reactions
+                FROM (
+                  SELECT
+                    message_id,
+                    emoji,
+                    jsonb_agg(user_id ORDER BY created_at ASC) AS user_ids
+                  FROM message_reactions
+                  WHERE message_id IN (SELECT id FROM page)
+                  GROUP BY message_id, emoji
+                ) per_emoji
+                GROUP BY message_id
+              )
+              SELECT
+                page.*,
+                COALESCE(reactions_by_message.reactions, '{}'::jsonb) AS reactions
+              FROM page
+              LEFT JOIN reactions_by_message ON reactions_by_message.message_id = page.id
+              ORDER BY page.created_at DESC, page.id DESC
             `
             : `
-              SELECT *
-              FROM messages
-              WHERE conversation_id = $1
-              ORDER BY created_at DESC, id DESC
-              LIMIT $2
+              WITH page AS (
+                SELECT *
+                FROM messages
+                WHERE conversation_id = $1
+                ORDER BY created_at DESC, id DESC
+                LIMIT $2
+              ),
+              reactions_by_message AS (
+                SELECT
+                  message_id,
+                  jsonb_object_agg(emoji, user_ids) AS reactions
+                FROM (
+                  SELECT
+                    message_id,
+                    emoji,
+                    jsonb_agg(user_id ORDER BY created_at ASC) AS user_ids
+                  FROM message_reactions
+                  WHERE message_id IN (SELECT id FROM page)
+                  GROUP BY message_id, emoji
+                ) per_emoji
+                GROUP BY message_id
+              )
+              SELECT
+                page.*,
+                COALESCE(reactions_by_message.reactions, '{}'::jsonb) AS reactions
+              FROM page
+              LEFT JOIN reactions_by_message ON reactions_by_message.message_id = page.id
+              ORDER BY page.created_at DESC, page.id DESC
             `,
           useCursor ? [args.conversationId, args.beforeCreatedAt, args.beforeId, pageSize] : [args.conversationId, pageSize]
         );

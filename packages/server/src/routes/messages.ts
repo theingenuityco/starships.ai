@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MessageService } from '@/services/MessageService';
 import { ConversationService } from '@/services/ConversationService';
+import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
@@ -9,7 +10,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
-import { ConversationParticipantRepository } from '@starships/models';
+import { ConversationParticipantRepository, MessageReactionRepository } from '@starships/models';
 
 const router: Router = Router();
 
@@ -38,6 +39,10 @@ const CreateMessageSchema = z.object({
 });
 
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });
+
+const ToggleReactionSchema = z.object({
+  emoji: z.string().min(1, 'emoji is required').max(32, 'emoji too long'),
+});
 
 // Helper function for authentication check
 const checkAuth = (req: Request, res: Response): boolean => {
@@ -232,6 +237,96 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     sendSuccess(res, updatedMessage, 200);
   } catch (error) {
     handleError(error, res, 'updating message');
+  }
+});
+
+/**
+ * POST /messages/:messageId/reactions - Toggle an emoji reaction on a message
+ */
+router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const authUserId = req.user?.id as string;
+
+    const paramValidation = validateData(z.object({ messageId: IdSchema }), req.params, res, 'message parameter');
+    if (!paramValidation) return;
+    const bodyValidation = validateData(ToggleReactionSchema, req.body, res, 'toggle reaction data');
+    if (!bodyValidation) return;
+
+    const { messageId } = paramValidation;
+    const emoji = String(bodyValidation.emoji || '').trim();
+    if (!emoji) {
+      sendError(res, 'VALIDATION_ERROR', 'emoji is required', 400, { field: 'emoji' });
+      return;
+    }
+
+    // Load the message so we can enforce access and locate the conversation stream.
+    const messageService = new MessageService();
+    const message = await messageService.getMessage(messageId);
+    if (!message) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, { resource: 'message', id: messageId });
+      return;
+    }
+
+    const conversationId =
+      typeof (message as any)?.conversationId === 'string'
+        ? String((message as any).conversationId).trim()
+        : typeof (message as any)?.conversation_id === 'string'
+          ? String((message as any).conversation_id).trim()
+          : '';
+    const starshipId =
+      typeof (message as any)?.starshipId === 'string'
+        ? String((message as any).starshipId).trim()
+        : typeof (message as any)?.starship_id === 'string'
+          ? String((message as any).starship_id).trim()
+          : '';
+
+    if (!conversationId || !starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
+      return;
+    }
+
+    // Authorization: verify user has access to the starship + is a member of restricted conversations.
+    if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+
+    const reactionRepo = new MessageReactionRepository();
+    await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
+    const reactions = await reactionRepo.getAggregatedReactions(messageId);
+
+    // Publish realtime update so all connected clients update without refresh.
+    try {
+      const bus = ConversationStreamBus.getInstance();
+      await bus.publish(conversationId, {
+        type: 'message.reactions',
+        data: { conversationId, messageId, reactions },
+      });
+    } catch {
+      /* best-effort: persist succeeded even if streaming publish fails */
+    }
+
+    sendSuccess(res, { messageId, reactions }, 200);
+  } catch (error) {
+    handleError(error, res, 'toggling message reaction');
   }
 });
 

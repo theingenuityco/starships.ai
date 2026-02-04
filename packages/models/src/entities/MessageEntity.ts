@@ -13,6 +13,7 @@ import {
   IsEnum,
   IsISO8601,
   IsInt,
+  IsObject,
   IsString,
   Length,
   MinLength,
@@ -139,6 +140,17 @@ export class MessageEntity implements MessageModel {
   @IsArray()
   @IsString({ each: true })
   attachmentIds?: string[];
+
+  /**
+   * Emoji reactions keyed by emoji (value is ordered userId list).
+   *
+   * NOTE: This is derived (joined/aggregated) at query time and is NOT written directly
+   * by MessageRepository create/upsert paths.
+   */
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  reactions?: Record<string, string[]>;
 
   /**
    * Optional link target conversation (index/preview posts).

@@ -33,6 +33,8 @@ import { useModelContextLength } from '@/hooks/useLlmModels'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { Skeleton } from '@/components/ui/skeleton'
+import { MessageReactions } from './MessageReactions'
+import { MessageReactionAction } from './MessageReactionAction'
 
 type TurnUsageForRing = {
   turnId: string
@@ -1947,6 +1949,7 @@ export function ConversationMessageList({
                       >
                         <MemoizedMessageBubble
                           message={message}
+                          conversationId={conversationId}
                           agentName={assistant?.displayName}
                           agentSlug={assistant?.slug}
                           starshipSlug={starshipSlug}
@@ -2142,6 +2145,8 @@ interface ExtendedMessage extends MessageModel {
 
 interface ConversationMessageBubbleProps {
   message: ExtendedMessage
+  /** Parent conversation id (required for reaction toggles + optimistic cache patching). */
+  conversationId: string | null
   agentName?: string
   agentSlug?: string
   starshipSlug?: string
@@ -2313,6 +2318,7 @@ function extractWidgetResults(uiActions: unknown): WidgetResult[] {
 const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
     message,
+    conversationId,
     agentName,
     agentSlug,
     starshipSlug,
@@ -2359,6 +2365,7 @@ const MemoizedMessageBubble = memo(
     const isUser = message.role === 'user'
     const { userId: authUserId } = useAuth()
     const sid = typeof starshipId === 'string' ? starshipId : ''
+    const cid = typeof conversationId === 'string' ? conversationId : ''
     const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
     const memberByUserId = useMemo(() => {
       const list = Array.isArray((membersData as any)?.members) ? (((membersData as any).members as any[]) ?? []) : []
@@ -2431,6 +2438,25 @@ const MemoizedMessageBubble = memo(
         </Button>
       )
     }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
+
+    const reactionActionButton = useMemo(() => {
+      const id = typeof message.id === 'string' ? message.id : ''
+      if (!id) return null
+      // Only for persisted messages in a real conversation.
+      if (!cid) return null
+      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      return <MessageReactionAction conversationId={cid} messageId={id} />
+    }, [cid, message.id])
+
+    const messageActionNodes = useMemo(() => {
+      if (!threadActionButton && !reactionActionButton) return null
+      return (
+        <>
+          {threadActionButton}
+          {reactionActionButton}
+        </>
+      )
+    }, [reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2647,7 +2673,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={true}
-                extraActions={threadActionButton}
+                extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={false}
                 // Always compact (no "normal" padding mode).
@@ -2666,6 +2692,15 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                <MessageReactions
+                  conversationId={cid}
+                  starshipId={starshipId}
+                  messageId={message.id}
+                  reactions={(message as any)?.reactions}
+                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                />
+              )}
               {!suppressLinkedConversationCard && (
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
@@ -2747,7 +2782,7 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive}
-                  extraActions={null}
+                  extraActions={messageActionNodes}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
@@ -2767,6 +2802,15 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
+                {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                  <MessageReactions
+                    conversationId={cid}
+                    starshipId={starshipId}
+                    messageId={message.id}
+                    reactions={(message as any)?.reactions}
+                    disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                  />
+                )}
                 {!suppressLinkedConversationCard && (
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
@@ -2851,7 +2895,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive}
-                extraActions={threadActionButton}
+                extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
@@ -2870,6 +2914,15 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                <MessageReactions
+                  conversationId={cid}
+                  starshipId={starshipId}
+                  messageId={message.id}
+                  reactions={(message as any)?.reactions}
+                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                />
+              )}
               {!suppressLinkedConversationCard && (
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}

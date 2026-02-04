@@ -2947,6 +2947,14 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    // Re-render when reactions change (otherwise pills update only when unrelated props change, e.g. presence).
+    {
+      const prevRx = (prevProps.message as any)?.reactions
+      const nextRx = (nextProps.message as any)?.reactions
+      if (prevRx !== nextRx) {
+        return false
+      }
+    }
     // Re-render when expert mode toggles, since it affects avatar ring visibility.
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     // Presence and busy indicators are independent of message content.

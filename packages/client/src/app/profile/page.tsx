@@ -42,11 +42,7 @@ export default function ProfilePage(): React.JSX.Element {
 
   // Loading or creating workspace
   if (authLoading || starshipsLoading || (starships?.length === 0 && ensureDefault.isPending)) {
-    return (
-      <AuthLoadingScreen
-        message={starships?.length === 0 && ensureDefault.isPending ? 'Creating your workspace...' : 'Loading your profile...'}
-      />
-    )
+    return <AuthLoadingScreen message={starships?.length === 0 && ensureDefault.isPending ? 'Creating your workspace...' : 'Loading your profile...'} />
   }
 
   // Waiting for redirect after ensure (avoid flash of "no starships" message)

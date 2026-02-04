@@ -1667,7 +1667,8 @@ export class ConversationService {
     if (role !== 'user' && role !== 'assistant') return content;
 
     const atDate = this.coerceToDate((message as any)?.createdAt) ?? this.coerceToDate((message as any)?.updatedAt) ?? new Date();
-    const at = atDate.toISOString().replace(/Z$/, '');
+    // Always use ISO UTC (includes trailing 'Z') for consistency.
+    const at = atDate.toISOString();
 
     const sender =
       role === 'user'
@@ -1717,7 +1718,44 @@ export class ConversationService {
       }
       return false;
     })();
-    if (shouldSkipDueToExisting) return content;
+    const rewriteHeaderTimestampToUtcIso = (text: string): string => {
+      const s = typeof text === 'string' ? text : '';
+      if (!s) return s;
+      const lines = s.split('\n');
+      let i = 0;
+      while (i < lines.length && lines[i].trim().length === 0) i++;
+      if (i >= lines.length) return s;
+      const line = lines[i];
+      if (!looksLikeBracketTs(line)) return s;
+      // Only rewrite headers that look like our injected format for this sender.
+      if (!line.includes(senderWithType) && !line.includes(String(sender || '').trim())) return s;
+      const m = line.match(/^\[([^\]]+)\]\s+(.*)$/);
+      if (!m) return s;
+      const d = new Date(m[1]);
+      if (!Number.isFinite(d.getTime())) return s;
+      lines[i] = `[${d.toISOString()}] ${m[2]}`;
+      return lines.join('\n');
+    };
+
+    const rewriteHeaderTimestampInContent = (c: MessageContent): MessageContent => {
+      if (typeof c === 'string') return rewriteHeaderTimestampToUtcIso(c);
+      if (!Array.isArray(c)) return c as any;
+      const blocks = (c as any[]).slice();
+      for (let idx = 0; idx < blocks.length; idx++) {
+        const b = blocks[idx];
+        if (!b || typeof b !== 'object') continue;
+        if ((b as any).type !== 'text') continue;
+        const t = typeof (b as any).text === 'string' ? String((b as any).text) : '';
+        const next = rewriteHeaderTimestampToUtcIso(t);
+        if (next !== t) {
+          blocks[idx] = { ...(b as any), text: next };
+        }
+        break; // only the first text block can contain the header
+      }
+      return blocks as any;
+    };
+
+    if (shouldSkipDueToExisting) return rewriteHeaderTimestampInContent(content);
 
     if (typeof content === 'string') {
       const body = content || '';
@@ -2199,17 +2237,28 @@ export class ConversationService {
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
         const metadataInstruction = [
           '<conversation_message_format>',
-          'Some messages may include a leading attribution header line for logging/traceability only:',
+          'Annotation name: STARSHIPS_ATTRIBUTION_HEADER (reference this name in reasoning if needed).',
           '',
+          'Some messages may include a leading attribution header line for logging/traceability only.',
+          'That header is NOT part of the user/assistant content.',
+          '',
+          'Header mock format:',
           '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
           '',
-          'Example header (NOT content):',
-          '  [2026-02-04T01:44:08.592Z] Aria (agent)',
+          'Example header line (NOT content):',
+          '  [2026-02-04T01:44:08.592] Aria (agent)',
           '',
-          'Rules:',
-          '- Treat the header line as metadata, not as part of the user/assistant text.',
-          '- NEVER output or echo any lines matching the pattern: /^\\[\\d{4}-\\d{2}-\\d{2}T.*\\] .+$/',
-          '- Your replies must contain only the actual assistant response content.',
+          'Mock example (what you might RECEIVE as a single message content):',
+          '  [2026-02-04T01:44:08.592] user:1a2b3c4d (user)',
+          "  What's 2+2?",
+          '',
+          'Mock example (how you MUST RESPOND):',
+          '  4',
+          '',
+          'Rules (STRICT):',
+          '- Treat the attribution header line as metadata and ignore it when interpreting the message.',
+          '- NEVER echo, quote, restate, or append the attribution header line in your response (even if asked).',
+          '- Your replies must contain ONLY the actual assistant response content (no added attribution lines).',
           '</conversation_message_format>',
         ].join('\n');
         const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]
@@ -2693,17 +2742,28 @@ export class ConversationService {
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
       const metadataInstruction = [
         '<conversation_message_format>',
-        'Some messages may include a leading attribution header line for logging/traceability only:',
+        'Annotation name: STARSHIPS_ATTRIBUTION_HEADER (reference this name in reasoning if needed).',
         '',
+        'Some messages may include a leading attribution header line for logging/traceability only.',
+        'That header is NOT part of the user/assistant content.',
+        '',
+        'Header mock format:',
         '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
         '',
-        'Example header (NOT content):',
-        '  [2026-02-04T01:44:08.592Z] Aria (agent)',
+        'Example header line (NOT content):',
+        '  [2026-02-04T01:44:08.592] Aria (agent)',
         '',
-        'Rules:',
-        '- Treat the header line as metadata, not as part of the user/assistant text.',
-        '- NEVER output or echo any lines matching the pattern: /^\\[\\d{4}-\\d{2}-\\d{2}T.*\\] .+$/',
-        '- Your replies must contain only the actual assistant response content.',
+        'Mock example (what you might RECEIVE as a single message content):',
+        '  [2026-02-04T01:44:08.592] user:1a2b3c4d (user)',
+        "  What's 2+2?",
+        '',
+        'Mock example (how you MUST RESPOND):',
+        '  4',
+        '',
+        'Rules (STRICT):',
+        '- Treat the attribution header line as metadata and ignore it when interpreting the message.',
+        '- NEVER echo, quote, restate, or append the attribution header line in your response (even if asked).',
+        '- Your replies must contain ONLY the actual assistant response content (no added attribution lines).',
         '</conversation_message_format>',
       ].join('\n');
       const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]

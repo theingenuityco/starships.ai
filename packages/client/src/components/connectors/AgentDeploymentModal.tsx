@@ -26,7 +26,7 @@ export function AgentDeploymentModal({ open, onOpenChange, agentName, agentRole,
   const handleLater = () => {
     onOpenChange(false)
     // Navigate to chat with this agent
-    router.push(`/ship/${starshipSlug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+    router.push(`/ship/${starshipSlug}/dm/${encodeURIComponent(`a:${agentId}`)}`)
   }
 
   const handleContinue = () => {

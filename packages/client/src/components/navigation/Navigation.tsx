@@ -117,7 +117,7 @@ export function Navigation(props: NavigationProps) {
       }
       // If we're in a specific conversation, don't carry the conversationId across starships.
       // It may not exist / be accessible in the destination starship.
-      if (p.includes('/conversations/') || p.includes('/channels/')) {
+      if (p.includes('/conversations/') || p.includes('/channels/') || p.includes('/dm/')) {
         return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
@@ -417,13 +417,7 @@ export function Navigation(props: NavigationProps) {
             }}
           >
             <div className="flex flex-col space-y-0 w-full px-2">
-              <NavigationSection
-                title="Navigation"
-                items={mainNavigationItems}
-                pathname={pathname}
-                expanded={isExpanded}
-                onItemClick={isMobile && onClose ? onClose : undefined}
-              />
+              <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
               <div className="mt-5 mb-2 border-t border-border/60" />
             </div>
@@ -440,9 +434,7 @@ export function Navigation(props: NavigationProps) {
                   compact={true}
                   onboardingChannelsAnchorRef={channelsRef}
                   onboardingDirectMessagesAnchorRef={directMessagesRef}
-                  onboardingHighlight={
-                    currentStepInfo?.label === 'Channels' ? 'channels' : currentStepInfo?.label === 'Direct messages' ? 'directMessages' : null
-                  }
+                  onboardingHighlight={currentStepInfo?.label === 'Channels' ? 'channels' : currentStepInfo?.label === 'Direct messages' ? 'directMessages' : null}
                   onConversationSelect={() => {
                     if (isMobile && onClose) onClose()
                   }}

@@ -74,18 +74,23 @@ export class DirectMessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         // Membership-based listing (authoritative), regardless of dm_type.
+        //
+        // IMPORTANT:
+        // DM access control is enforced via `conversation_participants` (see enforceDirectMessageMembership).
+        // Using `conversation_members` here can omit legitimate DMs (and causes `/dm/<peer>` to mis-resolve as "draft").
         const rows = await connection.query<Record<string, unknown>>(
           `
           SELECT dm.*
             FROM direct_messages dm
-            INNER JOIN conversation_members cm
-              ON cm.conversation_id = dm.conversation_id
+            INNER JOIN conversation_participants cp
+              ON cp.conversation_id = dm.conversation_id
            WHERE dm.starship_id = $1
-             AND cm.user_id = $2
+             AND cp.user_id = $2
            ORDER BY dm.updated_at DESC
           `,
           [starshipId, userId]
         );
+
         return fromDatabaseArray(DirectMessageEntity, rows);
       },
       'listByStarshipForUser',

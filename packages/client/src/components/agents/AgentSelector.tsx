@@ -241,7 +241,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   const handleChatWithAgent = async (agent: AgentModel) => {
     // Do not pre-create a conversation; navigate to fresh-start with agent preselected
     try {
-      router.push(`/ship/${starshipSlug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agent.id)}`)
+      router.push(`/ship/${starshipSlug}/dm/${encodeURIComponent(`a:${agent.id}`)}`)
     } catch (error) {
       console.error('Failed to navigate to conversation:', error)
       setError('Failed to open chat with agent')

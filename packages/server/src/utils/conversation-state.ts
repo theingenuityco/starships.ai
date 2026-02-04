@@ -104,8 +104,23 @@ export function extractPersistableState(executionState: Record<string, unknown> 
 
   // Persist most execution state to conversation.state, but keep certain keys ephemeral
   // (per-turn/per-request) so they don't "stick" across turns.
-  // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be persisted from execution state
-  const blacklist = new Set(['messages', 'tools', 'modalities', 'imageConfig', 'plugins']);
+  //
+  // IMPORTANT:
+  // - Plugins are conversation-level only (controlled by UI toggle) and should NEVER be persisted from execution state.
+  // - LLM runtime config (model/temperature/maxTokens/timeout/reasoning) should be sourced from the active agent config,
+  //   not from conversation state. Persisting these creates "sticky" overrides across turns and agents.
+  const blacklist = new Set([
+    'messages',
+    'tools',
+    'modalities',
+    'imageConfig',
+    'plugins',
+    'model',
+    'temperature',
+    'maxTokens',
+    'timeout',
+    'reasoning',
+  ]);
 
   // Blacklist: Store everything except messages, tools, and plugins
   // Plugins are managed exclusively via conversation state updates (UI toggle), not from execution state

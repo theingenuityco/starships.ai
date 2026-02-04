@@ -29,12 +29,6 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
   // Memoize agents array to prevent unnecessary rerenders
   const agents = useMemo(() => agentsData, [agentsData])
 
-  const defaultAgent = useMemo(() => {
-    if (!Array.isArray(agents) || agents.length === 0) return null
-    const aria = agents.find(a => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
-    return aria ?? agents[0] ?? null
-  }, [agents])
-
   const avatarAttachmentIds = useMemo(() => {
     const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
     return Array.from(new Set(ids))
@@ -49,13 +43,6 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
     }
     return map
   }, [avatarAttachments])
-
-  // Auto-select default agent (prefer aria*) when agents are loaded
-  useEffect(() => {
-    if (!loading && !selectedAgent && defaultAgent) {
-      onAgentChange(defaultAgent)
-    }
-  }, [defaultAgent, loading, selectedAgent, onAgentChange])
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>

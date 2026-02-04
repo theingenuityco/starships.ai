@@ -16,7 +16,9 @@ export interface InvokeBedrockOptions {
   signal?: AbortSignal;
 }
 
-const redactPresignedUrlForLogs = (raw: string): {
+const redactPresignedUrlForLogs = (
+  raw: string
+): {
   kind: 's3_https' | 'other';
   bucket?: string;
   key?: string;
@@ -59,7 +61,9 @@ export async function invokeBedrock(
   // Extract reasoning config
   const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
   const reasoningRec =
-    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg) ? (reasoningCfg as Record<string, unknown>) : undefined;
+    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg)
+      ? (reasoningCfg as Record<string, unknown>)
+      : undefined;
   const reasoningEnabled = reasoningRec?.enabled === true && reasoningRec?.exclude !== true;
   const computeThinkingBudgetTokens = (): number => {
     if (!reasoningEnabled) return 0;
@@ -74,7 +78,8 @@ export async function invokeBedrock(
             ? 2048
             : 1024; // default/medium
 
-    const maxTokens = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
+    const maxTokens =
+      typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
     // Bedrock/Claude requires maxTokens > budget_tokens, so clamp conservatively.
     if (typeof maxTokens === 'number') {
       if (maxTokens <= 1) {
@@ -94,14 +99,13 @@ export async function invokeBedrock(
 
   const rawMessages = request.messages as OpenAI.Chat.ChatCompletionMessageParam[];
 
-  // Claude extended thinking requires that any prior assistant turns include the provider-issued
-  // thinking/reasoning blocks (including signatures) exactly as returned. We currently do not
-  // persist those provider-native blocks, so enabling thinking on multi-turn conversations
-  // will fail Bedrock validation. Only enable thinking when there is no assistant history.
+  // Claude extended thinking may require that prior assistant turns include provider-issued
+  // thinking/reasoning blocks (including signatures) exactly as returned.
+  // We currently do not persist those provider-native blocks. Historically we disabled thinking
+  // when assistant history existed; however, this can prevent thinking entirely in normal chats.
+  // We now allow thinking even with assistant history, and rely on runtime validation to confirm
+  // whether Bedrock accepts it for this model/profile.
   const hasAssistantHistory = Array.isArray(rawMessages) && rawMessages.some((m) => m?.role === 'assistant');
-  if (hasAssistantHistory) {
-    thinkingWillBeEnabled = false;
-  }
 
   for (const m of rawMessages) {
     if (m.role === 'system') {
@@ -124,16 +128,59 @@ export async function invokeBedrock(
     }
 
     const content: BedrockContentBlock[] = [];
+    // Preserve provider-native reasoning blocks (Bedrock ContentBlock.reasoningContent) when present.
+    // This is required for multi-turn "thinking" replay when Bedrock provides signatures.
+    try {
+      const rdRaw =
+        Array.isArray((m as any)?.reasoningDetails) && (m as any).reasoningDetails.length > 0
+          ? ((m as any).reasoningDetails as unknown[])
+          : Array.isArray((m as any)?.reasoning_details) && (m as any).reasoning_details.length > 0
+            ? ((m as any).reasoning_details as unknown[])
+            : [];
+      if (rdRaw.length > 0) {
+        for (const d of rdRaw) {
+          if (!d || typeof d !== 'object') continue;
+          const det = d as Record<string, unknown>;
+          if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.trim().length > 0) {
+            const signature = typeof det.signature === 'string' && det.signature.trim().length > 0 ? det.signature.trim() : undefined;
+            (content as unknown[]).push({
+              reasoningContent: {
+                reasoningText: {
+                  text: det.text,
+                  ...(signature ? { signature } : {}),
+                },
+              },
+            });
+          } else if (det.type === 'reasoning.encrypted' && typeof det.data === 'string' && det.data.trim().length > 0) {
+            // Map encrypted reasoning payloads (base64) into Bedrock redactedContent.
+            // Note: We do not log or inspect the data for safety.
+            try {
+              const bytes = Buffer.from(det.data, 'base64');
+              (content as unknown[]).push({
+                reasoningContent: {
+                  redactedContent: bytes,
+                },
+              });
+            } catch {
+              // ignore invalid base64
+            }
+          }
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+
     if (typeof m.content === 'string') {
       const trimmed = m.content.trim();
       // Bedrock validation requires non-blank text fields; provide a minimal placeholder
       // when the original content is empty (e.g. attachment-only messages).
-      content.push({ text: trimmed.length > 0 ? trimmed : ' ' });
+      content.push({ text: trimmed.length > 0 ? trimmed : '.' });
     } else if (Array.isArray(m.content)) {
       for (const part of m.content) {
         if (part.type === 'text') {
           const txt = typeof part.text === 'string' ? part.text.trim() : '';
-          content.push({ text: txt.length > 0 ? txt : ' ' });
+          content.push({ text: txt.length > 0 ? txt : '.' });
         } else if (part.type === 'image_url' && part.image_url?.url) {
           const rawUrl = part.image_url.url;
           const matches = rawUrl.match(/^data:image\/([a-z]+);base64,(.+)$/);
@@ -249,15 +296,15 @@ export async function invokeBedrock(
   // Docs: Claude on Bedrock extended thinking uses: { thinking: { type: 'enabled', budget_tokens: <int> } }
   try {
     if (thinkingWillBeEnabled) {
-        input.additionalModelRequestFields = {
-          ...(input.additionalModelRequestFields ?? {}),
-          thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
-        };
+      input.additionalModelRequestFields = {
+        ...(input.additionalModelRequestFields ?? {}),
+        thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
+      };
 
-        // Bedrock validation for Claude extended thinking:
-        // - temperature may only be set to 1 when thinking is enabled
-        // - (provider-dependent) avoid sending topP alongside this
-        inferenceConfig.temperature = 1;
+      // Bedrock validation for Claude extended thinking:
+      // - temperature may only be set to 1 when thinking is enabled
+      // - (provider-dependent) avoid sending topP alongside this
+      inferenceConfig.temperature = 1;
     }
   } catch {
     // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
@@ -310,7 +357,12 @@ export async function invokeBedrock(
         accumulatedArgs: string;
       };
       const toolUseStates: Record<number, BedrockToolUseState> = {};
-      const reasoningStates: Record<number, string> = {};
+      // Track reasoning/thinking blocks so we can persist + replay them in future turns.
+      // - reasoningSnapshots: last raw text we observed (may be cumulative OR delta)
+      // - reasoningAcc: accumulated reasoning text for this stream (always cumulative)
+      const reasoningSnapshots: Record<number, string> = {};
+      const reasoningAcc: Record<number, string> = {};
+      const reasoningSignatures: Record<number, string> = {};
 
       type BedrockDelta = {
         text?: string;
@@ -332,6 +384,25 @@ export async function invokeBedrock(
       // Usage and finish_reason are delivered late in the stream (messageStop/metadata).
       let bedrockStopReason: string | undefined;
       let bedrockUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
+      let loggedReasoningShape = false;
+      let reasoningContentEvents = 0;
+      let reasoningContentHadSignature = 0;
+
+      const coerceToText = (v: unknown): string => {
+        try {
+          if (typeof v === 'string') return v;
+          if (!v || typeof v !== 'object') return '';
+          const rec = v as Record<string, unknown>;
+          if (typeof rec.text === 'string') return rec.text;
+          const tokens = rec.tokens;
+          if (Array.isArray(tokens) && tokens.length > 0) {
+            return (tokens as unknown[]).map((t) => coerceToText(t)).join('');
+          }
+          return '';
+        } catch {
+          return '';
+        }
+      };
 
       for await (const event of stream) {
         // Capture stop reason + usage (metadata) when present.
@@ -350,11 +421,7 @@ export async function invokeBedrock(
               const inputTokens = typeof ut.inputTokens === 'number' ? ut.inputTokens : undefined;
               const outputTokens = typeof ut.outputTokens === 'number' ? ut.outputTokens : undefined;
               const totalTokens = typeof ut.totalTokens === 'number' ? ut.totalTokens : undefined;
-              if (
-                typeof inputTokens === 'number' ||
-                typeof outputTokens === 'number' ||
-                typeof totalTokens === 'number'
-              ) {
+              if (typeof inputTokens === 'number' || typeof outputTokens === 'number' || typeof totalTokens === 'number') {
                 bedrockUsage = {
                   ...(typeof inputTokens === 'number' ? { inputTokens } : {}),
                   ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
@@ -377,21 +444,44 @@ export async function invokeBedrock(
           if (delta.reasoningContent) {
             const rc = delta.reasoningContent;
             let nextText = '';
+            let eventHasSignature = false;
+            try {
+              if (rc && typeof rc === 'object') {
+                const rco = rc as Record<string, unknown>;
+                const reasoningText = rco.reasoningText;
+                if (reasoningText && typeof reasoningText === 'object') {
+                  const rt = reasoningText as Record<string, unknown>;
+                  eventHasSignature = typeof rt.signature === 'string' && rt.signature.trim().length > 0;
+                } else {
+                  eventHasSignature = typeof rco.signature === 'string' && rco.signature.trim().length > 0;
+                }
+              }
+            } catch {
+              eventHasSignature = false;
+            }
+            reasoningContentEvents += 1;
+            if (eventHasSignature) reasoningContentHadSignature += 1;
+
             try {
               if (typeof rc === 'string') {
                 nextText = rc;
               } else if (rc && typeof rc === 'object') {
                 const rco = rc as Record<string, unknown>;
                 // Common shapes:
-                // - { reasoningText: { text: string, signature?: string } }
+                // - ReasoningContentBlock: { reasoningText: { text: string, signature?: string } }
+                // - OR ReasoningTextBlock: { text: string, signature?: string }
                 // - { text: string }
                 const reasoningText = (rco as { reasoningText?: unknown }).reasoningText as unknown;
                 if (reasoningText && typeof reasoningText === 'object') {
                   const rt = reasoningText as Record<string, unknown>;
-                  if (typeof rt.text === 'string') nextText = rt.text;
+                  nextText = coerceToText(rt.text);
+                  if (typeof rt.signature === 'string' && rt.signature.trim().length > 0) {
+                    reasoningSignatures[idx] = rt.signature.trim();
+                  }
                 }
-                if (!nextText && typeof (rco as { text?: unknown }).text === 'string') {
-                  nextText = (rco as { text: string }).text;
+                if (!nextText) nextText = coerceToText((rco as { text?: unknown }).text);
+                if (typeof rco.signature === 'string' && rco.signature.trim().length > 0) {
+                  reasoningSignatures[idx] = rco.signature.trim();
                 }
               }
             } catch {
@@ -399,9 +489,13 @@ export async function invokeBedrock(
             }
 
             if (typeof nextText === 'string') {
-              const prev = reasoningStates[idx] || '';
+              const prev = reasoningSnapshots[idx] || '';
               const fragment = nextText.startsWith(prev) ? nextText.slice(prev.length) : nextText;
-              reasoningStates[idx] = nextText;
+              reasoningSnapshots[idx] = nextText;
+              if (fragment.length > 0) {
+                const base = reasoningAcc[idx] || '';
+                reasoningAcc[idx] = base + fragment;
+              }
               if (fragment.length > 0) {
                 yield {
                   id: 'bedrock-stream',
@@ -428,11 +522,9 @@ export async function invokeBedrock(
               // Bedrock sends the FULL accumulated arguments in each delta, not just the fragment.
               // input can be a string or a structured object; normalize to string for diffing.
               const newAccumulatedArgs =
-                typeof delta.toolUse.input === 'string'
-                  ? delta.toolUse.input
-                  : JSON.stringify(delta.toolUse.input ?? '');
+                typeof delta.toolUse.input === 'string' ? delta.toolUse.input : JSON.stringify(delta.toolUse.input ?? '');
               const previousArgs = toolState.accumulatedArgs || '';
-              
+
               // Compute the delta: only the new portion that wasn't in the previous args
               let argsFragment = '';
               if (newAccumulatedArgs.startsWith(previousArgs)) {
@@ -442,10 +534,10 @@ export async function invokeBedrock(
                 // (shouldn't happen, but handle gracefully)
                 argsFragment = newAccumulatedArgs;
               }
-              
+
               // Update accumulated args for next delta
               toolState.accumulatedArgs = newAccumulatedArgs;
-              
+
               // Only emit if there's new content
               // Use idx (contentBlockIndex) as the tool_calls index to match OpenAI format
               // Each Bedrock tool call has its own contentBlockIndex, which maps to tool_calls[index]
@@ -546,6 +638,45 @@ export async function invokeBedrock(
         // are reconstructed from the accumulated tool_calls deltas.
       }
 
+      // Emit a final snapshot chunk containing reasoning_details so the LLM node can persist
+      // provider-native thinking (including signatures) for replay in future Bedrock turns.
+      try {
+        const indices = Object.keys(reasoningAcc)
+          .map((k) => Number(k))
+          .filter((n) => Number.isFinite(n))
+          .sort((a, b) => a - b);
+        const reasoning_details: unknown[] = [];
+        for (const idx of indices) {
+          const text = typeof reasoningAcc[idx] === 'string' ? (reasoningAcc[idx] as string) : '';
+          if (text.trim().length === 0) continue;
+          const sig = typeof reasoningSignatures[idx] === 'string' ? reasoningSignatures[idx] : undefined;
+          reasoning_details.push({
+            type: 'reasoning.text',
+            text,
+            ...(sig ? { signature: sig } : {}),
+            format: 'anthropic-claude-v1',
+            index: idx,
+          });
+        }
+        if (reasoning_details.length > 0) {
+          yield {
+            id: 'bedrock-stream',
+            object: 'chat.completion.chunk',
+            created: Math.floor(Date.now() / 1000),
+            model: canonicalModelId,
+            choices: [
+              {
+                index: 0,
+                delta: { reasoning_details },
+                finish_reason: null,
+              },
+            ],
+          };
+        }
+      } catch {
+        // Non-fatal
+      }
+
       // Emit a final synthetic chunk containing usage + finish_reason so downstream accounting records it.
       // LLM.ts normalizes snake_case usage (prompt_tokens/completion_tokens/total_tokens).
       const inputTokens = typeof bedrockUsage?.inputTokens === 'number' ? bedrockUsage.inputTokens : undefined;
@@ -585,4 +716,3 @@ export async function invokeBedrock(
     throw e;
   }
 }
-

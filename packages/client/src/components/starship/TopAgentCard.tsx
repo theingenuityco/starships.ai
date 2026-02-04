@@ -55,7 +55,7 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
               </div>
             </div>
             <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
-              <Link href={`/ship/${starshipSlug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(String((topAgent as any)?.id || ''))}`}>
+              <Link href={`/ship/${starshipSlug}/dm/${encodeURIComponent(`a:${String((topAgent as any)?.id || '')}`)}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Message Agent
               </Link>

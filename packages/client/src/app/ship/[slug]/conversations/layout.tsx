@@ -14,10 +14,7 @@ import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import api from '@/lib/api'
 
-function sanitizeThreadTitleSnippetFromMessageContent(
-  input: string,
-  maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }
-): string {
+function sanitizeThreadTitleSnippetFromMessageContent(input: string, maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }): string {
   // Thread titles are plain text snippets. Do not carry mention tokens into the title:
   // - Avoid decoding `<@a:...>` / `<@u:...>` to names in the header/nav.
   // - Avoid accidental notifications/UX confusion from `@mentions` in titles.
@@ -392,14 +389,40 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         .filter((dm: any) => dm && dm.dmType === 'user_agent')
         .find((dm: any) => String(dm.agentId || '') === String(agent.id))?.conversationId ?? null
 
-    if (existingCid) {
-      router.replace(`/ship/${routeParams.slug}/conversations/${encodeURIComponent(String(existingCid))}`)
+    const peerKey = String((agent as any)?.slug || '').trim() || `a:${String(agent.id)}`
+    // Canonical DM route is `/dm/<peerKey>` (agent slug when available, else `a:<agentId>`).
+    router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
+  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, shouldShowOnboarding, starshipData?.id])
+
+  // Back-compat: if the user is on `/conversations/:id` and that id is a DM conversation, redirect to `/dm/<peerKey>`.
+  useEffect(() => {
+    if (!starshipData?.id) return
+    const cid = typeof routeParams.conversationId === 'string' ? routeParams.conversationId.trim() : ''
+    if (!cid) return
+    if (directMessagesLoading || agentsLoading) return
+
+    const list = ((directMessagesData as any)?.directMessages || []) as DirectMessageListItem[]
+    const match = list.find(it => String((it as any)?.dm?.conversationId || '') === cid) ?? null
+    if (!match) return
+
+    const dm: any = (match as any)?.dm
+    const dmType = String(dm?.dmType || '')
+    if (dmType === 'user_agent') {
+      const agent = (match as any)?.agent
+      const agentSlug = String(agent?.slug || '').trim()
+      const agentId = String(dm?.agentId || '').trim()
+      const peerKey = agentSlug || (agentId ? `a:${agentId}` : '')
+      if (!peerKey) return
+      router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
       return
     }
-
-    // Open draft DM view targeted at this agent.
-    router.replace(`/ship/${routeParams.slug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(String(agent.id))}`)
-  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, shouldShowOnboarding, starshipData?.id])
+    if (dmType === 'user_user') {
+      const peerUserId = String((match as any)?.peerUser?.id || '').trim()
+      if (!peerUserId) return
+      router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(`u-${peerUserId}`)}`)
+      return
+    }
+  }, [agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, starshipData?.id])
 
   const pickAutoChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
@@ -474,6 +497,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // Must be called before any early returns to satisfy React Hooks rules
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
+      // If we're transitioning out of a "draft DM" view, capture the DM target before we clear query params.
+      const dm = (searchParams.get('dm') || '').trim()
+      const dmType = (searchParams.get('dmType') || '').trim()
+      const draftAgentId = (searchParams.get('agentId') || '').trim()
+      const draftPeerUserId = (searchParams.get('peerUserId') || '').trim()
+
       // If we're transitioning out of a "draft DM" view, drop the draft-only query params.
       const sp = new URLSearchParams(searchParams.toString())
       sp.delete('dm')
@@ -483,6 +512,20 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       sp.delete('peerLabel')
       sp.delete('peerAvatar')
       if (newConversationId) {
+        // Canonicalize DMs to `/dm/<peerKey>` even if they were opened via legacy `/conversations` draft params.
+        if (dm === 'draft' && dmType === 'user_agent' && draftAgentId) {
+          const agents = Array.isArray(agentsData) ? (agentsData as any[]) : []
+          const a = agents.find(x => String((x as any)?.id || '').trim() === draftAgentId) ?? null
+          const agentSlug = String((a as any)?.slug || '').trim()
+          const peerKey = agentSlug || `a:${draftAgentId}`
+          router.push(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
+          return
+        }
+        if (dm === 'draft' && dmType === 'user_user' && draftPeerUserId) {
+          router.push(`/ship/${routeParams.slug}/dm/${encodeURIComponent(`u-${draftPeerUserId}`)}`)
+          return
+        }
+
         const cid = String(newConversationId)
         const channels = channelsData?.channels ?? []
         const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
@@ -503,7 +546,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
       }
     },
-    [channelsData?.channels, router, routeParams.slug, searchParams]
+    [agentsData, channelsData?.channels, router, routeParams.slug, searchParams]
   )
 
   // Don't render conversations interface if we're redirecting to onboarding

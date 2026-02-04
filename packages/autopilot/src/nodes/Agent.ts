@@ -50,7 +50,10 @@ export class Agent implements NodeHandler {
     if (state.timeout === undefined && params.timeout !== undefined) {
       state.timeout = params.timeout;
     }
-    if (state.reasoning === undefined && params.reasoning !== undefined) {
+    // Treat null as "unset" too. Some hosts serialize missing optional fields as null,
+    // which would otherwise prevent runtime config from being seeded.
+    const shouldSeedReasoning = (state.reasoning === undefined || state.reasoning === null) && params.reasoning !== undefined;
+    if (shouldSeedReasoning) {
       state.reasoning = params.reasoning;
     }
   }
@@ -170,6 +173,7 @@ export class Agent implements NodeHandler {
             const content = typeof msg.content === 'string' ? msg.content : '';
             const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
             const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
+            const reasoningDetails = Array.isArray(msg.reasoningDetails) ? msg.reasoningDetails : undefined;
             let out;
             if (calls.length > 0) {
               const toolCalls = calls.map(tc => ({
@@ -184,9 +188,9 @@ export class Agent implements NodeHandler {
                   })()
                 }
               }));
-              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), toolCalls };
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}), toolCalls };
             } else {
-              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}) };
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}) };
             }
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), out];
@@ -450,6 +454,7 @@ export class Agent implements NodeHandler {
             const content = typeof msg.content === 'string' ? msg.content : '';
             const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
             const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
+            const reasoningDetails = Array.isArray(msg.reasoningDetails) ? msg.reasoningDetails : undefined;
             let out;
             if (calls.length > 0) {
               const toolCalls = calls.map(tc => ({
@@ -464,9 +469,9 @@ export class Agent implements NodeHandler {
                   })()
                 }
               }));
-              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), toolCalls };
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}), toolCalls };
             } else {
-              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}) };
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}) };
             }
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), out];

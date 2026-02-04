@@ -110,7 +110,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       // Marketplace UX: after deploy, take the user to the correct starship (chat).
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
         if (agentId) {
-          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
         }
@@ -164,9 +164,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
               onClick={() => {
                 const deployedAgent = deployedAgents.find(a => a.sourceTemplateId === template?.id)
                 router.push(
-                  deployedAgent?.id
-                    ? `/ship/${encodeURIComponent(primaryStarship.slug)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(deployedAgent.id)}`
-                    : `/ship/${encodeURIComponent(primaryStarship.slug)}`
+                  deployedAgent?.id ? `/ship/${encodeURIComponent(primaryStarship.slug)}/dm/${encodeURIComponent(`a:${deployedAgent.id}`)}` : `/ship/${encodeURIComponent(primaryStarship.slug)}`
                 )
                 onOpenChange(false)
               }}

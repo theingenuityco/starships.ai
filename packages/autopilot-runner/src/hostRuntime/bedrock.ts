@@ -107,92 +107,6 @@ export async function invokeBedrock(
   // whether Bedrock accepts it for this model/profile.
   const hasAssistantHistory = Array.isArray(rawMessages) && rawMessages.some((m) => m?.role === 'assistant');
 
-  // #region agent log
-  try {
-    const r = (request as unknown as { reasoning?: unknown })?.reasoning;
-    const rec = r && typeof r === 'object' && !Array.isArray(r) ? (r as Record<string, unknown>) : undefined;
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'B1_B2',
-        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
-        message: 'Bedrock request thinking config computed',
-        data: {
-          providerModelId,
-          hasReasoningConfig: r != null,
-          reasoningEnabled: typeof rec?.enabled === 'boolean' ? rec.enabled : undefined,
-          reasoningEffort: typeof rec?.effort === 'string' ? rec.effort : undefined,
-          reasoningMaxTokens: typeof rec?.max_tokens === 'number' ? rec.max_tokens : undefined,
-          thinkingBudgetTokens,
-          hasAssistantHistory,
-          thinkingWillBeEnabled,
-          maxTokens: typeof request.maxTokens === 'number' ? request.maxTokens : undefined,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {}
-  // #endregion
-
-  // #region agent log
-  try {
-    let assistantMsgs = 0;
-    let assistantMsgsWithReasoningDetails = 0;
-    let assistantReasoningDetailsCount = 0;
-    let assistantReasoningDetailsWithSignature = 0;
-    for (const rm of rawMessages ?? []) {
-      if (!rm || typeof rm !== 'object') continue;
-      const role = (rm as { role?: unknown }).role;
-      if (role !== 'assistant') continue;
-      assistantMsgs += 1;
-      const rdRaw =
-        Array.isArray((rm as any)?.reasoningDetails) && (rm as any).reasoningDetails.length > 0
-          ? ((rm as any).reasoningDetails as unknown[])
-          : Array.isArray((rm as any)?.reasoning_details) && (rm as any).reasoning_details.length > 0
-            ? ((rm as any).reasoning_details as unknown[])
-            : [];
-      if (rdRaw.length > 0) assistantMsgsWithReasoningDetails += 1;
-      assistantReasoningDetailsCount += rdRaw.length;
-      for (const d of rdRaw) {
-        try {
-          if (d && typeof d === 'object') {
-            const rec = d as Record<string, unknown>;
-            if (rec.type === 'reasoning.text') {
-              const sig = rec.signature;
-              if (typeof sig === 'string' && sig.trim().length > 0) assistantReasoningDetailsWithSignature += 1;
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'B4',
-        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
-        message: 'Incoming assistant reasoningDetails presence (for replay)',
-        data: {
-          providerModelId,
-          hasAssistantHistory,
-          assistantMsgs,
-          assistantMsgsWithReasoningDetails,
-          assistantReasoningDetailsCount,
-          assistantReasoningDetailsWithSignature,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {}
-  // #endregion
-
   for (const m of rawMessages) {
     if (m.role === 'system') {
       // OpenAI messages may represent system content as a string OR as an array of content parts
@@ -373,30 +287,6 @@ export async function invokeBedrock(
     inferenceConfig,
   };
 
-  // #region agent log
-  try {
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'B1',
-        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
-        message: 'Bedrock ConverseStreamCommand input summary',
-        data: {
-          providerModelId,
-          systemCount: system.length,
-          messagesCount: bedrockMessages.length,
-          thinkingWillBeEnabled,
-          thinkingBudgetTokens,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {}
-  // #endregion
-
   if (system.length > 0) {
     input.system = system;
   }
@@ -419,30 +309,6 @@ export async function invokeBedrock(
   } catch {
     // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
   }
-
-  // #region agent log
-  try {
-    const t = (input as unknown as { additionalModelRequestFields?: { thinking?: unknown } })?.additionalModelRequestFields?.thinking;
-    const hasThinking = t != null && typeof t === 'object';
-    const b =
-      hasThinking && typeof (t as Record<string, unknown>)?.budget_tokens === 'number'
-        ? (t as Record<string, unknown>).budget_tokens
-        : undefined;
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'pre-fix',
-        hypothesisId: 'B2',
-        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
-        message: 'Bedrock additionalModelRequestFields.thinking applied?',
-        data: { providerModelId, thinkingWillBeEnabled, hasThinking, budget_tokens: b },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-  } catch {}
-  // #endregion
 
   // If thinking is not enabled, forward sampling params as-is.
   if (!input.additionalModelRequestFields?.thinking) {
@@ -491,7 +357,11 @@ export async function invokeBedrock(
         accumulatedArgs: string;
       };
       const toolUseStates: Record<number, BedrockToolUseState> = {};
-      const reasoningStates: Record<number, string> = {};
+      // Track reasoning/thinking blocks so we can persist + replay them in future turns.
+      // - reasoningSnapshots: last raw text we observed (may be cumulative OR delta)
+      // - reasoningAcc: accumulated reasoning text for this stream (always cumulative)
+      const reasoningSnapshots: Record<number, string> = {};
+      const reasoningAcc: Record<number, string> = {};
       const reasoningSignatures: Record<number, string> = {};
 
       type BedrockDelta = {
@@ -517,6 +387,22 @@ export async function invokeBedrock(
       let loggedReasoningShape = false;
       let reasoningContentEvents = 0;
       let reasoningContentHadSignature = 0;
+
+      const coerceToText = (v: unknown): string => {
+        try {
+          if (typeof v === 'string') return v;
+          if (!v || typeof v !== 'object') return '';
+          const rec = v as Record<string, unknown>;
+          if (typeof rec.text === 'string') return rec.text;
+          const tokens = rec.tokens;
+          if (Array.isArray(tokens) && tokens.length > 0) {
+            return (tokens as unknown[]).map((t) => coerceToText(t)).join('');
+          }
+          return '';
+        } catch {
+          return '';
+        }
+      };
 
       for await (const event of stream) {
         // Capture stop reason + usage (metadata) when present.
@@ -576,32 +462,6 @@ export async function invokeBedrock(
             reasoningContentEvents += 1;
             if (eventHasSignature) reasoningContentHadSignature += 1;
 
-            // #region agent log
-            try {
-              if (!loggedReasoningShape) {
-                loggedReasoningShape = true;
-                const keys = rc && typeof rc === 'object' ? Object.keys(rc as Record<string, unknown>).slice(0, 12) : [];
-                fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'pre-fix',
-                    hypothesisId: 'B3',
-                    location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
-                    message: 'Observed Bedrock reasoningContent shape',
-                    data: {
-                      providerModelId,
-                      reasoningContentType: typeof rc,
-                      reasoningContentKeys: keys,
-                      hasSignature: eventHasSignature,
-                    },
-                    timestamp: Date.now(),
-                  }),
-                }).catch(() => {});
-              }
-            } catch {}
-            // #endregion
             try {
               if (typeof rc === 'string') {
                 nextText = rc;
@@ -614,14 +474,12 @@ export async function invokeBedrock(
                 const reasoningText = (rco as { reasoningText?: unknown }).reasoningText as unknown;
                 if (reasoningText && typeof reasoningText === 'object') {
                   const rt = reasoningText as Record<string, unknown>;
-                  if (typeof rt.text === 'string') nextText = rt.text;
+                  nextText = coerceToText(rt.text);
                   if (typeof rt.signature === 'string' && rt.signature.trim().length > 0) {
                     reasoningSignatures[idx] = rt.signature.trim();
                   }
                 }
-                if (!nextText && typeof (rco as { text?: unknown }).text === 'string') {
-                  nextText = (rco as { text: string }).text;
-                }
+                if (!nextText) nextText = coerceToText((rco as { text?: unknown }).text);
                 if (typeof rco.signature === 'string' && rco.signature.trim().length > 0) {
                   reasoningSignatures[idx] = rco.signature.trim();
                 }
@@ -631,9 +489,13 @@ export async function invokeBedrock(
             }
 
             if (typeof nextText === 'string') {
-              const prev = reasoningStates[idx] || '';
+              const prev = reasoningSnapshots[idx] || '';
               const fragment = nextText.startsWith(prev) ? nextText.slice(prev.length) : nextText;
-              reasoningStates[idx] = nextText;
+              reasoningSnapshots[idx] = nextText;
+              if (fragment.length > 0) {
+                const base = reasoningAcc[idx] || '';
+                reasoningAcc[idx] = base + fragment;
+              }
               if (fragment.length > 0) {
                 yield {
                   id: 'bedrock-stream',
@@ -776,40 +638,16 @@ export async function invokeBedrock(
         // are reconstructed from the accumulated tool_calls deltas.
       }
 
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'pre-fix',
-            hypothesisId: 'B5',
-            location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
-            message: 'Bedrock stream reasoningContent totals',
-            data: {
-              providerModelId,
-              reasoningContentEvents,
-              reasoningContentHadSignature,
-              stopReason: bedrockStopReason,
-              usage: bedrockUsage,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {}
-      // #endregion
-
       // Emit a final snapshot chunk containing reasoning_details so the LLM node can persist
       // provider-native thinking (including signatures) for replay in future Bedrock turns.
       try {
-        const indices = Object.keys(reasoningStates)
+        const indices = Object.keys(reasoningAcc)
           .map((k) => Number(k))
           .filter((n) => Number.isFinite(n))
           .sort((a, b) => a - b);
         const reasoning_details: unknown[] = [];
         for (const idx of indices) {
-          const text = typeof reasoningStates[idx] === 'string' ? (reasoningStates[idx] as string) : '';
+          const text = typeof reasoningAcc[idx] === 'string' ? (reasoningAcc[idx] as string) : '';
           if (text.trim().length === 0) continue;
           const sig = typeof reasoningSignatures[idx] === 'string' ? reasoningSignatures[idx] : undefined;
           reasoning_details.push({
@@ -821,32 +659,6 @@ export async function invokeBedrock(
           });
         }
         if (reasoning_details.length > 0) {
-          // #region agent log
-          try {
-            let withSig = 0;
-            for (const d of reasoning_details as unknown[]) {
-              if (d && typeof d === 'object') {
-                const rec = d as Record<string, unknown>;
-                const sig = rec.signature;
-                if (typeof sig === 'string' && sig.trim().length > 0) withSig += 1;
-              }
-            }
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'B6',
-                location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
-                message: 'Emitting reasoning_details snapshot chunk',
-                data: { providerModelId, count: reasoning_details.length, withSignature: withSig },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-          } catch {}
-          // #endregion
-
           yield {
             id: 'bedrock-stream',
             object: 'chat.completion.chunk',

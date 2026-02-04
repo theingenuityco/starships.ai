@@ -2048,7 +2048,7 @@ export function ConversationMessageList({
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (
-              <div className="flex justify-start">
+              <div className={cn('flex justify-start w-full', sizeVariant === 'delegation' ? 'mt-2' : 'mt-4')}>
                 {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
                   <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
                     <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
@@ -2060,15 +2060,32 @@ export function ConversationMessageList({
                     </div>
                   </div>
                 ) : (
-                  <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                      {(() => {
-                        const p = gapLoaderPresentation || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
-                        return <AgentAvatar seed={p.displayName || 'AI'} imageUrl={p.avatarUrl} size={40} rounded />
-                      })()}
-                    </div>
+                  <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+                    {(() => {
+                      // Must match `AgentAvatarWithTurnUsageRing`'s `pad` so gap loader aligns with normal assistant rows in expert mode.
+                      const usageRingPadPx = 3
+                      const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
+                      const avatarSlotPx = 40 + avatarSlotPadPx
+                      const p = gapLoaderPresentation || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                      return (
+                        <div className="flex-shrink-0 mt-1" style={{ width: avatarSlotPx, height: avatarSlotPx }}>
+                          <AgentAvatarWithTurnUsageRing
+                            seed={p.displayName || 'AI'}
+                            imageUrl={p.avatarUrl}
+                            modelIdOverride={null}
+                            tokenLimitOverride={null}
+                            size={40}
+                            rounded
+                            enabled={Boolean(expertMode)}
+                            usage={null}
+                            busy={true}
+                            className="mx-auto"
+                          />
+                        </div>
+                      )
+                    })()}
                     <div className="min-w-0 flex-1 pt-0.5">
-                      <div className="mb-1 text-sm font-bold text-foreground">
+                      <div className="mb-0 text-sm font-bold text-foreground">
                         {(() => {
                           const p = gapLoaderPresentation || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
                           const label = (p.displayName || fallbackAgentDisplayName || 'Assistant').trim()

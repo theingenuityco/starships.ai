@@ -255,7 +255,7 @@ export function ConversationList({
           'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
-            : hasUnread
+            : hasUnread || hasNotifBadge
               ? 'text-foreground border-transparent hover:bg-muted'
               : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
           isBusy && 'opacity-70 pointer-events-none'
@@ -504,7 +504,7 @@ export function ConversationList({
                               'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
-                                : hasUnread
+                                : hasUnread || hasNotifBadge
                                   ? 'text-foreground border-transparent hover:bg-muted'
                                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                             )}

@@ -35,7 +35,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import api, { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
@@ -47,6 +47,8 @@ import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hoo
 import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -1369,6 +1371,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
+    // Presence (online/offline) for mention suggestion avatars
+    const { isUserOnline } = useStarshipPresence(starshipId, Boolean(starshipId))
+
     const MentionList = ({
       items,
       command,
@@ -1423,6 +1428,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
             const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
             const key = `${kind}:${String((item as any)?.id || '')}`
+            const userIdForPresence = kind === 'user' ? String((user as any)?.userId || (item as any)?.id || '').trim() : ''
+            const online = kind === 'user' ? isUserOnline(userIdForPresence) : true
+            const fallback = (label || '?').trim().slice(0, 1).toUpperCase()
             return (
               <button
                 key={key}
@@ -1433,8 +1441,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 role="option"
                 aria-selected={idx === active}
                 className={cn(
-                  'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60 dark:hover:bg-muted/70'
+                  // Match navbar item styling: muted by default, foreground on hover/active.
+                  'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
+                  idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                 )}
                 onMouseEnter={() => onHover(idx)}
                 onMouseDown={e => {
@@ -1452,16 +1461,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   command(item)
                 }}
               >
-                <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                  {kind === 'user' && user?.avatar ? (
-                    <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
-                  ) : (
-                    <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
-                  )}
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="font-medium leading-5">{label}</div>
+                <div className="relative">
+                  <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
+                    {kind === 'user' ? (
+                      <>
+                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover rounded-full" /> : null}
+                        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+                      </>
+                    ) : (
+                      <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={20} rounded />
+                    )}
+                  </Avatar>
+                  <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
                 </div>
+                <span className="min-w-0 truncate font-medium">{label}</span>
               </button>
             )
           })}

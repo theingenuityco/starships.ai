@@ -114,64 +114,6 @@ export class ConversationService {
     }
   }
 
-  private isValidIanaTimeZone(tz: unknown): tz is string {
-    if (typeof tz !== 'string') return false;
-    const s = tz.trim();
-    if (!s) return false;
-    try {
-      // Throws RangeError for invalid tz strings.
-      new Intl.DateTimeFormat('en-US', { timeZone: s }).format(new Date(0));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Format a Date into an ISO-like string in the requested IANA timezone,
-   * including an explicit numeric offset (keeps our "[YYYY-MM-DDT...]" header regex stable).
-   *
-   * Example: 2026-02-04T10:23:45-05:00
-   */
-  private formatIsoInTimeZone(date: Date, timeZone: string): string {
-    const pad2 = (n: number): string => String(n).padStart(2, '0');
-    const pad3 = (n: number): string => String(n).padStart(3, '0');
-
-    const dtf = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-
-    const parts = dtf.formatToParts(date);
-    const get = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value || '00';
-
-    const year = get('year');
-    const month = get('month');
-    const day = get('day');
-    const hour = get('hour');
-    const minute = get('minute');
-    const second = get('second');
-
-    // Compute offset at that instant for the timezone.
-    // See: offsetMinutes = (utcFromLocalParts - actualUtcMs)/60000
-    const utcFromLocal = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
-    const offsetMinutes = Math.round((utcFromLocal - date.getTime()) / 60000);
-    const sign = offsetMinutes >= 0 ? '+' : '-';
-    const abs = Math.abs(offsetMinutes);
-    const offH = Math.floor(abs / 60);
-    const offM = abs % 60;
-
-    const ms = date.getUTCMilliseconds();
-    const msPart = ms ? `.${pad3(ms)}` : '';
-    return `${year}-${month}-${day}T${hour}:${minute}:${second}${msPart}${sign}${pad2(offH)}:${pad2(offM)}`;
-  }
-
   private coerceToIsoString(value: unknown): string | undefined {
     const d = this.coerceToDate(value);
     return d ? d.toISOString() : undefined;
@@ -1720,23 +1662,12 @@ export class ConversationService {
    * - We only inject metadata for `role=user|assistant` (system/tool messages are left unchanged).
    * - For multimodal `ContentBlock[]`, we prepend to the FIRST text block (which `buildMessageContent` guarantees).
    */
-  private injectAttributionIntoContent(
-    message: MessageModel,
-    content: MessageContent,
-    opts?: {
-      /**
-       * Optional IANA timezone identifier to render the attribution timestamp in.
-       * If omitted/invalid, we fall back to ISO UTC.
-       */
-      timeZone?: string;
-    }
-  ): MessageContent {
+  private injectAttributionIntoContent(message: MessageModel, content: MessageContent): MessageContent {
     const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return content;
 
     const atDate = this.coerceToDate((message as any)?.createdAt) ?? this.coerceToDate((message as any)?.updatedAt) ?? new Date();
-    const tz = this.isValidIanaTimeZone(opts?.timeZone) ? (opts?.timeZone as string).trim() : '';
-    const at = tz ? this.formatIsoInTimeZone(atDate, tz) : atDate.toISOString();
+    const at = atDate.toISOString().replace(/Z$/, '');
 
     const sender =
       role === 'user'
@@ -1818,11 +1749,6 @@ export class ConversationService {
     },
     ctx?: {
       authContext?: { userId: string; agentId?: string; starshipId?: string };
-      /**
-       * Optional user IANA timezone string from the client (e.g. "America/New_York").
-       * Used only for formatting attribution timestamps inside the LLM prompt.
-       */
-      userTimezone?: string;
     },
     opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string }
   ): Promise<void> {
@@ -2331,15 +2257,7 @@ export class ConversationService {
             const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
             const contentStripped = strippedInfo.content;
             const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
-            // Prefer a per-request user timezone if provided (header-driven), fall back to any persisted value on conversation state.
-            const timeZoneFromCtx = typeof ctx?.userTimezone === 'string' ? String(ctx.userTimezone).trim() : '';
-            const timeZoneFromState =
-              conversationState && typeof (conversationState as any).userTimezone === 'string'
-                ? String((conversationState as any).userTimezone).trim()
-                : '';
-            const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions, {
-              timeZone: timeZoneFromCtx || timeZoneFromState || undefined,
-            });
+            const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
 
             const effectiveRole = (() => {
               const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';
@@ -2676,13 +2594,7 @@ export class ConversationService {
           const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
           const contentStripped = strippedInfo.content;
           const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
-          const timeZoneFromState =
-            conversationState && typeof (conversationState as any).userTimezone === 'string'
-              ? String((conversationState as any).userTimezone).trim()
-              : '';
-          const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions, {
-            timeZone: timeZoneFromState || undefined,
-          });
+          const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
           const baseMessage: LlmMessage = {
             role: (() => {
               const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';

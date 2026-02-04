@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState, type RefObject } from 'react'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -92,10 +93,38 @@ export function ConversationList({
   const currentConversationId = params.conversationId as string | undefined
   const currentChannelSlug = params.channelSlug as string | undefined
   const currentDmPeer = (params as any)?.peer as string | undefined
+  const pendingConversationId = useStarshipUIStore(s => s.pendingConversationId)
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
-  const { unread: notifUnread } = useNotificationsStream(starshipId, true)
+  const activeConversationIdForNotifications = useMemo(() => {
+    // 1) /ship/:slug/conversations/:conversationId
+    const byRoute = typeof currentConversationId === 'string' ? String(currentConversationId).trim() : ''
+    if (byRoute) return byRoute
+
+    // 2) /ship/:slug/channels/:channelSlug
+    const chSlug = typeof currentChannelSlug === 'string' ? String(currentChannelSlug).trim().toLowerCase() : ''
+    if (chSlug) {
+      const chans = (channelsData as any)?.channels
+      if (Array.isArray(chans)) {
+        const match =
+          chans.find(
+            (c: any) =>
+              String(c?.slug || '')
+                .trim()
+                .toLowerCase() === chSlug
+          ) ?? null
+        const cid = typeof match?.conversationId === 'string' ? String(match.conversationId).trim() : ''
+        if (cid) return cid
+      }
+    }
+
+    // 3) /ship/:slug/dm/:peer (conversationId is not in the route; ship layout uses pendingConversationId)
+    const pending = typeof pendingConversationId === 'string' ? String(pendingConversationId).trim() : ''
+    return pending || null
+  }, [channelsData, currentChannelSlug, currentConversationId, pendingConversationId])
+
+  const { unread: notifUnread } = useNotificationsStream(starshipId, true, { activeConversationId: activeConversationIdForNotifications })
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const { isUserOnline } = useStarshipPresence(starshipId, true)
@@ -211,8 +240,10 @@ export function ConversationList({
         : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
 
     const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
-    const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-    const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+    const isOpenConversation = Boolean(conversationId && activeConversationIdForNotifications && conversationId === activeConversationIdForNotifications)
+    // UX requirement: don't show an unread badge/highlight for the conversation the user is already viewing.
+    const hasUnread = Boolean(!isOpenConversation && conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
+    const dmCount = Number(!isOpenConversation && conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
 
     return (
       <div
@@ -251,7 +282,8 @@ export function ConversationList({
         <span
           className={cn(
             'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+            // Color is controlled by the row container (matches `NavigationItem`); keep only weight here.
+            isActive ? 'font-medium' : hasUnread ? 'font-bold' : 'font-medium'
           )}
         >
           {label}
@@ -710,10 +742,10 @@ export function ConversationList({
                     <div
                       key={t.key}
                       className={cn(
-                        'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
+                        // Match channel row styling (spacing, hover, active background)
+                        'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
                         'hover:bg-muted/50',
-                        isActive && 'bg-primary/10 text-primary',
-                        !isActive && hasUnread && 'text-foreground',
+                        isActive && 'bg-muted/70 shadow-sm',
                         isBusy && 'opacity-70 pointer-events-none'
                       )}
                       onClick={() => handleDmTargetClick(t)}
@@ -724,8 +756,16 @@ export function ConversationList({
                         <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1 gap-2">
-                          <p className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}>{label}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className={cn(
+                              'text-sm truncate',
+                              // Match channel label styling
+                              isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+                            )}
+                          >
+                            {label}
+                          </p>
                           {dmCount > 0 ? (
                             <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                               {dmCount > 99 ? '99+' : String(dmCount)}

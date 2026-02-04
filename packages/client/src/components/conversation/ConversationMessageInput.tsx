@@ -35,7 +35,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
-import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import api, { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
@@ -47,6 +47,8 @@ import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hoo
 import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -798,9 +800,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
       // This prevents a brief "agent is typing" flash for messages that the server will persist without agent execution
       // (e.g. user mentions like <@u:...> in a default-agent thread).
-      const willTriggerAgentBestEffort = (() => {
-        if (isUserUserDm) return false
-        if (shouldPersistOnly) return false
+      const routingPreview = (() => {
+        if (isUserUserDm) return { willTriggerAgentBestEffort: false, hasUserMentionToken: false, hasAgentMention: false }
+        if (shouldPersistOnly) return { willTriggerAgentBestEffort: false, hasUserMentionToken: false, hasAgentMention: false }
 
         const raw = String(messageToSend || '')
         const hasUserMentionToken = raw.includes('<@u:')
@@ -812,14 +814,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
 
         // Mention-only contexts only run when at least one agent is mentioned.
-        if (isChannelConversation || isMentionOnlyThread) return hasAgentMention
+        if (isChannelConversation || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
 
         // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
-        if (hasUserMentionToken && !hasAgentMention) return false
+        if (hasUserMentionToken && !hasAgentMention) return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention }
 
         // Otherwise: if we have an effective agent (explicit or fallback) or an agent mention, expect execution.
-        return Boolean(effectiveAgent || hasAgentMention)
+        return { willTriggerAgentBestEffort: Boolean(effectiveAgent || hasAgentMention), hasUserMentionToken, hasAgentMention }
       })()
+      const willTriggerAgentBestEffort = routingPreview.willTriggerAgentBestEffort
 
       // Validation for agent and starship
       if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {
@@ -1368,6 +1371,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
+    // Presence (online/offline) for mention suggestion avatars
+    const { isUserOnline } = useStarshipPresence(starshipId, Boolean(starshipId))
+
     const MentionList = ({
       items,
       command,
@@ -1422,6 +1428,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
             const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
             const key = `${kind}:${String((item as any)?.id || '')}`
+            const userIdForPresence = kind === 'user' ? String((user as any)?.userId || (item as any)?.id || '').trim() : ''
+            const online = kind === 'user' ? isUserOnline(userIdForPresence) : true
+            const fallback = (label || '?').trim().slice(0, 1).toUpperCase()
             return (
               <button
                 key={key}
@@ -1432,8 +1441,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 role="option"
                 aria-selected={idx === active}
                 className={cn(
-                  'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring flex items-center gap-3 text-sm',
-                  idx === active ? 'bg-accent text-accent-foreground' : 'hover:bg-primary/5'
+                  // Match navbar item styling: muted by default, foreground on hover/active.
+                  'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
+                  idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                 )}
                 onMouseEnter={() => onHover(idx)}
                 onMouseDown={e => {
@@ -1451,17 +1461,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   command(item)
                 }}
               >
-                <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                  {kind === 'user' && user?.avatar ? (
-                    <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" />
-                  ) : (
-                    <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={28} />
-                  )}
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="font-medium leading-5">{label}</div>
-                  {kind === 'agent' && agent?.description ? <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div> : null}
+                <div className="relative">
+                  <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
+                    {kind === 'user' ? (
+                      <>
+                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover rounded-full" /> : null}
+                        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+                      </>
+                    ) : (
+                      <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={20} rounded />
+                    )}
+                  </Avatar>
+                  <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
                 </div>
+                <span className="min-w-0 truncate font-medium">{label}</span>
               </button>
             )
           })}
@@ -1473,43 +1486,98 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       char: '@',
       allowSpaces: false,
       items: ({ query }: any) => {
-        const q = String(query || '').toLowerCase()
+        const q = String(query || '')
+          .toLowerCase()
+          .trim()
+        const me = String(userId || '').trim()
         const dmAllowed = dmMentionAllowedRef.current
         const dmKind = dmAllowed?.kind ?? null
         const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
         const restrictToSingleDmPeer = Boolean(dmKind && dmId)
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
-        const agentItems = (Array.isArray(agents) ? agents : [])
-          .filter(a => {
-            if (restrictToSingleDmPeer) {
-              if (dmKind !== 'agent') return false
-              if (String(a?.id || '') !== String(dmId)) return false
-            }
-            if (!q) return true
-            return a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
+
+        const matchesQuery = (haystacks: string[]) => {
+          if (!q) return true
+          return haystacks.some(h => h.includes(q))
+        }
+        // Prefer "starts with" matches first, then "contains".
+        const matchRank = (haystacks: string[]) => {
+          if (!q) return 0
+          if (haystacks.some(h => h.startsWith(q))) return 0
+          if (haystacks.some(h => h.includes(q))) return 1
+          return 2
+        }
+
+        const items: Array<{
+          id: string
+          label: string
+          kind: 'agent' | 'user'
+          agent?: AgentModel
+          user?: StarshipMemberListItem
+          _kindRank: number
+          _matchRank: number
+        }> = []
+
+        // Humans first
+        for (const u of Array.isArray(users) ? users : []) {
+          if (restrictToSingleDmPeer) {
+            if (dmKind !== 'user') continue
+            const uid = String((u as any)?.userId || '').trim()
+            if (!uid || uid !== String(dmId)) continue
+          }
+          const uid = String((u as any)?.userId || '').trim()
+          if (!uid) continue
+          // Self-mentions are not allowed (do not even suggest them).
+          if (me && uid === me) continue
+
+          const label = String(u.displayName || u.email || 'User').trim() || 'User'
+          const haystacks = [label.toLowerCase(), String(u.email || '').toLowerCase()]
+          if (!matchesQuery(haystacks)) continue
+          items.push({
+            id: uid,
+            label,
+            kind: 'user',
+            user: u,
+            _kindRank: 0,
+            _matchRank: matchRank(haystacks),
           })
+        }
+
+        // Then agents
+        for (const a of Array.isArray(agents) ? agents : []) {
+          if (restrictToSingleDmPeer) {
+            if (dmKind !== 'agent') continue
+            if (String(a?.id || '') !== String(dmId)) continue
+          }
+          const id = String((a as any)?.id || '').trim()
+          if (!id) continue
+          const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
+          const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
+          if (!matchesQuery(haystacks)) continue
+          items.push({
+            id,
+            label,
+            kind: 'agent',
+            agent: a as any,
+            _kindRank: 1,
+            _matchRank: matchRank(haystacks),
+          })
+        }
+
+        items.sort((a, b) => {
+          if (a._kindRank !== b._kindRank) return a._kindRank - b._kindRank // users first
+          if (a._matchRank !== b._matchRank) return a._matchRank - b._matchRank // starts-with first
+          return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+        })
+
+        return items
+          .filter(i => Boolean(i.id))
           .slice(0, 8)
-          .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), kind: 'agent' as const, agent: a }))
-        const userItems = (Array.isArray(users) ? users : [])
-          .filter(u => {
-            if (restrictToSingleDmPeer) {
-              if (dmKind !== 'user') return false
-              const uid = String((u as any)?.userId || '').trim()
-              if (!uid || uid !== String(dmId)) return false
-            }
-            if (!q) return true
-            const name = String(u.displayName || '').toLowerCase()
-            const email = String(u.email || '').toLowerCase()
-            return name.includes(q) || email.includes(q)
+          .map(i => {
+            const { _kindRank: _kr, _matchRank: _mr, ...rest } = i
+            return rest
           })
-          .slice(0, 8)
-          .map(u => {
-            const id = String((u as any).userId || '')
-            const label = String(u.displayName || u.email || 'User')
-            return { id, label, kind: 'user' as const, user: u }
-          })
-        return [...agentItems, ...userItems].filter(i => Boolean(i.id)).slice(0, 8)
       },
       render: () => {
         let component: ReactRenderer | null = null

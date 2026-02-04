@@ -5,6 +5,7 @@ import { useCreateDirectMessage, useStarshipDirectMessages, type DirectMessageLi
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { useMarkConversationRead } from '@/hooks/useNotifications'
 import { LoadingSpinner } from '@/components/ui/simple-loading'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useParams, useRouter } from 'next/navigation'
@@ -81,6 +82,7 @@ export default function DmPeerPage() {
   const peer = params.peer
   const peerStr = String(peer || '').trim()
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
+  const markConversationRead = useMarkConversationRead()
 
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
@@ -204,6 +206,16 @@ export default function DmPeerPage() {
       }
     }
   }, [resolved.conversationId, setPendingConversationId])
+
+  // Important: `/ship/[slug]/dm/<peer>` is NOT under `/conversations` or `/channels` layouts,
+  // so we must explicitly mark the open DM conversation as read here to prevent navbar/sidebar
+  // DM unread badges from stacking while the user is actively viewing the thread.
+  useEffect(() => {
+    const cid = resolved.conversationId ? String(resolved.conversationId) : ''
+    if (!cid) return
+    void markConversationRead.mutateAsync(cid).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolved.conversationId])
 
   // If we can't resolve the peer and we aren't in a loading window, bounce back to the starship root.
   if (!dmTarget && !dmsLoading && !agentsLoading) {

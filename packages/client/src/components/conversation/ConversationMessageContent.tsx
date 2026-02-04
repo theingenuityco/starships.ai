@@ -82,11 +82,7 @@ function aggregateStreamChunks(chunks: StreamChunk[]): string {
   return agg
 }
 
-function replaceMentionTokens(args: {
-  content: string
-  agentNameById: Map<string, string>
-  userNameById: Map<string, string>
-}): string {
+function replaceMentionTokens(args: { content: string; agentNameById: Map<string, string>; userNameById: Map<string, string> }): string {
   const input = String(args.content || '')
   if (!input) return ''
   // Replace tokens so markdown does not treat them as HTML tags.

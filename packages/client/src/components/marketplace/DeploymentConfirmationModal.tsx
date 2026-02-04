@@ -32,7 +32,18 @@ interface DeploymentConfirmationModalProps {
   ownedStarships?: DeployStarshipOption[]
 }
 
-export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName, starshipId, starshipSlug, ownedStarships }: DeploymentConfirmationModalProps) {
+export function DeploymentConfirmationModal({
+  isOpen,
+  onOpenChange,
+  onConfirm,
+  isProcessing,
+  type,
+  template,
+  starshipName,
+  starshipId,
+  starshipSlug,
+  ownedStarships,
+}: DeploymentConfirmationModalProps) {
   const isAgent = type === 'agent'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
   const avatarUrl = isAgent ? (template as AgentTemplateModel).avatarUrl : undefined
@@ -43,9 +54,8 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, isOpen && isAgent && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, isOpen && isAgent && !!templateId)
 
-  const singleStarshipFromProps: DeployStarshipOption | null =
-    starshipId && starshipName ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName } : null
-  const listForSelection = ownedStarships?.length ? ownedStarships : (singleStarshipFromProps ? [singleStarshipFromProps] : [])
+  const singleStarshipFromProps: DeployStarshipOption | null = starshipId && starshipName ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName } : null
+  const listForSelection = ownedStarships?.length ? ownedStarships : singleStarshipFromProps ? [singleStarshipFromProps] : []
 
   const [selectedStarship, setSelectedStarship] = useState<DeployStarshipOption | null>(null)
   const firstId = listForSelection[0]?.id
@@ -152,9 +162,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                         }}
                         disabled={isProcessing}
                       >
-                        <SelectTrigger
-                          className="w-[200px] shrink-0 h-9 border-primary/30 bg-primary/10 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-0"
-                        >
+                        <SelectTrigger className="w-[200px] shrink-0 h-9 border-primary/30 bg-primary/10 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-0">
                           <SelectValue placeholder="Select starship" />
                         </SelectTrigger>
                         <SelectContent className="border-primary/30 bg-primary/10 backdrop-blur-sm">
@@ -363,12 +371,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             </div>
 
             <DialogFooter className="flex-shrink-0 gap-2 pt-3 border-t border-border/50 mt-3 justify-end pb-0">
-              <Button
-                type="button"
-                onClick={handleConfirm}
-                disabled={isProcessing || (isAgent && !selectedStarship)}
-                className="min-w-[120px]"
-              >
+              <Button type="button" onClick={handleConfirm} disabled={isProcessing || (isAgent && !selectedStarship)} className="min-w-[120px]">
                 {isProcessing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />

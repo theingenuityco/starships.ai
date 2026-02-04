@@ -67,10 +67,7 @@ export interface UseOwnedStarshipsForDeployOptions {
  * Returns owned starships suitable for marketplace deploy (filtered by ownerId, minimal shape).
  * Use this instead of duplicating filter/map logic in deploy CTAs and modals.
  */
-export function useOwnedStarshipsForDeploy(
-  userId: string,
-  options: UseOwnedStarshipsForDeployOptions = {}
-): { ownedStarships: DeployStarshipOption[]; primaryStarship: DeployStarshipOption | null } {
+export function useOwnedStarshipsForDeploy(userId: string, options: UseOwnedStarshipsForDeployOptions = {}): { ownedStarships: DeployStarshipOption[]; primaryStarship: DeployStarshipOption | null } {
   const { enabled = true, explicitStarship } = options
   const { data: starships = [] } = useUserStarships(userId, enabled && explicitStarship == null)
 
@@ -78,9 +75,7 @@ export function useOwnedStarshipsForDeploy(
     if (explicitStarship != null && explicitStarship.id) {
       return { ownedStarships: [explicitStarship], primaryStarship: explicitStarship }
     }
-    const owned = (starships as StarshipModel[])
-      .filter(s => s.ownerId === userId)
-      .map(s => ({ id: s.id, slug: s.slug, name: s.name }))
+    const owned = (starships as StarshipModel[]).filter(s => s.ownerId === userId).map(s => ({ id: s.id, slug: s.slug, name: s.name }))
     return { ownedStarships: owned, primaryStarship: owned[0] ?? null }
   }, [userId, starships, explicitStarship])
 }

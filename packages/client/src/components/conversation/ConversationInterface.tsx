@@ -948,14 +948,21 @@ export function ConversationInterface({
                                 } as const,
                               ]
                             })()
-                          : [
-                              {
-                                kind: 'human',
-                                key: `human:${String(draftDm.peerUserId || draftDm.peerLabel || 'peer')}`,
-                                label: String(draftDm.peerLabel || 'User'),
-                                ...(draftDm.peerAvatar ? { avatarUrl: String(draftDm.peerAvatar) } : null),
-                              } as const,
-                            ]),
+                          : (() => {
+                              const currentUserId = String(authUser?.id ?? userId ?? '')
+                              const peerId = String(draftDm.peerUserId ?? '')
+                              if (peerId && peerId !== currentUserId) {
+                                return [
+                                  {
+                                    kind: 'human',
+                                    key: `human:${peerId}`,
+                                    label: String(draftDm.peerLabel || 'User'),
+                                    ...(draftDm.peerAvatar ? { avatarUrl: String(draftDm.peerAvatar) } : null),
+                                  } as const,
+                                ]
+                              }
+                              return []
+                            })()),
                       ]
                     : null
                 }

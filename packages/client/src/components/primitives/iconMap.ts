@@ -125,6 +125,7 @@ const map: Record<string, ResolvedIcon> = {
   receipt: { type: 'phosphor', component: 'Receipt' },
   'credit-card': { type: 'phosphor', component: 'CreditCard' },
   trash: { type: 'phosphor', component: 'Trash' },
+  link: { type: 'phosphor', component: 'Link' },
   unlink: { type: 'phosphor', component: 'LinkBreak' },
   refresh: { type: 'phosphor', component: 'ArrowClockwise' },
   'rotate-ccw': { type: 'phosphor', component: 'ArrowCounterClockwise' },

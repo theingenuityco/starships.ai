@@ -16,9 +16,7 @@ interface AgentTemplateDetailsModalContentProps {
 export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDetailsModalContentProps) {
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
 
-  const toolSlugs: string[] = Array.isArray(template.assignedToolSlugs)
-    ? template.assignedToolSlugs.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-    : []
+  const toolSlugs: string[] = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter((s): s is string => typeof s === 'string' && s.trim().length > 0) : []
   const canCollapseTools = toolSlugs.length > 3
   const visibleToolSlugs = isToolsExpanded ? toolSlugs : toolSlugs.slice(0, 3)
 
@@ -44,11 +42,6 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
           {template.category ? (
             <Badge variant="outline" className={`capitalize border font-medium ${getCategoryColor(template.category)}`}>
               {template.category}
-            </Badge>
-          ) : null}
-          {template.version ? (
-            <Badge variant="outline" className="font-mono text-xs">
-              <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{template.version}
             </Badge>
           ) : null}
           {template.model ? (

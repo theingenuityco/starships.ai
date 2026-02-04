@@ -38,12 +38,13 @@ export interface UserModel {
   isInstanceAdmin?: boolean;
 
   // Authentication method tracking
-  hasPassword: boolean;           // Does user have password auth?
-  authMethods: AuthMethod[];      // List of auth methods
+  hasPassword: boolean; // Does user have password auth?
+  authMethods: AuthMethod[]; // List of auth methods
   primaryAuthMethod: 'password' | 'oauth'; // Primary login method
 
   // Onboarding tracking
   navigationOnboardingCompleted?: boolean; // Has user completed the navigation onboarding tour?
+  wizardOnboardingCompleted?: boolean; // Has user completed the wizard onboarding (name starship, invite, add agent)?
 }
 
 // ============================================================================

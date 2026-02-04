@@ -16,6 +16,7 @@ import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipChannels, useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversationsPendingApprovals, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
+import { useMarkConversationRead } from '@/hooks/useNotifications'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
@@ -752,12 +753,53 @@ export function ConversationInterface({
     const liveMessages = (ctx?.messages as any[]) || []
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
+    const markConversationRead = useMarkConversationRead()
+    const lastAutoMarkedKeyRef = useRef<string>('')
+
+    const lastMessageId = useMemo(() => {
+      if (!currentConversationId) return null
+      if (!Array.isArray(liveMessages) || liveMessages.length === 0) return null
+      const last = liveMessages[liveMessages.length - 1]
+      const id = typeof (last as any)?.id === 'string' ? String((last as any).id) : (last as any)?.id != null ? String((last as any).id) : ''
+      return id || null
+      // Perf: only depend on length; this is used for "append" detection.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentConversationId, liveMessages.length])
 
     // Consume UI actions emitted over SSE (conversation title updates, child conversations, etc.)
     useEffect(() => {
       if (!lastUIAction) return
       handleUIPayload(lastUIAction)
     }, [lastUIAction, handleUIPayload])
+
+    // Keep open DMs "read" while the user is watching them.
+    // Without this, DM notifications keep incrementing (and badges stack) during long-running conversations.
+    useEffect(() => {
+      const cid = String(currentConversationId || '').trim()
+      if (!cid) return
+      if (!lastMessageId) return
+      // DMs / non-channel conversations only.
+      if (isChannelConversation) return
+
+      // Don't auto-clear unread while tab is hidden/unfocused.
+      try {
+        if (typeof document !== 'undefined') {
+          if (document.visibilityState && document.visibilityState !== 'visible') return
+          if (typeof document.hasFocus === 'function' && !document.hasFocus()) return
+        }
+      } catch {
+        // ignore
+      }
+
+      const key = `${cid}:${lastMessageId}`
+      if (lastAutoMarkedKeyRef.current === key) return
+      lastAutoMarkedKeyRef.current = key
+
+      const t = window.setTimeout(() => {
+        void markConversationRead.mutateAsync(cid).catch(() => undefined)
+      }, 450)
+      return () => clearTimeout(t)
+    }, [currentConversationId, lastMessageId, isChannelConversation, markConversationRead])
 
     // Track last processed state to avoid redundant updates
     const lastProcessedStateRef = useRef<{ conversationId: string; agentId: string } | null>(null)

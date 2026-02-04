@@ -12,6 +12,7 @@ interface NavigationItemProps {
   label: string
   icon: string
   isActive: boolean
+  badgeCount?: number
   showLabels?: boolean
   expanded?: boolean
   onClick?: () => void
@@ -26,6 +27,7 @@ export function NavigationItem({
   label,
   icon,
   isActive,
+  badgeCount,
   showLabels = false,
   expanded = false,
   onClick,
@@ -79,6 +81,8 @@ export function NavigationItem({
 
   // Determine if item should be highlighted (either active route or onboarding highlight)
   const shouldHighlight = isActive || isOnboardingHighlighted
+  const hasBadge = typeof badgeCount === 'number' && Number.isFinite(badgeCount) && badgeCount > 0
+  const badgeLabel = hasBadge ? `${badgeCount > 99 ? '99+' : String(badgeCount)} unread` : ''
 
   const motionDiv = (
     <div
@@ -93,7 +97,9 @@ export function NavigationItem({
             ? isOnboardingHighlighted
               ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'
               : 'text-primary bg-primary/10 border-transparent'
-            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+            : hasBadge
+              ? 'text-foreground border-transparent hover:text-foreground hover:bg-muted'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
       }`}
       style={{
         justifyContent: 'flex-start',
@@ -103,6 +109,23 @@ export function NavigationItem({
       }}
     >
       {StableIcon}
+      {hasBadge ? (
+        expanded ? (
+          <span
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold"
+            aria-label={badgeLabel}
+            title={badgeLabel}
+          >
+            {badgeCount > 99 ? '99+' : String(badgeCount)}
+          </span>
+        ) : (
+          <span
+            className="pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm"
+            aria-label={badgeLabel}
+            title={badgeLabel}
+          />
+        )
+      ) : null}
       <AnimatePresence mode="wait">
         {expanded && (
           <motion.span

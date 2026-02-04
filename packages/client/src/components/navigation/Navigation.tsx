@@ -15,10 +15,12 @@ import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hook
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { useWallet } from '@/hooks/useWallet'
+import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -162,6 +164,34 @@ export function Navigation(props: NavigationProps) {
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
+  const starshipId = starshipData?.id ? String(starshipData.id) : null
+
+  // Badge data:
+  // Prefer live unread counts if an SSE notifications stream is already mounted somewhere else
+  // (e.g. conversation list). Otherwise fall back to the list endpoint.
+  const { data: streamChunks } = useQuery({
+    queryKey: starshipId ? NOTIFICATION_QUERY_KEYS.stream(starshipId) : (['__noop__'] as const),
+    queryFn: async () => [],
+    enabled: false,
+    staleTime: Infinity,
+  })
+  const { data: notifList } = useNotificationsList(starshipId, Boolean(isAuthenticated && starshipId))
+  const unreadTotal = useMemo(() => {
+    const chunks = Array.isArray(streamChunks) ? (streamChunks as any[]) : []
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'notification.state' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+      if (c?.type === 'snapshot' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+    }
+    const fallback = Number((notifList as any)?.unread?.totalUnread ?? 0)
+    return Number.isFinite(fallback) ? fallback : 0
+  }, [streamChunks, notifList])
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
   const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
@@ -242,6 +272,7 @@ export function Navigation(props: NavigationProps) {
               label: 'Notifications',
               icon: 'bell',
               isActive: pathname.startsWith(`/ship/${starshipSlug}/notifications`),
+              badgeCount: unreadTotal,
             },
           ]
         : []),
@@ -280,7 +311,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight, unreadTotal]
   )
 
   const handleSidebarBackgroundClick = useCallback(

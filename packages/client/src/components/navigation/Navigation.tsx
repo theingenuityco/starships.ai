@@ -15,10 +15,12 @@ import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hook
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { useWallet } from '@/hooks/useWallet'
+import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -170,6 +172,71 @@ export function Navigation(props: NavigationProps) {
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
+  const starshipId = starshipData?.id ? String(starshipData.id) : null
+  const queryClient = useQueryClient()
+
+  // Badge data:
+  // Prefer live unread counts if an SSE notifications stream is already mounted somewhere else
+  // (e.g. conversation list). Otherwise fall back to the list endpoint.
+  const streamKey = useMemo(() => (starshipId ? NOTIFICATION_QUERY_KEYS.stream(starshipId) : null), [starshipId])
+  const streamChunks = useSyncExternalStore(
+    useCallback(
+      (onStoreChange: () => void) => {
+        if (!streamKey) return () => {}
+        const sameKey = (a: unknown, b: unknown): boolean => {
+          if (!Array.isArray(a) || !Array.isArray(b)) return false
+          if (a.length !== b.length) return false
+          for (let i = 0; i < a.length; i++) if ((a as any)[i] !== (b as any)[i]) return false
+          return true
+        }
+        const cache = queryClient.getQueryCache()
+        const unsub = cache.subscribe(event => {
+          try {
+            const qk = (event as any)?.query?.queryKey
+            if (!sameKey(qk, streamKey)) return
+            onStoreChange()
+          } catch {
+            /* ignore */
+          }
+        })
+        return () => {
+          try {
+            unsub()
+          } catch {
+            /* ignore */
+          }
+        }
+      },
+      [queryClient, streamKey]
+    ),
+    useCallback(() => {
+      if (!streamKey) return null
+      try {
+        const data = queryClient.getQueryData(streamKey)
+        return Array.isArray(data) ? (data as any[]) : null
+      } catch {
+        return null
+      }
+    }, [queryClient, streamKey]),
+    () => null
+  )
+  const { data: notifList } = useNotificationsList(starshipId, Boolean(isAuthenticated && starshipId))
+  const unreadTotal = useMemo(() => {
+    const chunks = Array.isArray(streamChunks) ? (streamChunks as any[]) : []
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'notification.state' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+      if (c?.type === 'snapshot' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+    }
+    const fallback = Number((notifList as any)?.unread?.totalUnread ?? 0)
+    return Number.isFinite(fallback) ? fallback : 0
+  }, [streamChunks, notifList])
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
   const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
@@ -250,6 +317,7 @@ export function Navigation(props: NavigationProps) {
               label: 'Notifications',
               icon: 'bell',
               isActive: pathname.startsWith(`/ship/${starshipSlug}/notifications`),
+              badgeCount: unreadTotal,
             },
           ]
         : []),
@@ -288,7 +356,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight, unreadTotal]
   )
 
   const handleSidebarBackgroundClick = useCallback(
@@ -359,7 +427,7 @@ export function Navigation(props: NavigationProps) {
                     playOnMountOnce={false}
                   />
                 ) : (
-                  <Icon name="chevron-right" className="w-4 h-4" />
+                  <Icon name="sidebar" className="w-4 h-4" />
                 )}
               </div>
               {isExpanded && (
@@ -368,7 +436,7 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="text-[15px] font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
+                  className="text-sm font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
                   style={{ marginLeft: '0.375rem' }}
                 >
                   {starshipData?.name || 'Starships.ai'}
@@ -408,7 +476,7 @@ export function Navigation(props: NavigationProps) {
                   aria-label="Collapse sidebar"
                   style={{ cursor: 'w-resize' }}
                 >
-                  <Icon name="chevron-left" className="w-4 h-4" />
+                  <Icon name="sidebar" className="w-4 h-4" />
                 </button>
               )
             )}

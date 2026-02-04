@@ -56,6 +56,14 @@ export interface Message extends Omit<LlmMessage, 'content'> {
   attachmentIds?: string[];
 
   /**
+   * Emoji reactions keyed by emoji.
+   *
+   * Value is the ordered list of userIds who reacted with that emoji.
+   * (Ordering is stable for UI; do not treat it as meaningful beyond display.)
+   */
+  reactions?: Record<string, string[]>;
+
+  /**
    * Optional: link this message to a separate conversation.
    * Used for generic "thread preview" / "index post" messages in channels.
    */

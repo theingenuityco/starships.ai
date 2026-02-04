@@ -71,7 +71,7 @@ export function MarketplaceAvatar({
 
   return (
     <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, shapeClassName, ringClassName, bgClassName, shadowClassName, className)}>
-      {!hasImage && showTintWhenMissing ? <div className={cn('absolute inset-0', tintClassName)} /> : null}
+      {!hasImage && showTintWhenMissing ? <div className={cn('absolute inset-0', shapeClassName, tintClassName)} /> : null}
       {hasImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt={rawLabel || 'Avatar'} referrerPolicy="no-referrer" decoding="async" onError={() => setDidError(true)} className="relative z-10 h-full w-full object-cover" />
@@ -81,7 +81,7 @@ export function MarketplaceAvatar({
         </div>
       )}
       {/* Avoid an inner border on "empty" (missing-image) avatars. */}
-      {showInsetRing && hasImage ? <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" /> : null}
+      {showInsetRing && hasImage ? <div className={cn('pointer-events-none absolute inset-0', shapeClassName, 'ring-1 ring-inset ring-white/10')} /> : null}
     </div>
   )
 }

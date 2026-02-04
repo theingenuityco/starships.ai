@@ -8,6 +8,7 @@ interface NavigationSectionItem {
   label: string
   icon: string
   isActive?: boolean
+  badgeCount?: number
   onClick?: () => void
   special?: boolean
   itemRef?: React.RefObject<HTMLDivElement | null>

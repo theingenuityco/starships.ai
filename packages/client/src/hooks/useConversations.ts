@@ -19,6 +19,7 @@ import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 import { addPendingAppendCallback, getLastAssistantMessageId, isAnimationComplete, removePendingAppendCallback } from './useMessageAnimationState'
+import { useAuth } from '@/hooks/useAuth'
 
 // Ensure only one live SSE stream exists per conversation.
 // We observed duplicate assistant deltas when multiple streamedQuery instances ran concurrently
@@ -702,6 +703,157 @@ export function useLinkMessageToConversation() {
   })
 }
 
+// Toggle a reaction on a message (optimistic stream-cache patch)
+export function useToggleMessageReaction() {
+  const queryClient = useQueryClient()
+  const { userId: authUserId } = useAuth()
+  const userId = typeof authUserId === 'string' ? authUserId : ''
+
+  type ReactionsMap = Record<string, string[]>
+  type ToggleMessageReactionArgs = { conversationId: string; messageId: string; emoji: string }
+  type ToggleMessageReactionResponse = { messageId: string; reactions: ReactionsMap }
+  type ToggleMessageReactionContext = { conversationId: string; key: readonly unknown[]; prev: unknown }
+
+  const normalizeReactions = (input: unknown): ReactionsMap => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+    const out: ReactionsMap = {}
+    for (const [emoji, ids] of Object.entries(input as Record<string, unknown>)) {
+      if (!emoji) continue
+      if (!Array.isArray(ids)) continue
+      out[String(emoji)] = ids.map(x => String(x)).filter(Boolean)
+    }
+    return out
+  }
+
+  const toggleLocal = (reactions: ReactionsMap, emoji: string): ReactionsMap => {
+    if (!userId) return reactions
+    const prev = Array.isArray(reactions[emoji]) ? reactions[emoji] : []
+    const has = prev.includes(userId)
+    const nextUsers = has ? prev.filter(x => x !== userId) : [...prev, userId]
+    const next = { ...reactions }
+    if (nextUsers.length === 0) delete next[emoji]
+    else next[emoji] = nextUsers
+    return next
+  }
+
+  const patchChunksWithReactions = (old: unknown, args: { messageId: string; reactions: ReactionsMap }) => {
+    if (!Array.isArray(old)) return old
+    const { messageId, reactions } = args
+    return old.map((chunk: any) => {
+      if (!chunk || typeof chunk !== 'object') return chunk
+
+      // Back-compat local pre-seed event
+      if (chunk.type === 'append' && chunk.message && chunk.message.id === messageId) {
+        return { ...chunk, message: { ...chunk.message, reactions } }
+      }
+
+      // Snapshot event
+      if (chunk.type === 'snapshot' && chunk.data && Array.isArray(chunk.data.messages)) {
+        const nextMsgs = chunk.data.messages.map((m: any) => (m && m.id === messageId ? { ...m, reactions } : m))
+        return { ...chunk, data: { ...chunk.data, messages: nextMsgs } }
+      }
+
+      // Standard append event
+      if (chunk.type === 'message.append' && chunk.data && chunk.data.message && chunk.data.message.id === messageId) {
+        return { ...chunk, data: { ...chunk.data, message: { ...chunk.data.message, reactions } } }
+      }
+
+      return chunk
+    })
+  }
+
+  const appendReactionsChunk = (old: unknown, args: { conversationId: string; messageId: string; reactions: ReactionsMap }) => {
+    const base = Array.isArray(old) ? old : []
+    const nextChunk: { type: 'message.reactions'; data: { conversationId: string; messageId: string; reactions: ReactionsMap } } = {
+      type: 'message.reactions',
+      data: { conversationId: args.conversationId, messageId: args.messageId, reactions: args.reactions },
+    }
+    // Avoid unbounded duplicates when the last chunk is already the same update.
+    try {
+      const last = base.length > 0 ? (base[base.length - 1] as any) : null
+      if (last?.type === 'message.reactions' && last?.data?.messageId === args.messageId) {
+        const lastReactions = last?.data?.reactions
+        // Cheap structural compare: if keys+stringified values match, skip.
+        const a = typeof lastReactions === 'object' && lastReactions ? JSON.stringify(lastReactions) : ''
+        const b = JSON.stringify(args.reactions || {})
+        if (a === b) {
+          return base
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return [...base, nextChunk]
+  }
+
+  const findCurrentReactions = (chunks: unknown[], messageId: string): ReactionsMap => {
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const chunk: any = chunks[i] as any
+      if (!chunk || typeof chunk !== 'object') continue
+
+      // Stream reactions event (including synthetic optimistic chunks).
+      if (chunk.type === 'message.reactions') {
+        const mid = chunk?.data?.messageId
+        if (typeof mid === 'string' && mid === messageId) {
+          return normalizeReactions(chunk?.data?.reactions)
+        }
+      }
+
+      if (chunk.type === 'message.append' && chunk.data?.message?.id === messageId) return normalizeReactions(chunk.data.message.reactions)
+      if (chunk.type === 'append' && chunk.message?.id === messageId) return normalizeReactions(chunk.message.reactions)
+      if (chunk.type === 'snapshot' && chunk.data && Array.isArray(chunk.data.messages)) {
+        const m = chunk.data.messages.find((x: any) => x && x.id === messageId)
+        if (m) return normalizeReactions(m.reactions)
+      }
+    }
+    return {}
+  }
+
+  return useMutation<ToggleMessageReactionResponse, unknown, ToggleMessageReactionArgs, ToggleMessageReactionContext>({
+    mutationFn: async (args: ToggleMessageReactionArgs) => {
+      const emoji = String(args.emoji || '').trim()
+      const response: FetchResponse<ApiResponse<ToggleMessageReactionResponse>> = await api.post(`/api/v1/messages/${encodeURIComponent(args.messageId)}/reactions`, { emoji })
+      return response.data.data as ToggleMessageReactionResponse
+    },
+    onMutate: async (args: ToggleMessageReactionArgs): Promise<ToggleMessageReactionContext | undefined> => {
+      const conversationId = String(args.conversationId || '').trim()
+      const messageId = String(args.messageId || '').trim()
+      const emoji = String(args.emoji || '').trim()
+      if (!conversationId || !messageId || !emoji || !userId) return undefined
+
+      const key = CONVERSATION_QUERY_KEYS.messages(conversationId)
+      const prev = queryClient.getQueryData(key)
+
+      queryClient.setQueryData(key, (old: any) => {
+        const chunks = Array.isArray(old) ? old : []
+        const current = findCurrentReactions(chunks, messageId)
+        const next = toggleLocal(current, emoji)
+        // IMPORTANT:
+        // Append a synthetic stream event so `chunksRevisionKey` changes and the UI re-reduces immediately.
+        // Mutating nested fields inside existing chunks can be missed by memoization keyed to length/last-chunk.
+        return appendReactionsChunk(old, { conversationId, messageId, reactions: next })
+      })
+
+      return { conversationId, key, prev }
+    },
+    onError: (error: unknown, _vars, ctx) => {
+      if (ctx?.key) {
+        queryClient.setQueryData(ctx.key, ctx.prev as any)
+      }
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to add reaction', { description: errorMessage })
+    },
+    onSuccess: (data, vars) => {
+      const conversationId = String(vars.conversationId || '').trim()
+      const messageId = typeof data?.messageId === 'string' ? String(data.messageId).trim() : String(vars.messageId || '').trim()
+      const reactions = normalizeReactions(data?.reactions)
+      if (!conversationId || !messageId) return
+
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => appendReactionsChunk(old, { conversationId, messageId, reactions }))
+    },
+  })
+}
+
 // Get conversation agents (for agent restoration on refresh)
 export function useConversationAgents(conversationId: string | null) {
   return useQuery({
@@ -931,6 +1083,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
   const lastSseOpenAtRef = useRef<number | null>(null)
   const lastSseErrorAtRef = useRef<number | null>(null)
+  const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
   type TurnUsage = {
@@ -1056,6 +1209,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
               return
             case 'message.append':
               push({ type: 'message.append', data })
+              return
+            case 'message.reactions':
+              push({ type: 'message.reactions', data })
               return
             case 'ui_action':
               push({ type: 'ui_action', data })
@@ -1299,6 +1455,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
 
       return [...messages, { ...msg }]
+    }
+
+    if (chunk.type === 'message.reactions') {
+      const messages = clone(acc)
+      const messageId = typeof chunk.data?.messageId === 'string' ? String(chunk.data.messageId) : ''
+      const reactions = chunk.data?.reactions
+      if (!messageId) return messages
+      const idx = messages.findIndex(m => m.id === messageId)
+      if (idx === -1) return messages
+      messages[idx] = {
+        ...(messages[idx] as any),
+        reactions: reactions && typeof reactions === 'object' ? reactions : {},
+        updatedAt: new Date().toISOString(),
+      } as any
+      return messages
     }
 
     if (chunk.type === 'assistant.delta' || chunk.type === 'assistant.reasoning_delta') {

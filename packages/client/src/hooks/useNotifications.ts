@@ -15,6 +15,7 @@ type UnreadSummary = {
   totalUnread: number
   dmUnreadByConversationId: Record<string, number>
   mentionUnreadByConversationId: Record<string, number>
+  reactionUnreadByConversationId: Record<string, number>
 }
 
 export type NotificationsSnapshot = {
@@ -22,12 +23,17 @@ export type NotificationsSnapshot = {
   userId: string
   notifications: NotificationModel[]
   unread: UnreadSummary
+  hasMoreBefore?: boolean
+  oldestCursor?: { createdAt: string; id: string } | null
 }
 
 type StreamChunk =
   | { type: 'snapshot'; data: NotificationsSnapshot }
   | { type: 'notification.append'; data: { notification: NotificationModel } }
   | { type: 'notification.state'; data: { unread: UnreadSummary } }
+  | { type: 'notification.mark_read'; data: { conversationId: string | null; at: string } }
+  | { type: 'notification.mark_seen'; data: { before?: string | null; at: string } }
+  | { type: 'notification.page'; data: { notifications: NotificationModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null } }
   | { type: 'error'; error: unknown }
 
 const playedNotificationIdsByStarship = new Map<string, Set<string>>()
@@ -36,6 +42,17 @@ const MAX_TRACKED_IDS_PER_STARSHIP = 500
 function shouldPlayForNotification(n: NotificationModel): boolean {
   const typ = String((n as any)?.type || '')
   // Current UI treats only these as unread-notification types.
+  return typ === 'dm' || typ === 'mention' || typ === 'reaction'
+}
+
+function shouldAutoMarkReadForNotification(n: NotificationModel): boolean {
+  const typ = String((n as any)?.type || '')
+  // Auto-mark-read is intended to keep DM/mention badges from accumulating while
+  // the user is already actively reading that conversation.
+  //
+  // Reactions are *directed* at the message author and are often what the user
+  // is trying to notice while they're in the conversation, so we do not auto-mark
+  // them read.
   return typ === 'dm' || typ === 'mention'
 }
 
@@ -190,14 +207,33 @@ export function useNotificationsStream(
     return null
   }, [chunks.length, starshipId])
 
+  const pageInfo = useMemo(() => {
+    // Last-write-wins from snapshot + load-older pages.
+    let hasMoreBefore = Boolean(snapshot?.hasMoreBefore)
+    let oldestCursor: { createdAt: string; id: string } | null = (snapshot?.oldestCursor as any) ?? null
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'snapshot' && c?.data) {
+        hasMoreBefore = Boolean(c.data.hasMoreBefore)
+        oldestCursor = (c.data.oldestCursor as any) ?? null
+      }
+      if (c?.type === 'notification.page' && c?.data) {
+        hasMoreBefore = Boolean(c.data.hasMoreBefore)
+        oldestCursor = (c.data.oldestCursor as any) ?? null
+      }
+    }
+    return { hasMoreBefore, oldestCursor }
+  }, [chunks.length, snapshot])
+
   const unread = useMemo<UnreadSummary>(() => {
     // Start with snapshot unread, then apply state updates + append increments.
-    let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} }
+    let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} }
     // Copy so we can mutate safely
     let cur: UnreadSummary = {
       totalUnread: Number(base.totalUnread ?? 0) || 0,
       dmUnreadByConversationId: { ...(base.dmUnreadByConversationId ?? {}) },
       mentionUnreadByConversationId: { ...(base.mentionUnreadByConversationId ?? {}) },
+      reactionUnreadByConversationId: { ...(base.reactionUnreadByConversationId ?? {}) },
     }
     for (const ch of chunks) {
       const c: any = ch as any
@@ -207,16 +243,18 @@ export function useNotificationsStream(
           totalUnread: Number(u.totalUnread ?? 0) || 0,
           dmUnreadByConversationId: { ...(u.dmUnreadByConversationId ?? {}) },
           mentionUnreadByConversationId: { ...(u.mentionUnreadByConversationId ?? {}) },
+          reactionUnreadByConversationId: { ...(u.reactionUnreadByConversationId ?? {}) },
         }
       }
       if (c?.type === 'notification.append' && c?.data?.notification) {
         const n = c.data.notification as NotificationModel
         const cid = String((n as any).conversationId || '')
         const typ = String((n as any).type || '')
-        if (cid && (typ === 'dm' || typ === 'mention')) {
+        if (cid && (typ === 'dm' || typ === 'mention' || typ === 'reaction')) {
           cur.totalUnread += 1
           if (typ === 'dm') cur.dmUnreadByConversationId[cid] = (cur.dmUnreadByConversationId[cid] || 0) + 1
           if (typ === 'mention') cur.mentionUnreadByConversationId[cid] = (cur.mentionUnreadByConversationId[cid] || 0) + 1
+          if (typ === 'reaction') cur.reactionUnreadByConversationId[cid] = (cur.reactionUnreadByConversationId[cid] || 0) + 1
         }
       }
     }
@@ -237,8 +275,88 @@ export function useNotificationsStream(
         list.splice(0, list.length, ...c.data.notifications)
       }
     }
+
+    // Older pages (pagination): append to the end (list is newest-first).
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'notification.page' && Array.isArray(c?.data?.notifications)) {
+        for (const n of c.data.notifications as NotificationModel[]) {
+          if (!n?.id) continue
+          if (!list.some(x => x.id === n.id)) list.push(n)
+        }
+      }
+    }
+
+    // Apply local state mutations (mark read/seen) so the UI reflects server writes immediately.
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'notification.mark_read' && c?.data) {
+        const cid = typeof c.data.conversationId === 'string' ? String(c.data.conversationId).trim() : ''
+        const at = typeof c.data.at === 'string' ? String(c.data.at) : new Date().toISOString()
+        for (let i = 0; i < list.length; i++) {
+          const n = list[i] as any
+          if (!n) continue
+          if (cid && String(n.conversationId || '').trim() !== cid) continue
+          // Mark read implies seen.
+          list[i] = { ...(n as NotificationModel), readAt: (n as any).readAt ?? at, seenAt: (n as any).seenAt ?? at }
+        }
+      }
+      if (c?.type === 'notification.mark_seen' && c?.data) {
+        const before = c.data.before != null ? String(c.data.before) : null
+        const at = typeof c.data.at === 'string' ? String(c.data.at) : new Date().toISOString()
+        const beforeMs = before ? Date.parse(before) : null
+        for (let i = 0; i < list.length; i++) {
+          const n = list[i] as any
+          if (!n) continue
+          if ((n as any).seenAt) continue
+          if (beforeMs != null) {
+            const createdMs = Date.parse(String((n as any).createdAt || ''))
+            if (!Number.isFinite(createdMs) || createdMs > beforeMs) continue
+          }
+          list[i] = { ...(n as NotificationModel), seenAt: at }
+        }
+      }
+    }
+
     return list
   }, [chunks.length, snapshot])
+
+  const loadOlder = useMutation({
+    mutationFn: async (args?: { limit?: number }) => {
+      const sid = String(starshipId || '')
+      if (!sid) return null
+      const cursor = pageInfo.oldestCursor
+      if (!cursor?.createdAt || !cursor?.id) return null
+      const resp = await api.get(`/api/v1/starships/${sid}/notifications`, {
+        params: {
+          limit: typeof args?.limit === 'number' ? args?.limit : 50,
+          beforeCreatedAt: cursor.createdAt,
+          beforeId: cursor.id,
+        },
+      })
+      return (resp as any).data?.data as {
+        notifications: NotificationModel[]
+        hasMoreBefore: boolean
+        oldestCursor: { createdAt: string; id: string } | null
+      }
+    },
+    onSuccess: data => {
+      const sid = String(starshipId || '')
+      if (!sid || !data) return
+      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
+        const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({
+          type: 'notification.page',
+          data: {
+            notifications: Array.isArray((data as any)?.notifications) ? (data as any).notifications : [],
+            hasMoreBefore: Boolean((data as any)?.hasMoreBefore),
+            oldestCursor: ((data as any)?.oldestCursor as any) ?? null,
+          },
+        })
+        return arr
+      })
+    },
+  })
 
   const markSeen = useMutation({
     mutationFn: async (args?: { before?: string | null }) => {
@@ -246,12 +364,13 @@ export function useNotificationsStream(
       const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-seen`, { before: args?.before ?? null })
       return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       // Best-effort: update cached state immediately
       const sid = String(starshipId || '')
       if (!sid || !data?.unread) return
       queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
         const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.mark_seen', data: { before: variables?.before ?? null, at: new Date().toISOString() } })
         arr.push({ type: 'notification.state', data: { unread: data.unread } })
         return arr
       })
@@ -264,11 +383,12 @@ export function useNotificationsStream(
       const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-read`, { conversationId: args?.conversationId ?? null })
       return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       const sid = String(starshipId || '')
       if (!sid || !data?.unread) return
       queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
         const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.mark_read', data: { conversationId: variables?.conversationId ?? null, at: new Date().toISOString() } })
         arr.push({ type: 'notification.state', data: { unread: data.unread } })
         return arr
       })
@@ -341,6 +461,9 @@ export function useNotificationsStream(
       if (c?.type !== 'notification.append' || !c?.data?.notification) continue
       const n = c.data.notification as NotificationModel
       if (!shouldPlayForNotification(n)) continue
+      if (!shouldAutoMarkReadForNotification(n)) {
+        continue
+      }
 
       const notifConversationId = String((n as any)?.conversationId || '').trim()
       if (!notifConversationId) continue
@@ -399,7 +522,9 @@ export function useNotificationsStream(
       //   that the notification is for (handled by passing an activeConversationId from call sites).
       const foreground = isForeground()
       const notifConversationId = String((n as any)?.conversationId || '').trim()
-      if (foreground && notifConversationId && activeConversationId && notifConversationId === activeConversationId) {
+      const typ = String((n as any)?.type || '')
+      const canSuppressInActiveConversation = typ === 'dm' || typ === 'mention'
+      if (foreground && canSuppressInActiveConversation && notifConversationId && activeConversationId && notifConversationId === activeConversationId) {
         continue
       }
 
@@ -445,6 +570,10 @@ export function useNotificationsStream(
     isFetching: q.fetchStatus === 'fetching',
     isError: q.isError,
     error: q.error,
+    hasMoreBefore: pageInfo.hasMoreBefore,
+    oldestCursor: pageInfo.oldestCursor,
+    isLoadingOlder: loadOlder.isPending,
+    loadOlder: (args?: { limit?: number }) => loadOlder.mutateAsync(args),
     markSeen: (args?: { before?: string | null }) => markSeen.mutateAsync(args),
     markRead: (args?: { conversationId?: string | null }) => markRead.mutateAsync(args),
   }
@@ -460,7 +589,14 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
       const data = (resp as any).data?.data as any
       return {
         notifications: (data?.notifications as NotificationModel[]) ?? [],
-        unread: (data?.unread as UnreadSummary) ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} },
+        unread:
+          (data?.unread as UnreadSummary) ??
+          ({
+            totalUnread: 0,
+            dmUnreadByConversationId: {},
+            mentionUnreadByConversationId: {},
+            reactionUnreadByConversationId: {},
+          } as UnreadSummary),
       }
     },
   })

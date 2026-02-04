@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useNotificationsStream } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
@@ -17,18 +17,6 @@ export default function NotificationsPage() {
 
   const [filter, setFilter] = useState<Filter>('all')
   const { notifications, unread, isLoading, markRead, markSeen } = useNotificationsStream(starshipId, Boolean(starshipId))
-  const debugLoggedRef = useRef(false)
-
-  useEffect(() => {
-    if (debugLoggedRef.current) return
-    const list = Array.isArray(notifications) ? notifications : []
-    const hasReaction = list.some((n: any) => String(n?.type || '') === 'reaction')
-    if (!hasReaction) return
-    debugLoggedRef.current = true
-    // #region agent log (H3/H9) notifications page sees reaction
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H9',location:'packages/client/src/app/ship/[slug]/notifications/page.tsx:effect',message:'Notifications page observed reaction notification in list',data:{starshipIdSuffix:String(starshipId||'').slice(-6),notificationsCount:list.length,totalUnread:Number((unread as any)?.totalUnread??0)||0,filter},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-  }, [filter, notifications, starshipId, unread])
 
   const filtered = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : []

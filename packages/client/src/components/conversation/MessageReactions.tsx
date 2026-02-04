@@ -54,8 +54,12 @@ export function MessageReactions({
   const userId = typeof authUserId === 'string' ? authUserId : ''
 
   const toggle = useToggleMessageReaction()
-  const pendingEmoji = (toggle as any)?.variables?.emoji ? String((toggle as any).variables.emoji) : null
-  const isPending = Boolean((toggle as any)?.isPending)
+  const toggleVars = toggle.variables
+  const isTogglePending = toggle.isPending
+  const pendingForThisMessage = Boolean(
+    isTogglePending && toggleVars && String(toggleVars.conversationId || '') === String(conversationId || '') && String(toggleVars.messageId || '') === String(messageId || '')
+  )
+  const pendingEmoji = pendingForThisMessage ? toggleVars.emoji : null
 
   const entries = useMemo(() => {
     const r = normalizeReactions(reactions)
@@ -175,7 +179,7 @@ export function MessageReactions({
       {entries.map(({ emoji, userIds }) => {
         const count = userIds.length
         const viewerReacted = userId ? userIds.includes(userId) : false
-        const isPending = pendingEmoji === emoji
+        const isEmojiPending = Boolean(pendingEmoji && pendingEmoji === emoji)
         const idsForDisplay = userIds.slice().reverse() // newest last in DB, but we display newest first
 
         return (
@@ -195,10 +199,12 @@ export function MessageReactions({
                 size="sm"
                 className={cn(
                   'h-6 px-2 py-0 rounded-full text-xs font-medium gap-1',
-                  viewerReacted ? 'bg-primary/15 text-primary border border-primary/20' : 'bg-muted/50',
-                  isPending ? 'opacity-70' : ''
+                  viewerReacted
+                    ? 'bg-primary/15 text-primary border border-primary/20 hover:bg-primary/15 hover:text-primary hover:border-primary/20'
+                    : 'bg-muted/50 hover:bg-muted/60',
+                  isEmojiPending ? 'opacity-70' : ''
                 )}
-                disabled={disabled || (isPending && pendingEmoji === emoji) || !userId}
+                disabled={disabled || isEmojiPending || !userId}
                 onClick={() => doToggle(emoji)}
                 onPointerEnter={e => {
                   triggerByEmojiRef.current.set(emoji, e.currentTarget)

@@ -3,11 +3,10 @@
 import { useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
-import type { AgentTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useOwnedStarshipsForDeploy, useStarshipAgents } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { Button } from '@/components/ui/button'
@@ -22,13 +21,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   const pathname = usePathname()
 
   const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
-  const starshipsWithOwner = starships as Array<{ id: string; slug: string; name: string; ownerId?: string }>
-  const ownedStarships = useMemo(
-    () => starshipsWithOwner.filter(s => s.ownerId === userId).map(s => ({ id: s.id, slug: s.slug, name: s.name })),
-    [starshipsWithOwner, userId]
-  )
-  const primaryStarship = ownedStarships[0] ?? null
+  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -69,7 +62,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: { id: string; slug: string; name: string } }) => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => {
     const targetStarship = input?.starship ?? primaryStarship
     if (!targetStarship) return
     setIsDeploying(true)

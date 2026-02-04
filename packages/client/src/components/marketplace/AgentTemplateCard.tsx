@@ -6,14 +6,13 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
-import { useStarship, useUserStarships } from '@/hooks/useStarships'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useOwnedStarshipsForDeploy, useStarship, useStarshipAgents } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 
 import { useMemo, useState } from 'react'
-import type { AgentTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 import api from '@/lib/api'
@@ -45,19 +44,16 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
   // Get current user and their starships for deployment
   const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId && !targetStarshipId)
-  const starshipsWithOwner = starships as Array<{ id: string; slug: string; name: string; ownerId?: string }>
-  const ownedFromList = useMemo(
-    () => starshipsWithOwner.filter(s => s.ownerId === userId).map(s => ({ id: s.id, slug: s.slug, name: s.name })),
-    [starshipsWithOwner, userId]
-  )
-  const primaryStarship = ownedFromList[0] ?? null
   const { data: explicitStarship } = useStarship(String(targetStarshipId || ''), !!targetStarshipId && !!isAuthenticated)
+  const explicitDeployOption = useMemo(() => {
+    if (!explicitStarship) return null
+    return { id: explicitStarship.id, slug: explicitStarship.slug ?? '', name: explicitStarship.name ?? '' }
+  }, [explicitStarship])
+  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', {
+    enabled: !!userId,
+    explicitStarship: targetStarshipId ? explicitDeployOption : undefined,
+  })
   const starship = targetStarshipId ? (explicitStarship ?? { id: targetStarshipId, slug: '', name: '' }) : primaryStarship
-  const ownedStarships =
-    targetStarshipId && explicitStarship
-      ? [{ id: explicitStarship.id, slug: (explicitStarship as { slug?: string }).slug ?? '', name: (explicitStarship as { name?: string }).name ?? '' }]
-      : ownedFromList
 
   // Get deployed agents to check if this template is already deployed
   const { data: deployedAgents = [] } = useStarshipAgents(starship?.id || '', !!starship)
@@ -120,7 +116,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
 
-  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: { id: string; slug: string; name: string } }) => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => {
     const targetStarship = input?.starship ?? starship
     if (!targetStarship) return
 

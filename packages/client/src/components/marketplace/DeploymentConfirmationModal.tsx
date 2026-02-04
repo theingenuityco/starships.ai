@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
@@ -14,19 +14,13 @@ import { cn } from '@/lib/utils'
 import { useToolTemplates, useRequiredConnectors } from '@/hooks/useTemplates'
 import { ConnectorSuggestionCard } from '@/components/widgets/ConnectorSuggestionCard'
 
-import type { AgentTemplateModel, AgentToolPermission, ToolTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel, AgentToolPermission, DeployStarshipOption, ToolTemplateModel } from '@starships/protocol'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
-export interface DeploymentStarshipOption {
-  id: string
-  slug: string
-  name: string
-}
 
 interface DeploymentConfirmationModalProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeploymentStarshipOption }) => Promise<void>
+  onConfirm: (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => Promise<void>
   isProcessing: boolean
   type: 'agent' | 'tool'
   template: AgentTemplateModel | ToolTemplateModel
@@ -35,7 +29,7 @@ interface DeploymentConfirmationModalProps {
   starshipId?: string
   starshipSlug?: string
   /** When provided (agent deploy), user can choose target starship. If length > 1, show dropdown; if 1, show static name. */
-  ownedStarships?: DeploymentStarshipOption[]
+  ownedStarships?: DeployStarshipOption[]
 }
 
 export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName, starshipId, starshipSlug, ownedStarships }: DeploymentConfirmationModalProps) {
@@ -49,18 +43,18 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, isOpen && isAgent && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, isOpen && isAgent && !!templateId)
 
-  const singleStarshipFromProps =
+  const singleStarshipFromProps: DeployStarshipOption | null =
     starshipId && starshipName ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName } : null
   const listForSelection = ownedStarships?.length ? ownedStarships : (singleStarshipFromProps ? [singleStarshipFromProps] : [])
-  const listForSelectionRef = useRef(listForSelection)
-  listForSelectionRef.current = listForSelection
 
-  const [selectedStarship, setSelectedStarship] = useState<DeploymentStarshipOption | null>(null)
+  const [selectedStarship, setSelectedStarship] = useState<DeployStarshipOption | null>(null)
+  const firstId = listForSelection[0]?.id
+  const listLength = listForSelection.length
 
   useEffect(() => {
     if (!isOpen) return
-    setSelectedStarship(listForSelectionRef.current[0] ?? null)
-  }, [isOpen])
+    setSelectedStarship(listForSelection[0] ?? null)
+  }, [isOpen, firstId, listLength])
 
   const toolTemplateBySlug = useMemo(() => {
     const map = new Map<string, ToolTemplateModel>()
@@ -144,7 +138,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <DialogHeader className="flex-shrink-0 pt-3 mb-4 overflow-visible">
-              <DialogTitle className="flex items-center gap-2 flex-wrap items-center min-h-[2.25rem] overflow-visible">
+              <DialogTitle className="flex flex-wrap items-center gap-2 min-h-[2.25rem] overflow-visible">
                 <Icon name={ActionIconName} className="w-5 h-5 text-primary shrink-0" />
                 {isAgent ? (
                   <>

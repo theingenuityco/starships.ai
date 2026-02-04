@@ -59,7 +59,7 @@ export function MessageReactions({
   const pendingForThisMessage = Boolean(
     isTogglePending && toggleVars && String(toggleVars.conversationId || '') === String(conversationId || '') && String(toggleVars.messageId || '') === String(messageId || '')
   )
-  const pendingEmoji = pendingForThisMessage ? toggleVars.emoji : null
+  const pendingEmoji = pendingForThisMessage ? toggleVars?.emoji ?? null : null
 
   const entries = useMemo(() => {
     const r = normalizeReactions(reactions)
@@ -167,8 +167,9 @@ export function MessageReactions({
     if (!messageId) return
     if (!userId) return
     if (!conversationId) return
-    if (isPending) return
-    toggle.mutate({ conversationId, messageId, emoji } as any)
+    // Only block while a toggle for THIS message is in-flight.
+    if (pendingForThisMessage) return
+    toggle.mutate({ conversationId, messageId, emoji })
   }
 
   // If there are no reactions, render nothing (no empty row/spacing).
@@ -200,7 +201,7 @@ export function MessageReactions({
                 className={cn(
                   'h-6 px-2 py-0 rounded-full text-xs font-medium gap-1',
                   viewerReacted
-                    ? 'bg-primary/15 text-primary border border-primary/20 hover:bg-primary/15 hover:text-primary hover:border-primary/20'
+                    ? 'bg-primary/15 text-primary border border-primary/20 hover:bg-primary/20 hover:text-primary hover:border-primary/30'
                     : 'bg-muted/50 hover:bg-muted/60',
                   isEmojiPending ? 'opacity-70' : ''
                 )}

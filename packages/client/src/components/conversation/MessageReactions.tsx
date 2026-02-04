@@ -231,7 +231,7 @@ export function MessageReactions({
               align="start"
               side="bottom"
               sideOffset={8}
-              className="w-64 p-1 bg-popover text-popover-foreground border border-border shadow-xl rounded-xl"
+              className="w-64 !p-1 bg-card text-popover-foreground !border-0 ring-1 ring-border/60 dark:ring-border shadow-md !rounded-lg"
               onOpenAutoFocus={e => e.preventDefault()}
               onCloseAutoFocus={e => e.preventDefault()}
               onPointerEnter={() => openPopoverFor(emoji)}

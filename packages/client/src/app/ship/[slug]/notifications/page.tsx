@@ -1,13 +1,95 @@
 'use client'
 
+import Icon from '@/components/primitives/Icon'
 import { useParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useNotificationsStream } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
+import { useStarshipChannels, useStarshipDirectMessages } from '@/hooks/useConversations'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import type { DirectMessageListItem } from '@/hooks/useConversations'
 
 type Filter = 'all' | 'mentions' | 'dms' | 'reactions'
+
+function safeDistanceToNow(input: string): string {
+  try {
+    const d = new Date(input)
+    if (Number.isNaN(d.getTime())) return ''
+    return formatDistanceToNow(d, { addSuffix: true })
+  } catch {
+    return ''
+  }
+}
+
+function getDmPeerKey(item: DirectMessageListItem): string | null {
+  const dm: any = (item as any)?.dm
+  if (!dm) return null
+  const dmType = String(dm?.dmType || '')
+  if (dmType === 'user_agent') {
+    const agent: any = (item as any)?.agent
+    const slug = typeof agent?.slug === 'string' ? agent.slug.trim() : ''
+    if (slug) return slug
+    const id = typeof agent?.id === 'string' ? agent.id.trim() : ''
+    return id ? `a:${id}` : null
+  }
+  if (dmType === 'user_user') {
+    const peerUser: any = (item as any)?.peerUser
+    const id = typeof peerUser?.id === 'string' ? peerUser.id.trim() : ''
+    return id ? `u-${id}` : null
+  }
+  return null
+}
+
+function getConversationLabel(args: {
+  conversationId: string
+  channelByConversationId: Map<string, any>
+  dmByConversationId: Map<string, DirectMessageListItem>
+}): { primary: string; secondary?: string; href: string } {
+  const cid = String(args.conversationId || '').trim()
+  const ch = cid ? args.channelByConversationId.get(cid) : null
+  if (ch) {
+    const slug = String((ch as any)?.slug || '').trim()
+    const name = String((ch as any)?.name || '').trim()
+    const isPrivate = Boolean((ch as any)?.isPrivate)
+    const primary = slug ? `#${slug}` : name ? name : 'a channel'
+    const secondary = slug && name ? name : isPrivate ? 'Private channel' : undefined
+    // Notifications route is already scoped to a ship; we can link by relative segment.
+    const href = slug ? `../channels/${encodeURIComponent(slug)}` : `../conversations/${encodeURIComponent(cid)}`
+    return { primary, secondary, href }
+  }
+
+  const dm = cid ? args.dmByConversationId.get(cid) : null
+  if (dm) {
+    const peerUser: any = (dm as any)?.peerUser
+    const agent: any = (dm as any)?.agent
+    const peerLabel = (() => {
+      if (agent) return formatAgentDisplayName(agent)
+      const displayName = typeof peerUser?.displayName === 'string' ? peerUser.displayName.trim() : ''
+      const email = typeof peerUser?.email === 'string' ? peerUser.email.trim() : ''
+      return displayName || email || 'Someone'
+    })()
+    const peerKey = getDmPeerKey(dm)
+    const href = peerKey ? `../dm/${encodeURIComponent(peerKey)}` : `../conversations/${encodeURIComponent(cid)}`
+    return { primary: `DM with ${peerLabel}`, href }
+  }
+
+  return { primary: 'a conversation', secondary: cid ? `Conversation ${cid}` : undefined, href: `../conversations/${encodeURIComponent(cid)}` }
+}
+
+function getNotificationSentence(args: {
+  type: string
+  locationLabel: string
+}): { title: string; iconName: 'tag' | 'message-circle-more' | 'smiley' | 'bell' } {
+  const t = String(args.type || '')
+  if (t === 'mention') return { title: `You were mentioned in ${args.locationLabel}`, iconName: 'tag' }
+  if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'message-circle-more' }
+  if (t === 'reaction') return { title: `Your message got a reaction in ${args.locationLabel}`, iconName: 'smiley' }
+  return { title: 'New notification', iconName: 'bell' }
+}
 
 export default function NotificationsPage() {
   const params = useParams()
@@ -17,6 +99,8 @@ export default function NotificationsPage() {
 
   const [filter, setFilter] = useState<Filter>('all')
   const { notifications, unread, isLoading, markRead, markSeen } = useNotificationsStream(starshipId, Boolean(starshipId))
+  const { data: channelsData } = useStarshipChannels(String(starshipId || ''), Boolean(starshipId))
+  const { data: dmsData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId))
 
   const filtered = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : []
@@ -25,6 +109,26 @@ export default function NotificationsPage() {
     if (filter === 'reactions') return list.filter(n => n.type === 'reaction')
     return list
   }, [notifications, filter])
+
+  const channelByConversationId = useMemo(() => {
+    const map = new Map<string, any>()
+    const list = (channelsData as any)?.channels ?? []
+    for (const ch of list) {
+      const cid = String((ch as any)?.conversationId || '').trim()
+      if (cid) map.set(cid, ch)
+    }
+    return map
+  }, [channelsData])
+
+  const dmByConversationId = useMemo(() => {
+    const map = new Map<string, DirectMessageListItem>()
+    const list = (dmsData as any)?.directMessages ?? []
+    for (const it of list) {
+      const cid = String((it as any)?.dm?.conversationId || '').trim()
+      if (cid) map.set(cid, it as DirectMessageListItem)
+    }
+    return map
+  }, [dmsData])
 
   return (
     <div className="px-6 py-6 max-w-5xl mx-auto">
@@ -35,7 +139,7 @@ export default function NotificationsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => markSeen()} disabled={isLoading}>
-            Mark seen
+            Mark all seen
           </Button>
           <Button onClick={() => markRead()} disabled={isLoading || !(unread?.totalUnread > 0)}>
             Mark all read
@@ -67,20 +171,51 @@ export default function NotificationsPage() {
           <div className="space-y-2">
             {filtered.map(n => {
               const isUnread = !n.readAt
+              const location = getConversationLabel({
+                conversationId: n.conversationId,
+                channelByConversationId,
+                dmByConversationId,
+              })
+              const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
+              const timeAgo = safeDistanceToNow(n.createdAt)
               return (
-                <div key={n.id} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3', isUnread && 'ring-1 ring-border')}>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('text-sm font-medium', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
-                        {n.type === 'mention' ? 'Mention' : n.type === 'dm' ? 'Direct message' : 'Reaction'}
+                <div
+                  key={n.id}
+                  className={cn(
+                    'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
+                    isUnread && 'ring-1 ring-border'
+                  )}
+                >
+                  <Link
+                    href={location.href}
+                    className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
+                    aria-label={sentence.title}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className={cn('mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border', isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground')}>
+                        <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
                       </span>
-                      {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" /> : null}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
+                            {sentence.title}
+                          </span>
+                          {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                          <span className="truncate">{location.secondary ? `${location.primary} · ${location.secondary}` : location.primary}</span>
+                          {timeAgo ? <span aria-label={`Received ${timeAgo}`}>{timeAgo}</span> : null}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">Conversation: {n.conversationId}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2">
-                    <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} disabled={!isUnread}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => markRead({ conversationId: n.conversationId })}
+                      disabled={!isUnread}
+                      aria-label={isUnread ? 'Mark this notification read' : 'Already read'}
+                    >
                       Mark read
                     </Button>
                   </div>

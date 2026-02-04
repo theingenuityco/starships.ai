@@ -205,9 +205,9 @@ export function ConversationList({
         })
       : all
 
-    // Stable ordering: agents first, then humans; alpha within group
+    // Stable ordering: humans first, then agents; alpha within group
     return filtered.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'agent' ? -1 : 1
+      if (a.kind !== b.kind) return a.kind === 'user' ? -1 : 1
       return a.label.localeCompare(b.label)
     })
   }, [agentsData, membersData?.members, authUserId, searchQuery])

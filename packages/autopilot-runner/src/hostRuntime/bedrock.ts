@@ -99,14 +99,43 @@ export async function invokeBedrock(
 
   const rawMessages = request.messages as OpenAI.Chat.ChatCompletionMessageParam[];
 
-  // Claude extended thinking requires that any prior assistant turns include the provider-issued
-  // thinking/reasoning blocks (including signatures) exactly as returned. We currently do not
-  // persist those provider-native blocks, so enabling thinking on multi-turn conversations
-  // will fail Bedrock validation. Only enable thinking when there is no assistant history.
+  // Claude extended thinking may require that prior assistant turns include provider-issued
+  // thinking/reasoning blocks (including signatures) exactly as returned.
+  // We currently do not persist those provider-native blocks. Historically we disabled thinking
+  // when assistant history existed; however, this can prevent thinking entirely in normal chats.
+  // We now allow thinking even with assistant history, and rely on runtime validation to confirm
+  // whether Bedrock accepts it for this model/profile.
   const hasAssistantHistory = Array.isArray(rawMessages) && rawMessages.some((m) => m?.role === 'assistant');
-  if (hasAssistantHistory) {
-    thinkingWillBeEnabled = false;
-  }
+
+  // #region agent log
+  try {
+    const r = (request as unknown as { reasoning?: unknown })?.reasoning;
+    const rec = r && typeof r === 'object' && !Array.isArray(r) ? (r as Record<string, unknown>) : undefined;
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'B1_B2',
+        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
+        message: 'Bedrock request thinking config computed',
+        data: {
+          providerModelId,
+          hasReasoningConfig: r != null,
+          reasoningEnabled: typeof rec?.enabled === 'boolean' ? rec.enabled : undefined,
+          reasoningEffort: typeof rec?.effort === 'string' ? rec.effort : undefined,
+          reasoningMaxTokens: typeof rec?.max_tokens === 'number' ? rec.max_tokens : undefined,
+          thinkingBudgetTokens,
+          hasAssistantHistory,
+          thinkingWillBeEnabled,
+          maxTokens: typeof request.maxTokens === 'number' ? request.maxTokens : undefined,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {}
+  // #endregion
 
   for (const m of rawMessages) {
     if (m.role === 'system') {
@@ -133,12 +162,12 @@ export async function invokeBedrock(
       const trimmed = m.content.trim();
       // Bedrock validation requires non-blank text fields; provide a minimal placeholder
       // when the original content is empty (e.g. attachment-only messages).
-      content.push({ text: trimmed.length > 0 ? trimmed : ' ' });
+      content.push({ text: trimmed.length > 0 ? trimmed : '.' });
     } else if (Array.isArray(m.content)) {
       for (const part of m.content) {
         if (part.type === 'text') {
           const txt = typeof part.text === 'string' ? part.text.trim() : '';
-          content.push({ text: txt.length > 0 ? txt : ' ' });
+          content.push({ text: txt.length > 0 ? txt : '.' });
         } else if (part.type === 'image_url' && part.image_url?.url) {
           const rawUrl = part.image_url.url;
           const matches = rawUrl.match(/^data:image\/([a-z]+);base64,(.+)$/);
@@ -245,6 +274,30 @@ export async function invokeBedrock(
     inferenceConfig,
   };
 
+  // #region agent log
+  try {
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'B1',
+        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
+        message: 'Bedrock ConverseStreamCommand input summary',
+        data: {
+          providerModelId,
+          systemCount: system.length,
+          messagesCount: bedrockMessages.length,
+          thinkingWillBeEnabled,
+          thinkingBudgetTokens,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {}
+  // #endregion
+
   if (system.length > 0) {
     input.system = system;
   }
@@ -267,6 +320,30 @@ export async function invokeBedrock(
   } catch {
     // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
   }
+
+  // #region agent log
+  try {
+    const t = (input as unknown as { additionalModelRequestFields?: { thinking?: unknown } })?.additionalModelRequestFields?.thinking;
+    const hasThinking = t != null && typeof t === 'object';
+    const b =
+      hasThinking && typeof (t as Record<string, unknown>)?.budget_tokens === 'number'
+        ? (t as Record<string, unknown>).budget_tokens
+        : undefined;
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'pre-fix',
+        hypothesisId: 'B2',
+        location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:invokeBedrock',
+        message: 'Bedrock additionalModelRequestFields.thinking applied?',
+        data: { providerModelId, thinkingWillBeEnabled, hasThinking, budget_tokens: b },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {}
+  // #endregion
 
   // If thinking is not enabled, forward sampling params as-is.
   if (!input.additionalModelRequestFields?.thinking) {
@@ -337,6 +414,7 @@ export async function invokeBedrock(
       // Usage and finish_reason are delivered late in the stream (messageStop/metadata).
       let bedrockStopReason: string | undefined;
       let bedrockUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
+      let loggedReasoningShape = false;
 
       for await (const event of stream) {
         // Capture stop reason + usage (metadata) when present.
@@ -378,6 +456,45 @@ export async function invokeBedrock(
           if (delta.reasoningContent) {
             const rc = delta.reasoningContent;
             let nextText = '';
+            // #region agent log
+            try {
+              if (!loggedReasoningShape) {
+                loggedReasoningShape = true;
+                const keys = rc && typeof rc === 'object' ? Object.keys(rc as Record<string, unknown>).slice(0, 12) : [];
+                let hasSignature = false;
+                try {
+                  if (rc && typeof rc === 'object') {
+                    const rco = rc as Record<string, unknown>;
+                    const reasoningText = rco.reasoningText;
+                    if (reasoningText && typeof reasoningText === 'object') {
+                      const rt = reasoningText as Record<string, unknown>;
+                      hasSignature = typeof rt.signature === 'string' && rt.signature.length > 0;
+                    }
+                  }
+                } catch {
+                  hasSignature = false;
+                }
+                fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'pre-fix',
+                    hypothesisId: 'B3',
+                    location: 'packages/autopilot-runner/src/hostRuntime/bedrock.ts:gen',
+                    message: 'Observed Bedrock reasoningContent shape',
+                    data: {
+                      providerModelId,
+                      reasoningContentType: typeof rc,
+                      reasoningContentKeys: keys,
+                      hasSignature,
+                    },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+              }
+            } catch {}
+            // #endregion
             try {
               if (typeof rc === 'string') {
                 nextText = rc;

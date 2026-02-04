@@ -794,11 +794,7 @@ export function ConversationInterface({
       const key = `${cid}:${lastMessageId}`
       if (lastAutoMarkedKeyRef.current === key) return
       lastAutoMarkedKeyRef.current = key
-
-      const t = window.setTimeout(() => {
-        void markConversationRead.mutateAsync(cid).catch(() => undefined)
-      }, 450)
-      return () => clearTimeout(t)
+      void markConversationRead.mutateAsync(cid).catch(() => undefined)
     }, [currentConversationId, lastMessageId, isChannelConversation, markConversationRead])
 
     // Track last processed state to avoid redundant updates

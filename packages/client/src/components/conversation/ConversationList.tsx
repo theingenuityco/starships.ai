@@ -174,6 +174,21 @@ export function ConversationList({
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
   const channels = (channelsData?.channels || []) as ChannelModel[]
+  const channelsForDisplay = useMemo(() => {
+    // Navigation UX: the default channel should always be first.
+    // Server-side default is `#lobby` (see ensureDefaultChannelForStarship).
+    const DEFAULT_CHANNEL_SLUG = 'lobby'
+    const normalize = (s: unknown): string =>
+      String(s ?? '')
+        .trim()
+        .toLowerCase()
+
+    const defaultIndex = channels.findIndex(ch => normalize((ch as any)?.slug) === DEFAULT_CHANNEL_SLUG)
+    if (defaultIndex <= 0) return channels
+
+    const defaultChannel = channels[defaultIndex]
+    return [defaultChannel, ...channels.slice(0, defaultIndex), ...channels.slice(defaultIndex + 1)]
+  }, [channels])
 
   const dmTargets = useMemo<DmTarget[]>(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -481,7 +496,7 @@ export function ConversationList({
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : (
                   <div className="space-y-1">
-                    {channels.map(ch => {
+                    {channelsForDisplay.map(ch => {
                       const isActive = currentChannelSlug
                         ? String(ch.slug || '')
                             .trim()
@@ -662,7 +677,7 @@ export function ConversationList({
               <div className="px-2 py-6 text-center text-xs text-muted-foreground">No channels yet</div>
             ) : (
               <div className="space-y-1">
-                {channels.map(ch => {
+                {channelsForDisplay.map(ch => {
                   const isActive = currentChannelSlug
                     ? String(ch.slug || '')
                         .trim()

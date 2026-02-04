@@ -185,7 +185,8 @@ export class NotificationRepository extends BaseRepository {
       async () => {
         const sid = String(args.starshipId || '').trim();
         const uid = String(args.userId || '').trim();
-        if (!sid || !uid) return { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} };
+        if (!sid || !uid)
+          return { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} };
 
         const conn = this.getConnection();
         const rows = await conn.query<{ type: string; conversation_id: string; n: number }>(

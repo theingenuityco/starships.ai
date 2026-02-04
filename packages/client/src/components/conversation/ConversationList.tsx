@@ -692,10 +692,7 @@ export function ConversationList({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p
-                              className={cn(
-                                'text-sm truncate',
-                                isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
-                              )}
+                              className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}
                             >
                               {label}
                             </p>

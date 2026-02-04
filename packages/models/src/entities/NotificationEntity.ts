@@ -85,4 +85,3 @@ export class NotificationEntity implements NotificationModel {
     }
   }
 }
-

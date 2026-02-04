@@ -11,4 +11,3 @@ export type NotificationModel = {
   seenAt?: string | null;
   readAt?: string | null;
 };
-

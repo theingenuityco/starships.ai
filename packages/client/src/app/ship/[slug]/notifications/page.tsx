@@ -45,10 +45,14 @@ function getDmPeerKey(item: DirectMessageListItem): string | null {
 }
 
 function getConversationLabel(args: {
+  starshipSlug: string
   conversationId: string
   channelByConversationId: Map<string, any>
   dmByConversationId: Map<string, DirectMessageListItem>
 }): { primary: string; secondary?: string; href: string } {
+  const shipSlug = String(args.starshipSlug || '').trim()
+  const shipBase = shipSlug ? `/ship/${encodeURIComponent(shipSlug)}` : ''
+
   const cid = String(args.conversationId || '').trim()
   const ch = cid ? args.channelByConversationId.get(cid) : null
   if (ch) {
@@ -57,8 +61,7 @@ function getConversationLabel(args: {
     const isPrivate = Boolean((ch as any)?.isPrivate)
     const primary = slug ? `#${slug}` : name ? name : 'a channel'
     const secondary = slug && name ? name : isPrivate ? 'Private channel' : undefined
-    // Notifications route is already scoped to a ship; we can link by relative segment.
-    const href = slug ? `../channels/${encodeURIComponent(slug)}` : `../conversations/${encodeURIComponent(cid)}`
+    const href = slug ? `${shipBase}/channels/${encodeURIComponent(slug)}` : `${shipBase}/conversations/${encodeURIComponent(cid)}`
     return { primary, secondary, href }
   }
 
@@ -73,11 +76,11 @@ function getConversationLabel(args: {
       return displayName || email || 'Someone'
     })()
     const peerKey = getDmPeerKey(dm)
-    const href = peerKey ? `../dm/${encodeURIComponent(peerKey)}` : `../conversations/${encodeURIComponent(cid)}`
+    const href = peerKey ? `${shipBase}/dm/${encodeURIComponent(peerKey)}` : `${shipBase}/conversations/${encodeURIComponent(cid)}`
     return { primary: `DM with ${peerLabel}`, href }
   }
 
-  return { primary: 'a conversation', secondary: cid ? `Conversation ${cid}` : undefined, href: `../conversations/${encodeURIComponent(cid)}` }
+  return { primary: 'a conversation', secondary: cid ? `Conversation ${cid}` : undefined, href: `${shipBase}/conversations/${encodeURIComponent(cid)}` }
 }
 
 function getNotificationSentence(args: {
@@ -98,7 +101,7 @@ export default function NotificationsPage() {
   const starshipId = starship?.id ?? null
 
   const [filter, setFilter] = useState<Filter>('all')
-  const { notifications, unread, isLoading, markRead } = useNotificationsStream(starshipId, Boolean(starshipId))
+  const { notifications, unread, isLoading, markRead, hasMoreBefore, isLoadingOlder, loadOlder } = useNotificationsStream(starshipId, Boolean(starshipId))
   const { data: channelsData } = useStarshipChannels(String(starshipId || ''), Boolean(starshipId))
   const { data: dmsData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId))
 
@@ -109,6 +112,9 @@ export default function NotificationsPage() {
     if (filter === 'reactions') return list.filter(n => n.type === 'reaction')
     return list
   }, [notifications, filter])
+
+  const unreadItems = useMemo(() => filtered.filter(n => !n.readAt), [filtered])
+  const readItems = useMemo(() => filtered.filter(n => Boolean(n.readAt)), [filtered])
 
   const channelByConversationId = useMemo(() => {
     const map = new Map<string, any>()
@@ -129,6 +135,63 @@ export default function NotificationsPage() {
     }
     return map
   }, [dmsData])
+
+  const renderRow = (n: any) => {
+    const isUnread = !n.readAt
+    const location = getConversationLabel({
+      starshipSlug: slug,
+      conversationId: n.conversationId,
+      channelByConversationId,
+      dmByConversationId,
+    })
+    const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
+    const timeAgo = safeDistanceToNow(n.createdAt)
+    return (
+      <div
+        key={n.id}
+        className={cn(
+          'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
+          isUnread && 'ring-1 ring-border'
+        )}
+      >
+        <Link
+          href={location.href}
+          className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
+          aria-label={sentence.title}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className={cn(
+                'mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border',
+                isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground'
+              )}
+            >
+              <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
+                  {sentence.title}
+                </span>
+                {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className="truncate">{location.secondary ? `${location.primary} · ${location.secondary}` : location.primary}</span>
+                {timeAgo ? <span aria-label={`Received ${timeAgo}`}>{timeAgo}</span> : null}
+              </div>
+            </div>
+          </div>
+        </Link>
+        {isUnread ? (
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} aria-label="Mark this notification read">
+              Mark read
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex flex-col h-full min-w-0">
@@ -178,67 +241,33 @@ export default function NotificationsPage() {
 
           {isLoading ? (
             <div className="text-sm text-muted-foreground">Loading…</div>
-          ) : filtered.length === 0 ? (
+          ) : unreadItems.length === 0 && readItems.length === 0 ? (
             <div className="text-sm text-muted-foreground">No notifications yet.</div>
           ) : (
-            <div className="space-y-2">
-              {filtered.map(n => {
-                const isUnread = !n.readAt
-                const location = getConversationLabel({
-                  conversationId: n.conversationId,
-                  channelByConversationId,
-                  dmByConversationId,
-                })
-                const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
-                const timeAgo = safeDistanceToNow(n.createdAt)
-                return (
-                  <div
-                    key={n.id}
-                    className={cn(
-                      'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
-                      isUnread && 'ring-1 ring-border'
-                    )}
-                  >
-                    <Link
-                      href={location.href}
-                      className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
-                      aria-label={sentence.title}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span
-                          className={cn(
-                            'mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border',
-                            isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground'
-                          )}
-                        >
-                          <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
-                              {sentence.title}
-                            </span>
-                            {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            <span className="truncate">{location.secondary ? `${location.primary} · ${location.secondary}` : location.primary}</span>
-                            {timeAgo ? <span aria-label={`Received ${timeAgo}`}>{timeAgo}</span> : null}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                    {isUnread ? (
-                      <div className="flex items-center gap-2">
-                        <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} aria-label="Mark this notification read">
-                          Mark read
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })}
+            <div className="space-y-6">
+              {unreadItems.length > 0 ? (
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unread</div>
+                  <div className="space-y-2">{unreadItems.map(renderRow)}</div>
+                </div>
+              ) : null}
+
+              {readItems.length > 0 ? (
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Read</div>
+                  <div className="space-y-2">{readItems.map(renderRow)}</div>
+                </div>
+              ) : null}
             </div>
           )}
+
+          {hasMoreBefore ? (
+            <div className="flex justify-center pt-4">
+              <Button variant="secondary" onClick={() => loadOlder()} disabled={isLoadingOlder || isLoading} className="h-8">
+                {isLoadingOlder ? 'Loading…' : 'Load older'}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

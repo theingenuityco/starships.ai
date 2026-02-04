@@ -27,6 +27,23 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipAccess(params.starshipId, authUserId, res))) return;
 
+    const query = validateData(
+      z.object({
+        limit: z.coerce.number().min(1).max(200).optional(),
+        beforeCreatedAt: z.string().datetime().optional(),
+        beforeId: IdSchema.optional(),
+      }),
+      req.query,
+      res,
+      'notifications query'
+    );
+    if (!query) return;
+    if ((query.beforeCreatedAt && !query.beforeId) || (!query.beforeCreatedAt && query.beforeId)) {
+      sendError(res, 'VALIDATION_ERROR', 'beforeCreatedAt and beforeId must be provided together', 400);
+      return;
+    }
+    const limit = query.limit ?? 50;
+
     if (wantsStreaming) {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
@@ -87,12 +104,28 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       const snapshotCursor = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor = snapshotCursor;
 
-      const notifications = await repo.listForUser({ starshipId: params.starshipId, userId: authUserId, limit: 50 });
+      const notifications = await repo.listForUser({
+        starshipId: params.starshipId,
+        userId: authUserId,
+        limit,
+        ...(query.beforeCreatedAt && query.beforeId ? { beforeCreatedAt: query.beforeCreatedAt, beforeId: query.beforeId } : null),
+      });
       const unread = await repo.getUnreadCounts({ starshipId: params.starshipId, userId: authUserId });
+      const oldest = notifications.length > 0 ? notifications[notifications.length - 1] : null;
+      const hasMoreBefore = notifications.length >= limit;
 
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
-      res.write(`data: ${JSON.stringify({ starshipId: params.starshipId, userId: authUserId, notifications, unread })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({
+          starshipId: params.starshipId,
+          userId: authUserId,
+          notifications,
+          unread,
+          hasMoreBefore,
+          oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+        })}\n\n`
+      );
       try {
         res.write(`event: stream_debug\n`);
         res.write(`data: ${JSON.stringify({ starshipId: params.starshipId, userId: authUserId, cursor, len, lastId })}\n\n`);
@@ -134,27 +167,11 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       return;
     }
 
-    const query = validateData(
-      z.object({
-        limit: z.coerce.number().min(1).max(200).optional(),
-        beforeCreatedAt: z.string().datetime().optional(),
-        beforeId: IdSchema.optional(),
-      }),
-      req.query,
-      res,
-      'notifications query'
-    );
-    if (!query) return;
-    if ((query.beforeCreatedAt && !query.beforeId) || (!query.beforeCreatedAt && query.beforeId)) {
-      sendError(res, 'VALIDATION_ERROR', 'beforeCreatedAt and beforeId must be provided together', 400);
-      return;
-    }
-
     const repo = new NotificationRepository();
     const notifications = await repo.listForUser({
       starshipId: params.starshipId,
       userId: authUserId,
-      limit: query.limit ?? 50,
+      limit,
       ...(query.beforeCreatedAt && query.beforeId ? { beforeCreatedAt: query.beforeCreatedAt, beforeId: query.beforeId } : null),
     });
     const counts = await repo.getUnreadCounts({ starshipId: params.starshipId, userId: authUserId });
@@ -165,7 +182,7 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       {
         notifications,
         unread: counts,
-        hasMoreBefore: notifications.length >= (query.limit ?? 50),
+        hasMoreBefore: notifications.length >= limit,
         oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
       },
       200

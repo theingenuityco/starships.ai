@@ -427,7 +427,7 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="text-[15px] font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
+                  className="text-sm font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
                   style={{ marginLeft: '0.375rem' }}
                 >
                   {starshipData?.name || 'Starships.ai'}

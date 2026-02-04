@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import type { AgentTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 import { Button } from '@/components/ui/button'
@@ -9,8 +9,8 @@ import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -31,8 +31,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   const searchParams = useSearchParams()
 
   const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
-  const primaryStarship = starships[0]
+  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -68,9 +67,10 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => {
     if (!template) return
-    if (!primaryStarship) return
+    const targetStarship = input?.starship ?? primaryStarship
+    if (!targetStarship) return
     setIsDeploying(true)
     try {
       const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
@@ -87,12 +87,12 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
 
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
-        starshipId: primaryStarship.id,
-        starshipSlug: safeStarshipPathSegment([primaryStarship.slug]) ?? undefined,
+        starshipId: targetStarship.id,
+        starshipSlug: safeStarshipPathSegment([targetStarship.slug]) ?? undefined,
       })
       const agentId = (created as any)?.id as string | undefined
       const agentSlug = (created as any)?.slug as string | undefined
-      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, primaryStarship.slug, primaryStarship.id])
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, targetStarship.slug, targetStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -191,6 +191,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
+        ownedStarships={ownedStarships}
       />
     </Dialog>
   )

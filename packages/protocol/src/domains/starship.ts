@@ -53,6 +53,12 @@ export interface StarshipModel {
   updatedAt: string;
 }
 
+/**
+ * Minimal starship fields needed for deploy-target selection (e.g. marketplace deploy modal).
+ * Use this when you only need id, slug, name for routing or display.
+ */
+export type DeployStarshipOption = Pick<StarshipModel, 'id' | 'slug' | 'name'>;
+
 // ============================================================================
 // STARSHIP MEMBERSHIP & INVITES
 // ============================================================================

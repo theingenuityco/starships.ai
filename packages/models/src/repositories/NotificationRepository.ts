@@ -63,7 +63,7 @@ export class NotificationRepository extends BaseRepository {
           `
           INSERT INTO notifications (starship_id, user_id, type, conversation_id, message_id)
           VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (user_id, type, message_id) WHERE message_id IS NOT NULL DO NOTHING
+          ON CONFLICT (user_id, type, message_id) WHERE message_id IS NOT NULL AND type IN ('dm', 'mention') DO NOTHING
           RETURNING *;
           `,
           [sid, uid, args.type, cid, mid]

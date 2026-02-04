@@ -485,7 +485,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <div id="sidebar-channels-list" className="flex-none overflow-y-auto pr-1 max-h-[40vh]">
+              <ScrollArea id="sidebar-channels-list" className="flex-none max-h-[40vh]">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -570,7 +570,7 @@ export function ConversationList({
                     })}
                   </div>
                 )}
-              </div>
+              </ScrollArea>
             ) : null}
           </div>
 
@@ -613,16 +613,18 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list" className="min-h-0 flex-1 overflow-y-auto pr-1 flex flex-col">
-                {dmTargets.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-6 px-2">
-                    <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                    <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
-                )}
-              </div>
+              <ScrollArea id="sidebar-direct-messages-list" className="min-h-0 flex-1">
+                <div className="flex flex-col">
+                  {dmTargets.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-6 px-2">
+                      <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                      <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  )}
+                </div>
+              </ScrollArea>
             ) : null}
           </div>
         </div>

@@ -184,7 +184,7 @@ export default function NotificationsPage() {
         </Link>
         {isUnread ? (
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} aria-label="Mark this notification read">
+            <Button size="sm" className="h-8" variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} aria-label="Mark this notification read">
               Mark read
             </Button>
           </div>

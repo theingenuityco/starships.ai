@@ -240,6 +240,41 @@ export function useNotificationsStream(
     return list
   }, [chunks.length, snapshot])
 
+  const markSeen = useMutation({
+    mutationFn: async (args?: { before?: string | null }) => {
+      const sid = String(starshipId || '')
+      const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-seen`, { before: args?.before ?? null })
+      return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
+    },
+    onSuccess: data => {
+      // Best-effort: update cached state immediately
+      const sid = String(starshipId || '')
+      if (!sid || !data?.unread) return
+      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
+        const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.state', data: { unread: data.unread } })
+        return arr
+      })
+    },
+  })
+
+  const markRead = useMutation({
+    mutationFn: async (args?: { conversationId?: string | null }) => {
+      const sid = String(starshipId || '')
+      const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-read`, { conversationId: args?.conversationId ?? null })
+      return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
+    },
+    onSuccess: data => {
+      const sid = String(starshipId || '')
+      if (!sid || !data?.unread) return
+      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
+        const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({ type: 'notification.state', data: { unread: data.unread } })
+        return arr
+      })
+    },
+  })
+
   // Play a short notification sound for newly appended notifications.
   // Important: this hook can be mounted in multiple places; dedupe globally by notification id.
   const lastProcessedIdxRef = useRef(0)
@@ -249,6 +284,81 @@ export function useNotificationsStream(
     initRef.current = false
     lastProcessedIdxRef.current = 0
   }, [starshipId, enabled])
+
+  // Auto-mark notifications read for the active conversation while in foreground.
+  //
+  // Why:
+  // We intentionally suppress DM badges while the user is already viewing that DM.
+  // However, notification rows can be created slightly after the message arrives (race),
+  // so if we only mark-read based on message stream timing, unread can accumulate invisibly
+  // and then "reappear" as a badge when the user navigates away.
+  const autoMarkIdxRef = useRef(0)
+  const autoMarkInitRef = useRef(false)
+  const lastAutoMarkAtRef = useRef<number>(0)
+  useEffect(() => {
+    autoMarkInitRef.current = false
+    autoMarkIdxRef.current = 0
+    lastAutoMarkAtRef.current = 0
+  }, [starshipId, enabled])
+
+  useEffect(() => {
+    if (!starshipId || !enabled) return
+    if (!activeConversationId) return
+
+    const isForeground = (): boolean => {
+      try {
+        if (typeof document === 'undefined') return true
+        if (document.visibilityState && document.visibilityState !== 'visible') return false
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false
+        return true
+      } catch {
+        return true
+      }
+    }
+
+    // On first mount, don't act on historical chunks.
+    if (!autoMarkInitRef.current) {
+      autoMarkInitRef.current = true
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    const start = Math.max(0, autoMarkIdxRef.current)
+    if (chunks.length <= start) {
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    const foreground = isForeground()
+    if (!foreground) {
+      // In background, we *do not* auto-mark read; user hasn't actually viewed the new message.
+      autoMarkIdxRef.current = chunks.length
+      return
+    }
+
+    for (let i = start; i < chunks.length; i++) {
+      const c: any = chunks[i] as any
+      if (c?.type !== 'notification.append' || !c?.data?.notification) continue
+      const n = c.data.notification as NotificationModel
+      if (!shouldPlayForNotification(n)) continue
+
+      const notifConversationId = String((n as any)?.conversationId || '').trim()
+      if (!notifConversationId) continue
+      if (notifConversationId !== activeConversationId) {
+        continue
+      }
+
+      // Throttle: many notifications can arrive in a burst; one mark-read clears the conversation.
+      const now = Date.now()
+      if (now - lastAutoMarkAtRef.current < 750) continue
+      lastAutoMarkAtRef.current = now
+      void markRead.mutateAsync({ conversationId: notifConversationId }).catch(() => undefined)
+      // After scheduling mark-read, we can stop scanning this batch.
+      break
+    }
+
+    autoMarkIdxRef.current = chunks.length
+  }, [activeConversationId, chunks.length, enabled, starshipId, markRead])
 
   useEffect(() => {
     if (!starshipId || !enabled) return
@@ -327,41 +437,6 @@ export function useNotificationsStream(
 
     lastProcessedIdxRef.current = chunks.length
   }, [activeConversationId, chunks.length, enabled, starshipId])
-
-  const markSeen = useMutation({
-    mutationFn: async (args?: { before?: string | null }) => {
-      const sid = String(starshipId || '')
-      const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-seen`, { before: args?.before ?? null })
-      return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
-    },
-    onSuccess: data => {
-      // Best-effort: update cached state immediately
-      const sid = String(starshipId || '')
-      if (!sid || !data?.unread) return
-      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
-        const arr = Array.isArray(old) ? old.slice() : []
-        arr.push({ type: 'notification.state', data: { unread: data.unread } })
-        return arr
-      })
-    },
-  })
-
-  const markRead = useMutation({
-    mutationFn: async (args?: { conversationId?: string | null }) => {
-      const sid = String(starshipId || '')
-      const resp = await api.post(`/api/v1/starships/${sid}/notifications/mark-read`, { conversationId: args?.conversationId ?? null })
-      return (resp as any).data?.data as { updated: number; unread: UnreadSummary }
-    },
-    onSuccess: data => {
-      const sid = String(starshipId || '')
-      if (!sid || !data?.unread) return
-      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
-        const arr = Array.isArray(old) ? old.slice() : []
-        arr.push({ type: 'notification.state', data: { unread: data.unread } })
-        return arr
-      })
-    },
-  })
 
   return {
     notifications,

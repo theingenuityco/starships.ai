@@ -757,7 +757,8 @@ export class LLM extends BaseNode<LlmParams> {
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
-    const name = this.nameFromStarshipsMeta((m as any).starshipsMeta);
+    const mRec = m as unknown as Record<string, unknown>;
+    const name = this.nameFromStarshipsMeta(m.starshipsMeta ?? mRec['starshipsMeta']);
 
     // OpenRouter reasoning preservation extension (only some providers accept these fields).
     // We attach them only on assistant messages, and downstream host runtimes that can't accept
@@ -766,16 +767,19 @@ export class LLM extends BaseNode<LlmParams> {
       try {
         if (role !== 'assistant') return {};
         const details =
-          Array.isArray((m as any)?.reasoningDetails) && (m as any).reasoningDetails.length > 0
-            ? ((m as any).reasoningDetails as ReasoningDetail[])
-            : Array.isArray((m as any)?.reasoning_details) && (m as any).reasoning_details.length > 0
-              ? ((m as any).reasoning_details as ReasoningDetail[])
-              : undefined;
-        if (details && details.length > 0) {
-          return { reasoning_details: details } as Record<string, unknown>;
+          Array.isArray(m.reasoningDetails) && m.reasoningDetails.length > 0
+            ? m.reasoningDetails
+            : (() => {
+                // Compatibility: some callers may still provide snake_case `reasoning_details`.
+                const snake = mRec['reasoning_details'];
+                if (!Array.isArray(snake) || snake.length === 0) return undefined;
+                return snake.every((x) => x && typeof x === 'object') ? (snake as ReasoningDetail[]) : undefined;
+              })();
+        if (details?.length) {
+          return { reasoning_details: details } satisfies Record<string, unknown>;
         }
-        const r = typeof (m as any)?.reasoning === 'string' ? String((m as any).reasoning) : '';
-        return r.trim().length > 0 ? ({ reasoning: r } as Record<string, unknown>) : {};
+        const r = typeof m.reasoning === 'string' ? m.reasoning : '';
+        return r.trim().length > 0 ? ({ reasoning: r } satisfies Record<string, unknown>) : {};
       } catch {
         return {};
       }
@@ -897,11 +901,13 @@ export class LLM extends BaseNode<LlmParams> {
             : JSON.stringify(obj.content ?? '');
 
       const reasoning = typeof obj.reasoning === 'string' ? obj.reasoning : undefined;
-      const reasoningDetailsRaw =
-        Array.isArray((obj as any).reasoningDetails) && (obj as any).reasoningDetails.length > 0
-          ? ((obj as any).reasoningDetails as unknown[])
-          : Array.isArray((obj as any).reasoning_details) && (obj as any).reasoning_details.length > 0
-            ? ((obj as any).reasoning_details as unknown[])
+      const reasoningDetailsCamel = obj['reasoningDetails'];
+      const reasoningDetailsSnake = obj['reasoning_details'];
+      const reasoningDetailsRaw: unknown[] | undefined =
+        Array.isArray(reasoningDetailsCamel) && reasoningDetailsCamel.length > 0
+          ? (reasoningDetailsCamel as unknown[])
+          : Array.isArray(reasoningDetailsSnake) && reasoningDetailsSnake.length > 0
+            ? (reasoningDetailsSnake as unknown[])
             : undefined;
       const reasoningDetails =
         Array.isArray(reasoningDetailsRaw) && reasoningDetailsRaw.every((x) => x && typeof x === 'object')
@@ -963,12 +969,10 @@ export class LLM extends BaseNode<LlmParams> {
         ...(toolCallId ? { toolCallId } : {}),
       };
       // Preserve optional Starships metadata for provider `name` mapping.
-      try {
-        const sm = (obj as any).starshipsMeta;
-        if (sm && typeof sm === 'object') {
-          (canonical as any).starshipsMeta = sm;
-        }
-      } catch {}
+      const sm = obj['starshipsMeta'];
+      if (sm && typeof sm === 'object') {
+        (canonical as unknown as Record<string, unknown>)['starshipsMeta'] = sm;
+      }
       out.push(canonical);
     }
 

@@ -282,7 +282,8 @@ export function ConversationList({
         <span
           className={cn(
             'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
-            isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+            // Color is controlled by the row container (matches `NavigationItem`); keep only weight here.
+            isActive ? 'font-medium' : hasUnread ? 'font-bold' : 'font-medium'
           )}
         >
           {label}
@@ -745,6 +746,7 @@ export function ConversationList({
                         'hover:bg-muted/50',
                         isActive && 'bg-primary/10 text-primary',
                         !isActive && hasUnread && 'text-foreground',
+                        !isActive && !hasUnread && 'text-muted-foreground hover:text-foreground',
                         isBusy && 'opacity-70 pointer-events-none'
                       )}
                       onClick={() => handleDmTargetClick(t)}
@@ -756,7 +758,15 @@ export function ConversationList({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <p className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}>{label}</p>
+                          <p
+                            className={cn(
+                              'text-sm truncate',
+                              // Color is controlled by the row container; keep only weight here.
+                              isActive ? 'font-medium' : hasUnread ? 'font-bold' : 'font-medium'
+                            )}
+                          >
+                            {label}
+                          </p>
                           {dmCount > 0 ? (
                             <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                               {dmCount > 99 ? '99+' : String(dmCount)}

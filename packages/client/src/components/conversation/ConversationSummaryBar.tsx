@@ -511,7 +511,6 @@ export function ConversationSummaryBar({
         <div className="px-2 py-2 font-normal">
           <div className="text-sm font-medium leading-tight truncate text-foreground">Participants</div>
         </div>
-        <div className="-mx-1 my-1 h-px bg-muted" />
         <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
           {effectiveParticipantItems.map(p => (
             <div

@@ -2452,8 +2452,8 @@ const MemoizedMessageBubble = memo(
       if (!threadActionButton && !reactionActionButton) return null
       return (
         <>
-          {threadActionButton}
           {reactionActionButton}
+          {threadActionButton}
         </>
       )
     }, [reactionActionButton, threadActionButton])

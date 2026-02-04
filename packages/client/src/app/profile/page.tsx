@@ -16,6 +16,7 @@ export default function ProfilePage(): React.JSX.Element {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
   const ensureDefault = useEnsureDefaultStarship()
+  // Prevent double-call when effect re-runs (e.g. deps change); reset on error so user can retry.
   const ensureAttempted = useRef(false)
 
   useEffect(() => {

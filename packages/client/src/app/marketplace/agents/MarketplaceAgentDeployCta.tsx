@@ -23,7 +23,12 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
 
   const { userId, isAuthenticated } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
-  const primaryStarship = starships[0]
+  const starshipsWithOwner = starships as Array<{ id: string; slug: string; name: string; ownerId?: string }>
+  const ownedStarships = useMemo(
+    () => starshipsWithOwner.filter(s => s.ownerId === userId).map(s => ({ id: s.id, slug: s.slug, name: s.name })),
+    [starshipsWithOwner, userId]
+  )
+  const primaryStarship = ownedStarships[0] ?? null
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -64,8 +69,9 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
-    if (!primaryStarship) return
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: { id: string; slug: string; name: string } }) => {
+    const targetStarship = input?.starship ?? primaryStarship
+    if (!targetStarship) return
     setIsDeploying(true)
     try {
       const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
@@ -82,13 +88,13 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
 
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
-        starshipId: primaryStarship.id,
-        starshipSlug: safeStarshipPathSegment([primaryStarship.slug]) ?? undefined,
+        starshipId: targetStarship.id,
+        starshipSlug: safeStarshipPathSegment([targetStarship.slug]) ?? undefined,
       })
 
       const agentId = (created as any)?.id as string | undefined
       const agentSlug = (created as any)?.slug as string | undefined
-      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, primaryStarship.slug, primaryStarship.id])
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, targetStarship.slug, targetStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -146,6 +152,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
+        ownedStarships={ownedStarships}
       />
     </>
   )

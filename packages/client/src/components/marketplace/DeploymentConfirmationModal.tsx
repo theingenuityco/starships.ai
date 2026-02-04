@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
@@ -15,11 +15,18 @@ import { useToolTemplates, useRequiredConnectors } from '@/hooks/useTemplates'
 import { ConnectorSuggestionCard } from '@/components/widgets/ConnectorSuggestionCard'
 
 import type { AgentTemplateModel, AgentToolPermission, ToolTemplateModel } from '@starships/protocol'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+export interface DeploymentStarshipOption {
+  id: string
+  slug: string
+  name: string
+}
 
 interface DeploymentConfirmationModalProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => Promise<void>
+  onConfirm: (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeploymentStarshipOption }) => Promise<void>
   isProcessing: boolean
   type: 'agent' | 'tool'
   template: AgentTemplateModel | ToolTemplateModel
@@ -27,9 +34,11 @@ interface DeploymentConfirmationModalProps {
   /** Required for "Connect" action on required connectors. If omitted, only a message is shown. */
   starshipId?: string
   starshipSlug?: string
+  /** When provided (agent deploy), user can choose target starship. If length > 1, show dropdown; if 1, show static name. */
+  ownedStarships?: DeploymentStarshipOption[]
 }
 
-export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName, starshipId, starshipSlug }: DeploymentConfirmationModalProps) {
+export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName, starshipId, starshipSlug, ownedStarships }: DeploymentConfirmationModalProps) {
   const isAgent = type === 'agent'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
   const avatarUrl = isAgent ? (template as AgentTemplateModel).avatarUrl : undefined
@@ -39,6 +48,19 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, isOpen && isAgent && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, isOpen && isAgent && !!templateId)
+
+  const singleStarshipFromProps =
+    starshipId && starshipName ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName } : null
+  const listForSelection = ownedStarships?.length ? ownedStarships : (singleStarshipFromProps ? [singleStarshipFromProps] : [])
+  const listForSelectionRef = useRef(listForSelection)
+  listForSelectionRef.current = listForSelection
+
+  const [selectedStarship, setSelectedStarship] = useState<DeploymentStarshipOption | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setSelectedStarship(listForSelectionRef.current[0] ?? null)
+  }, [isOpen])
 
   const toolTemplateBySlug = useMemo(() => {
     const map = new Map<string, ToolTemplateModel>()
@@ -109,7 +131,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   const handleConfirm = async () => {
     try {
-      await onConfirm(isAgent ? { toolPermissions } : undefined)
+      await onConfirm(isAgent ? { toolPermissions, starship: selectedStarship ?? undefined } : undefined)
       onOpenChange(false)
     } catch {
       // Keep the modal open if the deploy/install fails.
@@ -121,10 +143,41 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
       <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden p-6">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="flex-shrink-0 mb-4">
-              <DialogTitle className="flex items-center gap-2">
-                <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
-                {isAgent ? `Deploy to ${starshipName}` : 'Installation'}
+            <DialogHeader className="flex-shrink-0 pt-3 mb-4 overflow-visible">
+              <DialogTitle className="flex items-center gap-2 flex-wrap items-center min-h-[2.25rem] overflow-visible">
+                <Icon name={ActionIconName} className="w-5 h-5 text-primary shrink-0" />
+                {isAgent ? (
+                  <>
+                    <span className="shrink-0">Deploy to</span>
+                    {listForSelection.length > 0 ? (
+                      <Select
+                        value={selectedStarship?.id ?? ''}
+                        onValueChange={id => {
+                          const ship = listForSelection.find(s => s.id === id)
+                          if (ship) setSelectedStarship(ship)
+                        }}
+                        disabled={isProcessing}
+                      >
+                        <SelectTrigger
+                          className="w-[200px] shrink-0 h-9 border-primary/30 bg-primary/10 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-0"
+                        >
+                          <SelectValue placeholder="Select starship" />
+                        </SelectTrigger>
+                        <SelectContent className="border-primary/30 bg-primary/10 backdrop-blur-sm">
+                          {listForSelection.map(s => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="font-normal text-foreground">{starshipName}</span>
+                    )}
+                  </>
+                ) : (
+                  'Installation'
+                )}
               </DialogTitle>
             </DialogHeader>
 
@@ -180,9 +233,9 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                     <Icon name="plug" className="h-4 w-4 text-primary" />
                     <div className="text-sm font-semibold">Connect Apps</div>
                   </div>
-                  {starshipId ? (
+                  {(selectedStarship?.id ?? starshipId) ? (
                     <ConnectorSuggestionCard
-                      starshipId={starshipId}
+                      starshipId={selectedStarship?.id ?? starshipId!}
                       providers={requiredConnectors.map(c => c.provider)}
                       hideSearch={true}
                       hideDisconnect={false}
@@ -193,16 +246,17 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                     <div className="rounded-xl border border-border/60 bg-card/50 p-3">
                       <p className="text-sm text-muted-foreground">
                         Connect these in Settings → Connectors
-                        {starshipSlug ? (
+                        {(selectedStarship?.slug ?? starshipSlug) ? (
                           <>
                             {' '}
                             <a
-                              href={`/ship/${starshipSlug}/connectors`}
+                              href={`/ship/${selectedStarship?.slug ?? starshipSlug}/connectors`}
                               className="font-medium text-primary hover:underline"
                               onClick={e => {
                                 e.preventDefault()
                                 onOpenChange(false)
-                                window.location.href = `/ship/${starshipSlug}/connectors`
+                                const slug = selectedStarship?.slug ?? starshipSlug
+                                if (slug) window.location.href = `/ship/${slug}/connectors`
                               }}
                             >
                               Open Connectors
@@ -314,8 +368,13 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
               ) : null}
             </div>
 
-            <DialogFooter className="flex-shrink-0 gap-2 pt-5 border-t border-border/50 mt-5 justify-end">
-              <Button type="button" onClick={handleConfirm} disabled={isProcessing} className="min-w-[120px]">
+            <DialogFooter className="flex-shrink-0 gap-2 pt-3 border-t border-border/50 mt-3 justify-end pb-0">
+              <Button
+                type="button"
+                onClick={handleConfirm}
+                disabled={isProcessing || (isAgent && !selectedStarship)}
+                className="min-w-[120px]"
+              >
                 {isProcessing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />

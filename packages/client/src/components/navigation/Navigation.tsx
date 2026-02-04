@@ -48,6 +48,14 @@ export function Navigation(props: NavigationProps) {
       setIsExpanded(true)
     }
   }, [isMobile])
+
+  // When Marketplace is selected, collapse the sidebar (icons-only rail)
+  const isMarketplaceRoute = pathname === '/marketplace' || pathname.startsWith('/marketplace/')
+  useEffect(() => {
+    if (!isMobile && isMarketplaceRoute) {
+      setIsExpanded(false)
+    }
+  }, [isMobile, isMarketplaceRoute])
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug

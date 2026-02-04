@@ -23,6 +23,10 @@ export type PublicEnvConfig = {
    * - https://eu.i.posthog.com
    */
   POSTHOG_HOST: string;
+  /**
+   * Web Push VAPID public key (non-secret).
+   */
+  VAPID_PUBLIC_KEY: string;
 };
 
 function readEnv(name: keyof PublicEnvConfig): string {
@@ -48,6 +52,7 @@ export function getPublicEnvConfig(): PublicEnvConfig {
     USERBACK_TOKEN: readEnv('USERBACK_TOKEN'),
     POSTHOG_KEY: readEnv('POSTHOG_KEY'),
     POSTHOG_HOST: readEnv('POSTHOG_HOST'),
+    VAPID_PUBLIC_KEY: readEnv('VAPID_PUBLIC_KEY'),
   };
 }
 

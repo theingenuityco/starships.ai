@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState, type RefObject } from 'react'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -92,10 +93,38 @@ export function ConversationList({
   const currentConversationId = params.conversationId as string | undefined
   const currentChannelSlug = params.channelSlug as string | undefined
   const currentDmPeer = (params as any)?.peer as string | undefined
+  const pendingConversationId = useStarshipUIStore(s => s.pendingConversationId)
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
-  const { unread: notifUnread } = useNotificationsStream(starshipId, true)
+  const activeConversationIdForNotifications = useMemo(() => {
+    // 1) /ship/:slug/conversations/:conversationId
+    const byRoute = typeof currentConversationId === 'string' ? String(currentConversationId).trim() : ''
+    if (byRoute) return byRoute
+
+    // 2) /ship/:slug/channels/:channelSlug
+    const chSlug = typeof currentChannelSlug === 'string' ? String(currentChannelSlug).trim().toLowerCase() : ''
+    if (chSlug) {
+      const chans = (channelsData as any)?.channels
+      if (Array.isArray(chans)) {
+        const match =
+          chans.find(
+            (c: any) =>
+              String(c?.slug || '')
+                .trim()
+                .toLowerCase() === chSlug
+          ) ?? null
+        const cid = typeof match?.conversationId === 'string' ? String(match.conversationId).trim() : ''
+        if (cid) return cid
+      }
+    }
+
+    // 3) /ship/:slug/dm/:peer (conversationId is not in the route; ship layout uses pendingConversationId)
+    const pending = typeof pendingConversationId === 'string' ? String(pendingConversationId).trim() : ''
+    return pending || null
+  }, [channelsData, currentChannelSlug, currentConversationId, pendingConversationId])
+
+  const { unread: notifUnread } = useNotificationsStream(starshipId, true, { activeConversationId: activeConversationIdForNotifications })
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const { isUserOnline } = useStarshipPresence(starshipId, true)
@@ -211,8 +240,10 @@ export function ConversationList({
         : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId)
 
     const conversationId = t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
-    const hasUnread = Boolean(conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
-    const dmCount = Number(conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
+    const isOpenConversation = Boolean(conversationId && activeConversationIdForNotifications && conversationId === activeConversationIdForNotifications)
+    // UX requirement: don't show an unread badge/highlight for the conversation the user is already viewing.
+    const hasUnread = Boolean(!isOpenConversation && conversationId && unreadByConversationId?.[conversationId]?.hasUnread)
+    const dmCount = Number(!isOpenConversation && conversationId ? (notifUnread?.dmUnreadByConversationId?.[conversationId] ?? 0) : 0) || 0
 
     return (
       <div

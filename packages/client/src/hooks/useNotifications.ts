@@ -39,9 +39,23 @@ function shouldPlayForNotification(n: NotificationModel): boolean {
   return typ === 'dm' || typ === 'mention'
 }
 
-export function useNotificationsStream(starshipId: string | null, enabled: boolean = true) {
+export function useNotificationsStream(
+  starshipId: string | null,
+  enabled: boolean = true,
+  opts?: {
+    /**
+     * When provided, notification sounds will be suppressed ONLY when:
+     * - the app/tab is foreground AND
+     * - the incoming notification is for this active conversation.
+     *
+     * (In background, sound still plays.)
+     */
+    activeConversationId?: string | null
+  }
+) {
   const queryClient = useQueryClient()
   const activeGuardRef = useRef<AbortController | null>(null)
+  const activeConversationId = useMemo(() => String(opts?.activeConversationId || '').trim() || null, [opts?.activeConversationId])
 
   function makeSSEAsyncIterable(sid: string, token: string | null, signal?: AbortSignal): AsyncIterable<StreamChunk> {
     const cursorKey = `notif:${sid}:cursor`
@@ -239,6 +253,17 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
   useEffect(() => {
     if (!starshipId || !enabled) return
 
+    const isForeground = (): boolean => {
+      try {
+        if (typeof document === 'undefined') return true
+        if (document.visibilityState && document.visibilityState !== 'visible') return false
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) return false
+        return true
+      } catch {
+        return true
+      }
+    }
+
     // On first mount, don't replay historical chunks; just start tracking from "now".
     if (!initRef.current) {
       initRef.current = true
@@ -257,6 +282,16 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
       if (c?.type !== 'notification.append' || !c?.data?.notification) continue
       const n = c.data.notification as NotificationModel
       if (!shouldPlayForNotification(n)) continue
+
+      // Sound UX:
+      // - Always play if the tab/app is in the background.
+      // - Only suppress when the app is foreground AND the user is already viewing the conversation
+      //   that the notification is for (handled by passing an activeConversationId from call sites).
+      const foreground = isForeground()
+      const notifConversationId = String((n as any)?.conversationId || '').trim()
+      if (foreground && notifConversationId && activeConversationId && notifConversationId === activeConversationId) {
+        continue
+      }
 
       const sid = String(starshipId)
       const id = String((n as any)?.id ?? '')
@@ -291,7 +326,7 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
     }
 
     lastProcessedIdxRef.current = chunks.length
-  }, [chunks.length, enabled, starshipId])
+  }, [activeConversationId, chunks.length, enabled, starshipId])
 
   const markSeen = useMutation({
     mutationFn: async (args?: { before?: string | null }) => {

@@ -798,9 +798,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
       // This prevents a brief "agent is typing" flash for messages that the server will persist without agent execution
       // (e.g. user mentions like <@u:...> in a default-agent thread).
-      const willTriggerAgentBestEffort = (() => {
-        if (isUserUserDm) return false
-        if (shouldPersistOnly) return false
+      const routingPreview = (() => {
+        if (isUserUserDm) return { willTriggerAgentBestEffort: false, hasUserMentionToken: false, hasAgentMention: false }
+        if (shouldPersistOnly) return { willTriggerAgentBestEffort: false, hasUserMentionToken: false, hasAgentMention: false }
 
         const raw = String(messageToSend || '')
         const hasUserMentionToken = raw.includes('<@u:')
@@ -812,14 +812,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
 
         // Mention-only contexts only run when at least one agent is mentioned.
-        if (isChannelConversation || isMentionOnlyThread) return hasAgentMention
+        if (isChannelConversation || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
 
         // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
-        if (hasUserMentionToken && !hasAgentMention) return false
+        if (hasUserMentionToken && !hasAgentMention) return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention }
 
         // Otherwise: if we have an effective agent (explicit or fallback) or an agent mention, expect execution.
-        return Boolean(effectiveAgent || hasAgentMention)
+        return { willTriggerAgentBestEffort: Boolean(effectiveAgent || hasAgentMention), hasUserMentionToken, hasAgentMention }
       })()
+      const willTriggerAgentBestEffort = routingPreview.willTriggerAgentBestEffort
 
       // Validation for agent and starship
       if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {

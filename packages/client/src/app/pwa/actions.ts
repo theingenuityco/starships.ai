@@ -10,8 +10,6 @@ if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
 }
 
-let subscription: webpush.PushSubscription | null = null
-
 function assertVapidConfigured() {
   if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
     if (!vapidSubject) {
@@ -28,27 +26,21 @@ function assertVapidConfigured() {
 
 export async function subscribeUser(sub: webpush.PushSubscription) {
   assertVapidConfigured()
-  subscription = sub
   // Persist this in your database for production usage.
   return { success: true }
 }
 
 export async function unsubscribeUser() {
-  subscription = null
   // Remove the subscription from your database in production usage.
   return { success: true }
 }
 
-export async function sendNotification(message: string) {
+export async function sendNotification(sub: webpush.PushSubscription, message: string) {
   assertVapidConfigured()
-
-  if (!subscription) {
-    throw new Error('No subscription available')
-  }
 
   try {
     await webpush.sendNotification(
-      subscription,
+      sub,
       JSON.stringify({
         title: 'Starships.ai',
         body: message,

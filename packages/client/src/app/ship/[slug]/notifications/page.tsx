@@ -31,18 +31,13 @@ export default function NotificationsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Notifications</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {unread?.totalUnread ? `${unread.totalUnread} unread` : 'All caught up'}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{unread?.totalUnread ? `${unread.totalUnread} unread` : 'All caught up'}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => markSeen()} disabled={isLoading}>
             Mark seen
           </Button>
-          <Button
-            onClick={() => markRead()}
-            disabled={isLoading || !(unread?.totalUnread > 0)}
-          >
+          <Button onClick={() => markRead()} disabled={isLoading || !(unread?.totalUnread > 0)}>
             Mark all read
           </Button>
         </div>
@@ -73,13 +68,7 @@ export default function NotificationsPage() {
             {filtered.map(n => {
               const isUnread = !n.readAt
               return (
-                <div
-                  key={n.id}
-                  className={cn(
-                    'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
-                    isUnread && 'ring-1 ring-border'
-                  )}
-                >
+                <div key={n.id} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3', isUnread && 'ring-1 ring-border')}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn('text-sm font-medium', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
@@ -87,19 +76,11 @@ export default function NotificationsPage() {
                       </span>
                       {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" /> : null}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
-                      Conversation: {n.conversationId}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {new Date(n.createdAt).toLocaleString()}
-                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 truncate">Conversation: {n.conversationId}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => markRead({ conversationId: n.conversationId })}
-                      disabled={!isUnread}
-                    >
+                    <Button variant="secondary" onClick={() => markRead({ conversationId: n.conversationId })} disabled={!isUnread}>
                       Mark read
                     </Button>
                   </div>
@@ -112,4 +93,3 @@ export default function NotificationsPage() {
     </div>
   )
 }
-

@@ -10,7 +10,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
-import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository, MessageReactionRepository, NotificationRepository } from '@starships/models';
+import {
+  ChannelRepository,
+  ConversationParticipantRepository,
+  DirectMessageRepository,
+  MessageReactionRepository,
+  NotificationRepository,
+} from '@starships/models';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
 const router: Router = Router();
@@ -351,7 +357,10 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
               .catch(() => ({ created: false, notification: undefined }));
             if (created?.created && created?.notification) {
               const notifBus = NotificationStreamBus.getInstance();
-              await notifBus.publish(starshipId, authorUserId, { type: 'notification.append', data: { notification: created.notification } });
+              await notifBus.publish(starshipId, authorUserId, {
+                type: 'notification.append',
+                data: { notification: created.notification },
+              });
               const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authorUserId });
               await notifBus.publish(starshipId, authorUserId, { type: 'notification.state', data: { unread } });
             }
@@ -359,7 +368,7 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
         }
       }
     } catch (e) {
-      void e
+      void e;
       /* best-effort */
     }
 

@@ -2,14 +2,13 @@
 
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverTrigger } from '@/components/ui/popover'
+import { EmojiPicker } from '@/components/emoji/EmojiPicker'
 import { useToggleMessageReaction } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { useMemo, useState } from 'react'
-
-const DEFAULT_REACTIONS = ['👍', '❤️', '😂', '🎉', '😮', '😢', '👀'] as const
 
 export function MessageReactionAction({
   conversationId,
@@ -27,7 +26,6 @@ export function MessageReactionAction({
   popoverAlign?: 'start' | 'end' | 'center'
 }) {
   const [open, setOpen] = useState(false)
-  const [customEmoji, setCustomEmoji] = useState('')
   const toggle = useToggleMessageReaction()
   const isPending = toggle.isPending
   const { userId: authUserId } = useAuth()
@@ -73,21 +71,21 @@ export function MessageReactionAction({
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent align={popoverAlign} className="w-72 p-2">
-        <div className="flex flex-wrap gap-1 mb-2">
-          {DEFAULT_REACTIONS.map(e => (
-            <Button key={e} type="button" variant="secondary" size="sm" className="h-8 w-8 p-0 text-lg" onClick={() => doToggle(e)}>
-              {e}
-            </Button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <Input value={customEmoji} onChange={ev => setCustomEmoji(ev.target.value)} placeholder="Custom emoji…" className="h-8 text-sm" maxLength={32} />
-          <Button type="button" size="sm" className="h-8" onClick={() => doToggle(customEmoji)}>
-            Add
-          </Button>
-        </div>
-      </PopoverContent>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          asChild
+          align={popoverAlign}
+          sideOffset={4}
+          className="z-[1004] p-0 bg-transparent border-0 shadow-none outline-none"
+        >
+          <EmojiPicker
+            height={360}
+            onEmojiSelect={emoji => {
+              doToggle(emoji)
+            }}
+          />
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
     </Popover>
   )
 }

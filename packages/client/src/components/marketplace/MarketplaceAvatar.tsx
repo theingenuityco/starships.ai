@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export type MarketplaceAvatarProps = {
@@ -32,10 +33,7 @@ export type MarketplaceAvatarProps = {
 }
 
 function initialsFromSeed(seed: string): string {
-  const parts = seed
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
+  const parts = seed.trim().split(/\s+/).filter(Boolean)
   const letters = parts
     .slice(0, 2)
     .map(p => p[0]?.toUpperCase())
@@ -60,7 +58,11 @@ export function MarketplaceAvatar({
   className,
 }: MarketplaceAvatarProps) {
   const img = typeof imageUrl === 'string' ? imageUrl.trim() : ''
-  const hasImage = img.length > 0
+  const [didError, setDidError] = useState(false)
+  useEffect(() => {
+    setDidError(false)
+  }, [img])
+  const hasImage = img.length > 0 && !didError
 
   const rawSeed = typeof seed === 'string' ? seed.trim() : ''
   const rawLabel = typeof label === 'string' ? label.trim() : ''
@@ -72,14 +74,7 @@ export function MarketplaceAvatar({
       {!hasImage && showTintWhenMissing ? <div className={cn('absolute inset-0', tintClassName)} /> : null}
       {hasImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={img}
-          alt={rawLabel || 'Avatar'}
-          referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
-          decoding="async"
-          className="relative z-10 h-full w-full object-cover"
-        />
+        <img src={img} alt={rawLabel || 'Avatar'} referrerPolicy="no-referrer" decoding="async" onError={() => setDidError(true)} className="relative z-10 h-full w-full object-cover" />
       ) : (
         <div className="relative z-10 h-full w-full flex items-center justify-center">
           <span className={fallbackTextClassName}>{initials || 'AI'}</span>
@@ -90,4 +85,3 @@ export function MarketplaceAvatar({
     </div>
   )
 }
-

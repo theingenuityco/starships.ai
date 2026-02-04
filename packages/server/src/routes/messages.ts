@@ -327,7 +327,8 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
         type: 'message.reactions',
         data: { conversationId, messageId, reactions },
       });
-    } catch {
+    } catch (err) {
+      console.error('[reactions] Failed to publish realtime update:', err);
       /* best-effort: persist succeeded even if streaming publish fails */
     }
 

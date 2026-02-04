@@ -9,7 +9,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useRef, useState, type RefObject } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -163,21 +163,6 @@ export function ConversationList({
   }, [channelsData, directMessagesData?.directMessages])
   const { data: unreadMapData } = useUnreadByConversationIds(starshipId, conversationIdsForUnread, true)
   const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as Record<string, { hasUnread: boolean }> | undefined
-
-  // #region agent log (H10) reaction unread summary present
-  // Log once per mount when reaction unread map becomes non-empty so we can
-  // confirm what the sidebar is receiving from the notifications stream.
-  const __reactionLoggedRef = useRef(false)
-  useMemo(() => {
-    if (__reactionLoggedRef.current) return null
-    const m = (notifUnread as any)?.reactionUnreadByConversationId
-    const keys = m && typeof m === 'object' ? Object.keys(m) : []
-    if (!keys || keys.length === 0) return null
-    __reactionLoggedRef.current = true
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H10',location:'packages/client/src/components/conversation/ConversationList.tsx:reaction-summary',message:'ConversationList received reactionUnreadByConversationId keys',data:{starshipIdSuffix:String(starshipId||'').slice(-6),reactionConvoKeySuffixes:keys.slice(0,10).map(k=>String(k).slice(-6)),reactionKeyCount:keys.length},timestamp:Date.now()})}).catch(()=>{});
-    return null
-  }, [notifUnread, starshipId])
-  // #endregion
 
   const createChannel = useCreateChannel()
   const { userId: authUserId } = useAuthContext()

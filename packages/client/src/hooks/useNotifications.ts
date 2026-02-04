@@ -139,9 +139,6 @@ export function useNotificationsStream(
             return
           }
           if (eventType === 'notification.append') {
-            // #region agent log (H3) received notification.append
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'packages/client/src/hooks/useNotifications.ts:onmessage:append',message:'SSE notification.append received',data:{starshipIdSuffix:String(sid).slice(-6),notifType:String((data as any)?.notification?.type||''),conversationIdSuffix:String((data as any)?.notification?.conversationId||'').slice(-6),notificationIdSuffix:String((data as any)?.notification?.id||'').slice(-6)},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             push({ type: 'notification.append', data })
             return
           }
@@ -360,12 +357,6 @@ export function useNotificationsStream(
       const n = c.data.notification as NotificationModel
       if (!shouldPlayForNotification(n)) continue
       if (!shouldAutoMarkReadForNotification(n)) {
-        const typ = String((n as any)?.type || '')
-        if (typ === 'reaction') {
-          // #region agent log (H4) reaction not auto-marked read
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H4',location:'packages/client/src/hooks/useNotifications.ts:autoMark:skip-reaction',message:'autoMarkRead skipped for reaction notification',data:{notifConversationIdSuffix:String((n as any)?.conversationId||'').slice(-6),activeConversationIdSuffix:String(activeConversationId||'').slice(-6)},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-        }
         continue
       }
 
@@ -430,11 +421,6 @@ export function useNotificationsStream(
       const canSuppressInActiveConversation = typ === 'dm' || typ === 'mention'
       if (foreground && canSuppressInActiveConversation && notifConversationId && activeConversationId && notifConversationId === activeConversationId) {
         continue
-      }
-      if (typ === 'reaction') {
-        // #region agent log (H5) reaction sound decision
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H5',location:'packages/client/src/hooks/useNotifications.ts:sound:reaction',message:'reaction notification considered for sound',data:{foreground,notifConversationIdSuffix:String(notifConversationId||'').slice(-6),activeConversationIdSuffix:String(activeConversationId||'').slice(-6)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
       }
 
       const sid = String(starshipId)

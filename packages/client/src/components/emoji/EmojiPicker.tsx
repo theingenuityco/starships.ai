@@ -32,6 +32,7 @@ export const EmojiPicker = forwardRef<
 
   const [data, setData] = useState<EmojiMartData | null>(null)
   const [rgbTokens, setRgbTokens] = useState<{ background: string; input: string; color: string } | null>(null)
+  const [fontFamily, setFontFamily] = useState<string | null>(null)
 
   const parseHslTriplet = (raw: string): { h: number; s: number; l: number } | null => {
     const t = String(raw || '').trim()
@@ -93,6 +94,19 @@ export const EmojiPicker = forwardRef<
   }, [theme])
 
   useEffect(() => {
+    // Emoji Mart renders inside Shadow DOM and won't automatically pick up our Next/font styles
+    // unless we explicitly set its `--font-family`.
+    try {
+      const body = document.body
+      const fam = body ? getComputedStyle(body).fontFamily : ''
+      const next = String(fam || '').trim()
+      if (next) setFontFamily(next)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
@@ -149,11 +163,13 @@ export const EmojiPicker = forwardRef<
       // Avoid a second "component shadow" since Radix/popovers handle elevation in our UI.
       ['--shadow' as any]: 'none',
       // Typography
-      ['--font-family' as any]: 'inherit',
-      ['--font-size' as any]: '14px',
+      ['--font-family' as any]: fontFamily ?? 'inherit',
+      // Emoji Mart uses `calc(var(--font-size) - 1px)` for the search input.
+      // Set to 15px so the search text lands at 14px (matches our `Input` / `text-sm`).
+      ['--font-size' as any]: '15px',
     }
     return vars
-  }, [rgbTokens, theme])
+  }, [fontFamily, rgbTokens, theme])
 
   if (!data) {
     return (

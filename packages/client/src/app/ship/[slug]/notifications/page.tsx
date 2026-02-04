@@ -83,10 +83,10 @@ function getConversationLabel(args: {
 function getNotificationSentence(args: {
   type: string
   locationLabel: string
-}): { title: string; iconName: 'tag' | 'message-circle-more' | 'smiley' | 'bell' } {
+}): { title: string; iconName: 'tag' | 'chat' | 'smiley' | 'bell' } {
   const t = String(args.type || '')
   if (t === 'mention') return { title: `You were mentioned in ${args.locationLabel}`, iconName: 'tag' }
-  if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'message-circle-more' }
+  if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
   if (t === 'reaction') return { title: `Your message got a reaction in ${args.locationLabel}`, iconName: 'smiley' }
   return { title: 'New notification', iconName: 'bell' }
 }
@@ -209,16 +209,17 @@ export default function NotificationsPage() {
                       </div>
                     </div>
                   </Link>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      onClick={() => markRead({ conversationId: n.conversationId })}
-                      disabled={!isUnread}
-                      aria-label={isUnread ? 'Mark this notification read' : 'Already read'}
-                    >
-                      Mark read
-                    </Button>
-                  </div>
+                  {isUnread ? (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => markRead({ conversationId: n.conversationId })}
+                        aria-label="Mark this notification read"
+                      >
+                        Mark read
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )
             })}

@@ -1,5 +1,6 @@
 import api from '@/lib/api'
-import type { ApiResponse, CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol'
+import type { ApiResponse, CreateStarshipRequest, DeployStarshipOption, StarshipModel, UpdateStarshipRequest } from '@starships/protocol'
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
@@ -53,6 +54,30 @@ export function useUserStarships(userId: string, enabled: boolean = true) {
     gcTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: true,
   })
+}
+
+export interface UseOwnedStarshipsForDeployOptions {
+  /** When true, skip fetching user starships (e.g. when user is not authenticated). */
+  enabled?: boolean
+  /** When set, use this as the only deploy target (e.g. when deploying from a specific starship context). */
+  explicitStarship?: DeployStarshipOption | null
+}
+
+/**
+ * Returns owned starships suitable for marketplace deploy (filtered by ownerId, minimal shape).
+ * Use this instead of duplicating filter/map logic in deploy CTAs and modals.
+ */
+export function useOwnedStarshipsForDeploy(userId: string, options: UseOwnedStarshipsForDeployOptions = {}): { ownedStarships: DeployStarshipOption[]; primaryStarship: DeployStarshipOption | null } {
+  const { enabled = true, explicitStarship } = options
+  const { data: starships = [] } = useUserStarships(userId, enabled && explicitStarship == null)
+
+  return useMemo(() => {
+    if (explicitStarship != null && explicitStarship.id) {
+      return { ownedStarships: [explicitStarship], primaryStarship: explicitStarship }
+    }
+    const owned = (starships as StarshipModel[]).filter(s => s.ownerId === userId).map(s => ({ id: s.id, slug: s.slug, name: s.name }))
+    return { ownedStarships: owned, primaryStarship: owned[0] ?? null }
+  }, [userId, starships, explicitStarship])
 }
 
 /**

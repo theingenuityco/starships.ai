@@ -6,14 +6,14 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
-import { useStarship, useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 
-import { useState } from 'react'
-import type { AgentTemplateModel } from '@starships/protocol'
+import { useMemo, useState } from 'react'
+import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 import api from '@/lib/api'
@@ -45,9 +45,15 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
   // Get current user and their starships for deployment
   const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId && !targetStarshipId)
-  const primaryStarship = starships[0] // Use first starship by default
   const { data: explicitStarship } = useStarship(String(targetStarshipId || ''), !!targetStarshipId && !!isAuthenticated)
+  const explicitDeployOption = useMemo(() => {
+    if (!explicitStarship) return null
+    return { id: explicitStarship.id, slug: explicitStarship.slug ?? '', name: explicitStarship.name ?? '' }
+  }, [explicitStarship])
+  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', {
+    enabled: !!userId,
+    explicitStarship: targetStarshipId ? explicitDeployOption : undefined,
+  })
   const starship = targetStarshipId ? (explicitStarship ?? { id: targetStarshipId, slug: '', name: '' }) : primaryStarship
 
   // Get deployed agents to check if this template is already deployed
@@ -82,9 +88,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       return
     }
 
-    if (!primaryStarship) {
-      return // No starship to deploy to
-    }
+    if (!starship) return
     setShowConfirmationModal(true)
   }
 
@@ -113,10 +117,9 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
 
-  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
-    if (!starship) {
-      return // No starship to deploy to
-    }
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => {
+    const targetStarship = input?.starship ?? starship
+    if (!targetStarship) return
 
     setIsDeploying(true)
     try {
@@ -134,12 +137,12 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
-        starshipId: starship.id,
-        starshipSlug: safeStarshipPathSegment([(starship as any)?.slug]) ?? undefined,
+        starshipId: targetStarship.id,
+        starshipSlug: safeStarshipPathSegment([(targetStarship as { slug?: string }).slug]) ?? undefined,
       })
       const agentId = (created as any)?.id as string | undefined
       const agentSlug = (created as any)?.slug as string | undefined
-      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, (starship as any)?.slug, starship.id])
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, (targetStarship as { slug?: string }).slug, targetStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -274,9 +277,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         isProcessing={isDeploying}
         type="agent"
         template={template}
-        starshipName={(starship as any)?.name || 'Unknown Starship'}
+        starshipName={(starship as { name?: string })?.name || 'Unknown Starship'}
         starshipId={starship?.id}
-        starshipSlug={(starship as any)?.slug}
+        starshipSlug={(starship as { slug?: string })?.slug}
+        ownedStarships={ownedStarships}
       />
     </>
   )

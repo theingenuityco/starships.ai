@@ -12,6 +12,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 type DmTarget = { dmType: 'user_agent'; agentId: string; agentSlug: string | null } | { dmType: 'user_user'; peerUserId: string }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const NANOID_RE = /^[a-z0-9_-]{10,64}$/i
+const isValidId = (s: string): boolean => UUID_RE.test(String(s || '').trim()) || NANOID_RE.test(String(s || '').trim())
+
 function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string }> | null): DmTarget | null {
   const peer = String(peerRaw || '').trim()
   if (!peer) return null
@@ -19,7 +23,7 @@ function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string
   // Users: canonical form is `u-<userId>`. We also accept raw userId as a fallback.
   if (peer.toLowerCase().startsWith('u-')) {
     const peerUserId = peer.slice(2).trim()
-    return peerUserId ? { dmType: 'user_user', peerUserId } : null
+    return peerUserId && isValidId(peerUserId) ? { dmType: 'user_user', peerUserId } : null
   }
 
   // Agents: canonical form is `<agentSlug>` (no prefix). We also accept `a-<agentSlug>` and `a:<agentId>` fallbacks.
@@ -40,7 +44,7 @@ function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string
 
   if (peer.toLowerCase().startsWith('a:')) {
     const agentId = peer.slice(2).trim()
-    if (!agentId) return null
+    if (!agentId || !isValidId(agentId)) return null
     const list = Array.isArray(agents) ? agents : []
     const match = list.find(a => String(a?.id || '').trim() === agentId) ?? null
     return { dmType: 'user_agent', agentId, agentSlug: match?.slug ? String(match.slug) : null }
@@ -60,13 +64,14 @@ function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string
   }
 
   // Also accept raw agent ids (useful for legacy `?agent=<id>` deep links).
-  const agentById = list.find(a => String(a?.id || '').trim() === peer) ?? null
+  const agentById = isValidId(peer) ? (list.find(a => String(a?.id || '').trim() === peer) ?? null) : null
   if (agentById?.id) {
     return { dmType: 'user_agent', agentId: String(agentById.id), agentSlug: agentById?.slug ? String(agentById.slug) : null }
   }
 
-  // Fallback to user id (this is primarily for internal/debug and backwards-compat).
-  return { dmType: 'user_user', peerUserId: peer }
+  // Fallback to user id (legacy deep links) ONLY when it looks like a real UUID.
+  // Otherwise treat as unresolvable to avoid "phantom" DMs with invalid IDs.
+  return isValidId(peer) ? { dmType: 'user_user', peerUserId: peer } : null
 }
 
 export default function DmPeerPage() {

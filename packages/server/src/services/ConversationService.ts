@@ -84,6 +84,16 @@ type StreamingToolCallAccum = {
  */
 export class ConversationService {
   private static instance: ConversationService | null = null;
+  // Mention token ID allowlist.
+  // IMPORTANT: Most IDs in this codebase are nanoid() strings (URL-safe), not UUIDs.
+  // We allow both to prevent "accept anything" parsing while supporting legacy UUID-backed tables.
+  private static readonly UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  private static readonly NANOID_RE = /^[a-z0-9_-]{10,64}$/i;
+  private static isValidMentionId(id: string): boolean {
+    const s = String(id || '').trim();
+    if (!s) return false;
+    return ConversationService.UUID_RE.test(s) || ConversationService.NANOID_RE.test(s);
+  }
   private conversationRepository!: ConversationRepository;
   private agentRepository!: AgentRepository;
   private messageService!: MessageService;
@@ -427,7 +437,10 @@ export class ConversationService {
     // Per-turn / streaming accumulators
     this.streamingContent.delete(conversationId);
     this.streamingToolCalls.delete(conversationId);
-    this.streamingReasoning.delete(conversationId);
+    // IMPORTANT:
+    // Do NOT clear streamingReasoning here.
+    // After stop/cancel, late runner events (node_completed/workflow_completed) can still arrive and may
+    // rely on last-known reasoning to persist a consistent assistant snapshot.
     this.streamingGeneratedAttachmentIds.delete(conversationId);
     this.streamingGeneratedImageUrlSeen.delete(conversationId);
     this.ringBuffer.delete(conversationId);
@@ -468,6 +481,8 @@ export class ConversationService {
   private finalizeTurnState(conversationId: string): void {
     // Clear bulky streaming state first
     this.clearStreamingState(conversationId);
+    // Now that the turn is definitively finished, drop any retained reasoning.
+    this.streamingReasoning.delete(conversationId);
 
     // Turn identity + sequencing (safe to clear only once turn is definitively finished)
     this.currentTurnId.delete(conversationId);
@@ -591,7 +606,8 @@ export class ConversationService {
         // Clear accumulators for the active stream so a future stream can start cleanly
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
-        this.streamingReasoning.delete(conversationId);
+        // Do NOT clear streamingReasoning here (see clearStreamingState notes).
+        // Retain last-known reasoning through stop/cancel so late lifecycle events can still persist it.
         this.ringBuffer.delete(conversationId);
         this.streamingGeneratedAttachmentIds.delete(conversationId);
         this.streamingGeneratedImageUrlSeen.delete(conversationId);
@@ -635,16 +651,16 @@ export class ConversationService {
     if (text.length > 20_000) text = text.slice(0, 20_000);
     const userIds = new Set<string>();
     const agentIds = new Set<string>();
-    const userRe = /<@u:([^>\s]+)>/g;
-    const agentRe = /<@a:([^>\s]+)>/g;
+    const userRe = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
+    const agentRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
     let m: RegExpExecArray | null;
     while ((m = userRe.exec(text))) {
       const id = String(m[1] || '').trim();
-      if (id) userIds.add(id);
+      if (id && ConversationService.isValidMentionId(id)) userIds.add(id);
     }
     while ((m = agentRe.exec(text))) {
       const id = String(m[1] || '').trim();
-      if (id) agentIds.add(id);
+      if (id && ConversationService.isValidMentionId(id)) agentIds.add(id);
     }
     return { userIds, agentIds };
   }
@@ -735,14 +751,16 @@ export class ConversationService {
     if (!input) return '';
     if (!input.includes('<@u:') && !input.includes('<@a:')) return input;
     return input
-      .replace(/<@a:([^>\s]+)>/g, (_m, idRaw) => {
+      .replace(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, (m, idRaw) => {
         const id = String(idRaw || '').trim();
+        if (!ConversationService.isValidMentionId(id)) return m;
         const name = id ? args.agentNameById.get(id) : null;
         const label = name || id || 'agent';
         return `@${label}`;
       })
-      .replace(/<@u:([^>\s]+)>/g, (_m, idRaw) => {
+      .replace(/<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, (m, idRaw) => {
         const id = String(idRaw || '').trim();
+        if (!ConversationService.isValidMentionId(id)) return m;
         const name = id ? args.userNameById.get(id) : null;
         const label = name || id || 'user';
         return `@${label}`;
@@ -1302,6 +1320,7 @@ export class ConversationService {
       if (deleted) {
         // Best-effort: clear any in-memory streaming state for this conversation to avoid leaks
         this.clearStreamingState(conversationId);
+        this.streamingReasoning.delete(conversationId);
         console.log(`[ConversationService] Successfully deleted conversation ${conversationId}`);
       } else {
         console.error(`[ConversationService] Failed to delete conversation ${conversationId} - no rows affected`);
@@ -1901,7 +1920,7 @@ export class ConversationService {
       noAgentToRun = true;
     } else {
       const content = typeof data.content === 'string' ? data.content : '';
-      const userTokenCountPre = (content.match(/<@u:[^>\s]+>/gi) || []).length;
+      const userTokenCountPre = (content.match(/<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi) || []).length;
       const hasUserMentions = userTokenCountPre > 0;
       // If any agent is explicitly mentioned, we should route by mention (mentions take precedence over explicitAgentId fallback).
       const mentionedAgentsPreAll = this.extractMentionedAgents(content, allStarshipAgents);
@@ -2376,7 +2395,7 @@ export class ConversationService {
       // Mentions are resolved against the full starship agent list (not only currently-linked agents).
       const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
       const hasMention = mentioned.length > 0;
-      const hasUserMentionToken = /<@u:[^>\s]+>/i.test(content);
+      const hasUserMentionToken = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/i.test(content);
 
       // Mention-only contexts only trigger when at least one agent is mentioned.
       if (isChannelRoot || isMentionOnlyThread) return hasMention;
@@ -3036,8 +3055,8 @@ export class ConversationService {
         // Remove structured mention tokens and replace legacy @mentions with a generic placeholder.
         // (We intentionally avoid resolving IDs -> names for titles.)
         return input
-          .replace(/<@a:[^>\s]+>/gi, ' agent ')
-          .replace(/<@u:[^>\s]+>/gi, ' user ')
+          .replace(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, ' agent ')
+          .replace(/<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, ' user ')
           .replace(/<@[^>\n]+>/g, ' ')
           .replace(/(^|\s)@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|([a-z0-9._-]{1,100}))/gi, '$1mention')
           .replace(/\s+/g, ' ')
@@ -3142,7 +3161,7 @@ export class ConversationService {
       // IMPORTANT:
       // - User mentions are emitted as <@u:USER_ID> and must NEVER trigger agent execution.
       // - If we detect structured tokens, we prioritize them and ignore legacy @slug parsing to avoid collisions.
-      const tokenRe = /<@a:([^>\s]+)>/gi;
+      const tokenRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
       const tokenMatches = Array.from(text.matchAll(tokenRe));
       if (tokenMatches.length > 0) {
         const byId = new Map<string, AgentModel>();
@@ -3153,7 +3172,7 @@ export class ConversationService {
         const out: AgentModel[] = [];
         for (const m of tokenMatches) {
           const id = String(m[1] || '').trim();
-          if (!id) continue;
+          if (!id || !ConversationService.isValidMentionId(id)) continue;
           const agent = byId.get(id);
           if (!agent) continue;
           if (seen.has(id)) continue;
@@ -3200,48 +3219,21 @@ export class ConversationService {
           resolvedLog.push({ raw, strategy: 'all' });
           continue;
         }
-        const key = raw.replace(/\s+/g, '').replace(/[_.-]/g, '');
-        // 1) Exact match on name or slug
-        let candidates = entries.filter((e) => e.nameKey === key || e.slugKey === key);
-        let chosen: Entry | undefined = undefined;
-        let strategy = 'exact';
-        if (candidates.length === 1) {
-          chosen = candidates[0];
+        const key = normalize(raw);
+        // SECURITY:
+        // Only allow exact resolution for legacy @mentions. Prefix/contains heuristics are ambiguous and can cause
+        // @admin-style collisions as the agent set changes over time.
+        const candidates = entries.filter((e) => e.nameKey === key || e.slugKey === key);
+        if (candidates.length !== 1) {
+          resolvedLog.push({ raw, strategy: candidates.length > 1 ? 'ambiguous-exact' : 'no-match' });
+          continue;
         }
-        // 2) Prefix match if not found
-        if (!chosen) {
-          candidates = entries.filter((e) => e.nameKey.startsWith(key) || e.slugKey.startsWith(key));
-          if (candidates.length === 1) {
-            chosen = candidates[0];
-            strategy = 'prefix';
-          } else if (candidates.length > 1) {
-            // choose shortest key length for better specificity
-            chosen = candidates.sort(
-              (a, b) => Math.min(a.nameKey.length, a.slugKey.length) - Math.min(b.nameKey.length, b.slugKey.length)
-            )[0];
-            strategy = 'prefix-heuristic';
-          }
-        }
-        // 3) Contains match
-        if (!chosen) {
-          candidates = entries.filter((e) => e.nameKey.includes(key) || e.slugKey.includes(key));
-          if (candidates.length === 1) {
-            chosen = candidates[0];
-            strategy = 'contains';
-          } else if (candidates.length > 1) {
-            chosen = candidates.sort(
-              (a, b) => Math.min(a.nameKey.length, a.slugKey.length) - Math.min(b.nameKey.length, b.slugKey.length)
-            )[0];
-            strategy = 'contains-heuristic';
-          }
-        }
-        if (chosen && !seen.has(chosen.id)) {
+        const chosen = candidates[0];
+        if (!seen.has(chosen.id)) {
           seen.add(chosen.id);
           out.push(chosen.agent);
-          resolvedLog.push({ raw, matchedId: chosen.id, strategy });
-        } else {
-          resolvedLog.push({ raw });
-        }
+          resolvedLog.push({ raw, matchedId: chosen.id, strategy: 'exact' });
+        } else resolvedLog.push({ raw, matchedId: chosen.id, strategy: 'exact-duplicate' });
       }
 
       return out;

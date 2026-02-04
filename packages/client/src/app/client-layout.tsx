@@ -144,16 +144,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   // Redirect already-logged-in users who haven't completed the wizard (e.g. existing users after migration).
+  // Wizard must run before the nav tour; we do not exempt marketplace so users always see the 5-step wizard first.
   // Any flow that sends the user into the app (e.g. to /ship/...) must call wizard/complete and refetch auth first;
   // see: onboarding (handleFinish, handleJoinWithInviteLink) and accept-invite page.
   // Must run unconditionally (before any early return) to satisfy Rules of Hooks.
   useEffect(() => {
-    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage || isMarketplace) return
+    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage) return
     if (user.wizardOnboardingCompleted) return
     if (starshipsLoading) return
     if (!primaryStarship) return
     router.replace('/onboarding')
-  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, isMarketplace, starshipsLoading, primaryStarship, router])
+  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, starshipsLoading, primaryStarship, router])
 
   if (isPublicSimplePage) {
     // Public pages - no authentication required

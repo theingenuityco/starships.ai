@@ -4,17 +4,25 @@ import webpush from 'web-push'
 
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
-const vapidSubject = process.env.VAPID_SUBJECT ?? 'mailto:ops@starships.ai'
+const vapidSubject = process.env.VAPID_SUBJECT
 
-if (vapidPublicKey && vapidPrivateKey) {
+if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey)
 }
 
 let subscription: webpush.PushSubscription | null = null
 
 function assertVapidConfigured() {
-  if (!vapidPublicKey || !vapidPrivateKey) {
-    throw new Error('Missing VAPID keys. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.')
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
+    if (!vapidSubject) {
+      throw new Error('Missing VAPID_SUBJECT.')
+    }
+    if (!vapidPublicKey) {
+      throw new Error('Missing VAPID_PUBLIC_KEY.')
+    }
+    if (!vapidPrivateKey) {
+      throw new Error('Missing VAPID_PRIVATE_KEY.')
+    }
   }
 }
 

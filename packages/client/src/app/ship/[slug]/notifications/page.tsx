@@ -7,7 +7,7 @@ import { useNotificationsStream } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-type Filter = 'all' | 'mentions' | 'dms'
+type Filter = 'all' | 'mentions' | 'dms' | 'reactions'
 
 export default function NotificationsPage() {
   const params = useParams()
@@ -22,6 +22,7 @@ export default function NotificationsPage() {
     const list = Array.isArray(notifications) ? notifications : []
     if (filter === 'mentions') return list.filter(n => n.type === 'mention')
     if (filter === 'dms') return list.filter(n => n.type === 'dm')
+    if (filter === 'reactions') return list.filter(n => n.type === 'reaction')
     return list
   }, [notifications, filter])
 
@@ -57,6 +58,9 @@ export default function NotificationsPage() {
         <Button variant={filter === 'dms' ? 'default' : 'secondary'} onClick={() => setFilter('dms')}>
           Direct messages
         </Button>
+        <Button variant={filter === 'reactions' ? 'default' : 'secondary'} onClick={() => setFilter('reactions')}>
+          Reactions
+        </Button>
       </div>
 
       <div className="mt-6">
@@ -79,7 +83,7 @@ export default function NotificationsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn('text-sm font-medium', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
-                        {n.type === 'mention' ? 'Mention' : 'Direct message'}
+                        {n.type === 'mention' ? 'Mention' : n.type === 'dm' ? 'Direct message' : 'Reaction'}
                       </span>
                       {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" /> : null}
                     </div>

@@ -15,6 +15,7 @@ type UnreadSummary = {
   totalUnread: number
   dmUnreadByConversationId: Record<string, number>
   mentionUnreadByConversationId: Record<string, number>
+  reactionUnreadByConversationId: Record<string, number>
 }
 
 export type NotificationsSnapshot = {
@@ -36,7 +37,7 @@ const MAX_TRACKED_IDS_PER_STARSHIP = 500
 function shouldPlayForNotification(n: NotificationModel): boolean {
   const typ = String((n as any)?.type || '')
   // Current UI treats only these as unread-notification types.
-  return typ === 'dm' || typ === 'mention'
+  return typ === 'dm' || typ === 'mention' || typ === 'reaction'
 }
 
 export function useNotificationsStream(
@@ -192,12 +193,13 @@ export function useNotificationsStream(
 
   const unread = useMemo<UnreadSummary>(() => {
     // Start with snapshot unread, then apply state updates + append increments.
-    let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} }
+    let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} }
     // Copy so we can mutate safely
     let cur: UnreadSummary = {
       totalUnread: Number(base.totalUnread ?? 0) || 0,
       dmUnreadByConversationId: { ...(base.dmUnreadByConversationId ?? {}) },
       mentionUnreadByConversationId: { ...(base.mentionUnreadByConversationId ?? {}) },
+      reactionUnreadByConversationId: { ...(base.reactionUnreadByConversationId ?? {}) },
     }
     for (const ch of chunks) {
       const c: any = ch as any
@@ -207,16 +209,18 @@ export function useNotificationsStream(
           totalUnread: Number(u.totalUnread ?? 0) || 0,
           dmUnreadByConversationId: { ...(u.dmUnreadByConversationId ?? {}) },
           mentionUnreadByConversationId: { ...(u.mentionUnreadByConversationId ?? {}) },
+          reactionUnreadByConversationId: { ...(u.reactionUnreadByConversationId ?? {}) },
         }
       }
       if (c?.type === 'notification.append' && c?.data?.notification) {
         const n = c.data.notification as NotificationModel
         const cid = String((n as any).conversationId || '')
         const typ = String((n as any).type || '')
-        if (cid && (typ === 'dm' || typ === 'mention')) {
+        if (cid && (typ === 'dm' || typ === 'mention' || typ === 'reaction')) {
           cur.totalUnread += 1
           if (typ === 'dm') cur.dmUnreadByConversationId[cid] = (cur.dmUnreadByConversationId[cid] || 0) + 1
           if (typ === 'mention') cur.mentionUnreadByConversationId[cid] = (cur.mentionUnreadByConversationId[cid] || 0) + 1
+          if (typ === 'reaction') cur.reactionUnreadByConversationId[cid] = (cur.reactionUnreadByConversationId[cid] || 0) + 1
         }
       }
     }

@@ -29,7 +29,7 @@ export function MessageReactionAction({
   const [open, setOpen] = useState(false)
   const [customEmoji, setCustomEmoji] = useState('')
   const toggle = useToggleMessageReaction()
-  const isPending = Boolean((toggle as any)?.isPending)
+  const isPending = toggle.isPending
   const { userId: authUserId } = useAuth()
   const userId = typeof authUserId === 'string' ? authUserId : ''
 
@@ -41,7 +41,7 @@ export function MessageReactionAction({
     if (!canReact) return
     if (!emoji) return
     if (isPending) return
-    toggle.mutate({ conversationId, messageId, emoji } as any)
+    toggle.mutate({ conversationId, messageId, emoji })
     // Close after a selection so it feels like a quick action.
     setOpen(false)
   }

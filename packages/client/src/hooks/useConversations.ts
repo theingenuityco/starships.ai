@@ -709,9 +709,14 @@ export function useToggleMessageReaction() {
   const { userId: authUserId } = useAuth()
   const userId = typeof authUserId === 'string' ? authUserId : ''
 
-  const normalizeReactions = (input: unknown): Record<string, string[]> => {
+  type ReactionsMap = Record<string, string[]>
+  type ToggleMessageReactionArgs = { conversationId: string; messageId: string; emoji: string }
+  type ToggleMessageReactionResponse = { messageId: string; reactions: ReactionsMap }
+  type ToggleMessageReactionContext = { conversationId: string; key: readonly unknown[]; prev: unknown }
+
+  const normalizeReactions = (input: unknown): ReactionsMap => {
     if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
-    const out: Record<string, string[]> = {}
+    const out: ReactionsMap = {}
     for (const [emoji, ids] of Object.entries(input as Record<string, unknown>)) {
       if (!emoji) continue
       if (!Array.isArray(ids)) continue
@@ -720,7 +725,7 @@ export function useToggleMessageReaction() {
     return out
   }
 
-  const toggleLocal = (reactions: Record<string, string[]>, emoji: string): Record<string, string[]> => {
+  const toggleLocal = (reactions: ReactionsMap, emoji: string): ReactionsMap => {
     if (!userId) return reactions
     const prev = Array.isArray(reactions[emoji]) ? reactions[emoji] : []
     const has = prev.includes(userId)
@@ -731,7 +736,7 @@ export function useToggleMessageReaction() {
     return next
   }
 
-  const patchChunksWithReactions = (old: any, args: { messageId: string; reactions: Record<string, string[]> }) => {
+  const patchChunksWithReactions = (old: unknown, args: { messageId: string; reactions: ReactionsMap }) => {
     if (!Array.isArray(old)) return old
     const { messageId, reactions } = args
     return old.map((chunk: any) => {
@@ -757,9 +762,12 @@ export function useToggleMessageReaction() {
     })
   }
 
-  const appendReactionsChunk = (old: any, args: { conversationId: string; messageId: string; reactions: Record<string, string[]> }) => {
+  const appendReactionsChunk = (old: unknown, args: { conversationId: string; messageId: string; reactions: ReactionsMap }) => {
     const base = Array.isArray(old) ? old : []
-    const nextChunk = { type: 'message.reactions', data: { conversationId: args.conversationId, messageId: args.messageId, reactions: args.reactions } }
+    const nextChunk: { type: 'message.reactions'; data: { conversationId: string; messageId: string; reactions: ReactionsMap } } = {
+      type: 'message.reactions',
+      data: { conversationId: args.conversationId, messageId: args.messageId, reactions: args.reactions },
+    }
     // Avoid unbounded duplicates when the last chunk is already the same update.
     try {
       const last = base.length > 0 ? (base[base.length - 1] as any) : null
@@ -778,9 +786,9 @@ export function useToggleMessageReaction() {
     return [...base, nextChunk]
   }
 
-  const findCurrentReactions = (chunks: any[], messageId: string): Record<string, string[]> => {
+  const findCurrentReactions = (chunks: unknown[], messageId: string): ReactionsMap => {
     for (let i = chunks.length - 1; i >= 0; i--) {
-      const chunk = chunks[i]
+      const chunk: any = chunks[i] as any
       if (!chunk || typeof chunk !== 'object') continue
 
       // Stream reactions event (including synthetic optimistic chunks).
@@ -801,17 +809,17 @@ export function useToggleMessageReaction() {
     return {}
   }
 
-  return useMutation({
-    mutationFn: async (args: { conversationId: string; messageId: string; emoji: string }) => {
+  return useMutation<ToggleMessageReactionResponse, unknown, ToggleMessageReactionArgs, ToggleMessageReactionContext>({
+    mutationFn: async (args: ToggleMessageReactionArgs) => {
       const emoji = String(args.emoji || '').trim()
-      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/messages/${encodeURIComponent(args.messageId)}/reactions`, { emoji })
-      return response.data.data
+      const response: FetchResponse<ApiResponse<ToggleMessageReactionResponse>> = await api.post(`/api/v1/messages/${encodeURIComponent(args.messageId)}/reactions`, { emoji })
+      return response.data.data as ToggleMessageReactionResponse
     },
-    onMutate: async args => {
+    onMutate: async (args: ToggleMessageReactionArgs): Promise<ToggleMessageReactionContext | undefined> => {
       const conversationId = String(args.conversationId || '').trim()
       const messageId = String(args.messageId || '').trim()
       const emoji = String(args.emoji || '').trim()
-      if (!conversationId || !messageId || !emoji || !userId) return {}
+      if (!conversationId || !messageId || !emoji || !userId) return undefined
 
       const key = CONVERSATION_QUERY_KEYS.messages(conversationId)
       const prev = queryClient.getQueryData(key)
@@ -828,14 +836,14 @@ export function useToggleMessageReaction() {
 
       return { conversationId, key, prev }
     },
-    onError: (_error: any, _vars, ctx: any) => {
+    onError: (error: unknown, _vars, ctx) => {
       if (ctx?.key) {
-        queryClient.setQueryData(ctx.key, ctx.prev)
+        queryClient.setQueryData(ctx.key, ctx.prev as any)
       }
-      const errorMessage = getSafeErrorMessage(_error)
+      const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to add reaction', { description: errorMessage })
     },
-    onSuccess: (data: any, vars) => {
+    onSuccess: (data, vars) => {
       const conversationId = String(vars.conversationId || '').trim()
       const messageId = typeof data?.messageId === 'string' ? String(data.messageId).trim() : String(vars.messageId || '').trim()
       const reactions = normalizeReactions(data?.reactions)

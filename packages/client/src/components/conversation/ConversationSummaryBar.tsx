@@ -291,7 +291,14 @@ export function ConversationSummaryBar({
 
       return items.length > 0 ? items : participantItemsFromConversation
     }
-    if (Array.isArray(participantsOverride) && participantsOverride.length > 0) return participantsOverride
+    if (Array.isArray(participantsOverride) && participantsOverride.length > 0) {
+      const seen = new Set<string>()
+      return participantsOverride.filter(p => {
+        if (seen.has(p.key)) return false
+        seen.add(p.key)
+        return true
+      })
+    }
     return participantItemsFromConversation
   }, [authUserAvatar, authUserEmail, authUserId, authUserName, dmItem, participantItemsFromConversation, participantsOverride])
 

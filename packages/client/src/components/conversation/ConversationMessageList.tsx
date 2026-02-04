@@ -3095,7 +3095,7 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
               aria-hidden="true"
             />
             <Icon name="hash" className="relative z-10 h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
-            <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+            <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
@@ -3171,7 +3171,7 @@ function DirectMessageHeroAvatar({
     return (
       <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
         <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
-        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+        <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10" />
       </div>
     )
   }

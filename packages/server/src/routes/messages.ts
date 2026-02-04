@@ -288,6 +288,10 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
       return;
     }
 
+    // #region agent log (H1/H2) route context
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'packages/server/src/routes/messages.ts:reactions:context',message:'reaction toggle request context',data:{messageIdSuffix:String(messageId).slice(-6),conversationIdSuffix:String(conversationId).slice(-6),starshipIdSuffix:String(starshipId).slice(-6),emoji,actorUserIdSuffix:String(authUserId||'').slice(-6)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     // Authorization: verify user has access to the starship + is a member of restricted conversations.
     if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
     const conversationService = new ConversationService();
@@ -314,6 +318,10 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
     const toggled = await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
     const reactions = await reactionRepo.getAggregatedReactions(messageId);
 
+    // #region agent log (H1) toggle result
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'packages/server/src/routes/messages.ts:reactions:toggled',message:'reaction toggled + aggregated reactions',data:{messageIdSuffix:String(messageId).slice(-6),toggled,emoji,reactionEmojiCount:Object.keys(reactions||{}).length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     // Publish realtime update so all connected clients update without refresh.
     try {
       const bus = ConversationStreamBus.getInstance();
@@ -335,26 +343,60 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
             new DirectMessageRepository().findByConversationId(conversationId).catch(() => null),
             new ChannelRepository().findByConversationId(conversationId).catch(() => null),
           ]);
+          // #region agent log (H2) notification scope gating
+          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'packages/server/src/routes/messages.ts:reactions:notif-scope',message:'reaction notification scope + recipient gating',data:{messageIdSuffix:String(messageId).slice(-6),isChannel:Boolean(channel),isDm:Boolean(dm),authorIsActor:false,recipientUserIdSuffix:String(authorUserId).slice(-6)},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           if (dm || channel) {
             const notifRepo = new NotificationRepository();
-            const created = await notifRepo.createOrIgnoreByUserTypeMessage({
-              starshipId,
-              userId: authorUserId,
-              type: 'reaction',
-              conversationId,
-              messageId,
-            });
+            // NOTE: Reactions should notify for each add event (no per-message dedupe).
+            // We keep the same { created, notification } shape so existing debug logs remain unchanged.
+            const created: { created: boolean; notification?: any } = await notifRepo
+              .create({
+                starshipId,
+                userId: authorUserId,
+                type: 'reaction',
+                conversationId,
+                messageId,
+              })
+              .then((notification) => ({ created: true, notification }))
+              .catch(() => ({ created: false, notification: undefined }));
+            // #region agent log (H1) create notification result
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'packages/server/src/routes/messages.ts:reactions:notif-create',message:'reaction notification createOrIgnore result',data:{messageIdSuffix:String(messageId).slice(-6),created:Boolean(created?.created),hasNotification:Boolean(created?.notification),notificationIdSuffix:String((created?.notification as any)?.id||'').slice(-6)},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             if (created?.created && created?.notification) {
               const notifBus = NotificationStreamBus.getInstance();
               await notifBus.publish(starshipId, authorUserId, { type: 'notification.append', data: { notification: created.notification } });
               const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authorUserId });
               await notifBus.publish(starshipId, authorUserId, { type: 'notification.state', data: { unread } });
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[reactions] created reaction notification', {
+                  starshipId,
+                  conversationId,
+                  messageId,
+                  emoji,
+                  actorUserId: authUserId,
+                  recipientUserId: authorUserId,
+                  notificationId: (created.notification as any)?.id,
+                });
+              }
             }
           }
         }
       }
-    } catch {
-      /* best-effort */
+    } catch (e) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[reactions] failed to create reaction notification (best-effort)', {
+          starshipId,
+          conversationId,
+          messageId,
+          emoji,
+          actorUserId: authUserId,
+          error: e instanceof Error ? { message: e.message, name: e.name } : String(e),
+        });
+      }
+      // #region agent log (H1/H2) notification failure
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'packages/server/src/routes/messages.ts:reactions:notif-error',message:'reaction notification failed (best-effort catch)',data:{messageIdSuffix:String(messageId).slice(-6),emoji,errorName:e instanceof Error?e.name:'non-error',errorMessage:e instanceof Error?e.message:String(e)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
     }
 
     sendSuccess(res, { messageId, reactions }, 200);

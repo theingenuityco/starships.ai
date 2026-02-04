@@ -28,6 +28,11 @@ export interface AuthUser {
    * When true, user has completed the one-time navigation onboarding tour.
    */
   navigationOnboardingCompleted?: boolean
+  /**
+   * Wizard onboarding completion flag.
+   * When true, user has completed the one-time wizard (name starship, invite, add agent).
+   */
+  wizardOnboardingCompleted?: boolean
 }
 
 interface AuthLoginResponse {
@@ -211,15 +216,12 @@ export function useLogin() {
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
 
-      // Check if onboarding should start - redirect to marketplace instead of conversations
-      const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
-      const shouldStartOnboarding = !hasCompletedOnboarding
-
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
-        // If onboarding should start, go to marketplace; otherwise go to conversations
-        if (shouldStartOnboarding) {
+        if (!(user?.wizardOnboardingCompleted ?? false)) {
+          router.push('/onboarding')
+        } else if (!(user?.navigationOnboardingCompleted ?? false)) {
           router.push('/marketplace')
         } else {
           router.push(addWelcome(`/ship/${starship.slug}`))
@@ -291,7 +293,11 @@ export function useRegister() {
       if (redirectTarget) {
         router.push(redirectTarget)
       } else if (starship?.slug) {
-        router.push(`/ship/${starship.slug}`)
+        if (!(user?.wizardOnboardingCompleted ?? false)) {
+          router.push('/onboarding')
+        } else {
+          router.push(`/ship/${starship.slug}`)
+        }
       }
 
       queryClient.invalidateQueries()
@@ -351,15 +357,12 @@ export function useOAuthLogin() {
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
 
-      // Check if onboarding should start - redirect to marketplace instead of conversations
-      const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
-      const shouldStartOnboarding = !hasCompletedOnboarding
-
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
-        // If onboarding should start, go to marketplace; otherwise go to conversations
-        if (shouldStartOnboarding) {
+        if (!(user?.wizardOnboardingCompleted ?? false)) {
+          router.push('/onboarding')
+        } else if (!(user?.navigationOnboardingCompleted ?? false)) {
           router.push('/marketplace')
         } else {
           router.push(addWelcome(`/ship/${starship.slug}`))

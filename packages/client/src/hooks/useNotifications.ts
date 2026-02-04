@@ -23,6 +23,8 @@ export type NotificationsSnapshot = {
   userId: string
   notifications: NotificationModel[]
   unread: UnreadSummary
+  hasMoreBefore?: boolean
+  oldestCursor?: { createdAt: string; id: string } | null
 }
 
 type StreamChunk =
@@ -31,6 +33,7 @@ type StreamChunk =
   | { type: 'notification.state'; data: { unread: UnreadSummary } }
   | { type: 'notification.mark_read'; data: { conversationId: string | null; at: string } }
   | { type: 'notification.mark_seen'; data: { before?: string | null; at: string } }
+  | { type: 'notification.page'; data: { notifications: NotificationModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null } }
   | { type: 'error'; error: unknown }
 
 const playedNotificationIdsByStarship = new Map<string, Set<string>>()
@@ -204,6 +207,24 @@ export function useNotificationsStream(
     return null
   }, [chunks.length, starshipId])
 
+  const pageInfo = useMemo(() => {
+    // Last-write-wins from snapshot + load-older pages.
+    let hasMoreBefore = Boolean(snapshot?.hasMoreBefore)
+    let oldestCursor: { createdAt: string; id: string } | null = (snapshot?.oldestCursor as any) ?? null
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'snapshot' && c?.data) {
+        hasMoreBefore = Boolean(c.data.hasMoreBefore)
+        oldestCursor = (c.data.oldestCursor as any) ?? null
+      }
+      if (c?.type === 'notification.page' && c?.data) {
+        hasMoreBefore = Boolean(c.data.hasMoreBefore)
+        oldestCursor = (c.data.oldestCursor as any) ?? null
+      }
+    }
+    return { hasMoreBefore, oldestCursor }
+  }, [chunks.length, snapshot])
+
   const unread = useMemo<UnreadSummary>(() => {
     // Start with snapshot unread, then apply state updates + append increments.
     let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} }
@@ -255,6 +276,17 @@ export function useNotificationsStream(
       }
     }
 
+    // Older pages (pagination): append to the end (list is newest-first).
+    for (const ch of chunks) {
+      const c: any = ch as any
+      if (c?.type === 'notification.page' && Array.isArray(c?.data?.notifications)) {
+        for (const n of c.data.notifications as NotificationModel[]) {
+          if (!n?.id) continue
+          if (!list.some(x => x.id === n.id)) list.push(n)
+        }
+      }
+    }
+
     // Apply local state mutations (mark read/seen) so the UI reflects server writes immediately.
     for (const ch of chunks) {
       const c: any = ch as any
@@ -288,6 +320,43 @@ export function useNotificationsStream(
 
     return list
   }, [chunks.length, snapshot])
+
+  const loadOlder = useMutation({
+    mutationFn: async (args?: { limit?: number }) => {
+      const sid = String(starshipId || '')
+      if (!sid) return null
+      const cursor = pageInfo.oldestCursor
+      if (!cursor?.createdAt || !cursor?.id) return null
+      const resp = await api.get(`/api/v1/starships/${sid}/notifications`, {
+        params: {
+          limit: typeof args?.limit === 'number' ? args?.limit : 50,
+          beforeCreatedAt: cursor.createdAt,
+          beforeId: cursor.id,
+        },
+      })
+      return (resp as any).data?.data as {
+        notifications: NotificationModel[]
+        hasMoreBefore: boolean
+        oldestCursor: { createdAt: string; id: string } | null
+      }
+    },
+    onSuccess: data => {
+      const sid = String(starshipId || '')
+      if (!sid || !data) return
+      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.stream(sid), (old: any) => {
+        const arr = Array.isArray(old) ? old.slice() : []
+        arr.push({
+          type: 'notification.page',
+          data: {
+            notifications: Array.isArray((data as any)?.notifications) ? (data as any).notifications : [],
+            hasMoreBefore: Boolean((data as any)?.hasMoreBefore),
+            oldestCursor: ((data as any)?.oldestCursor as any) ?? null,
+          },
+        })
+        return arr
+      })
+    },
+  })
 
   const markSeen = useMutation({
     mutationFn: async (args?: { before?: string | null }) => {
@@ -501,6 +570,10 @@ export function useNotificationsStream(
     isFetching: q.fetchStatus === 'fetching',
     isError: q.isError,
     error: q.error,
+    hasMoreBefore: pageInfo.hasMoreBefore,
+    oldestCursor: pageInfo.oldestCursor,
+    isLoadingOlder: loadOlder.isPending,
+    loadOlder: (args?: { limit?: number }) => loadOlder.mutateAsync(args),
     markSeen: (args?: { before?: string | null }) => markSeen.mutateAsync(args),
     markRead: (args?: { conversationId?: string | null }) => markRead.mutateAsync(args),
   }

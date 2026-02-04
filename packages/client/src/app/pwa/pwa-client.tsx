@@ -102,8 +102,18 @@ function PushNotificationManager({ publicKey }: { publicKey: string | null }) {
       setError('Please subscribe first.')
       return
     }
-    await sendNotification(message)
-    setMessage('')
+    try {
+      const serializedSub = JSON.parse(JSON.stringify(subscription))
+      const result = await sendNotification(serializedSub, message)
+      if (!result?.success) {
+        setError(result?.error || 'Failed to send notification.')
+        return
+      }
+      setMessage('')
+    } catch (err) {
+      console.error('Failed to send push notification:', err)
+      setError('Failed to send notification.')
+    }
   }
 
   if (!isSupported) {

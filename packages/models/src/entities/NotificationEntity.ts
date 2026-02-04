@@ -25,7 +25,7 @@ export class NotificationEntity implements NotificationModel {
   userId!: string;
 
   @Expose()
-  @IsEnum(['dm', 'mention'])
+  @IsEnum(['dm', 'mention', 'reaction'])
   type!: NotificationType;
 
   @Expose()

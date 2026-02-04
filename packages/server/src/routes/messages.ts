@@ -10,7 +10,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
-import { ConversationParticipantRepository, MessageReactionRepository } from '@starships/models';
+import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository, MessageReactionRepository, NotificationRepository } from '@starships/models';
+import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
 const router: Router = Router();
 
@@ -310,7 +311,7 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
     const reactionRepo = new MessageReactionRepository();
-    await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
+    const toggled = await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
     const reactions = await reactionRepo.getAggregatedReactions(messageId);
 
     // Publish realtime update so all connected clients update without refresh.
@@ -322,6 +323,38 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
       });
     } catch {
       /* best-effort: persist succeeded even if streaming publish fails */
+    }
+
+    // Best-effort: create a durable notification for the message author when someone reacts.
+    // Scope matches v1 notifications: channels + DMs only.
+    try {
+      if (toggled === 'added') {
+        const authorUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
+        if (authorUserId && authorUserId !== authUserId) {
+          const [dm, channel] = await Promise.all([
+            new DirectMessageRepository().findByConversationId(conversationId).catch(() => null),
+            new ChannelRepository().findByConversationId(conversationId).catch(() => null),
+          ]);
+          if (dm || channel) {
+            const notifRepo = new NotificationRepository();
+            const created = await notifRepo.createOrIgnoreByUserTypeMessage({
+              starshipId,
+              userId: authorUserId,
+              type: 'reaction',
+              conversationId,
+              messageId,
+            });
+            if (created?.created && created?.notification) {
+              const notifBus = NotificationStreamBus.getInstance();
+              await notifBus.publish(starshipId, authorUserId, { type: 'notification.append', data: { notification: created.notification } });
+              const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authorUserId });
+              await notifBus.publish(starshipId, authorUserId, { type: 'notification.state', data: { unread } });
+            }
+          }
+        }
+      }
+    } catch {
+      /* best-effort */
     }
 
     sendSuccess(res, { messageId, reactions }, 200);

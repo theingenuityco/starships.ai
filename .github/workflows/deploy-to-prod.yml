@@ -127,6 +127,9 @@ jobs:
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           SENTRY_DSN_CLIENT: ${{ secrets.SENTRY_DSN_CLIENT }}
           SENTRY_DSN_SERVER: ${{ secrets.SENTRY_DSN_SERVER }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
           GH_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
           GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
@@ -192,6 +195,9 @@ jobs:
             --from-literal=POSTHOG_HOST="$POSTHOG_HOST" \
             --from-literal=SENTRY_DSN_CLIENT="$SENTRY_DSN_CLIENT" \
             --from-literal=SENTRY_DSN_SERVER="$SENTRY_DSN_SERVER" \
+            --from-literal=VAPID_SUBJECT="$VAPID_SUBJECT" \
+            --from-literal=VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" \
+            --from-literal=VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
             --from-literal=RUNNER_AUTH_TOKEN="$RUNNER_AUTH_TOKEN" \
             --from-literal=EMAIL_FROM_ADDRESS="$EMAIL_FROM_ADDRESS" \
             --from-literal=EMAIL_FROM_NAME="$EMAIL_FROM_NAME" \

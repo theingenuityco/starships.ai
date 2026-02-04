@@ -1,7 +1,7 @@
 import type { Client } from 'pg';
 
 /**
- * Migration 101: Add wizard onboarding completion flag
+ * Migration 103: Add wizard onboarding completion flag
  *
  * - Adds wizard_onboarding_completed boolean field (default false) to users table
  * - Used to track whether a user has completed the one-time wizard onboarding (name starship, invite, add agent, ready)

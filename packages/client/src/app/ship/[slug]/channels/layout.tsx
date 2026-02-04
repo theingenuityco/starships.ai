@@ -9,6 +9,42 @@ import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import api from '@/lib/api'
+import { LoadingSpinner } from '@/components/ui/simple-loading'
+
+function sanitizeThreadTitleSnippetFromMessageContent(
+  input: string,
+  maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }
+): string {
+  // Thread titles are plain text snippets. Do not carry mention tokens into the title:
+  // - Avoid decoding `<@a:...>` / `<@u:...>` to names in the header/nav.
+  // - Avoid accidental notifications/UX confusion from `@mentions` in titles.
+  const agentLabelById = maps?.agentLabelById
+  const userLabelById = maps?.userLabelById
+
+  const s = String(input || '')
+    // Structured mention tokens emitted by the composer (agents + users).
+    // Convert to plain-text @Name (NOT a structured token) so it renders correctly but doesn't "decode" via token parsing.
+    .replace(/<@a:([^>\s]+)>/gi, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const label = id && agentLabelById ? agentLabelById.get(id) : null
+      return `@${label || 'Agent'}`
+    })
+    .replace(/<@u:([^>\s]+)>/gi, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const label = id && userLabelById ? userLabelById.get(id) : null
+      return `@${label || 'User'}`
+    })
+    // Strip any other structured mention tokens defensively.
+    .replace(/<@[^>\n]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return s
+}
 
 export default function ChannelsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -153,6 +189,33 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: agentsData } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipData?.id ?? '', Boolean(starshipData?.id))
+
+  const agentLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
+    for (const a of list) {
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      if (!id) continue
+      const label = formatAgentDisplayName(a as any)
+      m.set(id, String(label || '').trim() || String((a as any)?.name || (a as any)?.slug || 'Agent'))
+    }
+    return m
+  }, [agentsData])
+
+  const userLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
+    for (const it of list) {
+      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+      if (!id) continue
+      const label = String(it?.displayName || it?.email || '').trim()
+      if (!label) continue
+      m.set(id, label)
+    }
+    return m
+  }, [membersAndInvites])
 
   const normalizedChannelSlug = useMemo(
     () =>
@@ -244,11 +307,57 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     }
   }, [threadKey])
 
+  useEffect(() => {
+    // Refresh-safe pin hydration:
+    // The thread pane's "pinned first message" is normally passed via ephemeral state when the user clicks
+    // a message. On refresh, that state is lost, so re-derive it by:
+    // - loading the thread conversation to get its parentConversationId
+    // - scanning the parent conversation messages for the message whose linkedConversationId points to this thread
+    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
+    if (!threadId) return
+    if (isDraftThreadOpen) return
+    if (threadPinnedFirstMessage) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
+        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
+        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
+        if (!parentId) return
+
+        const msgsResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/messages`, { params: { limit: 200 } })
+        const payload = (msgsResp as any)?.data?.data ?? (msgsResp as any)?.data ?? null
+        const msgs = Array.isArray(payload?.messages) ? (payload.messages as any[]) : []
+        const pinned = msgs.find(m => String((m as any)?.linkedConversationId ?? '').trim() === threadId) ?? null
+        if (cancelled) return
+        if (pinned) setThreadPinnedFirstMessage(pinned as any)
+      } catch {
+        // ignore (best-effort hydration)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [threadConversationId, isDraftThreadOpen, threadPinnedFirstMessage])
+
   const handleThreadCreated = useCallback(
     (cid: string) => {
-      setThreadConversationIdInUrl(cid)
+      // Persist the "pinned first message" across the draft -> real thread transition.
+      // Otherwise, when the `thread` query param updates from `draft` -> `<cid>`, the
+      // `threadKey` effect will clear the pinned message and it disappears.
+      const nextThreadKey = String(cid)
+      pendingThreadStateRef.current = {
+        threadKey: nextThreadKey,
+        threadAgent: threadAgent ?? null,
+        pinnedFirstMessage: threadPinnedFirstMessage ?? null,
+        draftParentConversationId: null,
+        draftTitle: null,
+      }
+      setThreadConversationIdInUrl(nextThreadKey)
     },
-    [setThreadConversationIdInUrl]
+    [setThreadConversationIdInUrl, threadAgent, threadPinnedFirstMessage]
   )
 
   const handleCloseThread = useCallback(() => {
@@ -356,9 +465,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     const thread = (searchParams.get('thread') || '').trim()
     if (thread) next.set('thread', thread)
     const qs = next.toString()
-    const href = qs
-      ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
-      : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
+    const href = qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
@@ -416,6 +523,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return null
   }
 
+  // Prevent a brief "starter screen" flash on hard reloads inside a channel:
+  // `activeConversationId` is derived from `channelsData`, which can be loading on first paint.
+  // If we render `ConversationInterface` with `conversationId=null`, it correctly shows the starter UI,
+  // but that's incorrect UX for an existing channel route.
+  const isResolvingActiveChannelConversationId = Boolean(normalizedChannelSlug && !activeConversationId && channelsLoading)
+  if (isResolvingActiveChannelConversationId) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <LoadingSpinner size="lg">Loading channel…</LoadingSpinner>
+      </div>
+    )
+  }
+
   const isThreadPaneOpen = Boolean(threadKey)
 
   const threadPaneSharedProps = {
@@ -467,9 +587,8 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
             const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
             setThreadDraftParentConversationId(parent || activeConversationId || null)
-            const raw = String((linkedMessage as any)?.content ?? '')
-              .trim()
-              .replace(/\s+/g, ' ')
+            const rawInput = String((linkedMessage as any)?.content ?? '')
+            const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
             const title = snippet ? `Thread: ${snippet}` : 'New thread'
             setThreadDraftTitle(title)

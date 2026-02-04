@@ -1,6 +1,9 @@
 {
   "name": "Starships.ai",
   "short_name": "Starships",
+  "description": "Assemble AI staff, connect tools, set guardrails, and collaborate in one workspace.",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",

@@ -13,6 +13,7 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,7 @@ import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type TurnUsageForRing = {
   turnId: string
@@ -155,6 +157,7 @@ function AgentAvatarWithTurnUsageRing({
 function LinkedConversationCard({
   linkedConversationId,
   linkedConversationHref,
+  isActiveThread,
   enableChannelMessageThreads,
   onThreadAction,
   message,
@@ -163,19 +166,24 @@ function LinkedConversationCard({
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
+  /** When true, visually highlight this card as the active/open thread. */
+  isActiveThread?: boolean
   enableChannelMessageThreads: boolean
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   message: MessageModel
   starshipId?: string
   isUserOnline?: (userId: string) => boolean
 }) {
-  const { data: conversation } = useConversationDetail(linkedConversationId)
-  const { data: agents = [] } = useConversationAgents(linkedConversationId)
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
+  const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
+  const { userId: authUserId } = useAuth()
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+  const title =
+    rawTitle ||
+    (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
@@ -183,12 +191,29 @@ function LinkedConversationCard({
     const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
     return Array.from(new Set(ids))
   }, [agentList])
-  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const { data: avatarAttachments = [], isLoading: isLoadingAvatarAttachments } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Starship member directory (resolve userId -> displayName/avatar for participant list)
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
+  const memberByUserId = useMemo(() => {
+    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
+    const m = new Map<string, { displayName?: string | null; email?: string | null; avatar?: string | null }>()
+    for (const it of list) {
+      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+      if (!id) continue
+      m.set(id, {
+        displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
+        email: typeof it?.email === 'string' ? String(it.email) : null,
+        avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
+      })
+    }
+    return m
+  }, [membersAndInvites])
 
   // Include human participants by sampling recent message authors.
   // The conversation detail endpoint does not currently include members/users.
-  const { data: participantsPreview } = useQuery({
+  const { data: participantsPreview, isLoading: isLoadingParticipantsPreview } = useQuery({
     queryKey: ['conversations', 'participants-preview', linkedConversationId],
     enabled: Boolean(linkedConversationId),
     queryFn: async () => {
@@ -205,20 +230,83 @@ function LinkedConversationCard({
     const items: ParticipantItem[] = []
     const seen = new Set<string>()
 
-    // Humans: derive from recent messages' user identity fields.
-    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    // Most-recent speakers first: scan messages newest -> oldest and add participants in encounter order.
+    const msgsRaw = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    const msgs = msgsRaw
+      .slice()
+      .sort((a, b) => {
+        const aAt = Date.parse(String(a?.createdAt || a?.updatedAt || '')) || 0
+        const bAt = Date.parse(String(b?.createdAt || b?.updatedAt || '')) || 0
+        return bAt - aAt
+      })
+
     for (const m of msgs) {
       const role = String(m?.role ?? '')
-      if (role !== 'user') continue
-      const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
-      const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
-      const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
 
-      const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
-      const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      items.push({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) })
+      if (role === 'user') {
+        const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
+        const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
+        const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
+
+        const fromDirectory = userId ? memberByUserId.get(userId) : null
+        const label =
+          (userId === String(authUserId || '') ? 'You' : '') ||
+          userName ||
+          (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '') ||
+          (userId ? `User ${userId.slice(0, 6)}` : 'User')
+        const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        const avatarUrl = userAvatar || (fromDirectory?.avatar?.trim() || '')
+        items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+        continue
+      }
+
+      if (role === 'assistant') {
+        const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+        if (!agentId) continue
+        const fromList = agentList.find(a => String(a?.id || '').trim() === agentId) as any
+        const agentNameFromMsg = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+        const label = String(fromList?.name || fromList?.slug || agentNameFromMsg || `Agent ${agentId.slice(0, 6)}`).trim() || `Agent ${agentId.slice(0, 6)}`
+        const key = `agent:${agentId}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        const seed = String(fromList?.name || fromList?.slug || agentNameFromMsg || agentId).trim() || agentId
+        const aid = typeof fromList?.avatarAttachmentId === 'string' ? String(fromList.avatarAttachmentId).trim() : ''
+        items.push({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) })
+        continue
+      }
+    }
+
+    // Stable participants list from server (includes conversation member userIds and linked agentIds).
+    const participants = Array.isArray((participantsPreview as any)?.participants) ? (((participantsPreview as any).participants as any[]) ?? []) : []
+    if (participants.length > 0) {
+      for (const raw of participants) {
+        const id = typeof raw === 'string' ? raw.trim() : ''
+        if (!id) continue
+        const fromAgentList = agentList.find(a => String(a?.id || '').trim() === id) as any
+        if (fromAgentList) {
+          const label = String(fromAgentList?.name || fromAgentList?.slug || id || `Agent ${id.slice(0, 6)}`).trim() || `Agent ${id.slice(0, 6)}`
+          const key = `agent:${id || label}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          const seed = String(fromAgentList?.name || fromAgentList?.slug || id || label).trim() || label
+          const aid = typeof fromAgentList?.avatarAttachmentId === 'string' ? String(fromAgentList.avatarAttachmentId).trim() : ''
+          items.push({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) })
+        } else {
+          const fromDirectory = memberByUserId.get(id)
+          const labelRaw =
+            id === String(authUserId || '')
+              ? 'You'
+              : (fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || '')
+          const label = labelRaw || `User ${id.slice(0, 6)}`
+          const key = `human:${id}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          const avatarUrl = typeof fromDirectory?.avatar === 'string' ? fromDirectory.avatar.trim() : ''
+          items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+        }
+      }
     }
 
     // Agents: from the agents list.
@@ -235,7 +323,7 @@ function LinkedConversationCard({
     }
 
     return items
-  }, [agentList, participantsPreview])
+  }, [agentList, authUserId, memberByUserId, participantsPreview])
 
   const participantsLabel = useMemo(() => {
     const labels = participantItems.map(p => p.label).filter(Boolean)
@@ -244,12 +332,20 @@ function LinkedConversationCard({
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
 
+  const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
+
   // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
   // between renders when `linkedConversationId` flips from null -> string.
   if (!linkedConversationId) return null
 
   const cardInner = (
-    <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">
+    <div
+      className={cn(
+        'w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3',
+        isActiveThread && 'border-primary/60 bg-primary/5 ring-1 ring-primary/20'
+      )}
+      data-thread-linked-conversation-id={linkedConversationId ?? undefined}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -259,31 +355,46 @@ function LinkedConversationCard({
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Participants (overlapping avatars) */}
-          {participantItems.length > 0 && (
-            <div className="flex items-center -space-x-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
-              {participantItems.slice(0, 4).map(p => {
-                if (p.kind === 'agent') {
-                  const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                  return (
-                    <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                    </div>
-                  )
-                }
-                return (
-                  <div key={p.key} className="h-7 w-7">
-                    <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                    </Avatar>
-                  </div>
-                )
-              })}
-              {participantItems.length > 4 && (
-                <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted text-xs font-semibold text-muted-foreground flex items-center justify-center">+{participantItems.length - 4}</div>
-              )}
+          {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
+            <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+              {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
+              <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
+                {shouldShowAvatarPlaceholders ? (
+                  <>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/60 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/50 animate-pulse" aria-hidden="true" />
+                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/40 animate-pulse" aria-hidden="true" />
+                  </>
+                ) : (
+                  participantItems
+                    .slice(0, 3)
+                    .slice()
+                    .reverse()
+                    .map(p => {
+                      if (p.kind === 'agent') {
+                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                        return (
+                          <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={p.key} className="h-7 w-7">
+                          <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      )
+                    })
+                )}
+              </div>
+              {participantItems.length > 3 ? (
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span>
+              ) : null}
             </div>
-          )}
+          ) : null}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
         </div>
       </div>
@@ -405,6 +516,11 @@ interface ConversationMessageListProps {
   selectedMatchIndex?: number | null
   /** When true, hide the search input (e.g. when search is in navbar) and show only Prev/Next. */
   hideSearchInput?: boolean
+  /**
+   * When set, highlight the message row whose `linkedConversationId` matches this id.
+   * Used to visually indicate which parent message the currently-open thread is linked to.
+   */
+  activeThreadConversationId?: string | null
 }
 
 export function ConversationMessageList({
@@ -438,6 +554,7 @@ export function ConversationMessageList({
   onSearchResults,
   selectedMatchIndex,
   hideSearchInput = false,
+  activeThreadConversationId,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -1055,11 +1172,31 @@ export function ConversationMessageList({
     return lastId
   }, [displayMessages])
 
-  // New loading logic:
-  // - turn is active (isResponding)
-  // - assistant hasn't started streaming tokens yet (isAssistantStreaming=false)
-  // - if tools are actively running, tool UI should show its own state
-  const shouldShowGapLoader = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  // Gap loader ("Typing...") logic:
+  // - We only want to show it when the agent is actually going to respond.
+  // - Some turns can briefly enter `active` and then immediately complete with no assistant output
+  //   (e.g. "no-op" routing decisions). If we show immediately, it flashes for a split second.
+  // - To avoid the flash, debounce: only render the gap loader after a short delay.
+  const GAP_LOADER_DELAY_MS = 250
+  const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+  const [gapLoaderArmed, setGapLoaderArmed] = useState(false)
+  useEffect(() => {
+    if (!isAwaitingAssistant) {
+      setGapLoaderArmed(false)
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(() => {
+      if (!cancelled) setGapLoaderArmed(true)
+    }, GAP_LOADER_DELAY_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [isAwaitingAssistant, activeTurnId])
+
+  // Show while awaiting first assistant text OR between tool results and next assistant text.
+  const shouldShowGapLoader = Boolean(isAwaitingAssistant && gapLoaderArmed)
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
@@ -1084,6 +1221,18 @@ export function ConversationMessageList({
     const withoutPinned = filtered.filter(m => m.id !== pinnedId)
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
+
+  const activeThreadParentMessageId = useMemo(() => {
+    const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
+    if (!tid) return null
+    for (const m of renderMessages) {
+      const anyMsg = m as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+      const linked = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : ''
+      if (linked && linked === tid) return m.id
+    }
+    return null
+  }, [activeThreadConversationId, renderMessages])
 
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
@@ -1145,6 +1294,14 @@ export function ConversationMessageList({
 
     const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
     if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
+      // When the thread pane opens, we intentionally perform a targeted scroll to the linked thread card.
+      // Suppress the generic "snap to bottom" in the MAIN pane to avoid overriding that scroll.
+      const suppressForThreadOpen = Boolean(enableChannelMessageThreads && activeThreadConversationId)
+      if (suppressForThreadOpen) {
+        bottomSnapStateRef.current.didSnapOnceContentExists = true
+        return
+      }
+
       // IMPORTANT:
       // Tailwind `scroll-smooth` (scroll-behavior: smooth) can cause even scrollTop assignment to animate.
       // Temporarily disable smooth behavior so the initial anchor is instantaneous.
@@ -1158,6 +1315,58 @@ export function ConversationMessageList({
     }
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
+  const lastAutoScrollThreadIdRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    // When the thread pane opens, the main pane shrinks which can reflow text and
+    // push the clicked "thread card" message out of view. Best-effort: scroll the
+    // linked parent message back into the viewport once per thread open.
+    const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
+    if (!tid) return
+    if (lastAutoScrollThreadIdRef.current === tid) return
+
+    const messageId = typeof activeThreadParentMessageId === 'string' ? activeThreadParentMessageId : ''
+    if (!messageId) return
+
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    // Prefer scrolling the *thread card* into view (it sits below the message content),
+    // because centering a very tall message can still leave the card near the bottom edge.
+    const cardEl = container.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null
+    const el = cardEl ?? messageRefs.current[messageId]
+    if (!el) return
+
+    // Defer to next frame so layout reflow from pane resize is applied.
+    requestAnimationFrame(() => {
+      const c = scrollContainerRef.current
+      const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
+      if (!c || !node) return
+
+      const cRect = c.getBoundingClientRect()
+      const r = node.getBoundingClientRect()
+      const pad = 16
+      const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
+      // On thread-open we prefer centering the thread card even if it's already visible,
+      // to avoid it drifting out of view after the pane shrink/reflow.
+      if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
+        // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
+        // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
+        try {
+          const currentTop = c.scrollTop
+          const deltaTop = r.top - cRect.top
+          const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
+          const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
+          const nextTop = Math.max(0, Math.min(maxTop, desired))
+          c.scrollTo({ top: nextTop, behavior: 'smooth' })
+        } catch {
+          /* ignore */
+        }
+      } else {
+      }
+      lastAutoScrollThreadIdRef.current = tid
+    })
+  }, [activeThreadConversationId, activeThreadParentMessageId])
+
   // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
     if (!scrollContainerRef.current) return
@@ -1170,13 +1379,19 @@ export function ConversationMessageList({
     // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
     //
     if (shouldStickToBottom) {
+      // During thread-open, avoid overriding the targeted "scroll linked card into view" behavior in the main pane.
+      if (enableChannelMessageThreads && activeThreadConversationId && lastAutoScrollThreadIdRef.current !== activeThreadConversationId) {
+        return
+      }
       const messagesIncreased = displayMessages.length > lastMessageCountRef.current
       const requestedBehavior: ScrollBehavior = messagesIncreased ? 'auto' : isActivelyStreaming ? 'auto' : 'smooth'
 
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
-        scrollContainerRef.current.scrollTo({
+        const c2 = scrollContainerRef.current
+        const targetTop = c2.scrollHeight
+        c2.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
           // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
           behavior: requestedBehavior,
@@ -1318,6 +1533,17 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
+  // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
+  // On first paint, `renderMessages` can be empty while the stream query is loading; at that moment
+  // `hasMoreBefore` is also not yet meaningful, which makes the hero incorrectly render.
+  //
+  // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
+  // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
+  // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
+  const isHydratingInitialMessages = Boolean(
+    !messagesOverride && stream && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+  )
+
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
   const isAtConversationStart = (() => {
@@ -1328,15 +1554,52 @@ export function ConversationMessageList({
     return renderMessages.length === 0
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
   // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
   const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
+
+  function InitialMessageSkeletons() {
+    // Skeleton rows should match the real "app layout" message rows:
+    // left avatar slot (40px) + monospace display name + markdown content (no right-aligned bubbles).
+    const skLine = 'bg-foreground/5 dark:bg-foreground/10'
+    const skAvatar = 'bg-foreground/5 dark:bg-foreground/10 ring-1 ring-border/30'
+    const Row = ({ variant, topMarginClass }: { variant: 'assistant' | 'user'; topMarginClass: string }) => {
+      const nameWidthClass = variant === 'assistant' ? 'w-40' : 'w-28'
+      return (
+        <div className={cn('flex justify-start w-full', topMarginClass)}>
+          <div className={cn('group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2', 'py-0')}>
+            <div className="flex-shrink-0 mt-1" style={{ width: 40, height: 40 }} aria-hidden="true">
+              <Skeleton className={cn('w-10 h-10 rounded-full', skAvatar)} />
+            </div>
+            <div className="min-w-0 flex-1 w-full pt-0.5">
+              <div className="mb-1.5">
+                <Skeleton className={cn('h-4', nameWidthClass, skLine)} />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className={cn('h-4 w-[82%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[68%]', skLine)} />
+                <Skeleton className={cn('h-4 w-[54%]', skLine)} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="pb-6">
+        <Row variant="assistant" topMarginClass="mt-6" />
+        <Row variant="user" topMarginClass="mt-4" />
+        <Row variant="assistant" topMarginClass="mt-4" />
+      </div>
+    )
+  }
 
   return (
     <div className={cn('h-full min-h-0 flex flex-col', className)}>
@@ -1456,22 +1719,26 @@ export function ConversationMessageList({
           )}
 
           <div className="mt-auto">
-            {showChannelHero ? (
-              <ChannelHero
-                channelName={channelName}
-                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {showDirectMessageHero ? (
-              <DirectMessageHero
-                title={resolvedEmptyHeroTitle}
-                participant={resolvedEmptyHeroParticipant ?? null}
-                avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
-                bottomAlign={shouldBottomAlignHero}
-              />
-            ) : null}
-            {renderMessages.map((message, idx) => {
+            {isHydratingInitialMessages ? (
+              <InitialMessageSkeletons />
+            ) : (
+              <>
+                {showChannelHero ? (
+                  <ChannelHero
+                    channelName={channelName}
+                    conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {showDirectMessageHero ? (
+                  <DirectMessageHero
+                    title={resolvedEmptyHeroTitle}
+                    participant={resolvedEmptyHeroParticipant ?? null}
+                    avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
+                    bottomAlign={shouldBottomAlignHero}
+                  />
+                ) : null}
+                {renderMessages.map((message, idx) => {
               const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
               const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
               const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
@@ -1567,6 +1834,7 @@ export function ConversationMessageList({
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
                       expertMode={expertMode}
+                      activeThreadConversationId={activeThreadConversationId ?? null}
                       turnUsage={(() => {
                         if (!expertMode) return null
                         if (message.role !== 'assistant') return null
@@ -1634,7 +1902,9 @@ export function ConversationMessageList({
                   </div>
                 </Fragment>
               )
-            })}
+                })}
+              </>
+            )}
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (
@@ -1769,6 +2039,8 @@ interface ConversationMessageBubbleProps {
   isUserOnline?: (userId: string) => boolean
   /** Conversation-scoped "busy" indicator (active or waiting_for_tools). */
   isConversationBusy?: boolean
+  /** When set, highlight this row if it links to the active thread. */
+  activeThreadConversationId?: string | null
   /**
    * Monotonic revision to force memoized bubbles to re-render when presence changes.
    * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
@@ -1916,6 +2188,7 @@ const MemoizedMessageBubble = memo(
     turnUsage,
     isUserOnline,
     isConversationBusy = false,
+    activeThreadConversationId,
     presenceRevision,
   }: ConversationMessageBubbleProps) {
     void presenceRevision
@@ -1929,13 +2202,37 @@ const MemoizedMessageBubble = memo(
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
-    const { userName, userEmail, userAvatar } = useAuth()
+    const { userId: authUserId } = useAuth()
+    const sid = typeof starshipId === 'string' ? starshipId : ''
+    const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
+    const memberByUserId = useMemo(() => {
+      const list = Array.isArray((membersData as any)?.members) ? (((membersData as any).members as any[]) ?? []) : []
+      const m = new Map<string, { displayName?: string | null; avatar?: string | null }>()
+      for (const it of list) {
+        const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+        if (!id) continue
+        m.set(id, {
+          displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
+          avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
+        })
+      }
+      return m
+    }, [membersData])
+
+    const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
+    const isAuthedUserMessage = Boolean(messageUserId && authUserId && String(messageUserId) === String(authUserId))
+    const fromDirectory = messageUserId ? memberByUserId.get(messageUserId) : null
     const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
     const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
 
-    const effectiveUserName = userNameOverride ?? messageUserName ?? userName
-    const effectiveUserEmail = userEmailOverride ?? userEmail
-    const effectiveUserAvatar = userAvatarUrlOverride ?? messageUserAvatar ?? userAvatar
+    const directoryUserName = (fromDirectory?.displayName?.trim() || '') || undefined
+    const effectiveUserName = userNameOverride ?? messageUserName ?? directoryUserName ?? (isAuthedUserMessage ? 'You' : undefined)
+    const effectiveUserEmail = userEmailOverride ?? undefined
+    const effectiveUserAvatar =
+      userAvatarUrlOverride ??
+      messageUserAvatar ??
+      ((fromDirectory?.avatar?.trim() || '') || undefined) ??
+      undefined
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     // Generic: allow any message to link to another conversation (thread preview/index post)
@@ -1953,6 +2250,8 @@ const MemoizedMessageBubble = memo(
       return null
     }, [linkedConversationId, starshipSlug])
 
+    const isActiveThreadLink = Boolean(linkedConversationId && activeThreadConversationId && linkedConversationId === activeThreadConversationId)
+
     const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
     const heroAvatarSlotPx = avatarSize + avatarSlotPadPx
     // In the normal app layout (non-hero), user avatars are rendered at 40px (w-10 h-10).
@@ -1968,7 +2267,7 @@ const MemoizedMessageBubble = memo(
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className={cn('h-7 w-7', isActiveThreadLink && 'bg-primary/10 text-primary hover:bg-primary/15')}
           onClick={e => {
             e.preventDefault()
             e.stopPropagation()
@@ -1980,7 +2279,7 @@ const MemoizedMessageBubble = memo(
           <Icon name="thread" className="h-4 w-4" />
         </Button>
       )
-    }, [enableChannelMessageThreads, linkedConversationId, message.content, message.id, onThreadAction])
+    }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -1989,8 +2288,7 @@ const MemoizedMessageBubble = memo(
       // Never fall back to the signed-in user's avatar when a seed override is present.
       const explicitUserAvatarUrl = userAvatarUrlOverride
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
-      const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
-      const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
+      const shouldUseResolvedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
       const showUserOnline = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline?.(messageUserId))
       const showUserPresenceDot = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline)
 
@@ -2024,6 +2322,7 @@ const MemoizedMessageBubble = memo(
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
                     linkedConversationHref={linkedConversationHref}
+                    isActiveThread={isActiveThreadLink}
                     enableChannelMessageThreads={enableChannelMessageThreads}
                     onThreadAction={onThreadAction}
                     message={message}
@@ -2050,7 +2349,7 @@ const MemoizedMessageBubble = memo(
                         />
                       ) : userAvatarSeedOverride ? (
                         <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                      ) : shouldUseAuthedUserAvatar ? (
+                      ) : shouldUseResolvedUserAvatar ? (
                         <AvatarImage
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
@@ -2077,8 +2376,9 @@ const MemoizedMessageBubble = memo(
       }
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
-      const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
-      const userProfileHref = typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+      const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
+      const userProfileHref =
+        isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
@@ -2116,7 +2416,7 @@ const MemoizedMessageBubble = memo(
                         />
                       ) : userAvatarSeedOverride ? (
                         <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                      ) : shouldUseAuthedUserAvatar ? (
+                      ) : shouldUseResolvedUserAvatar ? (
                         <AvatarImage
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
@@ -2153,7 +2453,7 @@ const MemoizedMessageBubble = memo(
                       />
                     ) : userAvatarSeedOverride ? (
                       <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                    ) : shouldUseAuthedUserAvatar ? (
+                    ) : shouldUseResolvedUserAvatar ? (
                       <AvatarImage
                         src={effectiveUserAvatar!}
                         alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
@@ -2177,9 +2477,13 @@ const MemoizedMessageBubble = memo(
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
                 <div className="mb-0 text-sm font-bold font-mono text-foreground">
-                  <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                    {userDisplayName}
-                  </Link>
+                  {userProfileHref ? (
+                    <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                      {userDisplayName}
+                    </Link>
+                  ) : (
+                    <span>{userDisplayName}</span>
+                  )}
                 </div>
               )}
               <ConversationMessageContent
@@ -2210,6 +2514,7 @@ const MemoizedMessageBubble = memo(
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
                   linkedConversationHref={linkedConversationHref}
+                  isActiveThread={isActiveThreadLink}
                   enableChannelMessageThreads={enableChannelMessageThreads}
                   onThreadAction={onThreadAction}
                   message={message}
@@ -2310,6 +2615,7 @@ const MemoizedMessageBubble = memo(
                   <LinkedConversationCard
                     linkedConversationId={linkedConversationId}
                     linkedConversationHref={linkedConversationHref}
+                    isActiveThread={isActiveThreadLink}
                     enableChannelMessageThreads={enableChannelMessageThreads}
                     onThreadAction={onThreadAction}
                     message={message}
@@ -2412,6 +2718,7 @@ const MemoizedMessageBubble = memo(
                 <LinkedConversationCard
                   linkedConversationId={linkedConversationId}
                   linkedConversationHref={linkedConversationHref}
+                  isActiveThread={isActiveThreadLink}
                   enableChannelMessageThreads={enableChannelMessageThreads}
                   onThreadAction={onThreadAction}
                   message={message}
@@ -2435,6 +2742,7 @@ const MemoizedMessageBubble = memo(
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     // Presence and busy indicators are independent of message content.
     if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
+    if (String(prevProps.activeThreadConversationId ?? '') !== String(nextProps.activeThreadConversationId ?? '')) return false
     if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }

@@ -19,7 +19,7 @@ import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifi
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface NavigationProps {
@@ -170,47 +170,48 @@ export function Navigation(props: NavigationProps) {
   // Badge data:
   // Prefer live unread counts if an SSE notifications stream is already mounted somewhere else
   // (e.g. conversation list). Otherwise fall back to the list endpoint.
-  const [streamChunks, setStreamChunks] = useState<any[] | null>(() => {
-    if (!starshipId) return null
-    const data = queryClient.getQueryData(NOTIFICATION_QUERY_KEYS.stream(starshipId))
-    return Array.isArray(data) ? (data as any[]) : null
-  })
-  useEffect(() => {
-    if (!starshipId) {
-      setStreamChunks(null)
-      return
-    }
-    const key = NOTIFICATION_QUERY_KEYS.stream(starshipId)
-    const sameKey = (a: unknown, b: unknown): boolean => {
-      if (!Array.isArray(a) || !Array.isArray(b)) return false
-      if (a.length !== b.length) return false
-      for (let i = 0; i < a.length; i++) if ((a as any)[i] !== (b as any)[i]) return false
-      return true
-    }
-    const cache = queryClient.getQueryCache()
-    const unsub = cache.subscribe(event => {
+  const streamKey = useMemo(() => (starshipId ? NOTIFICATION_QUERY_KEYS.stream(starshipId) : null), [starshipId])
+  const streamChunks = useSyncExternalStore(
+    useCallback(
+      (onStoreChange: () => void) => {
+        if (!streamKey) return () => {}
+        const sameKey = (a: unknown, b: unknown): boolean => {
+          if (!Array.isArray(a) || !Array.isArray(b)) return false
+          if (a.length !== b.length) return false
+          for (let i = 0; i < a.length; i++) if ((a as any)[i] !== (b as any)[i]) return false
+          return true
+        }
+        const cache = queryClient.getQueryCache()
+        const unsub = cache.subscribe(event => {
+          try {
+            const qk = (event as any)?.query?.queryKey
+            if (!sameKey(qk, streamKey)) return
+            onStoreChange()
+          } catch {
+            /* ignore */
+          }
+        })
+        return () => {
+          try {
+            unsub()
+          } catch {
+            /* ignore */
+          }
+        }
+      },
+      [queryClient, streamKey]
+    ),
+    useCallback(() => {
+      if (!streamKey) return null
       try {
-        const qk = (event as any)?.query?.queryKey
-        if (!sameKey(qk, key)) return
-        const data = queryClient.getQueryData(key)
-        setStreamChunks(Array.isArray(data) ? (data as any[]) : null)
+        const data = queryClient.getQueryData(streamKey)
+        return Array.isArray(data) ? (data as any[]) : null
       } catch {
-        // ignore
+        return null
       }
-    })
-    // Prime immediately (covers cases where stream cache already exists)
-    try {
-      const data = queryClient.getQueryData(key)
-      setStreamChunks(Array.isArray(data) ? (data as any[]) : null)
-    } catch {}
-    return () => {
-      try {
-        unsub()
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [queryClient, starshipId])
+    }, [queryClient, streamKey]),
+    () => null
+  )
   const { data: notifList } = useNotificationsList(starshipId, Boolean(isAuthenticated && starshipId))
   const unreadTotal = useMemo(() => {
     const chunks = Array.isArray(streamChunks) ? (streamChunks as any[]) : []

@@ -280,4 +280,3 @@ main().catch((err) => {
   console.error('[AutopilotAutomationResumeWorker] Fatal error during startup', err);
   process.exit(1);
 });
-

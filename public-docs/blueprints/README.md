@@ -48,4 +48,3 @@ Related references
 
 - Root overview: `../../README.md`
 - Autopilot engine (SDK): `../../packages/autopilot/README.md`
-

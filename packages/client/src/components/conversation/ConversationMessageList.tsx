@@ -557,10 +557,7 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
-  const awaitRequested = (stream as any)?.awaitRequested as
-    | { at: string; nodeRef: string; kind: 'connector_event'; spec: Record<string, unknown> }
-    | null
-    | undefined
+  const awaitRequested = (stream as any)?.awaitRequested as { at: string; nodeRef: string; kind: 'connector_event'; spec: Record<string, unknown> } | null | undefined
   const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
   const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null

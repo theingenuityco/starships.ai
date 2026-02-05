@@ -196,4 +196,3 @@ main().catch((err) => {
   console.error('[AutopilotAutomationWorker] Fatal error during startup', err);
   process.exit(1);
 });
-

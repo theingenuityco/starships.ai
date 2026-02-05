@@ -36,4 +36,3 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
-

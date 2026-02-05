@@ -14,6 +14,7 @@ import {
   useAdminConnectorTemplateActions,
   useBulkReplaceAdminConnectorTemplateActions,
   useDeleteAdminConnectorTemplateAction,
+  useMigrateAdminConnectorTemplateActionsFromLegacy,
   useUpdateAdminConnectorTemplate,
   useUpsertAdminConnectorTemplateAction,
 } from '@/hooks/useAdminConnectorTemplates'
@@ -50,6 +51,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   const upsertActionMutation = useUpsertAdminConnectorTemplateAction()
   const deleteActionMutation = useDeleteAdminConnectorTemplateAction()
   const bulkReplaceMutation = useBulkReplaceAdminConnectorTemplateActions()
+  const migrateLegacyMutation = useMigrateAdminConnectorTemplateActionsFromLegacy()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -60,6 +62,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const [baseUrl, setBaseUrl] = useState('')
   const [authText, setAuthText] = useState('')
+  const [endpointsText, setEndpointsText] = useState('')
   const [variablesText, setVariablesText] = useState('')
   const [rateLimitText, setRateLimitText] = useState('')
   const [metadataSchemaText, setMetadataSchemaText] = useState('')
@@ -92,6 +95,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
     setBaseUrl(connector.baseUrl || '')
     setAuthText(formatJson(connector.auth || { type: 'none' }))
+    setEndpointsText(formatJson((connector as any).endpoints || []))
     setVariablesText(formatJson(connector.variables || []))
     setRateLimitText(formatJson(connector.rateLimit || undefined))
     setMetadataSchemaText(formatJson(connector.metadataSchema || undefined))
@@ -172,12 +176,17 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                   if (!id) return
                   try {
                     const auth = parseOptionalJson(authText) as any
+                    const endpoints = parseOptionalJson(endpointsText) as any
                     const variables = parseOptionalJson(variablesText) as any
                     const rateLimit = parseOptionalJson(rateLimitText) as any
                     const metadataSchema = parseOptionalJson(metadataSchemaText) as any
 
                     if (auth !== undefined && (auth === null || typeof auth !== 'object' || Array.isArray(auth))) {
                       toast.error('auth must be a JSON object')
+                      return
+                    }
+                    if (endpoints !== undefined && !Array.isArray(endpoints)) {
+                      toast.error('endpoints must be a JSON array')
                       return
                     }
                     if (variables !== undefined && !Array.isArray(variables)) {
@@ -203,6 +212,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         category,
                         baseUrl,
                         auth: auth === undefined ? undefined : (auth as any),
+                        endpoints: endpoints === undefined ? undefined : (endpoints as any),
                         variables: variables === undefined ? undefined : (variables as any),
                         rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
                         metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
@@ -296,6 +306,13 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       <Textarea value={authText} onChange={e => setAuthText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
                     <div className="space-y-2">
+                      <label className="text-sm font-medium">endpoints_json (legacy JSON array)</label>
+                      <div className="text-xs text-muted-foreground">
+                        This is the old storage location. Runtime does not use it; click “Migrate legacy → actions” below to populate the new table.
+                      </div>
+                      <Textarea value={endpointsText} onChange={e => setEndpointsText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                    </div>
+                    <div className="space-y-2">
                       <label className="text-sm font-medium">variables (JSON array)</label>
                       <Textarea value={variablesText} onChange={e => setVariablesText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
@@ -315,13 +332,26 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="text-sm font-medium">Actions</div>
                         <div className="text-xs text-muted-foreground">Stored in `connector_template_actions`. Edit actions individually to avoid huge template payloads.</div>
                       </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowBulkReplace(v => !v)}
-                        disabled={bulkReplaceMutation.isPending}
-                      >
-                        {showBulkReplace ? 'Hide bulk replace' : 'Bulk replace'}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            if (!id) return
+                            if (!confirm('Migrate legacy endpoints_json into the new actions table? This will REPLACE all existing actions.')) return
+                            await migrateLegacyMutation.mutateAsync({ id })
+                          }}
+                          disabled={migrateLegacyMutation.isPending || !endpointsText.trim()}
+                        >
+                          {migrateLegacyMutation.isPending ? 'Migrating…' : 'Migrate legacy → actions'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowBulkReplace(v => !v)}
+                          disabled={bulkReplaceMutation.isPending}
+                        >
+                          {showBulkReplace ? 'Hide bulk replace' : 'Bulk replace'}
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">

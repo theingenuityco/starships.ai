@@ -376,6 +376,13 @@ export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
+  /**
+   * Legacy action catalog stored on connector_templates.endpoints_json.
+   *
+   * This is NOT used for runtime execution. It exists to support manual migration
+   * into the row-based action catalog (connector_template_actions).
+   */
+  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -421,6 +428,11 @@ export interface UpdateConnectorTemplateRequest {
   baseUrl?: string;
   auth?: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
+  /**
+   * Legacy endpoints_json payload (not used by runtime).
+   * Managed in admin UI as a raw JSON array field.
+   */
+  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }

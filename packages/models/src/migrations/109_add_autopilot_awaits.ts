@@ -19,6 +19,7 @@ export async function up(client: Client): Promise<void> {
         status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting','resuming','completed','cancelled','failed')),
         spec_json JSONB NOT NULL DEFAULT '{}'::jsonb,
         blueprint_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        execution_json JSONB NOT NULL DEFAULT '{}'::jsonb,
         state_json JSONB,
         expires_at TIMESTAMPTZ,
         last_error TEXT,

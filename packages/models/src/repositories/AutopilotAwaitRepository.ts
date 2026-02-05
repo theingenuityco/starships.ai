@@ -24,8 +24,9 @@ export class AutopilotAwaitRepository extends BaseRepository {
     starshipId: string;
     ownerUserId?: string | null;
     status?: AutopilotAwaitStatus;
-    specJson: Record<string, unknown>;
-    blueprintJson: Record<string, unknown>;
+    specJson: AutopilotAwaitModel['specJson'];
+    blueprintJson: AutopilotAwaitModel['blueprintJson'];
+    executionJson: AutopilotAwaitModel['executionJson'];
     stateJson?: Record<string, unknown> | null;
     expiresAt?: string | null;
     lastError?: string | null;
@@ -39,6 +40,7 @@ export class AutopilotAwaitRepository extends BaseRepository {
           status: data.status ?? 'waiting',
           specJson: data.specJson ?? {},
           blueprintJson: data.blueprintJson ?? {},
+          executionJson: data.executionJson ?? {},
           stateJson: data.stateJson ?? null,
           expiresAt: data.expiresAt ?? null,
           lastError: data.lastError ?? null,
@@ -64,11 +66,11 @@ export class AutopilotAwaitRepository extends BaseRepository {
       async () => {
         await AutopilotAwaitEntity.validate(updates as unknown as Record<string, unknown>, 'update');
         const entity = toEntityInstance(AutopilotAwaitEntity, updates as unknown as Record<string, unknown>);
-        const dbFormat = toDatabase(entity);
+        const dbFormat = toDatabase(entity) as Record<string, unknown>;
 
         // Strip read-only fields
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, created_at: _createdAt, starship_id: _starshipId, ...filtered } = dbFormat as any;
+        const { id: _id, created_at: _createdAt, starship_id: _starshipId, ...filtered } = dbFormat;
 
         if (Object.keys(filtered).length === 0) {
           return await this.findById(id);
@@ -106,12 +108,13 @@ export class AutopilotAwaitRepository extends BaseRepository {
           FROM autopilot_awaits
           WHERE starship_id = $1
             AND status = 'waiting'
-            AND (spec_json->>'provider' IS NULL OR spec_json->>'provider' = $2)
-            AND (spec_json->>'connectorId' IS NULL OR spec_json->>'connectorId' = $3)
+            AND spec_json->>'kind' = 'connector_event'
+            AND (spec_json->'spec'->>'provider' IS NULL OR spec_json->'spec'->>'provider' = $2)
+            AND (spec_json->'spec'->>'connectorId' IS NULL OR spec_json->'spec'->>'connectorId' = $3)
             AND (
-              spec_json->'eventTypes' IS NULL
-              OR jsonb_typeof(spec_json->'eventTypes') <> 'array'
-              OR (spec_json->'eventTypes') ? $4
+              spec_json->'spec'->'eventTypes' IS NULL
+              OR jsonb_typeof(spec_json->'spec'->'eventTypes') <> 'array'
+              OR (spec_json->'spec'->'eventTypes') ? $4
             )
           ORDER BY created_at ASC
           LIMIT $5

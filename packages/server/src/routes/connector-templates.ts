@@ -635,7 +635,9 @@ router.delete('/admin/connector-templates/:id/actions/:actionName', async (req: 
       return;
     }
 
-    res.status(204).send();
+    // NOTE: 204 is valid HTTP for DELETE, but our connector/workflow tooling expects a JSON ApiResponse payload.
+    // Returning a standard success payload avoids false-negative failures.
+    sendSuccess(res, { ok: true });
   } catch (error) {
     handleError(error, res, 'deleting connector template action');
   }

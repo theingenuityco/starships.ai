@@ -18,6 +18,8 @@ process.env.PUBLIC_URL = 'http://localhost:3000';
 process.env.CLIENT_URL = 'http://localhost:3000';
 process.env.SERVER_URL = 'http://localhost:3001';
 process.env.DOCS_URL = 'http://localhost:3002';
+// Stripe is instantiated at module import time in some services; provide a dummy key for tests.
+process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
 
 // Global test timeout
 jest.setTimeout(10000);

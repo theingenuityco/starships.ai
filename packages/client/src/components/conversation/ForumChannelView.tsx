@@ -15,6 +15,7 @@ export function ForumChannelView(props: {
   channelConversationId: string
   channelSlug?: string | null
   channelName?: string | null
+  channelIsPrivate?: boolean | null
   starshipSlug?: string | null
   /** Open a draft thread (no persistence until first message). */
   onCreateDraftThread?: () => void
@@ -96,6 +97,13 @@ export function ForumChannelView(props: {
         conversationId={props.channelConversationId}
         starshipId={props.starshipId}
         titlePrefix={<Icon name="hash" className="h-5 w-5" />}
+        titleRightSlot={
+          props.channelIsPrivate ? (
+            <span className="inline-flex items-center" title="Private channel">
+              <Icon name="lock" label="Private channel" className="h-4 w-4 text-muted-foreground" />
+            </span>
+          ) : null
+        }
         // Keep the header stable while conversation details load.
         fallbackTitle={label}
         rightSlot={

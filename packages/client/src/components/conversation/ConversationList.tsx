@@ -549,14 +549,26 @@ export function ConversationList({
                                 className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
                             </div>
-                            <span
+                            <div
                               className={cn(
-                                'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+                                'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1.5 flex items-center gap-1',
                                 isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
-                              {label}
-                            </span>
+                              <span className="truncate min-w-0">{label}</span>
+                              {ch.isPrivate ? (
+                                <Icon
+                                  name="lock"
+                                  label="Private channel"
+                                  title="Private channel"
+                                  className={cn(
+                                    'h-3.5 w-3.5 flex-shrink-0',
+                                    // Keep visible but not louder than unread/active styling.
+                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                                  )}
+                                />
+                              ) : null}
+                            </div>
                             {notifCount > 0 ? (
                               <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
                                 {notifCount > 99 ? '99+' : String(notifCount)}
@@ -708,14 +720,30 @@ export function ConversationList({
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p
-                              className={cn('text-sm truncate', isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium')}
-                            >
-                              {label}
-                            </p>
+                            <div className="flex items-center gap-1 min-w-0 flex-1">
+                              <p
+                                className={cn(
+                                  'text-sm truncate min-w-0',
+                                  isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+                                )}
+                              >
+                                {label}
+                              </p>
+                              {ch.isPrivate ? (
+                                <Icon
+                                  name="lock"
+                                  label="Private channel"
+                                  title="Private channel"
+                                  className={cn(
+                                    'h-3.5 w-3.5 flex-shrink-0',
+                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                                  )}
+                                />
+                              ) : null}
+                            </div>
                             <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
+                          <div className="flex items-center gap-2 mt-0.5" />
                         </div>
                         {notifCount > 0 ? (
                           <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">

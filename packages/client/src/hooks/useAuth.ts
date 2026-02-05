@@ -24,11 +24,6 @@ export interface AuthUser {
    */
   isInstanceAdmin?: boolean
   /**
-   * Navigation onboarding completion flag.
-   * When true, user has completed the one-time navigation onboarding tour.
-   */
-  navigationOnboardingCompleted?: boolean
-  /**
    * Wizard onboarding completion flag.
    * When true, user has completed the one-time wizard (name starship, invite, add agent).
    */
@@ -221,8 +216,6 @@ export function useLogin() {
       } else if (starship?.slug) {
         if (!(user?.wizardOnboardingCompleted ?? false)) {
           router.push('/onboarding')
-        } else if (!(user?.navigationOnboardingCompleted ?? false)) {
-          router.push('/marketplace')
         } else {
           router.push(addWelcome(`/ship/${starship.slug}`))
         }
@@ -362,8 +355,6 @@ export function useOAuthLogin() {
       } else if (starship?.slug) {
         if (!(user?.wizardOnboardingCompleted ?? false)) {
           router.push('/onboarding')
-        } else if (!(user?.navigationOnboardingCompleted ?? false)) {
-          router.push('/marketplace')
         } else {
           router.push(addWelcome(`/ship/${starship.slug}`))
         }

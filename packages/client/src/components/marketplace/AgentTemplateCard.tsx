@@ -5,8 +5,9 @@ import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
@@ -72,6 +73,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
 
   const requestDeploy = () => {
     track({
@@ -156,10 +158,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       }
       onDeploy?.(template)
 
-      // Marketplace UX: after deploy, take the user to the correct starship (chat).
-      // Guarded so uses of this card outside the marketplace don't unexpectedly navigate.
+      // Marketplace UX: after deploy, take the user to the agent's chat. Refetch agents so DM page finds the new agent.
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
         if (agentId) {
+          await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)

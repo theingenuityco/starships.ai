@@ -512,20 +512,6 @@ router.get('/users/:id/email/change/status', jwtAuthMiddleware, async (req: Requ
 // ONBOARDING ENDPOINTS
 // ============================================================================
 
-// POST /users/me/onboarding/navigation/complete - Mark navigation onboarding as completed
-router.post('/users/me/onboarding/navigation/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-
-    const userService = new UserService();
-    const user = await userService.markNavigationOnboardingCompleted(req.user!.id);
-
-    sendSuccess(res, user);
-  } catch (error) {
-    handleError(error, res, 'marking navigation onboarding as completed');
-  }
-});
-
 // POST /users/me/onboarding/wizard/complete - Mark wizard onboarding as completed
 router.post('/users/me/onboarding/wizard/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

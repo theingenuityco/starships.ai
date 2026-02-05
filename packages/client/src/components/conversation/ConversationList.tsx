@@ -9,7 +9,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState, type RefObject } from 'react'
+import { useMemo, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -36,9 +36,6 @@ interface ConversationListProps {
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
-  onboardingChannelsAnchorRef?: RefObject<HTMLDivElement | null>
-  onboardingDirectMessagesAnchorRef?: RefObject<HTMLDivElement | null>
-  onboardingHighlight?: 'channels' | 'directMessages' | null
 }
 
 function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; agent: AgentModel | null; busy?: boolean }) {
@@ -81,9 +78,6 @@ export function ConversationList({
   onConversationDelete,
   onConversationSelect,
   compact = false,
-  onboardingChannelsAnchorRef,
-  onboardingDirectMessagesAnchorRef,
-  onboardingHighlight = null,
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
@@ -442,13 +436,8 @@ export function ConversationList({
       <>
         <div className="flex flex-col h-full min-h-0">
           {/* Channels - content-sized so Direct messages starts right below */}
-          <div
-            className={cn(
-              'flex flex-col flex-none min-h-0 rounded-lg',
-              onboardingHighlight === 'channels' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
-            )}
-          >
-            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8 pr-2">
+          <div className="flex flex-col flex-none min-h-0 rounded-lg">
+            <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -577,13 +566,8 @@ export function ConversationList({
           <div className="my-3 border-t border-border/60" />
 
           {/* Direct messages - takes remaining space below Channels */}
-          <div
-            className={cn(
-              'flex flex-col min-h-0 rounded-lg flex-1',
-              onboardingHighlight === 'directMessages' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
-            )}
-          >
-            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8 pr-2">
+          <div className="flex flex-col min-h-0 rounded-lg flex-1">
+            <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}

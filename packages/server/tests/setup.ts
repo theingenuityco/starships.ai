@@ -17,6 +17,7 @@ process.env.CLIENT_PORT = '3000';
 process.env.PUBLIC_URL = 'http://localhost:3000';
 process.env.CLIENT_URL = 'http://localhost:3000';
 process.env.SERVER_URL = 'http://localhost:3001';
+process.env.DOCS_URL = 'http://localhost:3002';
 
 // Global test timeout
 jest.setTimeout(10000);

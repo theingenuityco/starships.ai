@@ -36,6 +36,18 @@ The server persists the paused `execution` snapshot in `autopilot_awaits.executi
 
 This means the **next node after the await** receives the connector event envelope as its input.
 
+### Where connector events come from (server)
+
+For `kind: "connector_event"`, the server creates normalized connector events by ingesting inbound connector webhooks.
+
+Important notes:
+
+- Webhook ingress is **global** (no starship id in the URL): `POST /api/v1/webhooks/connectors/:provider`
+- Routing is derived from the inbound request using connector template `webhooksJson` (`connector_templates.webhooks_json`)
+- The normalized event envelope injected on resume includes fields like `provider`, `eventType`, `payloadJson`, and timestamps
+
+See `../connectors/webhooks.md` for the template config reference.
+
 ### Matching semantics
 
 The matcher is intentionally permissive:

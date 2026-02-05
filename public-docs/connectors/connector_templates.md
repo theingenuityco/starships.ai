@@ -40,6 +40,7 @@ Connector templates store “root runtime fields” as JSONB/text columns. In AP
 - **`endpoints`** ↔ `endpoints_json` (jsonb)
 - **`rateLimit`** ↔ `rate_limit_json` (jsonb, optional)
 - **`metadataSchema`** ↔ `metadata_schema_json` (jsonb, optional)
+- **`webhooksJson`** ↔ `webhooks_json` (jsonb, optional; server-consumed)
 
 > Important: `auth_json` must **never** contain raw secret values. It must contain **SecretRefs** only.
 
@@ -92,7 +93,8 @@ Top-level runtime fields stored on the template:
   "variables": [],
   "endpoints": [],
   "rateLimit": { "tier": "free", "burstLimit": 10, "requestsPerMinute": 60 },
-  "metadataSchema": { "type": "object", "properties": {} }
+  "metadataSchema": { "type": "object", "properties": {} },
+  "webhooksJson": {}
 }
 ```
 
@@ -113,6 +115,10 @@ Top-level runtime fields stored on the template:
 - **`metadataSchema?: JsonSchemaObject`**
   - Optional JSON Schema describing non-secret connector metadata for instances (the `connectors.metadata` shape).
   - Used by clients/UX to validate metadata inputs (especially for OAuth flows requiring pre-OAuth metadata).
+- **`webhooksJson?: object`**
+  - Optional configuration that enables **inbound connector webhooks** (events) for this provider.
+  - This config is **consumed by the server** (not by the Engine/HostRuntime executing `connector_action`).
+  - See `./webhooks.md` for the schema and behavior notes.
 
 ---
 
@@ -434,5 +440,19 @@ Behavior notes (current implementation):
 
 - V2 uses root runtime fields (no legacy `runtime_config` blob).
 - Legacy env-key columns like `required_env_keys` are not part of the v2 runtime contract.
+
+---
+
+## Inbound webhooks (`webhooksJson` / `webhooks_json`)
+
+Connector templates may optionally define `webhooksJson` (stored in `webhooks_json`) to enable the server to:
+
+- Verify inbound webhook signatures (template-driven; secrets are referenced via `SecretRef`)
+- Normalize inbound webhook payloads into a stable connector event envelope
+- Route events to the correct connector instance(s) using a provider-derived external account identifier
+
+The full reference for this config lives here:
+
+- `./webhooks.md`
 
 

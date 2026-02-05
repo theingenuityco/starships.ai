@@ -106,19 +106,13 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   // Actions UI state
   const [actionsQuery, setActionsQuery] = useState('')
   const [selectedActionName, setSelectedActionName] = useState<string | null>(null)
-  const [bulkActionsText, setBulkActionsText] = useState('')
-  const [showBulkReplace, setShowBulkReplace] = useState(false)
   const [actionDraft, setActionDraft] = useState<Partial<ConnectorEndpointV2> | null>(null)
   const [actionParametersText, setActionParametersText] = useState('')
   const [actionMappingText, setActionMappingText] = useState('')
   const [actionResponseText, setActionResponseText] = useState('')
 
   const { data: actionsResp } = useAdminConnectorTemplateActions(id, { q: actionsQuery, limit: 50, offset: 0 }, isAuthenticated && isInstanceAdmin)
-  const { data: selectedAction } = useAdminConnectorTemplateAction(
-    id,
-    selectedActionName,
-    isAuthenticated && isInstanceAdmin && !!selectedActionName
-  )
+  const { data: selectedAction } = useAdminConnectorTemplateAction(id, selectedActionName, isAuthenticated && isInstanceAdmin && !!selectedActionName)
   const { data: legacyEndpoints } = useAdminConnectorTemplateLegacyEndpoints(id, isAuthenticated && isInstanceAdmin)
 
   const provider = connector?.provider
@@ -419,9 +413,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Structured editor for common fields. Raw auth JSON is available in Advanced.
-                      </div>
+                      <div className="text-xs text-muted-foreground">Structured editor for common fields. Raw auth JSON is available in Advanced.</div>
                     </div>
 
                     {!parsedAuth ? (
@@ -603,10 +595,24 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
-                          onClick={() => setShowBulkReplace(v => !v)}
-                          disabled={bulkReplaceMutation.isPending}
+                          onClick={async () => {
+                            if (!id) return
+                            const legacy = legacyEndpoints ?? []
+                            if (!Array.isArray(legacy) || legacy.length === 0) {
+                              toast.error('No legacy endpoints to migrate')
+                              return
+                            }
+                            if (!confirm('Migrate LEGACY_endpoints into actions? This will REPLACE all existing actions.')) return
+                            try {
+                              await bulkReplaceMutation.mutateAsync({ id, payload: { actions: legacy as any } })
+                              toast.success('Migrated legacy endpoints → actions', { description: `${legacy.length} actions` })
+                            } catch (e: any) {
+                              toast.error('Migration failed', { description: e?.message || 'Please try again.' })
+                            }
+                          }}
+                          disabled={bulkReplaceMutation.isPending || !(legacyEndpoints?.length ?? 0)}
                         >
-                          {showBulkReplace ? 'Hide bulk replace' : 'Bulk replace'}
+                          {bulkReplaceMutation.isPending ? 'Migrating…' : 'Migrate legacy → actions'}
                         </Button>
                       </div>
                     </div>
@@ -618,16 +624,12 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch h-[65vh] lg:h-[70vh] min-h-0 overflow-hidden">
                       <div className="rounded-md border border-border/60 flex flex-col min-h-0 h-full">
-                        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60">
-                          {actionsResp?.actions?.length ? `${actionsResp.actions.length} actions` : 'No actions'}
-                        </div>
+                        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60">{actionsResp?.actions?.length ? `${actionsResp.actions.length} actions` : 'No actions'}</div>
                         <div className="flex-1 min-h-0 overflow-auto divide-y divide-border/60">
                           {(actionsResp?.actions || []).map(a => (
                             <button
                               key={`${a.templateId}:${a.actionName}`}
-                              className={`w-full text-left px-3 py-2 hover:bg-muted/40 ${
-                                selectedActionName === a.actionName ? 'bg-muted/50' : ''
-                              }`}
+                              className={`w-full text-left px-3 py-2 hover:bg-muted/40 ${selectedActionName === a.actionName ? 'bg-muted/50' : ''}`}
                               onClick={() => setSelectedActionName(a.actionName)}
                             >
                               <div className="flex items-center justify-between gap-2">
@@ -652,142 +654,140 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
                         <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
                           {!selectedActionName ? (
-                            <div className="rounded-md border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-                              Select an action from the list to edit it.
-                            </div>
+                            <div className="rounded-md border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">Select an action from the list to edit it.</div>
                           ) : (
                             <div className="space-y-3">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-muted-foreground">Action name</label>
-                              <Input value={selectedActionName} readOnly className="font-mono h-9 text-sm" />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-muted-foreground">HTTP method</label>
-                              <Select
-                                value={String(actionDraft?.method ?? '')}
-                                onValueChange={v =>
-                                  setActionDraft(prev => ({
-                                    ...(prev ?? {}),
-                                    method: v as HttpMethod,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger className="h-9 text-sm">
-                                  <SelectValue placeholder="Select method" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {HTTP_METHODS.map(m => (
-                                    <SelectItem key={m} value={m}>
-                                      <span className="font-mono">{m}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                              <label className="text-xs font-medium text-muted-foreground">Path</label>
-                              <Input
-                                value={String(actionDraft?.path ?? '')}
-                                onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), path: e.target.value }))}
-                                placeholder="/v1/items/{id}"
-                                spellCheck={false}
-                                className="font-mono h-9 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                              <label className="text-xs font-medium text-muted-foreground">Description</label>
-                              <Textarea
-                                value={String(actionDraft?.description ?? '')}
-                                onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), description: e.target.value }))}
-                                className="min-h-[72px] text-sm"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-muted-foreground">Request style</label>
-                              <Select
-                                value={String(actionDraft?.requestStyle ?? '')}
-                                onValueChange={v =>
-                                  setActionDraft(prev => ({
-                                    ...(prev ?? {}),
-                                    requestStyle: v as RequestStyle,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger className="h-9 text-sm">
-                                  <SelectValue placeholder="(optional)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {REQUEST_STYLES.map(s => (
-                                    <SelectItem key={s} value={s}>
-                                      <span className="font-mono">{s}</span>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium text-muted-foreground">Timeout (ms)</label>
-                              <Input
-                                value={actionDraft?.timeoutMs === undefined ? '' : String(actionDraft.timeoutMs)}
-                                onChange={e =>
-                                  setActionDraft(prev => {
-                                    const raw = e.target.value.trim()
-                                    return { ...(prev ?? {}), timeoutMs: raw ? Number(raw) : undefined }
-                                  })
-                                }
-                                placeholder="e.g. 5000"
-                                inputMode="numeric"
-                                className="h-9 text-sm"
-                              />
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                              <label className="text-xs font-medium text-muted-foreground">Base URL override</label>
-                              <Input
-                                value={String(actionDraft?.baseUrlOverride ?? '')}
-                                onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), baseUrlOverride: e.target.value }))}
-                                placeholder="(optional) https://api.example.com"
-                                spellCheck={false}
-                                className="font-mono h-9 text-sm"
-                              />
-                            </div>
-                          </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Action name</label>
+                                  <Input value={selectedActionName} readOnly className="font-mono h-9 text-sm" />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground">HTTP method</label>
+                                  <Select
+                                    value={String(actionDraft?.method ?? '')}
+                                    onValueChange={v =>
+                                      setActionDraft(prev => ({
+                                        ...(prev ?? {}),
+                                        method: v as HttpMethod,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="h-9 text-sm">
+                                      <SelectValue placeholder="Select method" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {HTTP_METHODS.map(m => (
+                                        <SelectItem key={m} value={m}>
+                                          <span className="font-mono">{m}</span>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Path</label>
+                                  <Input
+                                    value={String(actionDraft?.path ?? '')}
+                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), path: e.target.value }))}
+                                    placeholder="/v1/items/{id}"
+                                    spellCheck={false}
+                                    className="font-mono h-9 text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Description</label>
+                                  <Textarea
+                                    value={String(actionDraft?.description ?? '')}
+                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), description: e.target.value }))}
+                                    className="min-h-[72px] text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Request style</label>
+                                  <Select
+                                    value={String(actionDraft?.requestStyle ?? '')}
+                                    onValueChange={v =>
+                                      setActionDraft(prev => ({
+                                        ...(prev ?? {}),
+                                        requestStyle: v as RequestStyle,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="h-9 text-sm">
+                                      <SelectValue placeholder="(optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {REQUEST_STYLES.map(s => (
+                                        <SelectItem key={s} value={s}>
+                                          <span className="font-mono">{s}</span>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Timeout (ms)</label>
+                                  <Input
+                                    value={actionDraft?.timeoutMs === undefined ? '' : String(actionDraft.timeoutMs)}
+                                    onChange={e =>
+                                      setActionDraft(prev => {
+                                        const raw = e.target.value.trim()
+                                        return { ...(prev ?? {}), timeoutMs: raw ? Number(raw) : undefined }
+                                      })
+                                    }
+                                    placeholder="e.g. 5000"
+                                    inputMode="numeric"
+                                    className="h-9 text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-2 md:col-span-2">
+                                  <label className="text-xs font-medium text-muted-foreground">Base URL override</label>
+                                  <Input
+                                    value={String(actionDraft?.baseUrlOverride ?? '')}
+                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), baseUrlOverride: e.target.value }))}
+                                    placeholder="(optional) https://api.example.com"
+                                    spellCheck={false}
+                                    className="font-mono h-9 text-sm"
+                                  />
+                                </div>
+                              </div>
 
-                          <div className="pt-2 border-t border-border/60 space-y-3">
-                            <div className="text-xs font-medium text-muted-foreground">Advanced JSON</div>
-                            <div className="grid grid-cols-1 gap-3">
-                              <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">parameters (JSON schema object)</label>
-                                <Textarea
-                                  value={actionParametersText}
-                                  onChange={e => setActionParametersText(e.target.value)}
-                                  className="min-h-[120px] font-mono text-xs"
-                                  spellCheck={false}
-                                  placeholder='e.g. { "type": "object", "properties": {} }'
-                                />
+                              <div className="pt-2 border-t border-border/60 space-y-3">
+                                <div className="text-xs font-medium text-muted-foreground">Advanced JSON</div>
+                                <div className="grid grid-cols-1 gap-3">
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">parameters (JSON schema object)</label>
+                                    <Textarea
+                                      value={actionParametersText}
+                                      onChange={e => setActionParametersText(e.target.value)}
+                                      className="min-h-[120px] font-mono text-xs"
+                                      spellCheck={false}
+                                      placeholder='e.g. { "type": "object", "properties": {} }'
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">mapping (JSON object)</label>
+                                    <Textarea
+                                      value={actionMappingText}
+                                      onChange={e => setActionMappingText(e.target.value)}
+                                      className="min-h-[120px] font-mono text-xs"
+                                      spellCheck={false}
+                                      placeholder='e.g. { "query": { "q": "{{ String(args.q) }}" } }'
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">response (JSON object)</label>
+                                    <Textarea
+                                      value={actionResponseText}
+                                      onChange={e => setActionResponseText(e.target.value)}
+                                      className="min-h-[96px] font-mono text-xs"
+                                      spellCheck={false}
+                                      placeholder='e.g. { "select": "{{ body.items }}" }'
+                                    />
+                                  </div>
+                                </div>
                               </div>
-                              <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">mapping (JSON object)</label>
-                                <Textarea
-                                  value={actionMappingText}
-                                  onChange={e => setActionMappingText(e.target.value)}
-                                  className="min-h-[120px] font-mono text-xs"
-                                  spellCheck={false}
-                                  placeholder='e.g. { "query": { "q": "{{ String(args.q) }}" } }'
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">response (JSON object)</label>
-                                <Textarea
-                                  value={actionResponseText}
-                                  onChange={e => setActionResponseText(e.target.value)}
-                                  className="min-h-[96px] font-mono text-xs"
-                                  spellCheck={false}
-                                  placeholder='e.g. { "select": "{{ body.items }}" }'
-                                />
-                              </div>
-                            </div>
-                          </div>
                             </div>
                           )}
                         </div>
@@ -815,7 +815,9 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                             onClick={async () => {
                               if (!id || !selectedActionName) return
                               try {
-                                const method = String(actionDraft?.method ?? '').trim().toUpperCase()
+                                const method = String(actionDraft?.method ?? '')
+                                  .trim()
+                                  .toUpperCase()
                                 const path = String(actionDraft?.path ?? '').trim()
                                 if (!method) {
                                   toast.error('method is required')
@@ -835,23 +837,13 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                   name: selectedActionName,
                                   method: method as HttpMethod,
                                   path,
-                                  ...(String(actionDraft?.description ?? '').trim()
-                                    ? { description: String(actionDraft?.description ?? '').trim() }
-                                    : {}),
-                                  ...(String(actionDraft?.baseUrlOverride ?? '').trim()
-                                    ? { baseUrlOverride: String(actionDraft?.baseUrlOverride ?? '').trim() }
-                                    : {}),
+                                  ...(String(actionDraft?.description ?? '').trim() ? { description: String(actionDraft?.description ?? '').trim() } : {}),
+                                  ...(String(actionDraft?.baseUrlOverride ?? '').trim() ? { baseUrlOverride: String(actionDraft?.baseUrlOverride ?? '').trim() } : {}),
                                   ...(actionDraft?.requestStyle ? { requestStyle: actionDraft.requestStyle } : {}),
                                   ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-                                  ...(parseOptionalJsonObject('parameters', actionParametersText)
-                                    ? { parameters: parseOptionalJsonObject('parameters', actionParametersText) as any }
-                                    : {}),
-                                  ...(parseOptionalJsonObject('mapping', actionMappingText)
-                                    ? { mapping: parseOptionalJsonObject('mapping', actionMappingText) as any }
-                                    : {}),
-                                  ...(parseOptionalJsonObject('response', actionResponseText)
-                                    ? { response: parseOptionalJsonObject('response', actionResponseText) as any }
-                                    : {}),
+                                  ...(parseOptionalJsonObject('parameters', actionParametersText) ? { parameters: parseOptionalJsonObject('parameters', actionParametersText) as any } : {}),
+                                  ...(parseOptionalJsonObject('mapping', actionMappingText) ? { mapping: parseOptionalJsonObject('mapping', actionMappingText) as any } : {}),
+                                  ...(parseOptionalJsonObject('response', actionResponseText) ? { response: parseOptionalJsonObject('response', actionResponseText) as any } : {}),
                                 }
 
                                 await upsertActionMutation.mutateAsync({
@@ -871,57 +863,10 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       </div>
                     </div>
 
-                    {showBulkReplace ? (
-                      <div className="space-y-2 pt-2 border-t border-border/60">
-                        <label className="text-sm font-medium">Bulk replace actions (JSON array)</label>
-                        <Textarea
-                          value={bulkActionsText}
-                          onChange={e => setBulkActionsText(e.target.value)}
-                          className="min-h-[220px] font-mono text-xs"
-                          spellCheck={false}
-                          placeholder='[ { "name": "list-tools", "method": "GET", "path": "/tools" } ]'
-                        />
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => setBulkActionsText('')}
-                            disabled={bulkReplaceMutation.isPending}
-                          >
-                            Clear
-                          </Button>
-                          <Button
-                            onClick={async () => {
-                              if (!id) return
-                              try {
-                                const parsed = parseOptionalJson(bulkActionsText)
-                                if (!Array.isArray(parsed)) {
-                                  toast.error('Bulk replace payload must be a JSON array')
-                                  return
-                                }
-                                await bulkReplaceMutation.mutateAsync({ id, payload: { actions: parsed as any } })
-                              } catch (e: any) {
-                                toast.error('Invalid JSON', { description: e?.message || 'Please fix JSON.' })
-                              }
-                            }}
-                            disabled={bulkReplaceMutation.isPending || !bulkActionsText.trim()}
-                          >
-                            {bulkReplaceMutation.isPending ? 'Replacing…' : 'Replace all actions'}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-
                     <div className="space-y-2 pt-2 border-t border-border/60 opacity-60">
                       <label className="text-sm font-medium">LEGACY_endpoints (read-only)</label>
-                      <div className="text-xs text-muted-foreground">
-                        This is the raw legacy `connector_templates.endpoints_json` value. It is not used by runtime and cannot be edited here.
-                      </div>
-                      <Textarea
-                        value={formatJson({ LEGACY_endpoints: legacyEndpoints ?? [] })}
-                        readOnly
-                        className="min-h-[180px] font-mono text-xs"
-                        spellCheck={false}
-                      />
+                      <div className="text-xs text-muted-foreground">This is the raw legacy `connector_templates.endpoints_json` value. It is not used by runtime and cannot be edited here.</div>
+                      <Textarea value={formatJson({ LEGACY_endpoints: legacyEndpoints ?? [] })} readOnly className="min-h-[180px] font-mono text-xs" spellCheck={false} />
                     </div>
                   </div>
 

@@ -19,20 +19,20 @@ type ActionRow = {
   updated_at: string;
 };
 
-function toEndpoint(row: ActionRow): ConnectorEndpointV2 {
-  const endpoint: ConnectorEndpointV2 = {
+function toAction(row: ActionRow): ConnectorEndpointV2 {
+  const action: ConnectorEndpointV2 = {
     name: row.action_name,
     method: row.method as HttpMethod,
     path: row.path,
   };
-  if (row.description) endpoint.description = row.description;
-  if (row.base_url_override) endpoint.baseUrlOverride = row.base_url_override;
-  if (typeof row.timeout_ms === 'number') endpoint.timeoutMs = row.timeout_ms;
-  if (row.request_style) endpoint.requestStyle = row.request_style as RequestStyle;
-  if (row.parameters_json && typeof row.parameters_json === 'object') endpoint.parameters = row.parameters_json as any;
-  if (row.mapping_json && typeof row.mapping_json === 'object') endpoint.mapping = row.mapping_json as any;
-  if (row.response_json && typeof row.response_json === 'object') endpoint.response = row.response_json as any;
-  return endpoint;
+  if (row.description) action.description = row.description;
+  if (row.base_url_override) action.baseUrlOverride = row.base_url_override;
+  if (typeof row.timeout_ms === 'number') action.timeoutMs = row.timeout_ms;
+  if (row.request_style) action.requestStyle = row.request_style as RequestStyle;
+  if (row.parameters_json && typeof row.parameters_json === 'object') action.parameters = row.parameters_json as any;
+  if (row.mapping_json && typeof row.mapping_json === 'object') action.mapping = row.mapping_json as any;
+  if (row.response_json && typeof row.response_json === 'object') action.response = row.response_json as any;
+  return action;
 }
 
 export class ConnectorTemplateActionRepository extends BaseRepository {
@@ -112,7 +112,7 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
     );
   }
 
-  async listEndpointsByTemplateId(templateId: string): Promise<ConnectorEndpointV2[]> {
+  async listActionsByTemplateId(templateId: string): Promise<ConnectorEndpointV2[]> {
     return this.executeWithErrorHandling(
       async () => {
         const id = String(templateId || '').trim();
@@ -128,15 +128,15 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
           `,
           [id]
         );
-        return rows.map(toEndpoint);
+        return rows.map(toAction);
       },
-      'listEndpointsByTemplateId',
+      'listActionsByTemplateId',
       'connector_template_actions',
       templateId
     );
   }
 
-  async findEndpoint(templateId: string, actionName: string): Promise<ConnectorEndpointV2 | null> {
+  async findAction(templateId: string, actionName: string): Promise<ConnectorEndpointV2 | null> {
     return this.executeWithErrorHandling(
       async () => {
         const tid = String(templateId || '').trim();
@@ -154,26 +154,26 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
           `,
           [tid, name]
         );
-        return row ? toEndpoint(row) : null;
+        return row ? toAction(row) : null;
       },
-      'findEndpoint',
+      'findAction',
       'connector_template_actions',
       `${templateId}:${actionName}`
     );
   }
 
-  async upsertEndpoint(args: { templateId: string; endpoint: ConnectorEndpointV2; ordinal?: number }): Promise<void> {
+  async upsertAction(args: { templateId: string; action: ConnectorEndpointV2; ordinal?: number }): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const templateId = String(args.templateId || '').trim();
         if (!templateId) throw new Error('templateId is required');
-        const e = args.endpoint;
+        const e = args.action;
         const actionName = String(e?.name || '').trim();
-        if (!actionName) throw new Error('endpoint.name is required');
+        if (!actionName) throw new Error('action.name is required');
         const method = String(e?.method || '').trim().toUpperCase();
         const path = String(e?.path || '').trim();
-        if (!method) throw new Error('endpoint.method is required');
-        if (!path) throw new Error('endpoint.path is required');
+        if (!method) throw new Error('action.method is required');
+        if (!path) throw new Error('action.path is required');
 
         const id = `${templateId}:${actionName}`;
         const ordinal = typeof args.ordinal === 'number' ? Math.max(0, Math.floor(args.ordinal)) : 0;
@@ -229,24 +229,24 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
           ]
         );
       },
-      'upsertEndpoint',
+      'upsertAction',
       'connector_template_actions'
     );
   }
 
-  async replaceAllEndpoints(args: { templateId: string; endpoints: ConnectorEndpointV2[] }): Promise<void> {
+  async replaceAllActions(args: { templateId: string; actions: ConnectorEndpointV2[] }): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const templateId = String(args.templateId || '').trim();
         if (!templateId) throw new Error('templateId is required');
-        const endpoints = Array.isArray(args.endpoints) ? args.endpoints : [];
+        const actions = Array.isArray(args.actions) ? args.actions : [];
 
         const connection = this.getConnection();
         await connection.transaction(async (tx) => {
           await tx.query(`DELETE FROM connector_template_actions WHERE template_id = $1`, [templateId]);
 
-          for (let i = 0; i < endpoints.length; i++) {
-            const e = endpoints[i] as ConnectorEndpointV2;
+          for (let i = 0; i < actions.length; i++) {
+            const e = actions[i] as ConnectorEndpointV2;
             const actionName = String(e?.name || '').trim();
             const method = String(e?.method || '').trim().toUpperCase();
             const path = String(e?.path || '').trim();

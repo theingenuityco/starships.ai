@@ -67,8 +67,6 @@ const UpdateConnectorTemplateSchema = z
     baseUrl: z.string().trim().min(1).max(2048).optional(),
     auth: AuthObjectSchema.optional(),
     variables: z.array(z.record(z.string(), z.unknown())).optional(),
-    // Legacy endpoints_json (not used by runtime; kept for manual migration).
-    endpoints: z.array(z.record(z.string(), z.unknown())).optional(),
     rateLimit: z.record(z.string(), z.unknown()).optional(),
     metadataSchema: z.record(z.string(), z.unknown()).optional(),
   })
@@ -82,7 +80,6 @@ const UpdateConnectorTemplateSchema = z
       body.baseUrl !== undefined ||
       body.auth !== undefined ||
       body.variables !== undefined ||
-      body.endpoints !== undefined ||
       body.rateLimit !== undefined ||
       body.metadataSchema !== undefined,
     { message: 'At least one field must be provided' }
@@ -100,8 +97,6 @@ const CreateConnectorTemplateSchema = z.object({
   baseUrl: z.string().trim().min(1).max(2048),
   auth: AuthObjectSchema,
   variables: z.array(z.record(z.string(), z.unknown())).optional(),
-  // Optional: actions are managed via dedicated endpoints; this is a convenience for bootstrapping.
-  endpoints: z.array(z.record(z.string(), z.unknown())).optional(),
   rateLimit: z.record(z.string(), z.unknown()).optional(),
   metadataSchema: z.record(z.string(), z.unknown()).optional(),
 });
@@ -124,15 +119,11 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
 }
 
 function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminModel {
-  // NOTE:
-  // - `endpoints` here is the legacy connector_templates.endpoints_json field.
-  // - Runtime execution uses connector_template_actions (row table), not this legacy field.
   return {
     ...toTemplateSummary(entity),
     baseUrl: entity.baseUrl,
     auth: entity.authJson as unknown as ConnectorAuthV2,
     variables: entity.variablesJson as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-    endpoints: (Array.isArray(entity.endpointsJson) ? entity.endpointsJson : []) as unknown as ConnectorEndpointV2[],
     rateLimit: entity.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
     metadataSchema: entity.metadataSchemaJson as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
   };
@@ -169,10 +160,7 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
     const safeVariables = (Array.isArray(template.variablesJson)
       ? template.variablesJson
       : undefined) as unknown as ConnectorTemplateRuntimeFieldsV2['variables'];
-    // Prefer new action table; fallback to legacy endpoints_json if not migrated yet.
-    const fromActions = (await actionRepo.listEndpointsByTemplateId(template.id)) as unknown as ConnectorEndpointV2[];
-    const legacyEndpoints = (Array.isArray(template.endpointsJson) ? template.endpointsJson : []) as unknown as ConnectorEndpointV2[];
-    const safeEndpoints = fromActions.length ? fromActions : legacyEndpoints;
+    const actions = (await actionRepo.listActionsByTemplateId(template.id)) as unknown as ConnectorEndpointV2[];
     const safeRateLimit =
       template.rateLimitJson && typeof template.rateLimitJson === 'object' && !Array.isArray(template.rateLimitJson)
         ? (template.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'])
@@ -196,10 +184,10 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
         baseUrl: template.baseUrl,
         auth: safeAuth,
         variables: safeVariables,
-        endpoints: safeEndpoints,
         rateLimit: safeRateLimit,
         metadataSchema: safeMetadataSchema,
       },
+      actions,
     };
 
     const container: ImportExportContainerV1<'connector_template'> = {
@@ -254,10 +242,10 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           baseUrl: z.string().trim().min(1),
           auth: AuthObjectSchema,
           variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
-          endpoints: z.array(z.record(z.string(), z.unknown())),
           rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
           metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
         }),
+        actions: z.array(z.record(z.string(), z.unknown())).optional(),
       }),
     });
 
@@ -267,6 +255,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
     const warnings: string[] = [];
     // Zod schema intentionally validates a safe-but-loose JSON shape; cast through unknown to satisfy TS.
     const ctRaw = body.payload.connectorTemplate as unknown as CreateConnectorTemplateRequest;
+    const rawActions = (body.payload as unknown as { actions?: unknown }).actions;
     const ctRawNullable = ctRaw as unknown as {
       variables?: unknown;
       rateLimit?: unknown;
@@ -308,7 +297,6 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           baseUrl: ct.baseUrl,
           authJson: ct.auth as unknown as ConnectorAuthV2,
           variablesJson: ct.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-          endpointsJson: ct.endpoints as unknown as ConnectorEndpointV2[],
           rateLimitJson: ct.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
           metadataSchemaJson: ct.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
         })) ?? undefined;
@@ -323,8 +311,18 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
       saved = await repo.create(ct);
     }
 
-    // NOTE: We intentionally do NOT migrate legacy endpoints_json into the action table here.
-    // That migration is performed manually via the admin UI button.
+    // Optional: import action catalog (source of truth: connector_template_actions).
+    // We intentionally do NOT read/write the legacy connector_templates.endpoints_json field here.
+    if (rawActions !== undefined) {
+      if (!Array.isArray(rawActions)) {
+        throw new Error('payload.actions must be an array when provided');
+      }
+      const actionRepo = new ConnectorTemplateActionRepository();
+      await actionRepo.replaceAllActions({
+        templateId: saved.id,
+        actions: rawActions as unknown as ConnectorEndpointV2[],
+      });
+    }
 
     const payload: AdminConnectorTemplateImportResponse = {
       connector: toAdminModel(saved),
@@ -373,8 +371,6 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       baseUrl: body.baseUrl,
       auth: body.auth as unknown as ConnectorAuthV2,
       variables: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      // Legacy field retained in protocol for now; storage is row-based.
-      endpoints: (body.endpoints ?? []) as unknown as ConnectorEndpointV2[],
       rateLimit: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
       metadataSchema: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     } satisfies CreateConnectorTemplateRequest);
@@ -438,7 +434,6 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
       baseUrl: body.baseUrl,
       authJson: body.auth as unknown as ConnectorAuthV2,
       variablesJson: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      endpointsJson: body.endpoints as unknown as ConnectorEndpointV2[],
       rateLimitJson: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
       metadataSchemaJson: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     });
@@ -537,13 +532,13 @@ router.get('/admin/connector-templates/:id/actions/:actionName', async (req: Req
     }
 
     const actionRepo = new ConnectorTemplateActionRepository();
-    const endpoint = await actionRepo.findEndpoint(template.id, params.actionName);
-    if (!endpoint) {
+    const action = await actionRepo.findAction(template.id, params.actionName);
+    if (!action) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template action not found', 404, { id: template.id, actionName: params.actionName });
       return;
     }
 
-    const payload: AdminConnectorTemplateActionResponse = { action: endpoint };
+    const payload: AdminConnectorTemplateActionResponse = { action };
     sendSuccess(res, payload);
   } catch (error) {
     handleError(error, res, 'fetching connector template action');
@@ -552,7 +547,7 @@ router.get('/admin/connector-templates/:id/actions/:actionName', async (req: Req
 
 const UpsertActionSchema = z
   .object({
-    endpoint: z.record(z.string(), z.unknown()),
+    action: z.record(z.string(), z.unknown()),
     ordinal: z.number().int().min(0).optional(),
   })
   .strict();
@@ -577,12 +572,12 @@ router.put('/admin/connector-templates/:id/actions/:actionName', async (req: Req
       return;
     }
 
-    const endpoint = body.endpoint as unknown as ConnectorEndpointV2;
+    const action = body.action as unknown as ConnectorEndpointV2;
     // Enforce name match for safety.
-    endpoint.name = params.actionName;
+    action.name = params.actionName;
 
     const actionRepo = new ConnectorTemplateActionRepository();
-    await actionRepo.upsertEndpoint({ templateId: template.id, endpoint, ordinal: body.ordinal });
+    await actionRepo.upsertAction({ templateId: template.id, action, ordinal: body.ordinal });
 
     sendSuccess(res, { ok: true });
   } catch (error) {
@@ -626,7 +621,7 @@ router.put('/admin/connector-templates/:id/actions', async (req: Request, res: R
     const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
-    const BodySchema = z.object({ endpoints: z.array(z.record(z.string(), z.unknown())) }).strict();
+    const BodySchema = z.object({ actions: z.array(z.record(z.string(), z.unknown())) }).strict();
     const body = validateData(BodySchema, req.body as unknown as BulkReplaceConnectorTemplateActionsRequest, res, 'bulk replace actions body');
     if (!body) return;
 
@@ -637,38 +632,11 @@ router.put('/admin/connector-templates/:id/actions', async (req: Request, res: R
     }
 
     const actionRepo = new ConnectorTemplateActionRepository();
-    await actionRepo.replaceAllEndpoints({ templateId: template.id, endpoints: body.endpoints as unknown as ConnectorEndpointV2[] });
+    await actionRepo.replaceAllActions({ templateId: template.id, actions: body.actions as unknown as ConnectorEndpointV2[] });
 
     sendSuccess(res, { ok: true });
   } catch (error) {
     handleError(error, res, 'bulk replacing connector template actions');
-  }
-});
-
-// POST /admin/connector-templates/:id/actions/migrate-legacy
-// Copy legacy connector_templates.endpoints_json into connector_template_actions (replace-all).
-router.post('/admin/connector-templates/:id/actions/migrate-legacy', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
-    if (!params) return;
-
-    const template = await loadTemplateByIdOrProvider(params.id);
-    if (!template) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const legacyEndpoints = (Array.isArray(template.endpointsJson) ? template.endpointsJson : []) as unknown as ConnectorEndpointV2[];
-    const actionRepo = new ConnectorTemplateActionRepository();
-    await actionRepo.replaceAllEndpoints({ templateId: template.id, endpoints: legacyEndpoints });
-
-    sendSuccess(res, {
-      ok: true,
-      templateId: template.id,
-      migratedCount: legacyEndpoints.length,
-    });
-  } catch (error) {
-    handleError(error, res, 'migrating legacy endpoints_json to actions table');
   }
 });
 

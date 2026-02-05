@@ -31,6 +31,23 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
 
 ---
 
+## Inbound events (webhooks)
+
+Connectors can also support **inbound events** (webhooks). This enables server-side ingestion of external events and allows headless automations to resume from an `await` node of kind `connector_event`.
+
+Key points:
+
+- Inbound connector webhooks use a **global** endpoint (no starship id in the URL): `POST /api/v1/webhooks/connectors/:provider`
+- Routing is done using a provider-derived **external account identifier** extracted from the inbound request.
+- Webhook verification + event normalization is configured on the connector template via `connector_templates.webhooks_json` (`webhooksJson` in API payloads).
+
+Full reference:
+
+- `webhooksJson` schema and behavior: `./webhooks.md`
+- Await node reference: `../blueprints/node-await.md`
+
+---
+
 ### Examples
 
 - **API key connector template**: `example-api-key.md`

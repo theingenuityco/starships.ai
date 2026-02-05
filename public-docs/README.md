@@ -8,6 +8,7 @@ This folder contains documentation for the Starships workflow system, including 
 - **Connectors**
   - [Connectors reference](./connectors/README.md)
   - [Connector templates](./connectors/connector_templates.md)
+  - [Connector webhooks (inbound events)](./connectors/webhooks.md)
 
 - **Widgets**
   - [Widgets](./widgets/README.md)

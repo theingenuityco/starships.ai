@@ -1,0 +1,69 @@
+---
+title: Connectors
+description: Managed integrations for outbound actions and inbound events
+icon: Plug
+---
+
+import { Plug, ExternalLink, Shield, ArrowRight, Bell } from 'lucide-react';
+
+<div style={{ position: 'relative', marginTop: '-140px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
+  <CopyPageButton />
+</div>
+
+## What are connectors?
+
+**Connectors** are Starships-managed integrations to external systems. They provide two capabilities:
+
+- **Outbound actions**: call external APIs via the `connector_action` node with server-injected auth (blueprints never see secrets).
+- **Inbound events**: ingest external events (webhooks) into normalized connector events that can resume automations waiting on an `await` node.
+
+---
+
+## Outbound actions (connector_action)
+
+Use `connector_action` when you need Starships to own:
+
+- auth/credential injection (OAuth/API key/basic/platform JWT)
+- base URL and request mapping (path/query/headers/body) from connector templates
+- consistent request/response envelopes
+
+This is the default in hosted execution mode, where the server can enforce allow/ask/deny policies and keep secrets out of workflows.
+
+---
+
+## Inbound events (webhooks → connector events)
+
+Connectors can optionally support **inbound events**. The server exposes a **global** webhook entrypoint:
+
+- `POST /api/v1/webhooks/connectors/:provider`
+
+Key properties:
+
+- The URL does **not** include a starship id.
+- Routing is derived from the inbound request using a provider-derived **external account identifier**.
+- When multiple connectors share the same external account id, the server may **fan out** routing and treat the event as applicable to multiple connector instances.
+
+### How templates opt in
+
+Inbound ingestion is enabled and configured by the connector template’s `webhooksJson` (`connector_templates.webhooks_json`).
+
+This config controls:
+
+- routing key extraction (`externalAccountId`)
+- signature verification (using `SecretRef`, never raw secrets)
+- how to extract `eventType`, `externalEventId`, and the normalized `payloadJson`
+
+---
+
+## Event-driven automations (await)
+
+Automations can pause on:
+
+- `await` with `kind: "connector_event"`
+
+When a matching connector event is ingested, the server resumes the paused workflow and injects the event envelope as the await node’s output.
+
+Links:
+
+- Nodes reference: [`/nodes/reference`](/nodes/reference)
+

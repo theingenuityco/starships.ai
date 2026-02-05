@@ -5,7 +5,7 @@ import { toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateConnectorTemplateRequest, ConnectorProvider } from '@starships/protocol';
-import type { ConnectorAuthV2, ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, JsonSchemaObject } from '@starships/protocol';
+import type { ConnectorAuthV2, ConnectorTemplateRuntimeFieldsV2, JsonSchemaObject } from '@starships/protocol';
 
 export class ConnectorTemplateRepository extends BaseRepository {
   constructor() {
@@ -13,11 +13,37 @@ export class ConnectorTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Read-only access to the legacy endpoints catalog stored on connector_templates.endpoints_json.
+   *
+   * IMPORTANT: This exists only for admin transparency/debugging. Runtime execution must use
+   * connector_template_actions (row table) exclusively.
+   */
+  async getLegacyEndpointsJsonByTemplateId(templateId: string): Promise<unknown[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(templateId || '').trim();
+        if (!id) throw new Error('templateId is required');
+
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ endpoints_json?: unknown }>(
+          `SELECT endpoints_json FROM connector_templates WHERE id = $1`,
+          [id]
+        );
+        const raw = row?.endpoints_json;
+        return Array.isArray(raw) ? raw : [];
+      },
+      'getLegacyEndpointsJsonByTemplateId',
+      'ConnectorTemplate',
+      templateId
+    );
+  }
+
+  /**
    * IMPORTANT:
    * node-postgres serializes JavaScript arrays as PostgreSQL array literals (e.g. {"a","b"}).
    * When the destination column is JSONB, that encoding is NOT valid JSON (JSON arrays are ["a","b"]).
    *
-   * This is why updates to connector_templates.endpoints_json (and variables_json when non-empty)
+   * This is why updates to connector_templates.variables_json (when non-empty)
    * can fail with: `invalid input syntax for type json` / `Expected ":", but found ",".`
    *
    * To ensure JSONB columns always receive valid JSON, we explicitly JSON.stringify any object/array
@@ -32,7 +58,13 @@ export class ConnectorTemplateRepository extends BaseRepository {
 
   private normalizeJsonbColumns(dbRecord: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = { ...dbRecord };
-    const jsonbColumns = ['auth_json', 'variables_json', 'endpoints_json', 'rate_limit_json', 'metadata_schema_json'] as const;
+    const jsonbColumns = [
+      'auth_json',
+      'variables_json',
+      'rate_limit_json',
+      'metadata_schema_json',
+      'webhooks_json',
+    ] as const;
     for (const col of jsonbColumns) {
       if (col in out) {
         out[col] = this.normalizeJsonbUpdateValue(out[col]);
@@ -143,7 +175,6 @@ export class ConnectorTemplateRepository extends BaseRepository {
           baseUrl: data.baseUrl,
           authJson: data.auth as ConnectorAuthV2,
           variablesJson: (data.variables as ConnectorTemplateRuntimeFieldsV2['variables']) ?? undefined,
-          endpointsJson: (data.endpoints as ConnectorEndpointV2[]) ?? [],
           rateLimitJson: (data.rateLimit as ConnectorTemplateRuntimeFieldsV2['rateLimit']) ?? undefined,
           metadataSchemaJson: (data.metadataSchema as JsonSchemaObject | undefined) ?? undefined,
           version: data.version || '1.0.0',
@@ -180,7 +211,6 @@ export class ConnectorTemplateRepository extends BaseRepository {
         | 'baseUrl'
         | 'authJson'
         | 'variablesJson'
-        | 'endpointsJson'
         | 'rateLimitJson'
         | 'metadataSchemaJson'
       >

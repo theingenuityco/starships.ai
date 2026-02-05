@@ -64,14 +64,19 @@ describe('PUT /messages/:messageId streaming', () => {
   });
 
   it('broadcasts a message.append update when a message is linked to a thread', async () => {
+    // Must satisfy IdSchema: 10-30 chars, alnum + _/-
+    const messageId = 'msg_1234567';
+    const parentConversationId = 'parentconv12';
+    const childConversationId = 'childconv123';
+
     updateMessageMock.mockResolvedValue({
-      id: 'msg-1',
+      id: messageId,
       role: 'user',
       content: 'hello',
       messageType: 'user_input',
-      conversationId: 'parent-conv-1',
+      conversationId: parentConversationId,
       userId: 'user-a',
-      linkedConversationId: 'child-conv-1',
+      linkedConversationId: childConversationId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -83,21 +88,21 @@ describe('PUT /messages/:messageId streaming', () => {
     const server = app.listen(0);
     const port = (server.address() as any).port as number;
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/v1/messages/msg-1`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/v1/messages/${messageId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ linkedConversationId: 'child-conv-1' }),
+        body: JSON.stringify({ linkedConversationId: childConversationId }),
       });
 
       expect(res.status).toBe(200);
       expect(publishMock).toHaveBeenCalledTimes(1);
-      expect(publishMock).toHaveBeenCalledWith('parent-conv-1', {
+      expect(publishMock).toHaveBeenCalledWith(parentConversationId, {
         type: 'message.append',
         data: {
-          conversationId: 'parent-conv-1',
+          conversationId: parentConversationId,
           message: expect.objectContaining({
-            id: 'msg-1',
-            linkedConversationId: 'child-conv-1',
+            id: messageId,
+            linkedConversationId: childConversationId,
           }),
         },
       });

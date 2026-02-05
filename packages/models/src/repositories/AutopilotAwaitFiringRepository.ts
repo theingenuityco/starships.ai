@@ -88,8 +88,9 @@ export class AutopilotAwaitFiringRepository extends BaseRepository {
         const entity = toEntityInstance(AutopilotAwaitFiringEntity, updates as unknown as Record<string, unknown>);
         const dbFormat = toDatabase(entity);
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _id, created_at: _createdAt, ...filtered } = dbFormat as any;
+        const { id: _id, created_at: _createdAt, ...filtered } = dbFormat;
+        void _id;
+        void _createdAt;
         if (Object.keys(filtered).length === 0) {
           return await this.findById(id);
         }

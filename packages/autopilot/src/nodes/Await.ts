@@ -22,6 +22,7 @@ export class Await extends BaseNode<AwaitParams> {
   }
 
   async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    void _input;
     const params = this.getParams();
     const execution = this.getOptions()?.execution;
     if (!execution) {

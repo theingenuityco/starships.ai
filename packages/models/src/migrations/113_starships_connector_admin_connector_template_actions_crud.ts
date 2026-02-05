@@ -219,7 +219,11 @@ export async function down(client: DbClient): Promise<void> {
 
     const row = rows[0];
     const endpoints: Endpoint[] = Array.isArray(row.endpoints_json) ? (row.endpoints_json as Endpoint[]) : [];
-    const nextEndpoints = endpoints.filter((e) => !ENDPOINT_NAMES.includes(e?.name as any));
+    const endpointNameSet = new Set<string>(ENDPOINT_NAMES);
+    const nextEndpoints = endpoints.filter((e) => {
+      if (typeof e?.name !== 'string') return true;
+      return !endpointNameSet.has(e.name);
+    });
 
     await client.query(`UPDATE connector_templates SET endpoints_json = $1::jsonb WHERE id = $2;`, [JSON.stringify(nextEndpoints), row.id]);
 

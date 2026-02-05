@@ -29,9 +29,15 @@ function toAction(row: ActionRow): ConnectorEndpointV2 {
   if (row.base_url_override) action.baseUrlOverride = row.base_url_override;
   if (typeof row.timeout_ms === 'number') action.timeoutMs = row.timeout_ms;
   if (row.request_style) action.requestStyle = row.request_style as RequestStyle;
-  if (row.parameters_json && typeof row.parameters_json === 'object') action.parameters = row.parameters_json as any;
-  if (row.mapping_json && typeof row.mapping_json === 'object') action.mapping = row.mapping_json as any;
-  if (row.response_json && typeof row.response_json === 'object') action.response = row.response_json as any;
+  if (row.parameters_json && typeof row.parameters_json === 'object' && !Array.isArray(row.parameters_json)) {
+    action.parameters = row.parameters_json as ConnectorEndpointV2['parameters'];
+  }
+  if (row.mapping_json && typeof row.mapping_json === 'object' && !Array.isArray(row.mapping_json)) {
+    action.mapping = row.mapping_json as ConnectorEndpointV2['mapping'];
+  }
+  if (row.response_json && typeof row.response_json === 'object' && !Array.isArray(row.response_json)) {
+    action.response = row.response_json as ConnectorEndpointV2['response'];
+  }
   return action;
 }
 

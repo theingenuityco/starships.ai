@@ -376,13 +376,6 @@ export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  /**
-   * Legacy action catalog stored on connector_templates.endpoints_json.
-   *
-   * This is NOT used for runtime execution. It exists to support manual migration
-   * into the row-based action catalog (connector_template_actions).
-   */
-  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -428,11 +421,6 @@ export interface UpdateConnectorTemplateRequest {
   baseUrl?: string;
   auth?: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  /**
-   * Legacy endpoints_json payload (not used by runtime).
-   * Managed in admin UI as a raw JSON array field.
-   */
-  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -457,13 +445,6 @@ export interface CreateConnectorTemplateRequest {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  /**
-   * Optional bootstrap action catalog for creation/import convenience.
-   *
-   * Source of truth is the row table `connector_template_actions`.
-   * Most callers should manage actions via the dedicated admin actions endpoints.
-   */
-  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -497,12 +478,12 @@ export interface AdminConnectorTemplateActionResponse {
 }
 
 export interface UpsertConnectorTemplateActionRequest {
-  endpoint: ConnectorEndpointV2;
+  action: ConnectorEndpointV2;
   ordinal?: number;
 }
 
 export interface BulkReplaceConnectorTemplateActionsRequest {
-  endpoints: ConnectorEndpointV2[];
+  actions: ConnectorEndpointV2[];
 }
 
 export interface ConnectWithApiKeyRequest {

@@ -16,7 +16,6 @@ import {
   useAdminConnectorTemplateActions,
   useBulkReplaceAdminConnectorTemplateActions,
   useDeleteAdminConnectorTemplateAction,
-  useMigrateAdminConnectorTemplateActionsFromLegacy,
   useUpdateAdminConnectorTemplate,
   useUpsertAdminConnectorTemplateAction,
 } from '@/hooks/useAdminConnectorTemplates'
@@ -89,7 +88,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   const upsertActionMutation = useUpsertAdminConnectorTemplateAction()
   const deleteActionMutation = useDeleteAdminConnectorTemplateAction()
   const bulkReplaceMutation = useBulkReplaceAdminConnectorTemplateActions()
-  const migrateLegacyMutation = useMigrateAdminConnectorTemplateActionsFromLegacy()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -100,7 +98,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const [baseUrl, setBaseUrl] = useState('')
   const [authText, setAuthText] = useState('')
-  const [endpointsText, setEndpointsText] = useState('')
   const [variablesText, setVariablesText] = useState('')
   const [rateLimitText, setRateLimitText] = useState('')
   const [metadataSchemaText, setMetadataSchemaText] = useState('')
@@ -108,7 +105,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   // Actions UI state
   const [actionsQuery, setActionsQuery] = useState('')
   const [selectedActionName, setSelectedActionName] = useState<string | null>(null)
-  const [bulkEndpointsText, setBulkEndpointsText] = useState('')
+  const [bulkActionsText, setBulkActionsText] = useState('')
   const [showBulkReplace, setShowBulkReplace] = useState(false)
   const [actionDraft, setActionDraft] = useState<Partial<ConnectorEndpointV2> | null>(null)
   const [actionParametersText, setActionParametersText] = useState('')
@@ -151,7 +148,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
     setBaseUrl(connector.baseUrl || '')
     setAuthText(formatJson(connector.auth || { type: 'none' }))
-    setEndpointsText(formatJson((connector as any).endpoints || []))
     setVariablesText(formatJson(connector.variables || []))
     setRateLimitText(formatJson(connector.rateLimit || undefined))
     setMetadataSchemaText(formatJson(connector.metadataSchema || undefined))
@@ -177,14 +173,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const authTypeBadge = (authType || 'none') as string
   const hasActions = Boolean(actionsResp?.actions?.length)
-  const legacyEndpointsCount = useMemo(() => {
-    try {
-      const parsed = parseOptionalJson(endpointsText)
-      return Array.isArray(parsed) ? parsed.length : 0
-    } catch {
-      return 0
-    }
-  }, [endpointsText])
 
   const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
   const REQUEST_STYLES: RequestStyle[] = ['auto', 'query', 'json', 'form', 'multipart']
@@ -263,27 +251,17 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                 Back
               </Button>
               <div className="flex items-center gap-2">
-                {!hasActions && legacyEndpointsCount > 0 ? (
-                  <Badge variant="secondary" className="hidden sm:inline-flex">
-                    Legacy endpoints present — migrate to actions
-                  </Badge>
-                ) : null}
                 <Button
                   onClick={async () => {
                     if (!id) return
                     try {
                       const auth = parseOptionalJson(authText) as any
-                      const endpoints = parseOptionalJson(endpointsText) as any
                       const variables = parseOptionalJson(variablesText) as any
                       const rateLimit = parseOptionalJson(rateLimitText) as any
                       const metadataSchema = parseOptionalJson(metadataSchemaText) as any
 
                       if (auth !== undefined && (auth === null || typeof auth !== 'object' || Array.isArray(auth))) {
                         toast.error('auth must be a JSON object')
-                        return
-                      }
-                      if (endpoints !== undefined && !Array.isArray(endpoints)) {
-                        toast.error('endpoints must be a JSON array')
                         return
                       }
                       if (variables !== undefined && !Array.isArray(variables)) {
@@ -309,7 +287,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                           category,
                           baseUrl,
                           auth: auth === undefined ? undefined : (auth as any),
-                          endpoints: endpoints === undefined ? undefined : (endpoints as any),
                           variables: variables === undefined ? undefined : (variables as any),
                           rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
                           metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
@@ -624,17 +601,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
-                          onClick={async () => {
-                            if (!id) return
-                            if (!confirm('Migrate legacy endpoints_json into the new actions table? This will REPLACE all existing actions.')) return
-                            await migrateLegacyMutation.mutateAsync({ id })
-                          }}
-                          disabled={migrateLegacyMutation.isPending || !endpointsText.trim()}
-                        >
-                          {migrateLegacyMutation.isPending ? 'Migrating…' : 'Migrate legacy → actions'}
-                        </Button>
-                        <Button
-                          variant="outline"
                           onClick={() => setShowBulkReplace(v => !v)}
                           disabled={bulkReplaceMutation.isPending}
                         >
@@ -646,14 +612,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Search</label>
                       <Input value={actionsQuery} onChange={e => setActionsQuery(e.target.value)} placeholder="Search by name, path, description" />
-                    </div>
-
-                    <div className="space-y-2 pt-2 border-t border-border/60">
-                      <label className="text-sm font-medium">endpoints_json (legacy JSON array)</label>
-                      <div className="text-xs text-muted-foreground">
-                        Legacy storage only. Runtime does not use it. Use “Migrate legacy → actions” to populate the new table.
-                      </div>
-                      <Textarea value={endpointsText} onChange={e => setEndpointsText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch h-[65vh] lg:h-[70vh] min-h-0 overflow-hidden">
@@ -897,7 +855,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                 await upsertActionMutation.mutateAsync({
                                   id,
                                   actionName: selectedActionName,
-                                  payload: { endpoint },
+                                  payload: { action: endpoint },
                                 })
                               } catch (e: any) {
                                 toast.error('Failed to save action', { description: e?.message || 'Please verify fields.' })
@@ -913,10 +871,10 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
                     {showBulkReplace ? (
                       <div className="space-y-2 pt-2 border-t border-border/60">
-                        <label className="text-sm font-medium">Bulk replace actions (JSON array of endpoints)</label>
+                        <label className="text-sm font-medium">Bulk replace actions (JSON array)</label>
                         <Textarea
-                          value={bulkEndpointsText}
-                          onChange={e => setBulkEndpointsText(e.target.value)}
+                          value={bulkActionsText}
+                          onChange={e => setBulkActionsText(e.target.value)}
                           className="min-h-[220px] font-mono text-xs"
                           spellCheck={false}
                           placeholder='[ { "name": "list-tools", "method": "GET", "path": "/tools" } ]'
@@ -924,7 +882,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="outline"
-                            onClick={() => setBulkEndpointsText('')}
+                            onClick={() => setBulkActionsText('')}
                             disabled={bulkReplaceMutation.isPending}
                           >
                             Clear
@@ -933,17 +891,17 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                             onClick={async () => {
                               if (!id) return
                               try {
-                                const parsed = parseOptionalJson(bulkEndpointsText)
+                                const parsed = parseOptionalJson(bulkActionsText)
                                 if (!Array.isArray(parsed)) {
                                   toast.error('Bulk replace payload must be a JSON array')
                                   return
                                 }
-                                await bulkReplaceMutation.mutateAsync({ id, payload: { endpoints: parsed as any } })
+                                await bulkReplaceMutation.mutateAsync({ id, payload: { actions: parsed as any } })
                               } catch (e: any) {
                                 toast.error('Invalid JSON', { description: e?.message || 'Please fix JSON.' })
                               }
                             }}
-                            disabled={bulkReplaceMutation.isPending || !bulkEndpointsText.trim()}
+                            disabled={bulkReplaceMutation.isPending || !bulkActionsText.trim()}
                           >
                             {bulkReplaceMutation.isPending ? 'Replacing…' : 'Replace all actions'}
                           </Button>

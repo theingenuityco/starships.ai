@@ -81,7 +81,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
 
   const [baseUrl, setBaseUrl] = useState('')
   const [authText, setAuthText] = useState(formatJson(defaultAuthForType('oauth2')))
-  const [endpointsText, setEndpointsText] = useState(formatJson([]))
   const [variablesText, setVariablesText] = useState(formatJson([]))
   const [rateLimitText, setRateLimitText] = useState('')
   const [metadataSchemaText, setMetadataSchemaText] = useState('')
@@ -169,7 +168,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                 onClick={async () => {
                   try {
                     const auth = parseOptionalJson(authText) as any
-                    const endpoints = parseOptionalJson(endpointsText) as any
                     const variables = parseOptionalJson(variablesText) as any
                     const rateLimit = parseOptionalJson(rateLimitText) as any
                     const metadataSchema = parseOptionalJson(metadataSchemaText) as any
@@ -193,10 +191,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
 
                     if (auth === undefined || auth === null || typeof auth !== 'object' || Array.isArray(auth)) {
                       toast.error('auth must be a JSON object')
-                      return
-                    }
-                    if (endpoints !== undefined && !Array.isArray(endpoints)) {
-                      toast.error('endpoints must be a JSON array')
                       return
                     }
                     if (variables !== undefined && !Array.isArray(variables)) {
@@ -223,7 +217,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                       category: category.trim() || undefined,
                       baseUrl: baseUrl.trim(),
                       auth: auth as any,
-                      endpoints: endpoints === undefined ? undefined : (endpoints as any),
                       variables: variables === undefined ? undefined : (variables as any),
                       rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
                       metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
@@ -309,13 +302,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">auth (JSON) *</label>
                   <Textarea value={authText} onChange={e => setAuthText(e.target.value)} className="min-h-[240px] font-mono text-xs" spellCheck={false} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">endpoints_json (legacy JSON array)</label>
-                  <div className="text-xs text-muted-foreground">
-                    Optional. This is stored on `connector_templates.endpoints_json` for manual migration into the new action rows table.
-                  </div>
-                  <Textarea value={endpointsText} onChange={e => setEndpointsText(e.target.value)} className="min-h-[240px] font-mono text-xs" spellCheck={false} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">variables (JSON array)</label>

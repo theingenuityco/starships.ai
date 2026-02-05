@@ -7,6 +7,7 @@ export { MessageRepository } from './MessageRepository';
 export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { ConnectorTemplateRepository } from './ConnectorTemplateRepository';
+export { ConnectorTemplateActionRepository } from './ConnectorTemplateActionRepository';
 export { ConnectorRepository } from './ConnectorRepository';
 export { ConnectorEventRepository } from './ConnectorEventRepository';
 export { ConnectorWebhookBindingRepository } from './ConnectorWebhookBindingRepository';

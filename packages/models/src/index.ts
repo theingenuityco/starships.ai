@@ -52,6 +52,7 @@ export { ConversationRepository } from './repositories/ConversationRepository';
 export { ConnectorSecretRepository } from './repositories/ConnectorSecretRepository';
 export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { ConnectorTemplateRepository } from './repositories/ConnectorTemplateRepository';
+export { ConnectorTemplateActionRepository } from './repositories/ConnectorTemplateActionRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { ConnectorEventRepository } from './repositories/ConnectorEventRepository';
 export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebhookBindingRepository';

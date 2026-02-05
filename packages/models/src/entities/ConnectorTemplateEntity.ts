@@ -2,7 +2,6 @@ import { Expose } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
-  IsArray,
   IsObject,
   IsOptional,
   IsString,
@@ -16,7 +15,6 @@ import {
 import type {
   ConnectorAuthTypeV2,
   ConnectorAuthV2,
-  ConnectorEndpointV2,
   ConnectorProvider,
   ConnectorTemplateRuntimeFieldsV2,
   JsonSchemaObject,
@@ -77,12 +75,10 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsOptional()
-  @IsArray()
+  // Stored as JSONB array. We intentionally validate shape at higher layers.
+  // This is not the action catalog (which lives in connector_template_actions).
+  // See migration 112_create_connector_template_actions.
   variablesJson?: NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']>;
-
-  @Expose()
-  @IsArray()
-  endpointsJson!: ConnectorEndpointV2[];
 
   @Expose()
   @IsOptional()
@@ -153,7 +149,6 @@ export class ConnectorTemplateEntity {
       baseUrl: (dataRecord.baseUrl as string) || '',
       authJson: (dataRecord.authJson as ConnectorAuthV2) || ({ type: 'none' } as ConnectorAuthV2),
       variablesJson: dataRecord.variablesJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']> | undefined,
-      endpointsJson: (dataRecord.endpointsJson as ConnectorEndpointV2[]) || [],
       rateLimitJson: dataRecord.rateLimitJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['rateLimit']> | undefined,
       metadataSchemaJson: dataRecord.metadataSchemaJson as JsonSchemaObject | undefined,
       webhooksJson: dataRecord.webhooksJson as Record<string, unknown> | undefined,

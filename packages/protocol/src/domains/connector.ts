@@ -319,7 +319,6 @@ export interface ConnectorTemplateRuntimePublicModel {
 
   // runtime fields
   baseUrl: string;
-  endpoints: ConnectorEndpointV2[];
 }
 
 export interface ConnectorListResponse {
@@ -377,7 +376,6 @@ export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -423,7 +421,6 @@ export interface UpdateConnectorTemplateRequest {
   baseUrl?: string;
   auth?: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -448,9 +445,52 @@ export interface CreateConnectorTemplateRequest {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints: ConnectorEndpointV2[];
+  /**
+   * Optional bootstrap action catalog for creation/import convenience.
+   *
+   * Source of truth is the row table `connector_template_actions`.
+   * Most callers should manage actions via the dedicated admin actions endpoints.
+   */
+  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
+}
+
+// ============================================================================
+// ADMIN (INSTANCE ADMIN ONLY) - CONNECTOR TEMPLATE ACTION CATALOG
+// ============================================================================
+
+export interface ConnectorTemplateActionSummary {
+  templateId: string;
+  actionName: string;
+  ordinal: number;
+  method: HttpMethod;
+  path: string;
+  description?: string;
+  baseUrlOverride?: string;
+  timeoutMs?: number;
+  requestStyle?: RequestStyle;
+  updatedAt: string;
+}
+
+export interface AdminConnectorTemplateActionsListResponse {
+  actions: ConnectorTemplateActionSummary[];
+  limit: number;
+  offset: number;
+  q?: string;
+}
+
+export interface AdminConnectorTemplateActionResponse {
+  action: ConnectorEndpointV2;
+}
+
+export interface UpsertConnectorTemplateActionRequest {
+  endpoint: ConnectorEndpointV2;
+  ordinal?: number;
+}
+
+export interface BulkReplaceConnectorTemplateActionsRequest {
+  endpoints: ConnectorEndpointV2[];
 }
 
 export interface ConnectWithApiKeyRequest {

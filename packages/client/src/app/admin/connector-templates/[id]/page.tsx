@@ -14,6 +14,7 @@ import {
   useAdminConnectorTemplate,
   useAdminConnectorTemplateAction,
   useAdminConnectorTemplateActions,
+  useAdminConnectorTemplateLegacyEndpoints,
   useBulkReplaceAdminConnectorTemplateActions,
   useDeleteAdminConnectorTemplateAction,
   useUpdateAdminConnectorTemplate,
@@ -118,6 +119,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
     selectedActionName,
     isAuthenticated && isInstanceAdmin && !!selectedActionName
   )
+  const { data: legacyEndpoints } = useAdminConnectorTemplateLegacyEndpoints(id, isAuthenticated && isInstanceAdmin)
 
   const provider = connector?.provider
   const slug = connector?.slug
@@ -908,6 +910,19 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         </div>
                       </div>
                     ) : null}
+
+                    <div className="space-y-2 pt-2 border-t border-border/60 opacity-60">
+                      <label className="text-sm font-medium">LEGACY_endpoints (read-only)</label>
+                      <div className="text-xs text-muted-foreground">
+                        This is the raw legacy `connector_templates.endpoints_json` value. It is not used by runtime and cannot be edited here.
+                      </div>
+                      <Textarea
+                        value={formatJson({ LEGACY_endpoints: legacyEndpoints ?? [] })}
+                        readOnly
+                        className="min-h-[180px] font-mono text-xs"
+                        spellCheck={false}
+                      />
+                    </div>
                   </div>
 
                   {/* Advanced */}

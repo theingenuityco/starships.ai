@@ -557,6 +557,10 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const awaitRequested = (stream as any)?.awaitRequested as
+    | { at: string; nodeRef: string; kind: 'connector_event'; spec: Record<string, unknown> }
+    | null
+    | undefined
   const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
   const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
@@ -2050,6 +2054,33 @@ export function ConversationMessageList({
             )}
 
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
+            {/* Await banner: show when workflow paused waiting for external event */}
+            {Boolean(isAwaitingToolResults && awaitRequested && awaitRequested.kind === 'connector_event') && (
+              <div className={cn('flex justify-start w-full', sizeVariant === 'delegation' ? 'mt-2' : 'mt-4')}>
+                <div className="group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2 py-1.5">
+                  <div className="flex-shrink-0 mt-1 w-10 h-10 flex items-center justify-center rounded-full bg-muted/60">
+                    <Icon name="clock" className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="text-sm font-bold text-foreground">Waiting for connector event</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">
+                      {(() => {
+                        const spec = awaitRequested?.spec ?? {}
+                        const provider = typeof (spec as any)?.provider === 'string' ? String((spec as any).provider) : ''
+                        const connectorId = typeof (spec as any)?.connectorId === 'string' ? String((spec as any).connectorId) : ''
+                        const eventTypesRaw = (spec as any)?.eventTypes
+                        const eventTypes = Array.isArray(eventTypesRaw) ? eventTypesRaw.map((x: any) => String(x)).filter(Boolean) : []
+                        const parts: string[] = []
+                        if (provider) parts.push(`provider=${provider}`)
+                        if (connectorId) parts.push(`connectorId=${connectorId}`)
+                        if (eventTypes.length > 0) parts.push(`eventTypes=${eventTypes.join(',')}`)
+                        return parts.length > 0 ? parts.join(' • ') : 'Waiting for any connector event...'
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {shouldShowGapLoader && (
               <div className={cn('flex justify-start w-full', sizeVariant === 'delegation' ? 'mt-2' : 'mt-4')}>
                 {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (

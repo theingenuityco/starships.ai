@@ -1,4 +1,5 @@
 import type { MessageModel } from '../domains/message';
+import type { AutopilotAwaitConnectorEventSpec } from '../domains/autopilot-await';
 
 export type TurnStatus = 'active' | 'waiting_for_tools' | 'completed' | 'failed' | 'cancelled';
 
@@ -109,6 +110,19 @@ export type ConversationStreamTurnUsage = {
 };
 
 // ----------------------------------------------------------------------------
+// Await (server → client execution coordination over SSE)
+// ----------------------------------------------------------------------------
+
+export type ConversationStreamAwaitRequested = {
+  conversationId: string;
+  turnId: string;
+  at: string;
+  nodeRef: string;
+  kind: 'connector_event';
+  spec: AutopilotAwaitConnectorEventSpec;
+};
+
+// ----------------------------------------------------------------------------
 // UI Actions (server → client hints over SSE)
 // ----------------------------------------------------------------------------
 
@@ -179,6 +193,7 @@ export type ConversationStreamEvent =
   | { type: 'turn.started'; data: ConversationStreamTurnStarted }
   | { type: 'turn.status'; data: ConversationStreamTurnStatus }
   | { type: 'turn.usage'; data: ConversationStreamTurnUsage }
+  | { type: 'await_requested'; data: ConversationStreamAwaitRequested }
   | { type: 'assistant.delta'; data: ConversationStreamAssistantDelta }
   | { type: 'assistant.reasoning_delta'; data: ConversationStreamAssistantReasoningDelta }
   | { type: 'message.append'; data: ConversationStreamMessageAppend }

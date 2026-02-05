@@ -3352,6 +3352,7 @@ export class ConversationService {
       event.type === 'workflow_failed' ||
       event.type === 'workflow_paused' ||
       event.type === 'workflow_resumed' ||
+      event.type === 'await_requested' ||
       event.type === 'node_started' ||
       event.type === 'node_completed' ||
       event.type === 'node_failed'
@@ -3364,6 +3365,38 @@ export class ConversationService {
     }
 
     switch (event.type) {
+      case 'await_requested': {
+        try {
+          const anyEvt = event as unknown as { data?: { nodeRef?: unknown; kind?: unknown; spec?: unknown } };
+          const nodeRef = typeof anyEvt?.data?.nodeRef === 'string' ? anyEvt.data.nodeRef.trim() : '';
+          const kind = typeof anyEvt?.data?.kind === 'string' ? anyEvt.data.kind.trim() : '';
+          const spec =
+            anyEvt?.data?.spec && typeof anyEvt.data.spec === 'object' && !Array.isArray(anyEvt.data.spec)
+              ? (anyEvt.data.spec as Record<string, unknown>)
+              : null;
+
+          if (!nodeRef || kind !== 'connector_event' || !spec) {
+            break;
+          }
+
+          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+          const at = new Date().toISOString();
+          await this.streamBus.publish(conversationId, {
+            type: 'await_requested',
+            data: {
+              conversationId,
+              turnId,
+              at,
+              nodeRef,
+              kind: 'connector_event',
+              spec,
+            },
+          });
+        } catch {
+          // best-effort only
+        }
+        break;
+      }
       case 'ui_action': {
         try {
           const anyEvt = event as unknown as { data?: { action?: unknown; payload?: unknown } };

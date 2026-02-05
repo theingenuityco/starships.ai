@@ -105,4 +105,3 @@ export class AutopilotAwaitEntity implements AutopilotAwaitModel {
 }
 
 export default AutopilotAwaitEntity;
-

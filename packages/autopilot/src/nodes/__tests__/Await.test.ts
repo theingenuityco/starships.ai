@@ -13,10 +13,10 @@ describe('Await Node', () => {
       void event;
     });
 
-    const node = new Await(
-      { kind: 'connector_event', spec: { provider: 'slack', eventTypes: ['message.created'] } },
-      { execution: exec, eventCallback } as unknown as NodeHandlerOptions
-    );
+    const node = new Await({ kind: 'connector_event', spec: { provider: 'slack', eventTypes: ['message.created'] } }, {
+      execution: exec,
+      eventCallback,
+    } as unknown as NodeHandlerOptions);
 
     const out = await node.execute(ExecutionItemUtils.wrapSingle({}));
     expect(exec.status).toBe('paused');
@@ -39,4 +39,3 @@ describe('Await Node', () => {
     expect(v.valid).toBe(true);
   });
 });
-

@@ -155,4 +155,3 @@ export class ConnectorEventRepository extends BaseRepository {
 }
 
 export default ConnectorEventRepository;
-

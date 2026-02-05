@@ -92,4 +92,3 @@ export class Await extends BaseNode<AwaitParams> {
     return { valid: errors.length === 0, ...(errors.length > 0 ? { errors } : null) };
   }
 }
-

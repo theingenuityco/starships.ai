@@ -96,4 +96,3 @@ export class AutopilotAwaitFiringEntity implements AutopilotAwaitFiringModel {
 }
 
 export default AutopilotAwaitFiringEntity;
-

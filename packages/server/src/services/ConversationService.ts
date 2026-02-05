@@ -1297,6 +1297,94 @@ export class ConversationService {
   }
 
   /**
+   * Provider safety: ensure every assistant tool call has a corresponding tool result.
+   *
+   * Root issue:
+   * - We persist assistant messages with `toolCalls` as soon as the provider emits them.
+   * - If the process crashes / is cancelled / stops mid-turn, tool execution may never persist a matching
+   *   `role='tool'` message with `toolCallId`.
+   * - Most providers require a tool_result immediately after a tool_use/tool_call; otherwise they reject
+   *   subsequent requests ("expected tool result after tool call").
+   *
+   * Strategy:
+   * - Build a map of toolCallId -> latest tool message.
+   * - Rebuild the message list without any tool messages.
+   * - After each assistant message that includes toolCalls, inject the corresponding tool message if present,
+   *   otherwise inject a small synthetic error tool result.
+   *
+   * This is intentionally in-memory only (no DB writes) and is used only for LLM context construction.
+   */
+  private normalizeToolCallHistory(messages: LlmMessage[]): LlmMessage[] {
+    const list = Array.isArray(messages) ? messages : [];
+    if (list.length === 0) return [];
+
+    const toolResultById = new Map<string, LlmMessage>();
+    for (const m of list) {
+      if (!m || typeof m !== 'object') continue;
+      if (m.role !== 'tool') continue;
+      const idRaw = (m as unknown as { toolCallId?: unknown }).toolCallId;
+      const toolCallId = typeof idRaw === 'string' ? idRaw.trim() : '';
+      if (!toolCallId) continue;
+      // Keep the last-seen tool result for this id (best-effort: later rows may be "final" after approval).
+      toolResultById.set(toolCallId, m);
+    }
+
+    const out: LlmMessage[] = [];
+    for (const m of list) {
+      if (!m || typeof m !== 'object') continue;
+
+      // We will re-inject tool results immediately after their tool_calls.
+      if (m.role === 'tool') continue;
+
+      out.push(m);
+
+      if (m.role === 'assistant' && Array.isArray((m as unknown as { toolCalls?: unknown[] }).toolCalls)) {
+        const toolCalls = (m as unknown as { toolCalls?: unknown[] }).toolCalls as unknown[];
+        if (toolCalls.length === 0) continue;
+
+        for (const tc of toolCalls) {
+          if (!tc || typeof tc !== 'object') continue;
+          const rec = tc as Record<string, unknown>;
+          const idRaw = rec.id;
+          const toolCallId = typeof idRaw === 'string' ? idRaw.trim() : '';
+          if (!toolCallId) continue;
+
+          const existing = toolResultById.get(toolCallId);
+          if (existing) {
+            out.push(existing);
+            continue;
+          }
+
+          const toolName =
+            rec.function && typeof rec.function === 'object' && typeof (rec.function as Record<string, unknown>).name === 'string'
+              ? String((rec.function as Record<string, unknown>).name).trim()
+              : undefined;
+
+          // Synthetic tool_result so providers accept subsequent turns.
+          const syntheticPayload = {
+            success: false,
+            error: {
+              code: 'TOOL_RESULT_MISSING',
+              message:
+                'Tool call was persisted but no tool result exists (previous turn likely crashed, was cancelled, or stopped before tool execution completed). Retry the tool call if needed.',
+              toolCallId,
+              ...(toolName ? { toolName } : {}),
+            },
+          };
+
+          out.push({
+            role: 'tool',
+            toolCallId,
+            content: JSON.stringify(syntheticPayload),
+          } as LlmMessage);
+        }
+      }
+    }
+
+    return out;
+  }
+
+  /**
    * Delete a conversation and cleanup all associated S3 files
    */
   async deleteConversation(conversationId: string): Promise<boolean> {
@@ -2341,9 +2429,10 @@ export class ConversationService {
             return baseMessage;
           })
         );
+        const llmMessagesCoreNormalized = this.normalizeToolCallHistory(llmMessagesCore);
         const llmMessages: LlmMessage[] = hasMoreBefore
-          ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
-          : llmMessagesCore;
+          ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCoreNormalized]
+          : llmMessagesCoreNormalized;
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
@@ -2672,9 +2761,10 @@ export class ConversationService {
           return baseMessage;
         })
       );
+      const llmMessagesCoreNormalized = this.normalizeToolCallHistory(llmMessagesCore);
       const llmMessages: LlmMessage[] = page.hasMoreBefore
-        ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
-        : llmMessagesCore;
+        ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCoreNormalized]
+        : llmMessagesCoreNormalized;
 
       const env = getEnvConfig();
 

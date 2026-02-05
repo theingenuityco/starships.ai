@@ -3,6 +3,7 @@
 Goal: Use the dedicated `await` node to pause workflow execution, then resume later when a connector webhook event arrives.
 
 This example is designed to work with the server automation workers:
+
 - `packages/server/src/workers/autopilotAutomationWorker.ts`
 - `packages/server/src/workers/autopilotAutomationResumeWorker.ts`
 
@@ -30,9 +31,7 @@ const blueprint: Blueprint = {
       type: 'mutate',
       name: 'Set state (armed)',
       parameters: {
-        mutations: [
-          { op: 'set', path: 'automation', value: { armedAt: '{{ new Date().toISOString() }}' } },
-        ],
+        mutations: [{ op: 'set', path: 'automation', value: { armedAt: '{{ new Date().toISOString() }}' } }],
       },
     },
     {
@@ -82,6 +81,6 @@ const blueprint: Blueprint = {
 ```
 
 Notes
+
 - For predictable behavior, keep the portion of the graph **between awaits** small and explicit.
 - To make an automation recurring, add another `await` node after handling the event (the resume worker will persist the new paused execution as a new await and complete the previous await/firing).
-

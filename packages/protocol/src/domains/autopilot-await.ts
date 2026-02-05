@@ -25,12 +25,11 @@ export interface AutopilotAwaitConnectorEventSpec {
   eventTypes?: string[];
 }
 
-export type AutopilotAwaitRequest =
-  | {
-      kind: 'connector_event';
-      nodeRef: string;
-      spec: AutopilotAwaitConnectorEventSpec;
-    };
+export type AutopilotAwaitRequest = {
+  kind: 'connector_event';
+  nodeRef: string;
+  spec: AutopilotAwaitConnectorEventSpec;
+};
 
 /**
  * Minimal blueprint JSON structure used for persistence.
@@ -138,4 +137,3 @@ export interface AutopilotAwaitFiringModel {
   createdAt: string;
   updatedAt: string;
 }
-

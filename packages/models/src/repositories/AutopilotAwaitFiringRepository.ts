@@ -126,4 +126,3 @@ export class AutopilotAwaitFiringRepository extends BaseRepository {
 }
 
 export default AutopilotAwaitFiringRepository;
-

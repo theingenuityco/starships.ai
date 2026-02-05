@@ -110,4 +110,3 @@ export class ConnectorEventEntity implements ConnectorEventModel {
 }
 
 export default ConnectorEventEntity;
-

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { Request } from 'express';
-import type { SecretRef } from '@starships/protocol';
+import type { ConnectorProvider, SecretRef } from '@starships/protocol';
 import {
   AutopilotAwaitFiringRepository,
   AutopilotAwaitRepository,
@@ -8,6 +8,7 @@ import {
   ConnectorRepository,
   ConnectorSecretRepository,
   ConnectorTemplateRepository,
+  ConnectorWebhookBindingRepository,
 } from '@starships/models';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { getAutopilotAutomationQueue } from '@/queues/autopilotAutomationQueue';
@@ -23,7 +24,21 @@ type WebhookVerificationConfig =
 
 type WebhookFieldSource = { headerName: string } | { jsonPointer: string } | { value: string };
 
+type ConnectorWebhookRoutingConfig = {
+  /**
+   * Provider-derived identifier that lets the server route to a connector instance.
+   * This should be stable per tenant/installation/workspace/server.
+   */
+  externalAccountId?: WebhookFieldSource;
+  /**
+   * Optional connect-time mapping key: if set, we expect connectors.metadata[fromConnectorMetadataKey]
+   * to contain the externalAccountId, and we upsert a binding row.
+   */
+  fromConnectorMetadataKey?: string;
+};
+
 type ConnectorWebhookTemplateConfig = {
+  routing?: ConnectorWebhookRoutingConfig;
   verification?: WebhookVerificationConfig;
   eventType?: WebhookFieldSource;
   externalEventId?: WebhookFieldSource;
@@ -35,6 +50,76 @@ function safeEqual(a: string, b: string): boolean {
   const bBuf = Buffer.from(b, 'utf8');
   if (aBuf.length !== bBuf.length) return false;
   return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.trim().length > 0;
+}
+
+function parseWebhookFieldSource(v: unknown): WebhookFieldSource | undefined {
+  if (!isRecord(v)) return undefined;
+  const headerName = v.headerName;
+  if (isNonEmptyString(headerName)) return { headerName: headerName.trim() };
+  const jsonPointer = v.jsonPointer;
+  if (isNonEmptyString(jsonPointer)) return { jsonPointer: jsonPointer.trim() };
+  const value = v.value;
+  if (isNonEmptyString(value)) return { value: value.trim() };
+  return undefined;
+}
+
+function parseSecretRef(v: unknown): SecretRef | null {
+  if (!isRecord(v)) return null;
+  const type = v.type;
+  const key = v.key;
+  if (!isNonEmptyString(type) || !isNonEmptyString(key)) return null;
+  // NOTE: SecretRef.type is a union in protocol; keep runtime permissive but require strings.
+  return { type: type.trim() as SecretRef['type'], key: key.trim() };
+}
+
+function parseWebhookVerificationConfig(v: unknown): WebhookVerificationConfig | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!isRecord(v)) return undefined;
+
+  const type = v.type;
+  if (!isNonEmptyString(type)) return undefined;
+  const normalized = type.trim();
+  if (normalized === 'none') return { type: 'none' };
+
+  if (normalized !== 'hmac_sha256_base64' && normalized !== 'hmac_sha256_hex') return undefined;
+  const headerName = v.headerName;
+  const secretRef = parseSecretRef(v.secretRef);
+  if (!isNonEmptyString(headerName) || !secretRef) return undefined;
+
+  return { type: normalized, headerName: headerName.trim(), secretRef };
+}
+
+function parseConnectorWebhookTemplateConfig(raw: unknown): ConnectorWebhookTemplateConfig {
+  if (!isRecord(raw)) return {};
+  const routingRaw = raw.routing;
+  const routing: ConnectorWebhookRoutingConfig | undefined = isRecord(routingRaw)
+    ? {
+        externalAccountId: parseWebhookFieldSource(routingRaw.externalAccountId),
+        fromConnectorMetadataKey: isNonEmptyString(routingRaw.fromConnectorMetadataKey)
+          ? routingRaw.fromConnectorMetadataKey.trim()
+          : undefined,
+      }
+    : undefined;
+
+  const payloadRaw = raw.payload;
+  const payload =
+    isRecord(payloadRaw) && isNonEmptyString(payloadRaw.jsonPointer) ? { jsonPointer: payloadRaw.jsonPointer.trim() } : undefined;
+
+  return {
+    routing,
+    verification: parseWebhookVerificationConfig(raw.verification),
+    eventType: parseWebhookFieldSource(raw.eventType),
+    externalEventId: parseWebhookFieldSource(raw.externalEventId),
+    payload,
+  };
 }
 
 function redactHeaders(headers: Record<string, unknown>): Record<string, unknown> {
@@ -69,9 +154,9 @@ function parseJsonPointer(pointer: string): string[] {
 
 function getByJsonPointer(obj: unknown, pointer: string): unknown {
   const parts = parseJsonPointer(pointer);
-  let cur: any = obj;
+  let cur: unknown = obj;
   for (const part of parts) {
-    if (cur == null) return undefined;
+    if (cur === null || cur === undefined) return undefined;
     if (Array.isArray(cur)) {
       const idx = Number(part);
       if (!Number.isInteger(idx) || idx < 0 || idx >= cur.length) return undefined;
@@ -93,9 +178,9 @@ function coerceString(v: unknown): string {
 
 function resolveField(source: WebhookFieldSource | undefined, req: Request, parsedBody: unknown): string {
   if (!source || typeof source !== 'object') return '';
-  if ('value' in source) return coerceString((source as any).value).trim();
-  if ('headerName' in source) return coerceString(req.get(String((source as any).headerName)) || '').trim();
-  if ('jsonPointer' in source) return coerceString(getByJsonPointer(parsedBody, String((source as any).jsonPointer)) || '').trim();
+  if ('value' in source) return coerceString(source.value).trim();
+  if ('headerName' in source) return coerceString(req.get(source.headerName) || '').trim();
+  if ('jsonPointer' in source) return coerceString(getByJsonPointer(parsedBody, source.jsonPointer) || '').trim();
   return '';
 }
 
@@ -105,13 +190,14 @@ export class ConnectorEventIngestionService {
   private connectorEventRepo = new ConnectorEventRepository();
   private awaitRepo = new AutopilotAwaitRepository();
   private awaitFiringRepo = new AutopilotAwaitFiringRepository();
+  private bindingRepo = new ConnectorWebhookBindingRepository();
   private platformSecrets = new PlatformSecretService();
   private connectorSecrets = new ConnectorSecretRepository();
 
   private async resolveSecret(ref: SecretRef, connectorId: string): Promise<string | null> {
     if (!ref || typeof ref !== 'object') return null;
-    const type = (ref as any).type;
-    const key = String((ref as any).key || '').trim();
+    const type = ref.type;
+    const key = String(ref.key || '').trim();
     if (!key) return null;
 
     if (type === 'platform_secret') {
@@ -155,41 +241,31 @@ export class ConnectorEventIngestionService {
 
   /**
    * Ingest a connector webhook request:
-   * - Resolve connector instance and template
+   * - Resolve connector instance(s) via routing externalAccountId binding
    * - Verify signature (template-driven)
    * - Normalize event_type / external_event_id / payload_json
    * - Persist connector_events (deduped)
    * - Match + enqueue await resumes
    */
-  async ingestConnectorWebhook(args: { provider: string; starshipId: string; req: Request }): Promise<{
-    connectorEventId: string;
+  async ingestConnectorWebhook(args: { provider: string; req: Request }): Promise<{
+    externalAccountId?: string;
+    routedConnectorIds: string[];
+    connectorEventIds: string[];
     matchedAwaitIds: string[];
     enqueuedFiringIds: string[];
   }> {
     const provider = String(args.provider || '').trim();
-    const starshipId = String(args.starshipId || '').trim();
     if (!provider) throw new Error('provider is required');
-    if (!starshipId) throw new Error('starshipId is required');
 
-    // Resolve connector instance
-    const connector = await this.connectorRepo.findByStarshipAndProvider(starshipId, provider);
-    if (!connector) {
-      throw new Error(`No connector instance found for provider "${provider}" on starship "${starshipId}"`);
-    }
-
-    const template = await this.templateRepo.findByProvider(provider as any);
+    const template = await this.templateRepo.findByProvider(provider as unknown as ConnectorProvider);
     if (!template) {
       throw new Error(`No connector template found for provider "${provider}"`);
     }
 
-    const cfgRaw = (template as any).webhooksJson;
-    const cfg: ConnectorWebhookTemplateConfig =
-      cfgRaw && typeof cfgRaw === 'object' && !Array.isArray(cfgRaw) ? (cfgRaw as ConnectorWebhookTemplateConfig) : {};
+    const cfg = parseConnectorWebhookTemplateConfig(template.webhooksJson);
 
     const reqAny = args.req as unknown as { body?: unknown; headers?: unknown };
     const rawBody = Buffer.isBuffer(reqAny.body) ? (reqAny.body as Buffer) : Buffer.from('');
-
-    await this.verifyWebhook(cfg.verification, args.req, rawBody, connector.id);
 
     const rawText = rawBody.toString('utf8');
     let parsedBody: unknown = undefined;
@@ -197,6 +273,25 @@ export class ConnectorEventIngestionService {
       parsedBody = rawText ? JSON.parse(rawText) : {};
     } catch {
       parsedBody = { raw: rawText };
+    }
+
+    const externalAccountId = resolveField(cfg.routing?.externalAccountId, args.req, parsedBody) || '';
+    if (!externalAccountId) {
+      logger.warn('[ConnectorEventIngestion] Missing routing externalAccountId', { provider });
+      return { externalAccountId: undefined, routedConnectorIds: [], connectorEventIds: [], matchedAwaitIds: [], enqueuedFiringIds: [] };
+    }
+
+    // Resolve connector instances (fanout allowed)
+    const routedConnectorIds = await this.bindingRepo.listConnectorIds(provider, externalAccountId);
+    if (!routedConnectorIds.length) {
+      logger.info('[ConnectorEventIngestion] No bindings found for routing key', { provider, externalAccountId });
+      return { externalAccountId, routedConnectorIds: [], connectorEventIds: [], matchedAwaitIds: [], enqueuedFiringIds: [] };
+    }
+
+    const connectors = await this.connectorRepo.findByIds(routedConnectorIds);
+    if (!connectors.length) {
+      logger.warn('[ConnectorEventIngestion] Bindings resolved but connectors missing', { provider, externalAccountId });
+      return { externalAccountId, routedConnectorIds, connectorEventIds: [], matchedAwaitIds: [], enqueuedFiringIds: [] };
     }
 
     const eventType = resolveField(cfg.eventType, args.req, parsedBody) || 'webhook_received';
@@ -211,70 +306,84 @@ export class ConnectorEventIngestionService {
         ? (payloadValue as Record<string, unknown>)
         : { value: payloadValue };
 
-    const headersJson = redactHeaders((reqAny.headers && typeof reqAny.headers === 'object' ? (reqAny.headers as any) : {}) as Record<
-      string,
-      unknown
-    >);
-
-    const event = await this.connectorEventRepo.createOrGetByExternalId({
-      starshipId: connector.starshipId,
-      connectorId: connector.id,
-      provider: connector.provider,
-      eventType,
-      externalEventId,
-      payloadJson,
-      rawPayloadJson: parsedBody && typeof parsedBody === 'object' ? (parsedBody as Record<string, unknown>) : { raw: rawText },
-      headersJson,
-      receivedAt: new Date().toISOString(),
-    });
-
-    // Match awaits and enqueue resume jobs
-    const awaits = await this.awaitRepo.findWaitingMatches({
-      starshipId: connector.starshipId,
-      provider: String(connector.provider),
-      connectorId: connector.id,
-      eventType,
-      limit: 200,
-    });
+    const headersJson = redactHeaders(isRecord(reqAny.headers) ? (reqAny.headers as Record<string, unknown>) : {});
 
     const queue = getAutopilotAutomationQueue();
+    const connectorEventIds: string[] = [];
     const matchedAwaitIds: string[] = [];
     const enqueuedFiringIds: string[] = [];
 
-    for (const a of awaits) {
-      matchedAwaitIds.push(a.id);
-      const firing = await this.awaitFiringRepo.createOrIgnore({ awaitId: a.id, connectorEventId: event.id });
-      if (!firing) continue; // already exists
+    for (const connector of connectors) {
+      // Verify per-connector (secrets may be per-connector).
+      try {
+        await this.verifyWebhook(cfg.verification, args.req, rawBody, connector.id);
+      } catch (err) {
+        logger.warn('[ConnectorEventIngestion] Signature verification failed for routed connector', {
+          provider,
+          externalAccountId,
+          connectorId: connector.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
 
-      enqueuedFiringIds.push(firing.id);
-      await queue.add(
-        'resume-await',
-        { kind: 'resume', awaitFiringId: firing.id },
-        {
-          attempts: 5,
-          backoff: { type: 'exponential', delay: 30_000 },
-          removeOnComplete: true,
-          removeOnFail: false,
-        }
-      );
+      const event = await this.connectorEventRepo.createOrGetByExternalId({
+        starshipId: connector.starshipId,
+        connectorId: connector.id,
+        provider: connector.provider,
+        eventType,
+        externalEventId,
+        payloadJson,
+        rawPayloadJson: parsedBody && typeof parsedBody === 'object' ? (parsedBody as Record<string, unknown>) : { raw: rawText },
+        headersJson,
+        receivedAt: new Date().toISOString(),
+      });
+      connectorEventIds.push(event.id);
+
+      // Match awaits and enqueue resume jobs (per connector)
+      const awaits = await this.awaitRepo.findWaitingMatches({
+        starshipId: connector.starshipId,
+        provider: String(connector.provider),
+        connectorId: connector.id,
+        eventType,
+        limit: 200,
+      });
+
+      for (const a of awaits) {
+        matchedAwaitIds.push(a.id);
+        const firing = await this.awaitFiringRepo.createOrIgnore({ awaitId: a.id, connectorEventId: event.id });
+        if (!firing) continue; // already exists
+
+        enqueuedFiringIds.push(firing.id);
+        await queue.add(
+          'resume-await',
+          { kind: 'resume', awaitFiringId: firing.id },
+          {
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 30_000 },
+            removeOnComplete: true,
+            removeOnFail: false,
+          }
+        );
+      }
     }
 
     try {
       logger.info('[ConnectorEventIngestion] ingested', {
         provider,
-        starshipId,
-        connectorId: connector.id,
+        externalAccountId,
+        routedConnectorIds,
         eventType,
         externalEventId: externalEventId || undefined,
-        connectorEventId: event.id,
-        matchedAwaits: awaits.length,
+        connectorEventIds,
+        matchedAwaits: matchedAwaitIds.length,
         enqueuedFirings: enqueuedFiringIds.length,
       });
     } catch {
       // ignore
     }
 
-    return { connectorEventId: event.id, matchedAwaitIds, enqueuedFiringIds };
+    return { externalAccountId, routedConnectorIds, connectorEventIds, matchedAwaitIds, enqueuedFiringIds };
   }
 }
 

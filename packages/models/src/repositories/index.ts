@@ -9,6 +9,7 @@ export { StarshipRepository } from './StarshipRepository';
 export { ConnectorTemplateRepository } from './ConnectorTemplateRepository';
 export { ConnectorRepository } from './ConnectorRepository';
 export { ConnectorEventRepository } from './ConnectorEventRepository';
+export { ConnectorWebhookBindingRepository } from './ConnectorWebhookBindingRepository';
 export { ToolRepository } from './ToolRepository';
 export { ToolTemplateRepository } from './ToolTemplateRepository';
 export { UsageRepository } from './UsageRepository';

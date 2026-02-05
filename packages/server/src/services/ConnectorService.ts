@@ -17,6 +17,7 @@ import {
   ConnectorSecretRepository,
   StarshipRepository,
   ConnectorTemplateEntity,
+  ConnectorWebhookBindingRepository,
 } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
@@ -38,6 +39,7 @@ export class ConnectorService {
   private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
   private platformSecretService: PlatformSecretService;
+  private connectorWebhookBindingRepository: ConnectorWebhookBindingRepository;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
@@ -46,6 +48,25 @@ export class ConnectorService {
     this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
     this.platformSecretService = new PlatformSecretService();
+    this.connectorWebhookBindingRepository = new ConnectorWebhookBindingRepository();
+  }
+
+  private isRecord(v: unknown): v is Record<string, unknown> {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  private coerceNonEmptyString(v: unknown): string {
+    if (typeof v === 'string') return v.trim();
+    if (v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+
+  private getWebhookBindingMetadataKey(template: ConnectorTemplateEntity): string {
+    const raw = template.webhooksJson;
+    if (!this.isRecord(raw)) return '';
+    const routing = raw.routing;
+    if (!this.isRecord(routing)) return '';
+    return this.coerceNonEmptyString(routing.fromConnectorMetadataKey);
   }
 
   private parseSecretRef(ref: unknown, label: string): SecretRef {
@@ -151,13 +172,18 @@ export class ConnectorService {
         version: template.version,
       }));
 
+    // The connector row is the canonical store for non-secret metadata.
+    // Compute final merged metadata for downstream steps.
+    let mergedConnectorMetadata: Record<string, unknown> = metadata;
+
     if (existing) {
+      mergedConnectorMetadata = {
+        ...(existing.metadata || {}),
+        ...metadata,
+      };
       const updated = await this.connectorRepository.update(existing.id, {
         status,
-        metadata: {
-          ...(existing.metadata || {}),
-          ...metadata,
-        },
+        metadata: mergedConnectorMetadata,
         lastError,
       });
 
@@ -170,6 +196,30 @@ export class ConnectorService {
       for (const [key, value] of Object.entries(output.envUpdates)) {
         await this.upsertConnectorSecret(starshipId, key, value, userId, connector.id);
       }
+    }
+
+    // Optional: upsert webhook routing bindings if the template opts in.
+    // This is a best-effort side effect; failures should not block connector connect.
+    try {
+      const metadataKey = this.getWebhookBindingMetadataKey(template);
+      if (metadataKey) {
+        const externalAccountId = this.coerceNonEmptyString(mergedConnectorMetadata?.[metadataKey]);
+        if (externalAccountId) {
+          await this.connectorWebhookBindingRepository.upsert({
+            provider: String(provider),
+            externalAccountId,
+            connectorId: connector.id,
+            starshipId,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[CONNECTOR] Failed to upsert webhook binding', {
+        provider,
+        starshipId,
+        connectorId: connector.id,
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
     }
 
     const starship = await this.starshipRepository.findById(starshipId);

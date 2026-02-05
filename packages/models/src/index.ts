@@ -11,6 +11,7 @@ export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
 export { ConnectorEntity } from './entities/ConnectorEntity';
 export { ConnectorTemplateEntity } from './entities/ConnectorTemplateEntity';
 export { ConnectorEventEntity } from './entities/ConnectorEventEntity';
+export { ConnectorWebhookBindingEntity } from './entities/ConnectorWebhookBindingEntity';
 export { ChannelEntity } from './entities/ChannelEntity';
 export { ConversationReadStateEntity } from './entities/ConversationReadStateEntity';
 export { DirectMessageEntity } from './entities/DirectMessageEntity';
@@ -53,6 +54,7 @@ export { PlatformSecretRepository } from './repositories/PlatformSecretRepositor
 export { ConnectorTemplateRepository } from './repositories/ConnectorTemplateRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { ConnectorEventRepository } from './repositories/ConnectorEventRepository';
+export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebhookBindingRepository';
 export { ChannelRepository } from './repositories/ChannelRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';

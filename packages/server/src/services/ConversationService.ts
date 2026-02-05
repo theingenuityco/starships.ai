@@ -218,6 +218,8 @@ export class ConversationService {
   private suppressCompleteFor: Set<string> = new Set();
   // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
   private assistantPersistedThisTurn: Set<string> = new Set();
+  // When the user presses Stop, mark the conversation so we avoid persisting toolCalls without tool results.
+  private stopRequestedForConversation: Set<string> = new Set();
   // Track which agent is currently producing streamed content for a conversation (for attribution)
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // LLM model catalog repository (for pricing/context metadata)
@@ -530,6 +532,9 @@ export class ConversationService {
 
     // Also ensure we don't keep any outstanding cancellation handles around
     ConversationService.activeCancellations.delete(conversationId);
+
+    // Stop guard is turn-scoped; clear once the turn is definitively finished.
+    this.stopRequestedForConversation.delete(conversationId);
   }
 
   /**
@@ -704,7 +709,7 @@ export class ConversationService {
     const userIds = new Set<string>();
     const agentIds = new Set<string>();
     for (const msg of Array.isArray(messages) ? messages : []) {
-      const content = typeof (msg as any)?.content === 'string' ? String((msg as any).content) : '';
+      const content = typeof msg?.content === 'string' ? msg.content : '';
       if (!content || (!content.includes('<@u:') && !content.includes('<@a:'))) continue;
       const parsed = ConversationService.collectMentionIdsFromText(content);
       parsed.userIds.forEach((id) => userIds.add(id));
@@ -762,14 +767,14 @@ export class ConversationService {
     ]);
 
     for (const r of Array.isArray(agentRows) ? agentRows : []) {
-      const id = String((r as any)?.id || '').trim();
-      const name = typeof (r as any)?.name === 'string' ? String((r as any).name).trim() : '';
+      const id = String(r?.id || '').trim();
+      const name = typeof r?.name === 'string' ? r.name.trim() : '';
       if (id && name) agentNameById.set(id, name);
     }
     for (const r of Array.isArray(userRows) ? userRows : []) {
-      const id = String((r as any)?.id || '').trim();
-      const displayName = typeof (r as any)?.display_name === 'string' ? String((r as any).display_name).trim() : '';
-      const email = typeof (r as any)?.email === 'string' ? String((r as any).email).trim() : '';
+      const id = String(r?.id || '').trim();
+      const displayName = typeof r?.display_name === 'string' ? r.display_name.trim() : '';
+      const email = typeof r?.email === 'string' ? r.email.trim() : '';
       const name = displayName || email;
       if (id && name) userNameById.set(id, name);
     }
@@ -811,17 +816,17 @@ export class ConversationService {
     if (typeof content === 'string') {
       return this.replaceMentionTokensInText({ content, agentNameById: args.agentNameById, userNameById: args.userNameById });
     }
-    if (!Array.isArray(content)) return content as any;
-    const blocks = content.slice() as ContentBlock[];
+    if (!Array.isArray(content)) return content;
+    const blocks: ContentBlock[] = content.slice();
     let changed = false;
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i];
       if (!b || typeof b !== 'object') continue;
-      if ((b as any).type !== 'text') continue;
-      const text = typeof (b as any).text === 'string' ? (b as any).text : '';
+      if (b.type !== 'text') continue;
+      const text = typeof b.text === 'string' ? b.text : '';
       const next = this.replaceMentionTokensInText({ content: text, agentNameById: args.agentNameById, userNameById: args.userNameById });
       if (next !== text) {
-        blocks[i] = { ...(b as any), text: next } as any;
+        blocks[i] = { ...b, text: next } as ContentBlock;
         changed = true;
       }
     }
@@ -829,13 +834,11 @@ export class ConversationService {
   }
 
   private formatLlmMessageName(message: MessageModel): string | null {
-    const role = String((message as any)?.role || '');
+    const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return null;
 
     const at =
-      this.coerceToIsoString((message as any)?.createdAt) ??
-      this.coerceToIsoString((message as any)?.updatedAt) ??
-      new Date().toISOString();
+      this.coerceToIsoString(message.createdAt) ?? this.coerceToIsoString(message.updatedAt) ?? new Date().toISOString();
 
     const toCompactAt = (iso: string): string => {
       // 2026-02-04T01:44:08.592Z -> 20260204_014408Z
@@ -854,31 +857,31 @@ export class ConversationService {
     const compactAt = toCompactAt(at);
 
     if (role === 'assistant') {
-      const agentName = typeof (message as any)?.agentName === 'string' ? String((message as any).agentName).trim() : '';
-      const agentId = typeof (message as any)?.agentId === 'string' ? String((message as any).agentId).trim() : '';
+      const agentName = typeof message.agentName === 'string' ? message.agentName.trim() : '';
+      const agentId = typeof message.agentId === 'string' ? message.agentId.trim() : '';
       const who = sanitizePart(agentName || agentId || 'agent', 28) || 'agent';
       return `a_${who}_${compactAt}`.slice(0, 64);
     }
 
-    const userName = typeof (message as any)?.userName === 'string' ? String((message as any).userName).trim() : '';
-    const userId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
+    const userName = typeof message.userName === 'string' ? message.userName.trim() : '';
+    const userId = typeof message.userId === 'string' ? message.userId.trim() : '';
     const who = sanitizePart(userName || userId || 'user', 28) || 'user';
     return `u_${who}_${compactAt}`.slice(0, 64);
   }
 
   private buildStarshipsMessageMeta(message: MessageModel): { authorType: 'agent' | 'user'; authorId: string; createdAt?: string } | null {
-    const role = String((message as any)?.role || '');
+    const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return null;
 
-    const createdAt = this.coerceToIsoString((message as any)?.createdAt);
+    const createdAt = this.coerceToIsoString(message.createdAt);
 
     if (role === 'assistant') {
-      const agentId = typeof (message as any)?.agentId === 'string' ? String((message as any).agentId).trim() : '';
+      const agentId = typeof message.agentId === 'string' ? message.agentId.trim() : '';
       if (!agentId) return null;
       return { authorType: 'agent', authorId: agentId, ...(createdAt ? { createdAt } : null) };
     }
 
-    const userId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
+    const userId = typeof message.userId === 'string' ? message.userId.trim() : '';
     if (!userId) return null;
     return { authorType: 'user', authorId: userId, ...(createdAt ? { createdAt } : null) };
   }
@@ -922,17 +925,17 @@ export class ConversationService {
       const res = this.stripEchoedAttributionHeadersFromText(c);
       return { stripped: res.stripped, content: res.text };
     }
-    if (!Array.isArray(c)) return { stripped: 0, content: c as any };
-    const blocks = (c as any[]).slice();
+    if (!Array.isArray(c)) return { stripped: 0, content: c };
+    const blocks: ContentBlock[] = c.slice();
     for (let idx = 0; idx < blocks.length; idx++) {
       const b = blocks[idx];
       if (!b || typeof b !== 'object') continue;
-      if ((b as any).type !== 'text') continue;
-      const t = typeof (b as any).text === 'string' ? String((b as any).text) : '';
+      if (b.type !== 'text') continue;
+      const t = typeof b.text === 'string' ? String(b.text) : '';
       const res = this.stripEchoedAttributionHeadersFromText(t);
       if (res.stripped > 0) {
-        blocks[idx] = { ...(b as any), text: res.text };
-        return { stripped: res.stripped, content: blocks as any };
+        blocks[idx] = { ...b, text: res.text } as ContentBlock;
+        return { stripped: res.stripped, content: blocks };
       }
       return { stripped: 0, content: c };
     }
@@ -1754,21 +1757,21 @@ export class ConversationService {
     const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return content;
 
-    const atDate = this.coerceToDate((message as any)?.createdAt) ?? this.coerceToDate((message as any)?.updatedAt) ?? new Date();
+    const atDate = this.coerceToDate(message.createdAt) ?? this.coerceToDate(message.updatedAt) ?? new Date();
     // Always use ISO UTC (includes trailing 'Z') for consistency.
     const at = atDate.toISOString();
 
     const sender =
       role === 'user'
-        ? typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0
-          ? String((message as any).userName).trim()
-          : typeof (message as any)?.userId === 'string' && String((message as any).userId).trim().length > 0
-            ? `user:${String((message as any).userId).slice(0, 8)}`
+        ? typeof message.userName === 'string' && message.userName.trim().length > 0
+          ? message.userName.trim()
+          : typeof message.userId === 'string' && message.userId.trim().length > 0
+            ? `user:${message.userId.slice(0, 8)}`
             : 'User'
-        : typeof (message as any)?.agentName === 'string' && String((message as any).agentName).trim().length > 0
-          ? String((message as any).agentName).trim()
-          : typeof (message as any)?.agentId === 'string' && String((message as any).agentId).trim().length > 0
-            ? `agent:${String((message as any).agentId).slice(0, 8)}`
+        : typeof message.agentName === 'string' && message.agentName.trim().length > 0
+          ? message.agentName.trim()
+          : typeof message.agentId === 'string' && message.agentId.trim().length > 0
+            ? `agent:${message.agentId.slice(0, 8)}`
             : 'Assistant';
 
     const senderWithType = `${sender} (${role === 'assistant' ? 'agent' : 'user'})`;
@@ -1793,14 +1796,20 @@ export class ConversationService {
     const looksLikeBracketTs = (line: string): boolean => /^\[\d{4}-\d{2}-\d{2}T/.test(line);
     const shouldSkipDueToExisting = (() => {
       const senderLabel = String(sender || '').trim();
-      const c: any = content as any;
-      if (typeof c === 'string') {
-        const first = firstNonEmptyLine(c);
+      if (typeof content === 'string') {
+        const first = firstNonEmptyLine(content);
         return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
       }
-      if (Array.isArray(c)) {
-        const firstText = (c as any[]).find((b: any) => b && typeof b === 'object' && b.type === 'text') as any;
-        const txt = firstText && typeof firstText.text === 'string' ? firstText.text : '';
+      if (Array.isArray(content)) {
+        type TextBlock = { type: 'text'; text: string };
+        const isTextBlock = (b: ContentBlock): b is TextBlock => {
+          if (!b || typeof b !== 'object') return false;
+          if (b.type !== 'text') return false;
+          const rec = b as unknown as { text?: unknown };
+          return typeof rec.text === 'string';
+        };
+        const firstText = content.find(isTextBlock);
+        const txt = firstText?.text ?? '';
         const first = firstNonEmptyLine(String(txt || ''));
         return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
       }
@@ -1827,20 +1836,20 @@ export class ConversationService {
 
     const rewriteHeaderTimestampInContent = (c: MessageContent): MessageContent => {
       if (typeof c === 'string') return rewriteHeaderTimestampToUtcIso(c);
-      if (!Array.isArray(c)) return c as any;
-      const blocks = (c as any[]).slice();
+      if (!Array.isArray(c)) return c;
+      const blocks: ContentBlock[] = c.slice();
       for (let idx = 0; idx < blocks.length; idx++) {
         const b = blocks[idx];
         if (!b || typeof b !== 'object') continue;
-        if ((b as any).type !== 'text') continue;
-        const t = typeof (b as any).text === 'string' ? String((b as any).text) : '';
+        if (b.type !== 'text') continue;
+        const t = typeof b.text === 'string' ? String(b.text) : '';
         const next = rewriteHeaderTimestampToUtcIso(t);
         if (next !== t) {
-          blocks[idx] = { ...(b as any), text: next };
+          blocks[idx] = { ...b, text: next } as ContentBlock;
         }
         break; // only the first text block can contain the header
       }
-      return blocks as any;
+      return blocks;
     };
 
     if (shouldSkipDueToExisting) return rewriteHeaderTimestampInContent(content);
@@ -1857,11 +1866,11 @@ export class ConversationService {
     }
     const first = blocks[0];
     if (first && first.type === 'text') {
-      blocks[0] = { ...(first as any), text: `${prefix}\n${(first as any).text || ''}` } as any;
+      blocks[0] = { ...first, text: `${prefix}\n${first.text || ''}` } as ContentBlock;
       return blocks;
     }
     // Fallback: ensure the provider sees attribution even if the first block isn't text.
-    blocks.unshift({ type: 'text', text: `${prefix}\n` } as any);
+    blocks.unshift({ type: 'text', text: `${prefix}\n` });
     return blocks;
   }
 
@@ -1981,7 +1990,6 @@ export class ConversationService {
     // that an agent will actually run. This prevents a brief "agent is typing" flash for messages that are
     // persisted without any agent execution (e.g. user mentions in default-agent threads, mention-gated channels).
     try {
-      const at = new Date().toISOString();
       await this.streamBus.publish(data.conversationId, {
         type: 'message.append',
         data: { conversationId: data.conversationId, message: userMessage },
@@ -2367,15 +2375,16 @@ export class ConversationService {
             // If plugins is undefined, omit it (no plugins enabled)
             ...(plugins !== undefined ? { plugins } : {}),
             // Ensure per-agent LLM config wins over any persisted state.
-            ...(typeof (agentModel as any)?.model === 'string' && String((agentModel as any).model).trim().length > 0
-              ? { model: String((agentModel as any).model).trim() }
-              : {}),
-            ...(typeof (agentModel as any)?.temperature === 'number' ? { temperature: (agentModel as any).temperature } : {}),
-            ...(typeof (agentModel as any)?.maxTokens === 'number' ? { maxTokens: (agentModel as any).maxTokens } : {}),
-            ...(typeof (agentModel as any)?.timeout === 'number' ? { timeout: (agentModel as any).timeout } : {}),
-            ...((agentModel as any)?.reasoning && typeof (agentModel as any).reasoning === 'object'
-              ? { reasoning: (agentModel as any).reasoning }
-              : {}),
+            ...((): Record<string, unknown> => {
+              const cfg = agentModel as unknown as Record<string, unknown>;
+              const out: Record<string, unknown> = {};
+              if (typeof cfg.model === 'string' && cfg.model.trim().length > 0) out.model = cfg.model.trim();
+              if (typeof cfg.temperature === 'number') out.temperature = cfg.temperature;
+              if (typeof cfg.maxTokens === 'number') out.maxTokens = cfg.maxTokens;
+              if (typeof cfg.timeout === 'number') out.timeout = cfg.timeout;
+              if (cfg.reasoning && typeof cfg.reasoning === 'object') out.reasoning = cfg.reasoning;
+              return out;
+            })(),
           },
         };
 
@@ -2391,7 +2400,7 @@ export class ConversationService {
           messages.map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
-            const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
+            const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
             const contentStripped = strippedInfo.content;
             const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
             const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
@@ -2401,10 +2410,10 @@ export class ConversationService {
               if (r !== 'assistant') return r;
               // Multi-agent conversations: treat other agents' assistant messages as "external" input.
               // When executing agentModel.id, only that agent's assistant messages remain role=assistant.
-              const msgAgentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : '';
+              const msgAgentId = typeof msg.agentId === 'string' ? msg.agentId.trim() : '';
               if (msgAgentId && msgAgentId !== agentModel.id) return 'user';
               // Preserve assistant role when toolCalls are present (provider tool-result linkage).
-              const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0;
+              const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
               if (hasToolCalls) return 'assistant';
               return msgAgentId && msgAgentId !== agentModel.id ? 'user' : 'assistant';
             })();
@@ -2416,7 +2425,7 @@ export class ConversationService {
             };
             try {
               const meta = this.buildStarshipsMessageMeta(msg);
-              if (meta) (baseMessage as any).starshipsMeta = meta;
+              if (meta) (baseMessage as unknown as Record<string, unknown>).starshipsMeta = meta;
             } catch {
               /* ignore */
             }
@@ -2729,7 +2738,7 @@ export class ConversationService {
       const llmMessagesCore: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
-          const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: (msg as any)?.role, content });
+          const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
           const contentStripped = strippedInfo.content;
           const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameById, userNameById });
           const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
@@ -2737,9 +2746,9 @@ export class ConversationService {
             role: (() => {
               const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';
               if (r !== 'assistant') return r;
-              const msgAgentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : '';
+              const msgAgentId = typeof msg.agentId === 'string' ? msg.agentId.trim() : '';
               if (msgAgentId && msgAgentId !== agentModel.id) return 'user';
-              const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0;
+              const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
               if (hasToolCalls) return 'assistant';
               return 'assistant';
             })(),
@@ -2748,7 +2757,7 @@ export class ConversationService {
           };
           try {
             const meta = this.buildStarshipsMessageMeta(msg);
-            if (meta) (baseMessage as any).starshipsMeta = meta;
+            if (meta) (baseMessage as unknown as Record<string, unknown>).starshipsMeta = meta;
           } catch {
             /* ignore */
           }
@@ -2874,15 +2883,16 @@ export class ConversationService {
           // If plugins is undefined, omit it (no plugins enabled)
           ...(plugins !== undefined ? { plugins } : {}),
           // Ensure per-agent LLM config wins over any persisted state.
-          ...(typeof (agentModel as any)?.model === 'string' && String((agentModel as any).model).trim().length > 0
-            ? { model: String((agentModel as any).model).trim() }
-            : {}),
-          ...(typeof (agentModel as any)?.temperature === 'number' ? { temperature: (agentModel as any).temperature } : {}),
-          ...(typeof (agentModel as any)?.maxTokens === 'number' ? { maxTokens: (agentModel as any).maxTokens } : {}),
-          ...(typeof (agentModel as any)?.timeout === 'number' ? { timeout: (agentModel as any).timeout } : {}),
-          ...((agentModel as any)?.reasoning && typeof (agentModel as any).reasoning === 'object'
-            ? { reasoning: (agentModel as any).reasoning }
-            : {}),
+          ...((): Record<string, unknown> => {
+            const cfg = agentModel as unknown as Record<string, unknown>;
+            const out: Record<string, unknown> = {};
+            if (typeof cfg.model === 'string' && cfg.model.trim().length > 0) out.model = cfg.model.trim();
+            if (typeof cfg.temperature === 'number') out.temperature = cfg.temperature;
+            if (typeof cfg.maxTokens === 'number') out.maxTokens = cfg.maxTokens;
+            if (typeof cfg.timeout === 'number') out.timeout = cfg.timeout;
+            if (cfg.reasoning && typeof cfg.reasoning === 'object') out.reasoning = cfg.reasoning;
+            return out;
+          })(),
         },
       };
 
@@ -2947,6 +2957,9 @@ export class ConversationService {
    * Stop current turn: cancel runner, persist partial content/reasoning (omit tool_calls), finalize SSE.
    */
   async stopConversation(conversationId: string): Promise<void> {
+    // Mark stop-requested early so late node_completed persistence can avoid saving toolCalls.
+    this.stopRequestedForConversation.add(conversationId);
+
     // Cancel active runner if any
     try {
       const cancel = ConversationService.activeCancellations.get(conversationId);
@@ -3054,8 +3067,9 @@ export class ConversationService {
           if (agent?.id) {
             const agentService = new AgentService();
             const agentModel = await agentService.getAgent(agent.id).catch(() => null);
-            if (agentModel && typeof (agentModel as any)?.model === 'string') {
-              const m = String((agentModel as any).model).trim();
+            const cfg = agentModel && typeof agentModel === 'object' ? (agentModel as unknown as Record<string, unknown>) : null;
+            if (cfg && typeof cfg.model === 'string') {
+              const m = cfg.model.trim();
               if (m) model = m;
             }
           }
@@ -3073,7 +3087,7 @@ export class ConversationService {
         try {
           const page = await this.getConversationMessagesPage({ conversationId, limit: 30 });
           const msgs = Array.isArray(page?.messages) ? page.messages : [];
-          const joined = msgs.map((m) => String((m as any)?.content ?? '')).join('\n');
+          const joined = msgs.map((m) => String(m?.content ?? '')).join('\n');
           promptTokens = ConversationService.estimateTokensFromText(joined);
         } catch {
           promptTokens = 0;
@@ -3529,6 +3543,8 @@ export class ConversationService {
         this.assistantPersistedThisTurn.delete(conversationId);
         // Reset active stream persisted guard for this new turn
         this.activeStreamPersisted.delete(conversationId);
+        // New turn: clear any prior user-stop guard so toolCalls can persist normally.
+        this.stopRequestedForConversation.delete(conversationId);
         // Seed message index tracking to the current baseline so prior history isn't re-persisted
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
@@ -4199,6 +4215,7 @@ export class ConversationService {
               try {
                 // Treat as canonical LlmMessage after type guard
                 const lm = raw as LlmMessage;
+                const stopRequested = this.stopRequestedForConversation.has(conversationId);
 
                 // Read optional toolCallId (canonical only)
                 const toolCallId = typeof lm.toolCallId === 'string' ? lm.toolCallId : undefined;
@@ -4222,6 +4239,20 @@ export class ConversationService {
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
                 let contentToPersist = contentString;
                 let attachmentIdsToPersist = pendingAttachmentIds;
+
+                // If the user pressed Stop during/around tool calling, do NOT persist toolCalls.
+                // This prevents dangling tool calls without tool results, which breaks future provider calls.
+                if (role === 'assistant' && stopRequested) {
+                  toolCalls = undefined;
+                  // If this assistant message is tool-call-only (blank content + no reasoning + no attachments),
+                  // skip persisting it entirely.
+                  const hasText = typeof contentToPersist === 'string' && contentToPersist.trim().length > 0;
+                  const hasReasoning = typeof lm.reasoning === 'string' && lm.reasoning.trim().length > 0;
+                  const hasAttachments = Array.isArray(pendingAttachmentIds) && pendingAttachmentIds.length > 0;
+                  if (!hasText && !hasReasoning && !hasAttachments) {
+                    continue;
+                  }
+                }
 
                 // If tool results already include attachment ids (server-tools fast-path),
                 // persist them so the UI can render images/files the same way as uploads.

@@ -127,6 +127,33 @@ export class AutopilotAwaitRepository extends BaseRepository {
       'AutopilotAwait'
     );
   }
+
+  async listByStarship(args: {
+    starshipId: string;
+    status?: AutopilotAwaitStatus;
+    limit?: number;
+  }): Promise<AutopilotAwaitModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(500, Math.floor(args.limit)) : 100;
+        const conn = this.getConnection();
+        const rows = await conn.query<Record<string, unknown>>(
+          `
+          SELECT *
+          FROM autopilot_awaits
+          WHERE starship_id = $1
+            AND ($2::text IS NULL OR status = $2::text)
+          ORDER BY created_at DESC
+          LIMIT $3
+          `,
+          [args.starshipId, args.status ?? null, limit]
+        );
+        return fromDatabaseArray(AutopilotAwaitEntity, rows);
+      },
+      'listByStarship',
+      'AutopilotAwait'
+    );
+  }
 }
 
 export default AutopilotAwaitRepository;

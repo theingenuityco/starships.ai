@@ -15,6 +15,11 @@ export function buildAutopilotRuntimeEnv(args: { starshipId: string; conversatio
 
 export interface AutopilotRunnerExecuteConfig extends EngineConfig {
   /**
+   * Make this structurally compatible with places that expect a generic JSON map.
+   * (Many call sites treat runnerConfig/engineConfigFromHost as Record<string, unknown>.)
+   */
+  [key: string]: unknown;
+  /**
    * Connector templates (safe) passed from embedding host.
    * Keyed by provider/slug.
    */

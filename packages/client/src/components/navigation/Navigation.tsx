@@ -158,6 +158,7 @@ export function Navigation(props: NavigationProps) {
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
         isSchedulesRoute: false,
+        isAutomationsRoute: false,
       }
     }
     return {
@@ -165,10 +166,11 @@ export function Navigation(props: NavigationProps) {
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
+      isAutomationsRoute: pathname.startsWith(`/ship/${starshipSlug}/automations`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute, isAutomationsRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -265,6 +267,7 @@ export function Navigation(props: NavigationProps) {
   const myAgentsRef = useRef<HTMLDivElement>(null)
   const connectorsRef = useRef<HTMLDivElement>(null)
   const schedulesRef = useRef<HTMLDivElement>(null)
+  const automationsRef = useRef<HTMLDivElement>(null)
   const channelsRef = useRef<HTMLDivElement>(null)
   const directMessagesRef = useRef<HTMLDivElement>(null)
 
@@ -274,6 +277,7 @@ export function Navigation(props: NavigationProps) {
     refs.set('My Agents', myAgentsRef)
     refs.set('Connectors', connectorsRef)
     refs.set('Schedules', schedulesRef)
+    refs.set('Automations', automationsRef)
     refs.set('Channels', channelsRef)
     refs.set('Direct messages', directMessagesRef)
     return refs
@@ -343,6 +347,14 @@ export function Navigation(props: NavigationProps) {
               itemRef: schedulesRef,
               isOnboardingHighlighted: getOnboardingHighlight('Schedules'),
             },
+            {
+              href: `/ship/${starshipSlug}/automations`,
+              label: 'Automations',
+              icon: 'workflow',
+              isActive: isAutomationsRoute,
+              itemRef: automationsRef,
+              isOnboardingHighlighted: getOnboardingHighlight('Automations'),
+            },
           ]
         : []),
       ...(isAuthenticated && isInstanceAdmin
@@ -356,7 +368,20 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight, unreadTotal]
+    [
+      isAuthenticated,
+      starshipSlug,
+      isAgentsRoute,
+      isAgentBuilderRoute,
+      pathname,
+      isSchedulesRoute,
+      isAutomationsRoute,
+      isConnectorsRoute,
+      starshipData?.id,
+      isInstanceAdmin,
+      getOnboardingHighlight,
+      unreadTotal,
+    ]
   )
 
   const handleSidebarBackgroundClick = useCallback(

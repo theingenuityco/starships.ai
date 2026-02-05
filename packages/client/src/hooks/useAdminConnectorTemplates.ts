@@ -27,6 +27,7 @@ export const ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS = {
   actions: (id: string, params?: { q?: string; limit?: number; offset?: number }) =>
     [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'actions', id, params?.q ?? '', params?.limit ?? 50, params?.offset ?? 0] as const,
   action: (id: string, actionName: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'action', id, actionName] as const,
+  migrateLegacy: (id: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'migrate-legacy', id] as const,
 } as const
 
 export function useAdminConnectorTemplates(enabled: boolean = true) {
@@ -187,6 +188,26 @@ export function useBulkReplaceAdminConnectorTemplateActions() {
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to replace actions'
       toast.error('Failed to replace actions', { description: message })
+    },
+  })
+}
+
+export function useMigrateAdminConnectorTemplateActionsFromLegacy() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { id: string }) => {
+      const response: FetchResponse<ApiResponse<{ ok: true; templateId: string; migratedCount: number }>> = await api.post(
+        `/api/v1/admin/connector-templates/${args.id}/actions/migrate-legacy`
+      )
+      return response.data.data
+    },
+    onSuccess: (data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions(vars.id) })
+      toast.success('Migrated legacy endpoints', { description: `${data.migratedCount} actions` })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to migrate legacy endpoints'
+      toast.error('Migration failed', { description: message })
     },
   })
 }

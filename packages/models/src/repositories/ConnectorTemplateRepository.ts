@@ -5,7 +5,7 @@ import { toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateConnectorTemplateRequest, ConnectorProvider } from '@starships/protocol';
-import type { ConnectorAuthV2, ConnectorTemplateRuntimeFieldsV2, JsonSchemaObject } from '@starships/protocol';
+import type { ConnectorAuthV2, ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, JsonSchemaObject } from '@starships/protocol';
 
 export class ConnectorTemplateRepository extends BaseRepository {
   constructor() {
@@ -17,7 +17,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
    * node-postgres serializes JavaScript arrays as PostgreSQL array literals (e.g. {"a","b"}).
    * When the destination column is JSONB, that encoding is NOT valid JSON (JSON arrays are ["a","b"]).
    *
-   * This is why updates to connector_templates.variables_json (when non-empty)
+   * This is why updates to connector_templates.variables_json / endpoints_json (when non-empty)
    * can fail with: `invalid input syntax for type json` / `Expected ":", but found ",".`
    *
    * To ensure JSONB columns always receive valid JSON, we explicitly JSON.stringify any object/array
@@ -35,6 +35,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
     const jsonbColumns = [
       'auth_json',
       'variables_json',
+      'endpoints_json',
       'rate_limit_json',
       'metadata_schema_json',
       'webhooks_json',
@@ -149,6 +150,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
           baseUrl: data.baseUrl,
           authJson: data.auth as ConnectorAuthV2,
           variablesJson: (data.variables as ConnectorTemplateRuntimeFieldsV2['variables']) ?? undefined,
+          endpointsJson: (data.endpoints as ConnectorEndpointV2[]) ?? undefined,
           rateLimitJson: (data.rateLimit as ConnectorTemplateRuntimeFieldsV2['rateLimit']) ?? undefined,
           metadataSchemaJson: (data.metadataSchema as JsonSchemaObject | undefined) ?? undefined,
           version: data.version || '1.0.0',
@@ -185,6 +187,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
         | 'baseUrl'
         | 'authJson'
         | 'variablesJson'
+        | 'endpointsJson'
         | 'rateLimitJson'
         | 'metadataSchemaJson'
       >

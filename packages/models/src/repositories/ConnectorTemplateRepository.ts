@@ -13,6 +13,32 @@ export class ConnectorTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Read-only access to the legacy endpoints catalog stored on connector_templates.endpoints_json.
+   *
+   * IMPORTANT: This exists only for admin transparency/debugging. Runtime execution must use
+   * connector_template_actions (row table) exclusively.
+   */
+  async getLegacyEndpointsJsonByTemplateId(templateId: string): Promise<unknown[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(templateId || '').trim();
+        if (!id) throw new Error('templateId is required');
+
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ endpoints_json?: unknown }>(
+          `SELECT endpoints_json FROM connector_templates WHERE id = $1`,
+          [id]
+        );
+        const raw = row?.endpoints_json;
+        return Array.isArray(raw) ? raw : [];
+      },
+      'getLegacyEndpointsJsonByTemplateId',
+      'ConnectorTemplate',
+      templateId
+    );
+  }
+
+  /**
    * IMPORTANT:
    * node-postgres serializes JavaScript arrays as PostgreSQL array literals (e.g. {"a","b"}).
    * When the destination column is JSONB, that encoding is NOT valid JSON (JSON arrays are ["a","b"]).

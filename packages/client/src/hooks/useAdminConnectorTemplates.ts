@@ -24,6 +24,7 @@ export const ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS = {
   all: ['admin', 'connector-templates'] as const,
   list: () => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'list'] as const,
   detail: (id: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'detail', id] as const,
+  legacyEndpoints: (id: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'legacy-endpoints', id] as const,
   actions: (id: string, params?: { q?: string; limit?: number; offset?: number }) =>
     [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'actions', id, params?.q ?? '', params?.limit ?? 50, params?.offset ?? 0] as const,
   action: (id: string, actionName: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'action', id, actionName] as const,
@@ -49,6 +50,22 @@ export function useAdminConnectorTemplate(id: string | null | undefined, enabled
     queryFn: async (): Promise<ConnectorTemplateAdminModel> => {
       const response: FetchResponse<ApiResponse<AdminConnectorTemplateResponse>> = await api.get(`/api/v1/admin/connector-templates/${id}`)
       return response.data.data.connector
+    },
+    staleTime: 10 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+}
+
+export function useAdminConnectorTemplateLegacyEndpoints(id: string | null | undefined, enabled: boolean = true) {
+  return useQuery({
+    queryKey: id ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.legacyEndpoints(id) : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.legacyEndpoints('missing'),
+    enabled: enabled && !!id,
+    queryFn: async (): Promise<unknown[]> => {
+      const response: FetchResponse<ApiResponse<{ LEGACY_endpoints: unknown[] }>> = await api.get(
+        `/api/v1/admin/connector-templates/${id}/legacy-endpoints`
+      )
+      const raw = response.data.data?.LEGACY_endpoints
+      return Array.isArray(raw) ? raw : []
     },
     staleTime: 10 * 1000,
     gcTime: 5 * 60 * 1000,

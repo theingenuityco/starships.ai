@@ -139,6 +139,32 @@ async function loadTemplateByIdOrProvider(idOrProvider: string): Promise<Connect
 // ============================================================================
 
 /**
+ * GET /admin/connector-templates/:id/legacy-endpoints
+ * Read-only visibility into legacy connector_templates.endpoints_json.
+ *
+ * This is intentionally NOT part of the main template model contract; it exists only
+ * for transparent admin display and debugging. Runtime execution must use actions.
+ */
+router.get('/admin/connector-templates/:id/legacy-endpoints', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const repo = new ConnectorTemplateRepository();
+    const legacy = await repo.getLegacyEndpointsJsonByTemplateId(template.id);
+    sendSuccess(res, { LEGACY_endpoints: legacy });
+  } catch (error) {
+    handleError(error, res, 'fetching legacy connector template endpoints_json');
+  }
+});
+
+/**
  * GET /admin/connector-templates/:id/export
  * Export a connector template as a JSON container (instance admin only).
  */

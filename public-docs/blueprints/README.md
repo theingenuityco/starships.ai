@@ -18,6 +18,7 @@ This folder documents blueprint construction and execution: the Engine/Eval and 
   - [LLM](./node-llm.md)
   - [UserPrompt](./node-user-prompt.md)
   - [UIAction](./node-ui-action.md)
+  - [Await](./node-await.md)
   - [Workflow](./node-workflow.md)
   - [Tool](./node-tool.md)
   - [Agent](./node-agent.md)

@@ -1,9 +1,9 @@
 import { Worker } from 'bullmq';
 import { getEnvConfig } from '@starships/env';
 import { createConnection, AutopilotAwaitFiringRepository, AutopilotAwaitRepository, ConnectorEventRepository } from '@starships/models';
-import { autopilot, ExecutionItemUtils, RunnerFactory, type AutopilotEvent } from '@starships/autopilot';
-import type { Blueprint, Execution, ExecutionEvent, ExecutionEventType, UIActionEvent } from '@starships/autopilot';
-import type { AutopilotAwaitSpec, ConnectorEventModel } from '@starships/protocol';
+import { autopilot, RunnerFactory, type AutopilotEvent } from '@starships/autopilot';
+import type { Blueprint, Execution, ExecutionEvent, ExecutionEventType, ExecutionItem } from '@starships/autopilot';
+import type { AutopilotAwaitConnectorEventSpec, AutopilotAwaitRequest, ConnectorEventModel } from '@starships/protocol';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { extractPersistableState } from '@/utils/conversation-state';
 import {
@@ -12,8 +12,6 @@ import {
   closeAutopilotAutomationQueue,
 } from '@/queues/autopilotAutomationQueue';
 import { getRedisConnection } from '@/queues/scheduledRunsQueue';
-
-const AWAIT_UI_ACTION = 'await.connector_event';
 
 const EXECUTION_EVENT_TYPES: ReadonlySet<ExecutionEventType> = new Set([
   'workflow_started',
@@ -37,6 +35,27 @@ type ResumeConnectorEvent = Pick<
   ConnectorEventModel,
   'id' | 'starshipId' | 'connectorId' | 'provider' | 'eventType' | 'externalEventId' | 'receivedAt' | 'payloadJson'
 >;
+
+type ConnectorEventAwaitRequest = {
+  kind: 'connector_event';
+  nodeRef: string;
+  spec: AutopilotAwaitConnectorEventSpec;
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function upsertNodeResult(execution: Execution, nodeRef: string, items: ExecutionItem[]): void {
+  const normalizedItems: ExecutionItem[] = items.map((i) => ({ json: i.json, pairedItem: i.pairedItem, error: i.error }));
+  for (let i = execution.results.length - 1; i >= 0; i--) {
+    if (execution.results[i]?.nodeRef === nodeRef) {
+      execution.results[i] = { nodeRef, items: normalizedItems };
+      return;
+    }
+  }
+  execution.results.push({ nodeRef, items: normalizedItems });
+}
 
 async function main(): Promise<void> {
   const env = getEnvConfig();
@@ -121,28 +140,41 @@ async function main(): Promise<void> {
         payloadJson: evt.payloadJson ?? {},
       };
 
-      const execution: Execution = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(connectorEventEnvelope));
-      execution.state = (aw.stateJson && typeof aw.stateJson === 'object' ? aw.stateJson : {}) as Record<string, unknown>;
+      const req = aw.specJson as AutopilotAwaitRequest;
+      if (req.kind !== 'connector_event') {
+        throw new Error(`Unsupported await kind: ${(req as { kind?: unknown }).kind ?? 'unknown'}`);
+      }
+      if (!req.nodeRef) {
+        throw new Error(`Await ${aw.id} is missing nodeRef`);
+      }
 
-      let latestState: Record<string, unknown> | null = null;
-      let awaitSpecFromUi: AutopilotAwaitSpec | null = null;
+      const execution: Execution = aw.executionJson as unknown as Execution;
+      upsertNodeResult(execution, req.nodeRef, [{ json: connectorEventEnvelope }]);
+
+      const capture: {
+        awaitRequest?: ConnectorEventAwaitRequest;
+        pausedExecution?: Execution;
+      } = {};
 
       const eventCallback = async (event: AutopilotEvent): Promise<void> => {
         try {
-          if (event.type === 'ui_action') {
-            const evt = event as UIActionEvent;
-            const action = String(evt.data?.action || '').trim();
-            if (action !== AWAIT_UI_ACTION) return;
-            const payload = evt.data?.payload;
-            awaitSpecFromUi = payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as AutopilotAwaitSpec) : {};
+          if (event.type === 'await_requested') {
+            const data = (event as { data?: unknown }).data;
+            if (!isPlainObject(data)) return;
+            const nodeRef = data.nodeRef;
+            const kind = data.kind;
+            const spec = data.spec;
+            if (kind !== 'connector_event') return;
+            if (typeof nodeRef !== 'string' || nodeRef.trim().length === 0) return;
+            if (!isPlainObject(spec)) return;
+            capture.awaitRequest = { kind: 'connector_event', nodeRef: nodeRef.trim(), spec: spec as AutopilotAwaitConnectorEventSpec };
             return;
           }
 
           // Capture execution snapshots (for state checkpointing)
           const exec = getExecutionFromEvent(event);
-          const state = exec?.state;
-          if (state && typeof state === 'object') {
-            latestState = state as Record<string, unknown>;
+          if (event.type === 'workflow_paused' && exec) {
+            capture.pausedExecution = exec;
           }
         } catch {
           // best-effort
@@ -164,16 +196,23 @@ async function main(): Promise<void> {
           // ignore
         }
 
-        if (awaitSpecFromUi) {
-          // Recurring: create a new await and complete the current one.
-          const persistedState = extractPersistableState(latestState ?? (execution.state as Record<string, unknown>)) ?? null;
+        const awaitRequest = capture.awaitRequest;
+        const pausedExecution = capture.pausedExecution;
+        if (awaitRequest && pausedExecution) {
+          // Paused again: create a new await and complete the current one.
+          const persistedState = extractPersistableState(pausedExecution.state as Record<string, unknown>) ?? {};
+          const executionSnapshot = JSON.parse(JSON.stringify(pausedExecution)) as Execution;
+          executionSnapshot.state = persistedState;
+
+          const specJson: AutopilotAwaitRequest = { kind: 'connector_event', nodeRef: awaitRequest.nodeRef, spec: awaitRequest.spec };
 
           const next = await awaitRepo.create({
             starshipId: aw.starshipId,
             ownerUserId,
             status: 'waiting',
-            specJson: awaitSpecFromUi,
+            specJson,
             blueprintJson: aw.blueprintJson,
+            executionJson: executionSnapshot,
             stateJson: persistedState,
             expiresAt: null,
             lastError: null,
@@ -217,13 +256,19 @@ async function main(): Promise<void> {
     console.log('[AutopilotAutomationResumeWorker] Shutting down...');
     try {
       await worker.close();
-    } catch {}
+    } catch (err) {
+      console.error('[AutopilotAutomationResumeWorker] Failed to close worker', err);
+    }
     try {
       await closeAutopilotAutomationQueue();
-    } catch {}
+    } catch (err) {
+      console.error('[AutopilotAutomationResumeWorker] Failed to close queue', err);
+    }
     try {
       await connection.disconnect();
-    } catch {}
+    } catch (err) {
+      console.error('[AutopilotAutomationResumeWorker] Failed to disconnect DB', err);
+    }
     process.exit(0);
   };
 

@@ -40,6 +40,10 @@ export class AutopilotAwaitEntity implements AutopilotAwaitModel {
   blueprintJson!: AutopilotAwaitModel['blueprintJson'];
 
   @Expose()
+  @IsObject()
+  executionJson!: AutopilotAwaitModel['executionJson'];
+
+  @Expose()
   @IsOptional()
   @IsObject()
   stateJson?: AutopilotAwaitModel['stateJson'];
@@ -78,6 +82,7 @@ export class AutopilotAwaitEntity implements AutopilotAwaitModel {
         status: (dataRecord.status as AutopilotAwaitStatus) || 'waiting',
         specJson: (dataRecord.specJson as Record<string, unknown>) || {},
         blueprintJson: (dataRecord.blueprintJson as Record<string, unknown>) || {},
+        executionJson: (dataRecord.executionJson as Record<string, unknown>) || {},
         createdAt: dataRecord.createdAt || now,
         updatedAt: dataRecord.updatedAt || now,
         ...dataRecord,

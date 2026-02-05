@@ -102,25 +102,41 @@ export class AutopilotAwaitRepository extends BaseRepository {
       async () => {
         const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 100;
         const conn = this.getConnection();
-        const rows = await conn.query<Record<string, unknown>>(
-          `
-          SELECT *
-          FROM autopilot_awaits
-          WHERE starship_id = $1
-            AND status = 'waiting'
-            AND spec_json->>'kind' = 'connector_event'
-            AND (spec_json->'spec'->>'provider' IS NULL OR spec_json->'spec'->>'provider' = $2)
-            AND (spec_json->'spec'->>'connectorId' IS NULL OR spec_json->'spec'->>'connectorId' = $3)
-            AND (
-              spec_json->'spec'->'eventTypes' IS NULL
-              OR jsonb_typeof(spec_json->'spec'->'eventTypes') <> 'array'
-              OR (spec_json->'spec'->'eventTypes') ? $4
+        const rows = await conn.transaction(async (client) => {
+          const res = await client.query(
+            `
+            WITH matches AS (
+              SELECT id
+              FROM autopilot_awaits
+              WHERE starship_id = $1
+                AND status = 'waiting'
+                AND spec_json->>'kind' = 'connector_event'
+                AND (spec_json->'spec'->>'provider' IS NULL OR spec_json->'spec'->>'provider' = $2)
+                AND (spec_json->'spec'->>'connectorId' IS NULL OR spec_json->'spec'->>'connectorId' = $3)
+                AND (
+                  spec_json->'spec'->'eventTypes' IS NULL
+                  OR jsonb_typeof(spec_json->'spec'->'eventTypes') <> 'array'
+                  OR (spec_json->'spec'->'eventTypes') ? $4
+                )
+              ORDER BY created_at ASC
+              LIMIT $5
+              FOR UPDATE SKIP LOCKED
+            ),
+            updated AS (
+              UPDATE autopilot_awaits a
+              SET status = 'resuming',
+                  updated_at = NOW()
+              FROM matches m
+              WHERE a.id = m.id
+                AND a.status = 'waiting'
+              RETURNING a.*
             )
-          ORDER BY created_at ASC
-          LIMIT $5
-          `,
-          [args.starshipId, args.provider, args.connectorId, args.eventType, limit]
-        );
+            SELECT * FROM updated
+            `,
+            [args.starshipId, args.provider, args.connectorId, args.eventType, limit]
+          );
+          return res.rows as Record<string, unknown>[];
+        });
         return fromDatabaseArray(AutopilotAwaitEntity, rows);
       },
       'findWaitingMatches',

@@ -648,7 +648,12 @@ router.put('/admin/connector-templates/:id/actions', async (req: Request, res: R
     if (!params) return;
 
     const BodySchema = z.object({ actions: z.array(z.record(z.string(), z.unknown())) }).strict();
-    const body = validateData(BodySchema, req.body as unknown as BulkReplaceConnectorTemplateActionsRequest, res, 'bulk replace actions body');
+    const body = validateData(
+      BodySchema,
+      req.body as unknown as BulkReplaceConnectorTemplateActionsRequest,
+      res,
+      'bulk replace actions body'
+    );
     if (!body) return;
 
     const template = await loadTemplateByIdOrProvider(params.id);

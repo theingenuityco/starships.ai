@@ -61,9 +61,7 @@ export function useAdminConnectorTemplateLegacyEndpoints(id: string | null | und
     queryKey: id ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.legacyEndpoints(id) : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.legacyEndpoints('missing'),
     enabled: enabled && !!id,
     queryFn: async (): Promise<unknown[]> => {
-      const response: FetchResponse<ApiResponse<{ LEGACY_endpoints: unknown[] }>> = await api.get(
-        `/api/v1/admin/connector-templates/${id}/legacy-endpoints`
-      )
+      const response: FetchResponse<ApiResponse<{ LEGACY_endpoints: unknown[] }>> = await api.get(`/api/v1/admin/connector-templates/${id}/legacy-endpoints`)
       const raw = response.data.data?.LEGACY_endpoints
       return Array.isArray(raw) ? raw : []
     },
@@ -108,11 +106,7 @@ export function useCreateAdminConnectorTemplate() {
   })
 }
 
-export function useAdminConnectorTemplateActions(
-  id: string | null | undefined,
-  params?: { q?: string; limit?: number; offset?: number },
-  enabled: boolean = true
-) {
+export function useAdminConnectorTemplateActions(id: string | null | undefined, params?: { q?: string; limit?: number; offset?: number }, enabled: boolean = true) {
   const q = params?.q
   const limit = params?.limit
   const offset = params?.offset
@@ -125,9 +119,7 @@ export function useAdminConnectorTemplateActions(
       if (typeof limit === 'number') search.set('limit', String(limit))
       if (typeof offset === 'number') search.set('offset', String(offset))
       const qs = search.toString()
-      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionsListResponse>> = await api.get(
-        `/api/v1/admin/connector-templates/${id}/actions${qs ? `?${qs}` : ''}`
-      )
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionsListResponse>> = await api.get(`/api/v1/admin/connector-templates/${id}/actions${qs ? `?${qs}` : ''}`)
       return response.data.data
     },
     staleTime: 5 * 1000,
@@ -137,15 +129,10 @@ export function useAdminConnectorTemplateActions(
 
 export function useAdminConnectorTemplateAction(id: string | null | undefined, actionName: string | null | undefined, enabled: boolean = true) {
   return useQuery({
-    queryKey:
-      id && actionName
-        ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id, actionName)
-        : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id || 'missing', actionName || 'missing'),
+    queryKey: id && actionName ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id, actionName) : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id || 'missing', actionName || 'missing'),
     enabled: enabled && !!id && !!actionName,
     queryFn: async (): Promise<ConnectorEndpointV2> => {
-      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionResponse>> = await api.get(
-        `/api/v1/admin/connector-templates/${id}/actions/${encodeURIComponent(String(actionName))}`
-      )
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionResponse>> = await api.get(`/api/v1/admin/connector-templates/${id}/actions/${encodeURIComponent(String(actionName))}`)
       return response.data.data.action
     },
     staleTime: 5 * 1000,

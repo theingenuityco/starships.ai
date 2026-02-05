@@ -152,6 +152,22 @@ Scheduler/worker processes (require Redis):
 - `GET /docs` (search/index markdown in `public-docs/`)
 - `GET /docs/<slug>` (fetch raw markdown by slug)
 
+### Webhooks
+
+- `POST /webhooks` (generic webhook entrypoint; currently used for compliance flows that require raw-body verification)
+- `POST /webhooks/stripe` (Stripe webhook ingestion)
+- `POST /webhooks/connectors/:provider` (global connector webhook ingestion; routes by provider-derived external account id)
+
+Connector webhook ingestion notes:
+
+- The URL does **not** include a starship id.
+- Verification + normalization are template-driven via `connector_templates.webhooks_json`.
+- Routing uses `(provider, externalAccountId)` bindings and may fan out to multiple connector instances.
+
+Operational helper:
+
+- `pnpm -C packages/server connectors:backfill-webhook-bindings` (dry-run by default; add `--apply` to write)
+
 ### Subscriptions (Stripe)
 
 - `GET /subscriptions/plans` (prices with ship-class metadata)

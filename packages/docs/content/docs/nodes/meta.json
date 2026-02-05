@@ -1,6 +1,6 @@
 {
   "title": "Nodes",
-  "pages": ["reference", "code"],
+  "pages": ["reference", "await", "code"],
   "defaultOpen": true,
   "icon": "Boxes"
 }

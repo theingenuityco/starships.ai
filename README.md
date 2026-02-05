@@ -13,6 +13,7 @@ This monorepo contains the product UI, API, workflow engine, remote runner, and 
   - Tool templates can be browsed publicly; publishing uses an instance-admin approval flow.
   - Tool calls can be set to **allow / ask (approval) / deny** per agent.
 - **Connectors**: third‑party integrations executed via the `connector_action` node; auth is injected by the HostRuntime so blueprints never see raw secrets.
+- **Event-driven automations**: workflows can pause on `await` and resume when connector webhook events are ingested by the server (global webhook endpoint, template-driven verification/routing).
 - **Conversations with live streaming**: chat turns stream to the UI over **Server‑Sent Events (SSE)**; the server can stop a turn and resume/replay.
 - **Scheduling**: cron-based scheduled prompts executed by worker processes (BullMQ + Redis).
 - **Billing & credits**: Stripe subscriptions define ship classes/entitlements; wallets/ledger track usage and credits.

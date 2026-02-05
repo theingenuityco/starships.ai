@@ -356,7 +356,19 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight, unreadTotal]
+    [
+      isAuthenticated,
+      starshipSlug,
+      isAgentsRoute,
+      isAgentBuilderRoute,
+      pathname,
+      isSchedulesRoute,
+      isConnectorsRoute,
+      starshipData?.id,
+      isInstanceAdmin,
+      getOnboardingHighlight,
+      unreadTotal,
+    ]
   )
 
   const handleSidebarBackgroundClick = useCallback(

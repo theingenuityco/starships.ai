@@ -13,6 +13,7 @@
     "autopilot:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationWorker.ts",
     "autopilot:resume-worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationResumeWorker.ts",
     "avatars:optimize-existing": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/optimize-existing-avatars.ts",
+    "connectors:backfill-webhook-bindings": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/backfill-connector-webhook-bindings.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "NODE_OPTIONS='--experimental-vm-modules --max-old-space-size=4096' jest"

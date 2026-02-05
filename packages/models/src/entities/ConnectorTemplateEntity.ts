@@ -94,6 +94,16 @@ export class ConnectorTemplateEntity {
   @IsObject()
   metadataSchemaJson?: JsonSchemaObject;
 
+  /**
+   * Optional webhook/event ingestion configuration (server-consumed).
+   *
+   * Stored as connector_templates.webhooks_json (JSONB).
+   */
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  webhooksJson?: Record<string, unknown>;
+
   // Versioning / metadata
 
   @Expose()
@@ -146,6 +156,7 @@ export class ConnectorTemplateEntity {
       endpointsJson: (dataRecord.endpointsJson as ConnectorEndpointV2[]) || [],
       rateLimitJson: dataRecord.rateLimitJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['rateLimit']> | undefined,
       metadataSchemaJson: dataRecord.metadataSchemaJson as JsonSchemaObject | undefined,
+      webhooksJson: dataRecord.webhooksJson as Record<string, unknown> | undefined,
       version: (dataRecord.version as string) || '1.0.0',
       category: (dataRecord.category as string) || 'connector',
       usageCount: (dataRecord.usageCount as number) ?? 0,

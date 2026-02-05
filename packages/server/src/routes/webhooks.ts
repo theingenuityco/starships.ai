@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { StripeWebhookService } from '@/services/StripeWebhookService';
+import { ConnectorEventIngestionService } from '@/services/ConnectorEventIngestionService';
 import { getEnvConfig } from '@starships/env';
 
 const envConfig = getEnvConfig();
@@ -137,5 +138,41 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
 
   res.json({ received: true });
 });
+
+/**
+ * POST /api/v1/webhooks/connectors/:provider/:starshipId
+ *
+ * Generic connector webhook ingestion entrypoint. Normalization + verification
+ * are template-driven via connector_templates.webhooks_json.
+ *
+ * NOTE: This route is mounted before JSON body parsing so we can verify signatures.
+ */
+router.post(
+  '/webhooks/connectors/:provider/:starshipId',
+  express.raw({ type: '*/*' }),
+  async (req: Request, res: Response): Promise<void> => {
+    const provider = String(req.params?.provider || '').trim();
+    const starshipId = String(req.params?.starshipId || '').trim();
+    if (!provider || !starshipId) {
+      res.status(400).json({ received: false, error: 'provider and starshipId are required' });
+      return;
+    }
+
+    try {
+      const svc = new ConnectorEventIngestionService();
+      const result = await svc.ingestConnectorWebhook({ provider, starshipId, req });
+      res.status(200).json({ received: true, ...result });
+    } catch (err) {
+      logger.error('[WEBHOOK] Connector webhook ingestion failed', {
+        provider,
+        starshipId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Return 200 by default to avoid provider retry storms for non-actionable errors.
+      // (Providers often retry aggressively on 4xx/5xx.)
+      res.status(200).json({ received: false });
+    }
+  }
+);
 
 export default router;

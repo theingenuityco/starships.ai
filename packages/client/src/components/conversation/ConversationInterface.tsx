@@ -305,6 +305,11 @@ export function ConversationInterface({
     return chans.find((c: any) => String(c?.conversationId || '') === cid) || null
   }, [starshipChannelsData, currentConversationId])
 
+  const isCurrentChannelPrivate = useMemo(() => {
+    if (!currentChannel) return false
+    return Boolean((currentChannel as any)?.isPrivate)
+  }, [currentChannel])
+
   const isForumChannel = useMemo(() => {
     const t = typeof (currentChannel as any)?.channelType === 'string' ? String((currentChannel as any).channelType) : ''
     return t.trim().toLowerCase() === 'forum'
@@ -924,6 +929,7 @@ export function ConversationInterface({
           channelConversationId={currentConversationId}
           channelSlug={typeof (currentChannel as any)?.slug === 'string' ? String((currentChannel as any).slug) : null}
           channelName={typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null}
+          channelIsPrivate={Boolean((currentChannel as any)?.isPrivate)}
           starshipSlug={starshipSlug ?? null}
           onCreateDraftThread={() => {
             // Open a draft thread in the thread pane without persisting a conversation yet.
@@ -950,6 +956,13 @@ export function ConversationInterface({
                 conversationId={currentConversationId}
                 starshipId={starshipId}
                 titlePrefix={isChannelConversation ? <Icon name="hash" weight="bold" className="h-5 w-5" /> : null}
+                titleRightSlot={
+                  isChannelConversation && isCurrentChannelPrivate ? (
+                    <span className="inline-flex items-center" title="Private channel">
+                      <Icon name="lock" label="Private channel" className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                  ) : null
+                }
                 fallbackTitle={
                   draftDm
                     ? draftDm.dmType === 'user_agent'

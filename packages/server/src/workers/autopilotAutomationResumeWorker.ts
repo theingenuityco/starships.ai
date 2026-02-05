@@ -57,6 +57,21 @@ function upsertNodeResult(execution: Execution, nodeRef: string, items: Executio
   execution.results.push({ nodeRef, items: normalizedItems });
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  const ms = Number.isFinite(timeoutMs) ? Math.floor(timeoutMs) : 0;
+  if (ms <= 0) return promise;
+
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 async function main(): Promise<void> {
   const env = getEnvConfig();
 
@@ -183,11 +198,19 @@ async function main(): Promise<void> {
 
       try {
         const runner = RunnerFactory.getTopLevelRunner(0);
-        await runner.run(aw.blueprintJson as unknown as Blueprint, execution, {
+        const executionTimeoutMs = process.env.AUTOPILOT_EXECUTION_TIMEOUT_MS
+          ? parseInt(process.env.AUTOPILOT_EXECUTION_TIMEOUT_MS, 10)
+          : 10 * 60_000; // 10 minutes
+
+        await withTimeout(
+          runner.run(aw.blueprintJson as unknown as Blueprint, execution, {
           ...engineConfig,
           eventCallback,
           failOnNodeError: true,
-        });
+          }),
+          executionTimeoutMs,
+          'Autopilot execution'
+        );
 
         // Mark connector event processed (best-effort)
         try {

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { Request } from 'express';
 import type { ConnectorProvider, SecretRef } from '@starships/protocol';
+import { AppError, AuthError, NotFoundError, ValidationError } from '@starships/errors';
 import {
   AutopilotAwaitFiringRepository,
   AutopilotAwaitRepository,
@@ -221,12 +222,14 @@ export class ConnectorEventIngestionService {
 
     const header = String(req.get(cfg.headerName) || '').trim();
     if (!header) {
-      throw new Error(`Missing signature header: ${cfg.headerName}`);
+      throw new ValidationError(`Missing signature header: ${cfg.headerName}`, cfg.headerName);
     }
 
     const secret = await this.resolveSecret(cfg.secretRef, connectorId);
     if (!secret) {
-      throw new Error(`Webhook signing secret not configured for ref: ${cfg.secretRef.type}:${cfg.secretRef.key}`);
+      throw new AppError('Webhook signing secret not configured', 'WEBHOOK_SECRET_NOT_CONFIGURED', 500, {
+        details: { ref: `${cfg.secretRef.type}:${String(cfg.secretRef.key || '').trim() || '__missing__'}` },
+      });
     }
 
     const digest =
@@ -235,7 +238,7 @@ export class ConnectorEventIngestionService {
         : crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
     if (!safeEqual(digest, header)) {
-      throw new Error('Webhook signature verification failed');
+      throw new AuthError('Webhook signature verification failed');
     }
   }
 
@@ -255,11 +258,11 @@ export class ConnectorEventIngestionService {
     enqueuedFiringIds: string[];
   }> {
     const provider = String(args.provider || '').trim();
-    if (!provider) throw new Error('provider is required');
+    if (!provider) throw new ValidationError('provider is required', 'provider');
 
     const template = await this.templateRepo.findByProvider(provider as unknown as ConnectorProvider);
     if (!template) {
-      throw new Error(`No connector template found for provider "${provider}"`);
+      throw new NotFoundError('connector_template', provider);
     }
 
     const cfg = parseConnectorWebhookTemplateConfig(template.webhooksJson);

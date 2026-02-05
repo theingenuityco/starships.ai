@@ -6,6 +6,7 @@ import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { StripeWebhookService } from '@/services/StripeWebhookService';
 import { ConnectorEventIngestionService } from '@/services/ConnectorEventIngestionService';
 import { getEnvConfig } from '@starships/env';
+import { AppError } from '@starships/errors';
 
 const envConfig = getEnvConfig();
 const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
@@ -166,9 +167,11 @@ router.post(
         provider,
         error: err instanceof Error ? err.message : String(err),
       });
-      // Return 200 by default to avoid provider retry storms for non-actionable errors.
-      // (Providers often retry aggressively on 4xx/5xx.)
-      res.status(200).json({ received: false });
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ received: false, ...err.toResponse() });
+        return;
+      }
+      res.status(500).json({ received: false, error: { code: 'INTERNAL_ERROR', message: 'Internal error' } });
     }
   }
 );

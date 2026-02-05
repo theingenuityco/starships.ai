@@ -8,7 +8,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
-import { useAdminConnectorTemplate, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
+import {
+  useAdminConnectorTemplate,
+  useAdminConnectorTemplateAction,
+  useAdminConnectorTemplateActions,
+  useBulkReplaceAdminConnectorTemplateActions,
+  useDeleteAdminConnectorTemplateAction,
+  useUpdateAdminConnectorTemplate,
+  useUpsertAdminConnectorTemplateAction,
+} from '@/hooks/useAdminConnectorTemplates'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -39,6 +47,9 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const { data: connector, isLoading, isError, error } = useAdminConnectorTemplate(id, isAuthenticated && isInstanceAdmin)
   const updateMutation = useUpdateAdminConnectorTemplate()
+  const upsertActionMutation = useUpsertAdminConnectorTemplateAction()
+  const deleteActionMutation = useDeleteAdminConnectorTemplateAction()
+  const bulkReplaceMutation = useBulkReplaceAdminConnectorTemplateActions()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -49,10 +60,23 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const [baseUrl, setBaseUrl] = useState('')
   const [authText, setAuthText] = useState('')
-  const [endpointsText, setEndpointsText] = useState('')
   const [variablesText, setVariablesText] = useState('')
   const [rateLimitText, setRateLimitText] = useState('')
   const [metadataSchemaText, setMetadataSchemaText] = useState('')
+
+  // Actions UI state
+  const [actionsQuery, setActionsQuery] = useState('')
+  const [selectedActionName, setSelectedActionName] = useState<string | null>(null)
+  const [selectedActionText, setSelectedActionText] = useState('')
+  const [bulkEndpointsText, setBulkEndpointsText] = useState('')
+  const [showBulkReplace, setShowBulkReplace] = useState(false)
+
+  const { data: actionsResp } = useAdminConnectorTemplateActions(id, { q: actionsQuery, limit: 50, offset: 0 }, isAuthenticated && isInstanceAdmin)
+  const { data: selectedAction } = useAdminConnectorTemplateAction(
+    id,
+    selectedActionName,
+    isAuthenticated && isInstanceAdmin && !!selectedActionName
+  )
 
   const provider = connector?.provider
   const slug = connector?.slug
@@ -68,11 +92,15 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
     setBaseUrl(connector.baseUrl || '')
     setAuthText(formatJson(connector.auth || { type: 'none' }))
-    setEndpointsText(formatJson(connector.endpoints || []))
     setVariablesText(formatJson(connector.variables || []))
     setRateLimitText(formatJson(connector.rateLimit || undefined))
     setMetadataSchemaText(formatJson(connector.metadataSchema || undefined))
   }, [connector])
+
+  useEffect(() => {
+    if (!selectedAction) return
+    setSelectedActionText(formatJson(selectedAction))
+  }, [selectedAction])
 
   const title = useMemo(() => (provider ? `Connector template: ${provider}` : 'Connector template'), [provider])
 
@@ -144,17 +172,12 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                   if (!id) return
                   try {
                     const auth = parseOptionalJson(authText) as any
-                    const endpoints = parseOptionalJson(endpointsText) as any
                     const variables = parseOptionalJson(variablesText) as any
                     const rateLimit = parseOptionalJson(rateLimitText) as any
                     const metadataSchema = parseOptionalJson(metadataSchemaText) as any
 
                     if (auth !== undefined && (auth === null || typeof auth !== 'object' || Array.isArray(auth))) {
                       toast.error('auth must be a JSON object')
-                      return
-                    }
-                    if (endpoints !== undefined && !Array.isArray(endpoints)) {
-                      toast.error('endpoints must be a JSON array')
                       return
                     }
                     if (variables !== undefined && !Array.isArray(variables)) {
@@ -180,7 +203,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         category,
                         baseUrl,
                         auth: auth === undefined ? undefined : (auth as any),
-                        endpoints: endpoints === undefined ? undefined : (endpoints as any),
                         variables: variables === undefined ? undefined : (variables as any),
                         rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
                         metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
@@ -274,10 +296,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       <Textarea value={authText} onChange={e => setAuthText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">endpoints (JSON array)</label>
-                      <Textarea value={endpointsText} onChange={e => setEndpointsText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
-                    </div>
-                    <div className="space-y-2">
                       <label className="text-sm font-medium">variables (JSON array)</label>
                       <Textarea value={variablesText} onChange={e => setVariablesText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
@@ -289,6 +307,140 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       <label className="text-sm font-medium">metadataSchema (JSON)</label>
                       <Textarea value={metadataSchemaText} onChange={e => setMetadataSchemaText(e.target.value)} className="min-h-[180px] font-mono text-xs" spellCheck={false} />
                     </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/60 bg-background/70 p-5 space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium">Actions</div>
+                        <div className="text-xs text-muted-foreground">Stored in `connector_template_actions`. Edit actions individually to avoid huge template payloads.</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowBulkReplace(v => !v)}
+                        disabled={bulkReplaceMutation.isPending}
+                      >
+                        {showBulkReplace ? 'Hide bulk replace' : 'Bulk replace'}
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Search</label>
+                      <Input value={actionsQuery} onChange={e => setActionsQuery(e.target.value)} placeholder="Search by name, path, description" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="rounded-md border border-border/60">
+                        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60">
+                          {actionsResp?.actions?.length ? `${actionsResp.actions.length} actions` : 'No actions'}
+                        </div>
+                        <div className="max-h-[420px] overflow-auto divide-y divide-border/60">
+                          {(actionsResp?.actions || []).map(a => (
+                            <button
+                              key={`${a.templateId}:${a.actionName}`}
+                              className={`w-full text-left px-3 py-2 hover:bg-muted/40 ${
+                                selectedActionName === a.actionName ? 'bg-muted/50' : ''
+                              }`}
+                              onClick={() => setSelectedActionName(a.actionName)}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="font-mono text-xs truncate">{a.actionName}</div>
+                                <div className="text-[10px] text-muted-foreground shrink-0">{a.method}</div>
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate font-mono mt-1">{a.path}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Selected action {selectedActionName ? <span className="font-mono text-xs text-muted-foreground">{selectedActionName}</span> : null}</label>
+                        <Textarea
+                          value={selectedActionText}
+                          onChange={e => setSelectedActionText(e.target.value)}
+                          className="min-h-[420px] font-mono text-xs"
+                          spellCheck={false}
+                          placeholder="Select an action to edit, or paste a ConnectorEndpointV2 JSON object and set its name via the action route."
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              if (!id || !selectedActionName) return
+                              if (!confirm(`Delete action "${selectedActionName}"?`)) return
+                              await deleteActionMutation.mutateAsync({ id, actionName: selectedActionName })
+                              setSelectedActionName(null)
+                              setSelectedActionText('')
+                            }}
+                            disabled={!selectedActionName || deleteActionMutation.isPending}
+                          >
+                            Delete
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              if (!id || !selectedActionName) return
+                              try {
+                                const parsed = parseOptionalJson(selectedActionText)
+                                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                                  toast.error('Action must be a JSON object')
+                                  return
+                                }
+                                await upsertActionMutation.mutateAsync({
+                                  id,
+                                  actionName: selectedActionName,
+                                  payload: { endpoint: parsed as any },
+                                })
+                              } catch (e: any) {
+                                toast.error('Invalid JSON', { description: e?.message || 'Please fix action JSON.' })
+                              }
+                            }}
+                            disabled={!selectedActionName || upsertActionMutation.isPending}
+                          >
+                            {upsertActionMutation.isPending ? 'Saving…' : 'Save action'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {showBulkReplace ? (
+                      <div className="space-y-2 pt-2 border-t border-border/60">
+                        <label className="text-sm font-medium">Bulk replace actions (JSON array of endpoints)</label>
+                        <Textarea
+                          value={bulkEndpointsText}
+                          onChange={e => setBulkEndpointsText(e.target.value)}
+                          className="min-h-[220px] font-mono text-xs"
+                          spellCheck={false}
+                          placeholder='[ { "name": "list-tools", "method": "GET", "path": "/tools" } ]'
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setBulkEndpointsText('')}
+                            disabled={bulkReplaceMutation.isPending}
+                          >
+                            Clear
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              if (!id) return
+                              try {
+                                const parsed = parseOptionalJson(bulkEndpointsText)
+                                if (!Array.isArray(parsed)) {
+                                  toast.error('Bulk replace payload must be a JSON array')
+                                  return
+                                }
+                                await bulkReplaceMutation.mutateAsync({ id, payload: { endpoints: parsed as any } })
+                              } catch (e: any) {
+                                toast.error('Invalid JSON', { description: e?.message || 'Please fix JSON.' })
+                              }
+                            }}
+                            disabled={bulkReplaceMutation.isPending || !bulkEndpointsText.trim()}
+                          >
+                            {bulkReplaceMutation.isPending ? 'Replacing…' : 'Replace all actions'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}

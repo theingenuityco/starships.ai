@@ -5,10 +5,15 @@ import type {
   AdminConnectorTemplateDeleteResponse,
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateResponse,
+  AdminConnectorTemplateActionsListResponse,
+  AdminConnectorTemplateActionResponse,
   ApiResponse,
+  BulkReplaceConnectorTemplateActionsRequest,
   CreateConnectorTemplateRequest,
   ConnectorTemplateAdminModel,
   ConnectorTemplateModel,
+  ConnectorEndpointV2,
+  UpsertConnectorTemplateActionRequest,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -19,6 +24,9 @@ export const ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS = {
   all: ['admin', 'connector-templates'] as const,
   list: () => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'list'] as const,
   detail: (id: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'detail', id] as const,
+  actions: (id: string, params?: { q?: string; limit?: number; offset?: number }) =>
+    [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'actions', id, params?.q ?? '', params?.limit ?? 50, params?.offset ?? 0] as const,
+  action: (id: string, actionName: string) => [...ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all, 'action', id, actionName] as const,
 } as const
 
 export function useAdminConnectorTemplates(enabled: boolean = true) {
@@ -79,6 +87,106 @@ export function useCreateAdminConnectorTemplate() {
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to create connector template'
       toast.error('Failed to create connector template', { description: message })
+    },
+  })
+}
+
+export function useAdminConnectorTemplateActions(
+  id: string | null | undefined,
+  params?: { q?: string; limit?: number; offset?: number },
+  enabled: boolean = true
+) {
+  const q = params?.q
+  const limit = params?.limit
+  const offset = params?.offset
+  return useQuery({
+    queryKey: id ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions(id, { q, limit, offset }) : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions('missing'),
+    enabled: enabled && !!id,
+    queryFn: async (): Promise<AdminConnectorTemplateActionsListResponse> => {
+      const search = new URLSearchParams()
+      if (q) search.set('q', q)
+      if (typeof limit === 'number') search.set('limit', String(limit))
+      if (typeof offset === 'number') search.set('offset', String(offset))
+      const qs = search.toString()
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionsListResponse>> = await api.get(
+        `/api/v1/admin/connector-templates/${id}/actions${qs ? `?${qs}` : ''}`
+      )
+      return response.data.data
+    },
+    staleTime: 5 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+}
+
+export function useAdminConnectorTemplateAction(id: string | null | undefined, actionName: string | null | undefined, enabled: boolean = true) {
+  return useQuery({
+    queryKey:
+      id && actionName
+        ? ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id, actionName)
+        : ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(id || 'missing', actionName || 'missing'),
+    enabled: enabled && !!id && !!actionName,
+    queryFn: async (): Promise<ConnectorEndpointV2> => {
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateActionResponse>> = await api.get(
+        `/api/v1/admin/connector-templates/${id}/actions/${encodeURIComponent(String(actionName))}`
+      )
+      return response.data.data.action
+    },
+    staleTime: 5 * 1000,
+    gcTime: 5 * 60 * 1000,
+  })
+}
+
+export function useUpsertAdminConnectorTemplateAction() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { id: string; actionName: string; payload: UpsertConnectorTemplateActionRequest }) => {
+      await api.put(`/api/v1/admin/connector-templates/${args.id}/actions/${encodeURIComponent(args.actionName)}`, args.payload)
+      return true
+    },
+    onSuccess: (_ok, vars) => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions(vars.id) })
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.action(vars.id, vars.actionName) })
+      toast.success('Action saved', { description: vars.actionName })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to save action'
+      toast.error('Failed to save action', { description: message })
+    },
+  })
+}
+
+export function useDeleteAdminConnectorTemplateAction() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { id: string; actionName: string }) => {
+      await api.delete(`/api/v1/admin/connector-templates/${args.id}/actions/${encodeURIComponent(args.actionName)}`)
+      return true
+    },
+    onSuccess: (_ok, vars) => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions(vars.id) })
+      toast.success('Action deleted', { description: vars.actionName })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to delete action'
+      toast.error('Failed to delete action', { description: message })
+    },
+  })
+}
+
+export function useBulkReplaceAdminConnectorTemplateActions() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { id: string; payload: BulkReplaceConnectorTemplateActionsRequest }) => {
+      await api.put(`/api/v1/admin/connector-templates/${args.id}/actions`, args.payload)
+      return true
+    },
+    onSuccess: (_ok, vars) => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.actions(vars.id) })
+      toast.success('Actions replaced')
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to replace actions'
+      toast.error('Failed to replace actions', { description: message })
     },
   })
 }

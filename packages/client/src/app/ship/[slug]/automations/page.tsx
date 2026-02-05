@@ -30,7 +30,8 @@ export default function StarshipAutomationsPage(): React.JSX.Element {
     <PageLayout
       title="Automations"
       description="Event-driven automations that are currently waiting for external events."
-      actions={
+      showHeader
+      headerActions={
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name="workflow" className="w-4 h-4" />
           <span>Awaits</span>

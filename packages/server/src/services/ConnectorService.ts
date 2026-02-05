@@ -619,7 +619,9 @@ export class ConnectorService {
         version: template.version,
         category: template.category,
         baseUrl: template.baseUrl,
-        endpoints: template.endpointsJson ?? [],
+        // NOTE: endpoints/actions are intentionally excluded from this list payload.
+        // They are fetched via dedicated admin actions routes when needed, and runtime
+        // execution loads actions via connector_template_actions.
       } satisfies ConnectorListItem['template'];
 
       if (existing) {

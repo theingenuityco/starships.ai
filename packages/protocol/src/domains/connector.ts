@@ -519,3 +519,40 @@ export interface ConnectorActionResponse {
    */
   selected?: unknown;
 }
+
+// ============================================================================
+// CONNECTOR EVENTS (INBOUND)
+// ============================================================================
+
+/**
+ * Normalized connector event model, persisted server-side.
+ *
+ * NOTE: Connector providers vary widely; eventType is an open string.
+ */
+export interface ConnectorEventModel {
+  id: string;
+  starshipId: string;
+  connectorId: string;
+  provider: ConnectorProvider;
+  eventType: string;
+  /**
+   * Provider-supplied stable identifier for deduplication (nullable).
+   */
+  externalEventId?: string | null;
+  /**
+   * Normalized event payload (JSON-safe).
+   */
+  payloadJson: Record<string, unknown>;
+  /**
+   * Optional raw payload (for debugging/audit).
+   */
+  rawPayloadJson?: Record<string, unknown> | null;
+  /**
+   * Optional captured headers (for debugging; sensitive values should be redacted server-side).
+   */
+  headersJson?: Record<string, unknown> | null;
+  receivedAt: string;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

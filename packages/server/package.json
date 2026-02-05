@@ -10,6 +10,8 @@
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "schedule:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduledRunsWorker.ts",
     "schedule:scheduler": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduleScheduler.ts",
+    "autopilot:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationWorker.ts",
+    "autopilot:resume-worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationResumeWorker.ts",
     "avatars:optimize-existing": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/optimize-existing-avatars.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",

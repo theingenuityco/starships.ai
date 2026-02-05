@@ -32,7 +32,14 @@ export class ConnectorTemplateRepository extends BaseRepository {
 
   private normalizeJsonbColumns(dbRecord: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = { ...dbRecord };
-    const jsonbColumns = ['auth_json', 'variables_json', 'endpoints_json', 'rate_limit_json', 'metadata_schema_json'] as const;
+    const jsonbColumns = [
+      'auth_json',
+      'variables_json',
+      'endpoints_json',
+      'rate_limit_json',
+      'metadata_schema_json',
+      'webhooks_json',
+    ] as const;
     for (const col of jsonbColumns) {
       if (col in out) {
         out[col] = this.normalizeJsonbUpdateValue(out[col]);

@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
+import { useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,7 @@ import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { useAuth } from '@/hooks/useAuth'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -29,6 +30,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
   const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
@@ -107,9 +109,10 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       onDeploy?.(template)
       onOpenChange(false)
 
-      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      // Marketplace UX: after deploy, take the user to the agent's chat. Refetch agents so DM page finds the new agent.
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
         if (agentId) {
+          await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)

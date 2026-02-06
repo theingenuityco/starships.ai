@@ -187,11 +187,6 @@ export class UserEntity implements UserModel {
   @Expose()
   @IsOptional()
   @IsBoolean()
-  navigationOnboardingCompleted?: boolean;
-
-  @Expose()
-  @IsOptional()
-  @IsBoolean()
   wizardOnboardingCompleted?: boolean;
 
   /**

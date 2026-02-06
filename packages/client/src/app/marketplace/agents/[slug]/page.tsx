@@ -239,53 +239,6 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
               <div className="space-y-16 sm:space-y-20">
-                {/* Problem Statements Section */}
-                {hasProblemSection ? (
-                  hasProblemImage ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                      {/* Problem Statements Image */}
-                      <div className="rounded-lg border border-border/40 overflow-hidden">
-                        <AgentProfileImage
-                          src={problemStatementsImageUrl as string}
-                          alt={
-                            hasProblemText
-                              ? `${template.name} understanding user challenges: ${problemStatementsText
-                                  .slice(0, 3)
-                                  .map(s => `"${s}"`)
-                                  .join(', ')}`
-                              : `${template.name} - The Problem`
-                          }
-                          className="w-full h-auto"
-                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                        />
-                      </div>
-
-                      {/* Problem Statements Text (no outer card background) */}
-                      {hasProblemText ? (
-                        <section className="h-full flex flex-col justify-between px-1 sm:px-2 py-2">
-                          <div className="flex-1 flex flex-col justify-between space-y-10">
-                            {problemStatementsText.slice(0, 3).map((statement, index) => (
-                              <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                                &quot;{statement}&quot;
-                              </p>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-                    </div>
-                  ) : hasProblemText ? (
-                    <section className="px-1 sm:px-2 py-2">
-                      <div className="flex flex-col space-y-10">
-                        {problemStatementsText.slice(0, 3).map((statement, index) => (
-                          <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                            &quot;{statement}&quot;
-                          </p>
-                        ))}
-                      </div>
-                    </section>
-                  ) : null
-                ) : null}
-
                 {hasCapabilitiesSection ? (
                   hasCapabilitiesImage ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -371,6 +324,53 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       </div>
                     </section>
                   )
+                ) : null}
+
+                {/* Problem Statements Section */}
+                {hasProblemSection ? (
+                  hasProblemImage ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                      {/* Problem Statements Image */}
+                      <div className="rounded-lg border border-border/40 overflow-hidden">
+                        <AgentProfileImage
+                          src={problemStatementsImageUrl as string}
+                          alt={
+                            hasProblemText
+                              ? `${template.name} understanding user challenges: ${problemStatementsText
+                                  .slice(0, 3)
+                                  .map(s => `"${s}"`)
+                                  .join(', ')}`
+                              : `${template.name} - The Problem`
+                          }
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+
+                      {/* Problem Statements Text (no outer card background) */}
+                      {hasProblemText ? (
+                        <section className="h-full flex flex-col justify-between px-1 sm:px-2 py-2">
+                          <div className="flex-1 flex flex-col justify-between space-y-10">
+                            {problemStatementsText.slice(0, 3).map((statement, index) => (
+                              <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                                &quot;{statement}&quot;
+                              </p>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+                    </div>
+                  ) : hasProblemText ? (
+                    <section className="px-1 sm:px-2 py-2">
+                      <div className="flex flex-col space-y-10">
+                        {problemStatementsText.slice(0, 3).map((statement, index) => (
+                          <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                            &quot;{statement}&quot;
+                          </p>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null
                 ) : null}
 
                 {/* Try These Prompts Row - 2 columns */}

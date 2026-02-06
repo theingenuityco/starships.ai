@@ -13,7 +13,8 @@ import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useUserStarships } from '@/hooks/useStarships'
+import { StarshipRail } from '@/components/navigation/StarshipRail'
+import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -48,6 +49,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
+  const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
   const primaryStarship = starships[0]
   const isDashboard = pathname === '/'
@@ -122,6 +124,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const nextTitle = titleForPath(pathname)
     if (nextTitle && document.title !== nextTitle) document.title = nextTitle
   }, [pathname])
+
+  // Marketplace is a "starship-free zone": don't persist / highlight a selected starship
+  // while the user is browsing public marketplace pages.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (!isMarketplace) return
+    setSelectedStarship(null)
+  }, [isAuthenticated, isMarketplace, setSelectedStarship])
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
@@ -213,45 +223,24 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       )
     }
 
-    // Always show navigation for authenticated users on marketplace
-    const shouldHideNavigation = false
-
     return (
       <StarTheme>
         <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-          {/* Sidebar Navigation - conditionally rendered */}
-          {!shouldHideNavigation && (
-            <>
-              {/* Desktop: always visible */}
-              {!isMobile && (
-                <div className="flex-shrink-0 relative z-50">
-                  <aside className="relative h-full">
-                    <Navigation isMobile={false} isOpen={true} />
-                  </aside>
-                </div>
-              )}
-
-              {/* Mobile: overlay navigation */}
-              {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
-            </>
-          )}
-
-          {/* Mobile Toggle Button - only show when menu is closed */}
-          {isMobile && !shouldHideNavigation && !showMobileMenu && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              onClick={() => setShowMobileMenu(true)}
-              className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-              aria-label="Open navigation menu"
-              style={{ zIndex: 999 }}
-            >
-              <Icon name="sidebar" className="w-5 h-5" />
-            </motion.button>
-          )}
+          {/* Rail only (no sidebar panel) */}
+          <div className="flex-shrink-0 relative z-50">
+            <aside className="relative h-full">
+              <StarshipRail
+                starships={starships ?? []}
+                activeSlug={null}
+                onSelect={s => {
+                  setSelectedStarship(s.id)
+                  router.push(`/ship/${encodeURIComponent(s.slug)}`)
+                }}
+              />
+            </aside>
+          </div>
 
           {/* Main Content Area - takes remaining space */}
           <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>

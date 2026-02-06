@@ -12,6 +12,7 @@ import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -36,10 +37,20 @@ interface StarshipConnectorsPanelProps {
    * Defaults to 3 (current connectors page behavior).
    */
   maxColumns?: 1 | 2 | 3
+  /**
+   * Hide reconnect CTA when a connector is already connected.
+   * Useful for onboarding flows where we only want to show status + disconnect.
+   */
+  hideReconnect?: boolean
   /** Hide description on each connector card (compact layout, e.g. deploy modal). */
   hideCardDescription?: boolean
   /** Override connect button label (e.g. "Connect" instead of "Connect Gmail"). */
   connectButtonLabel?: string
+  /**
+   * Use the same card background/border as onboarding step 3 agent cards
+   * (e.g. bg-card/10, border-border/40) for visual consistency.
+   */
+  matchAgentCardStyle?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -62,8 +73,10 @@ export function StarshipConnectorsPanel({
   hideSearch = false,
   hideDisconnect = false,
   maxColumns = 3,
+  hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
+  matchAgentCardStyle = false,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -330,6 +343,8 @@ export function StarshipConnectorsPanel({
     const isManaged = authType === 'platform_jwt'
     const showLogo = !!provider && !hiddenLogos[provider]
 
+    const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
+
     const connectButton = (
       <Button
         size="sm"
@@ -348,7 +363,7 @@ export function StarshipConnectorsPanel({
           ? 'Managed by platform'
           : isOauthConnectable
             ? isConnected
-              ? 'Reconnect'
+              ? connectButtonLabel ?? `Connect ${label}`
               : (connectButtonLabel ?? `Connect ${label}`)
             : isApiKeyConnectable
               ? isConnected
@@ -374,9 +389,13 @@ export function StarshipConnectorsPanel({
       </Button>
     ) : null
 
+    const cardClassName = matchAgentCardStyle
+      ? 'group relative overflow-hidden h-full flex flex-col rounded-xl border border-border/40 bg-card/10 transition-colors duration-200 hover:bg-card/15'
+      : 'group relative overflow-hidden h-full flex flex-col rounded-xl bg-slate-100/50 dark:bg-zinc-800/35 border border-slate-200/50 dark:border-zinc-600/30 shadow-sm dark:shadow-black/5 transition-colors duration-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/50 hover:border-slate-200/70 dark:hover:border-zinc-600/45'
+
     return (
       <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
-        <Card className="group relative overflow-hidden h-full flex flex-col rounded-xl bg-slate-100/50 dark:bg-zinc-800/35 border border-slate-200/50 dark:border-zinc-600/30 shadow-sm dark:shadow-black/5 transition-colors duration-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/50 hover:border-slate-200/70 dark:hover:border-zinc-600/45">
+        <Card className={cn(cardClassName)}>
           <CardHeader className={hideCardDescription ? 'py-4 px-5 relative z-10' : 'pb-3 relative z-10 pt-5 space-y-3'}>
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-3 min-w-0">
@@ -395,7 +414,7 @@ export function StarshipConnectorsPanel({
               </CardTitle>
               {hideCardDescription ? (
                 <div className="flex items-center gap-2 shrink-0">
-                  {connectButton}
+                  {!shouldHideConnectButton && connectButton}
                   {disconnectButton}
                 </div>
               ) : null}
@@ -405,7 +424,7 @@ export function StarshipConnectorsPanel({
           {!hideCardDescription && (
             <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
               <div className="flex gap-2 justify-end">
-                {connectButton}
+                {!shouldHideConnectButton && connectButton}
                 {disconnectButton}
               </div>
             </CardContent>

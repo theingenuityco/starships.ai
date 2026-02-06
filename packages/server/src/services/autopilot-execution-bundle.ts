@@ -1,4 +1,7 @@
 import { getEnvConfig } from '@starships/env';
+import type { EngineConfig } from '@starships/autopilot';
+import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
+import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
 
 export function buildAutopilotRuntimeEnv(args: { starshipId: string; conversationId: string; agentId: string }): Record<string, unknown> {
   const env = getEnvConfig();
@@ -10,12 +13,62 @@ export function buildAutopilotRuntimeEnv(args: { starshipId: string; conversatio
   };
 }
 
+export interface AutopilotRunnerExecuteConfig extends EngineConfig {
+  /**
+   * Make this structurally compatible with places that expect a generic JSON map.
+   * (Many call sites treat runnerConfig/engineConfigFromHost as Record<string, unknown>.)
+   */
+  [key: string]: unknown;
+  /**
+   * Connector templates (safe) passed from embedding host.
+   * Keyed by provider/slug.
+   */
+  connectorTemplates: Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>;
+  /**
+   * Connector sessions (auth headers) passed from embedding host.
+   * Keyed by provider/slug.
+   */
+  connectorSessions: Record<string, ConnectorSession | undefined>;
+  /**
+   * Connector instance metadata (non-secret) passed from embedding host.
+   * Keyed by provider/slug.
+   */
+  connectorMetadata: Record<string, Record<string, unknown> | undefined>;
+  /**
+   * Optional LLM runtime configuration used by runner HostRuntime.llm.
+   */
+  llm?: {
+    apiKey: string;
+    baseUrl?: string;
+  };
+  /**
+   * AWS runtime configuration for Bedrock.
+   */
+  aws: {
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    region?: string;
+  };
+  /**
+   * Azure AI Foundry runtime configuration.
+   */
+  azureAiFoundry?: {
+    apiKey: string;
+    endpoint: string;
+    apiVersion?: string;
+  };
+  /**
+   * Model routing table.
+   */
+  modelRoutes?: Record<string, Array<{ provider: string; providerModelId: string }> | undefined>;
+}
+
 export async function buildAutopilotExecutionBundle(args: {
   starshipId: string;
   authUserId: string;
   runtimeEnv: Record<string, unknown>;
 }): Promise<{
-  engineConfig: Record<string, unknown>;
+  engineConfig: AutopilotRunnerExecuteConfig;
 }> {
   const env = getEnvConfig();
 
@@ -62,11 +115,11 @@ export async function buildAutopilotExecutionBundle(args: {
         }
       : undefined;
 
-  const engineConfig: Record<string, unknown> = {
+  const engineConfig: AutopilotRunnerExecuteConfig = {
     runtimeEnv: args.runtimeEnv,
-    connectorTemplates,
-    connectorSessions,
-    connectorMetadata,
+    connectorTemplates: connectorTemplates as Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>,
+    connectorSessions: connectorSessions as Record<string, ConnectorSession | undefined>,
+    connectorMetadata: connectorMetadata as Record<string, Record<string, unknown> | undefined>,
     llm,
     aws,
     azureAiFoundry,

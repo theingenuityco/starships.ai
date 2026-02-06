@@ -8,6 +8,45 @@ export class ConnectorRepository extends BaseRepository {
     super('ConnectorRepository');
   }
 
+  async findById(id: string): Promise<ConnectorModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const trimmed = String(id || '').trim();
+        if (!trimmed) throw new Error('id is required');
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM connectors WHERE id = $1', [trimmed]);
+        return result ? fromDatabase(ConnectorEntity, result) : null;
+      },
+      'findById',
+      'Connector',
+      id
+    );
+  }
+
+  async findByIds(ids: string[]): Promise<ConnectorModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const list = Array.isArray(ids) ? ids.map((x) => String(x || '').trim()).filter(Boolean) : [];
+        if (!list.length) return [];
+        const connection = this.getConnection();
+
+        // Preserve input order.
+        const rows = await connection.query<Record<string, unknown>>(
+          `
+          SELECT *
+          FROM connectors
+          WHERE id = ANY($1::text[])
+          `,
+          [list]
+        );
+        const byId = new Map(rows.map((r) => [String(r.id), fromDatabase(ConnectorEntity, r)]));
+        return list.map((id) => byId.get(id)).filter((v): v is ConnectorModel => Boolean(v));
+      },
+      'findByIds',
+      'Connector'
+    );
+  }
+
   async findByStarship(starshipId: string): Promise<ConnectorModel[]> {
     return this.executeWithErrorHandling(
       async () => {

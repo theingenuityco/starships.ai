@@ -22,6 +22,7 @@ export type NodeType =
   | 'start'
   | 'end'
   | 'ui_action'
+  | 'await'
   | 'http_request'
   | 'connector_action'
   | 'llm'

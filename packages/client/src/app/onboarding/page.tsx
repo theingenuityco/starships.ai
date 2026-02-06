@@ -43,6 +43,8 @@ type OnboardingPersistedState = {
   starshipName: string
   inviteEmailRows: string[]
   deployedTemplateIds: string[]
+  /** Emails we already sent an invite to this wizard run (avoids re-sending on Back then Next). */
+  invitedEmails: string[]
 }
 
 const ONBOARDING_STORAGE_PREFIX = 'starships:onboarding:wizard:'
@@ -59,6 +61,7 @@ function readPersistedOnboardingState(starshipId?: string | null): OnboardingPer
       starshipName: typeof parsed.starshipName === 'string' ? parsed.starshipName : '',
       inviteEmailRows: Array.isArray(parsed.inviteEmailRows) && parsed.inviteEmailRows.length > 0 ? parsed.inviteEmailRows : [''],
       deployedTemplateIds: Array.isArray(parsed.deployedTemplateIds) ? parsed.deployedTemplateIds : [],
+      invitedEmails: Array.isArray(parsed.invitedEmails) ? parsed.invitedEmails : [],
     }
   } catch {
     return null
@@ -94,6 +97,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [starshipName, setStarshipName] = useState('')
   const [inviteEmailRows, setInviteEmailRows] = useState<string[]>([''])
+  /** Emails we already sent an invite to this wizard run; avoids re-sending when user goes Back then Next. */
+  const [emailsInvitedThisSession, setEmailsInvitedThisSession] = useState<string[]>([])
   /** Template IDs of agents the user added on step 3 (used to show required connectors on step 4). */
   const [deployedTemplateIds, setDeployedTemplateIds] = useState<string[]>([])
 
@@ -155,6 +160,9 @@ export default function OnboardingPage() {
     if (persisted.deployedTemplateIds) {
       setDeployedTemplateIds(persisted.deployedTemplateIds)
     }
+    if (persisted.invitedEmails && persisted.invitedEmails.length > 0) {
+      setEmailsInvitedThisSession(persisted.invitedEmails)
+    }
   }, [primaryStarship?.id])
 
   // Persist wizard state whenever it changes.
@@ -165,8 +173,9 @@ export default function OnboardingPage() {
       starshipName,
       inviteEmailRows,
       deployedTemplateIds,
+      invitedEmails: emailsInvitedThisSession,
     })
-  }, [primaryStarship?.id, step, starshipName, inviteEmailRows, deployedTemplateIds])
+  }, [primaryStarship?.id, step, starshipName, inviteEmailRows, deployedTemplateIds, emailsInvitedThisSession])
 
   const handleStep1Next = useCallback(async () => {
     const name = starshipName.trim()
@@ -202,17 +211,20 @@ export default function OnboardingPage() {
 
   const handleStep2Next = useCallback(async () => {
     const emails = inviteEmailsParsed()
-    if (emails.length > 0 && primaryStarship?.id) {
-      for (const email of emails) {
+    const alreadyInvited = new Set(emailsInvitedThisSession.map(e => e.toLowerCase()))
+    const toSend = emails.filter(e => !alreadyInvited.has(e.toLowerCase()))
+    if (toSend.length > 0 && primaryStarship?.id) {
+      for (const email of toSend) {
         try {
           await createInvite.mutateAsync({ email, role: 'collaborator' })
         } catch {
           // Toast already from hook; continue with rest
         }
       }
+      setEmailsInvitedThisSession(prev => [...prev, ...toSend.map(e => e.toLowerCase())])
     }
     setStep(3)
-  }, [inviteEmailsParsed, primaryStarship?.id, createInvite])
+  }, [inviteEmailsParsed, primaryStarship?.id, createInvite, emailsInvitedThisSession])
 
   const handleStep3Next = useCallback(() => {
     setStep(4)

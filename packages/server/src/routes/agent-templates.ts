@@ -11,6 +11,13 @@ import { generatePresignedUrlInline } from '@/utils/s3-helper';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import type { AuthUser } from '@starships/protocol';
 import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
+import {
+  completeAgentTemplateMarketingJob,
+  createAgentTemplateMarketingJob,
+  failAgentTemplateMarketingJob,
+  getAgentTemplateMarketingJob,
+  markJobStep,
+} from '@/services/AgentTemplateMarketingJobs';
 
 const router: Router = Router();
 
@@ -160,16 +167,60 @@ router.post('/admin/agent-templates/:id/marketing/generate', async (req: Request
     const { id: templateId } = paramValidation;
     const adminUserId = req.user!.id;
 
-    const svc = new AgentTemplateMarketingService();
-    const result = await svc.generateTemplateMarketingContent(templateId, adminUserId);
+    const job = createAgentTemplateMarketingJob(templateId, adminUserId);
+
+    // Kick off background job (best-effort; status is tracked in memory).
+    (async () => {
+      try {
+        markJobStep(job.id, 'validate_admin', 'running');
+        markJobStep(job.id, 'validate_admin', 'completed');
+
+        const svc = new AgentTemplateMarketingService();
+        const result = await svc.generateTemplateMarketingContent(templateId, adminUserId, {
+          onStep: (key, status) => {
+            // Map service step keys into job step keys (same strings, minus validate_admin)
+            markJobStep(job.id, key as any, status as any);
+          },
+        });
+
+        // Ensure any still-pending steps are marked completed (defensive).
+        for (const step of ['load_template', 'resolve_parent_agent', 'build_runner_bundle', 'generate_avatar', 'generate_problem_statements', 'generate_profile_images', 'persist_template_assets', 'revalidate'] as const) {
+          markJobStep(job.id, step, 'completed');
+        }
+
+        completeAgentTemplateMarketingJob(job.id, result);
+      } catch (err) {
+        // Mark the currently-running step as failed is handled by step callbacks; store job-level error too.
+        failAgentTemplateMarketingJob(job.id, err);
+      }
+    })();
 
     sendSuccess(res, {
-      message: 'Agent template marketing content generated',
-      ...result,
+      message: 'Agent template marketing job started',
+      jobId: job.id,
+      job,
     });
   } catch (error) {
     console.error('[AGENT-TEMPLATES] Error generating template marketing content:', error);
     handleError(error, res, 'generating template marketing content');
+  }
+});
+
+// GET /admin/agent-templates/marketing/jobs/:jobId - Poll marketing generation progress (instance admin only)
+router.get('/admin/agent-templates/marketing/jobs/:jobId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ jobId: z.string().min(1).max(100) }), req.params, res, 'job parameter');
+    if (!paramValidation) return;
+
+    const job = getAgentTemplateMarketingJob(paramValidation.jobId);
+    if (!job) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Marketing job not found (expired or invalid id)', 404);
+      return;
+    }
+
+    sendSuccess(res, job, 200);
+  } catch (error) {
+    handleError(error, res, 'loading marketing job status');
   }
 });
 

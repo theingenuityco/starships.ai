@@ -8,7 +8,6 @@ import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -50,7 +49,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { shouldShowOnboarding } = useNavigationOnboardingContext()
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
@@ -385,13 +383,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     setThreadDraftTitle('New thread')
   }, [activeConversationId, isDraftThreadOpen, threadDraftParentConversationId])
 
-  // Channels is not part of the navigation onboarding flow.
-  useEffect(() => {
-    if (shouldShowOnboarding) {
-      router.replace('/marketplace')
-    }
-  }, [shouldShowOnboarding, router])
-
   const isDraftDm = useMemo(() => {
     const dm = searchParams.get('dm')
     return dm === 'draft'
@@ -415,7 +406,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   const hasAutoNavigatedRef = useRef(false)
   const pendingAutoNavigateHrefRef = useRef<string | null>(null)
   useEffect(() => {
-    if (shouldShowOnboarding) return
     if (!starshipData?.id) return
     if (routeParams.channelSlug) return
     if (isDraftDm) return
@@ -451,7 +441,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       cancelled = true
       if (pendingAutoNavigateHrefRef.current === href) pendingAutoNavigateHrefRef.current = null
     }
-  }, [shouldShowOnboarding, starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
+  }, [starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the channel slug is invalid (no matching channel), redirect to default channel.
   useEffect(() => {
@@ -514,10 +504,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     },
     [channelsData?.channels, router, routeParams.slug, searchParams]
   )
-
-  if (shouldShowOnboarding) {
-    return null
-  }
 
   if (!starshipData) {
     return null

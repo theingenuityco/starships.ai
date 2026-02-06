@@ -8,7 +8,6 @@ import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
-import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -44,7 +43,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { shouldShowOnboarding } = useNavigationOnboardingContext()
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
@@ -344,13 +342,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     setThreadDraftTitle('New thread')
   }, [isDraftThreadOpen, routeParams.conversationId, threadDraftParentConversationId])
 
-  // Conversations is not part of the navigation onboarding flow.
-  useEffect(() => {
-    if (shouldShowOnboarding) {
-      router.replace('/marketplace')
-    }
-  }, [shouldShowOnboarding, router])
-
   const isDraftDm = useMemo(() => {
     const dm = searchParams.get('dm')
     return dm === 'draft'
@@ -365,7 +356,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // DM landing: `?agent=<slug|id>` should open a DM with that agent (existing if present, otherwise draft).
   useEffect(() => {
     if (!starshipData?.id) return
-    if (shouldShowOnboarding) return
     if (routeParams.conversationId) return
     if (!agentFromUrl) return
     if (agentsLoading || directMessagesLoading) return
@@ -392,7 +382,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     const peerKey = String((agent as any)?.slug || '').trim() || `a:${String(agent.id)}`
     // Canonical DM route is `/dm/<peerKey>` (agent slug when available, else `a:<agentId>`).
     router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
-  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, shouldShowOnboarding, starshipData?.id])
+  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, starshipData?.id])
 
   // Back-compat: if the user is on `/conversations/:id` and that id is a DM conversation, redirect to `/dm/<peerKey>`.
   useEffect(() => {
@@ -451,7 +441,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const hasAutoNavigatedRef = useRef(false)
   useEffect(() => {
     if (hasAutoNavigatedRef.current) return
-    if (shouldShowOnboarding) return
     if (!starshipData?.id) return
     if (routeParams.conversationId) return
     if (isDraftDm) return
@@ -473,7 +462,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
     hasAutoNavigatedRef.current = true
     router.replace('/marketplace')
-  }, [agentFromUrl, shouldShowOnboarding, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
+  }, [agentFromUrl, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
   useEffect(() => {
@@ -548,11 +537,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     },
     [agentsData, channelsData?.channels, router, routeParams.slug, searchParams]
   )
-
-  // Don't render conversations interface if we're redirecting to onboarding
-  if (shouldShowOnboarding) {
-    return null
-  }
 
   if (!starshipData) {
     return null // Layout handles loading/error states

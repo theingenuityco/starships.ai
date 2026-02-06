@@ -86,17 +86,13 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return
     if (isWizardComplete) {
-      if (user?.navigationOnboardingCompleted ?? true) {
-        router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/marketplace')
-      } else {
-        router.replace('/marketplace')
-      }
+      router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/marketplace')
       return
     }
     if (!hasStarship && !starshipsLoading) {
       router.replace('/profile')
     }
-  }, [authLoading, isAuthenticated, isWizardComplete, hasStarship, starshipsLoading, user?.navigationOnboardingCompleted, primaryStarship?.slug, router])
+  }, [authLoading, isAuthenticated, isWizardComplete, hasStarship, starshipsLoading, primaryStarship?.slug, router])
 
   const handleStep1Next = useCallback(async () => {
     const name = starshipName.trim()

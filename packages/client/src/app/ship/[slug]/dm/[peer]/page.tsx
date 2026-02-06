@@ -75,11 +75,22 @@ function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string
   return isValidId(peer) ? { dmType: 'user_user', peerUserId: peer } : null
 }
 
+/** Decode the peer route param; Next.js gives us the raw segment (e.g. a%3Aid) so we decode once at the URL boundary. */
+function decodePeerSegment(raw: string | undefined): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return s
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
 export default function DmPeerPage() {
   const router = useRouter()
   const params = useParams<{ slug: string; peer: string }>()
   const slug = params.slug
-  const peer = params.peer
+  const peer = decodePeerSegment(params.peer)
   const peerStr = String(peer || '').trim()
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
   const markConversationRead = useMarkConversationRead()
@@ -87,7 +98,7 @@ export default function DmPeerPage() {
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
 
-  const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(starshipId, Boolean(starshipId))
+  const { data: agentsData, isLoading: agentsLoading, isFetching: agentsFetching } = useStarshipAgents(starshipId, Boolean(starshipId))
   const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
   const { data: directMessagesData, isLoading: dmsLoading, isFetching: dmsFetching, isError: dmsIsError } = useStarshipDirectMessages(starshipId, Boolean(starshipId))
   const createDirectMessage = useCreateDirectMessage()
@@ -218,14 +229,37 @@ export default function DmPeerPage() {
   }, [resolved.conversationId])
 
   // If we can't resolve the peer and we aren't in a loading window, bounce back to the starship root.
-  if (!dmTarget && !dmsLoading && !agentsLoading) {
-    if (slug) router.replace(`/ship/${slug}`)
-    return null
-  }
+  // Must run in useEffect to avoid "Cannot update Router while rendering" (no setState/navigate during render).
+  // When peer looks like an agent (a:, a-, or bare slug), wait for agents refetch to finish (e.g. after marketplace deploy).
+  const peerLooksLikeAgent =
+    peerStr.toLowerCase().startsWith('a:') || peerStr.toLowerCase().startsWith('a-') || (!peerStr.toLowerCase().startsWith('u-') && peerStr.length > 0)
+  const stillResolvingAgents = peerLooksLikeAgent && agentsFetching
+  // Don't bounce while we're still waiting for starship (agents query is disabled until starshipId is set).
+  const waitingForStarship = peerLooksLikeAgent && !starshipId && Boolean(slug)
+  const shouldBounceToShip =
+    !dmTarget &&
+    !dmsLoading &&
+    !agentsLoading &&
+    !stillResolvingAgents &&
+    !waitingForStarship &&
+    Boolean(slug)
 
-  // If we're on an agent DM route using the bare `<agentSlug>` form, `dmTarget` is intentionally null until
-  // the agents list loads. During that window, do NOT render the generic conversation starter/empty state.
-  if (!dmTarget && starshipId && peerStr && !peerStr.toLowerCase().startsWith('u-') && agentsLoading) {
+  useEffect(() => {
+    if (!shouldBounceToShip) return
+    router.replace(`/ship/${slug}`)
+  }, [shouldBounceToShip, slug, router])
+
+  if (shouldBounceToShip) return null
+
+  // If we're on an agent DM route, `dmTarget` is null until the agents list has the agent (initial load or after refetch e.g. deploy).
+  // Show loading while agents are loading or refetching so we don't bounce or flash empty state.
+  if (
+    !dmTarget &&
+    starshipId &&
+    peerStr &&
+    !peerStr.toLowerCase().startsWith('u-') &&
+    (agentsLoading || stillResolvingAgents)
+  ) {
     return (
       <div className="h-screen w-full flex items-center justify-center">
         <LoadingSpinner size="lg">Loading direct message…</LoadingSpinner>

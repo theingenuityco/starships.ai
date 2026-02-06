@@ -100,13 +100,9 @@ export function ForumChannelView(props: {
           <span className="relative inline-flex items-center justify-center h-5 w-5">
             <Icon name="hash" className="h-5 w-5" />
             {props.channelIsPrivate ? (
-              <Icon
-                name="lock"
-                weight="fill"
-                label="Private channel"
-                title="Private channel"
-                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-muted-foreground"
-              />
+              <span className="absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-[5px] bg-card text-muted-foreground" title="Private channel" aria-label="Private channel">
+                <Icon name="lock" weight="regular" label="Private channel" className="h-3 w-3" />
+              </span>
             ) : null}
           </span>
         }

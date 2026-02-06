@@ -212,6 +212,11 @@
       "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
       "outputs": []
     },
+    "@starships/server#test": {
+      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build", "@starships/models#build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
+      "outputs": []
+    },
     "@starships/errors#test": {
       "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],

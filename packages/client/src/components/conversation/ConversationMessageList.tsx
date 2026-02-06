@@ -2541,7 +2541,7 @@ const MemoizedMessageBubble = memo(
       // Only for persisted messages in a real conversation.
       if (!cid) return null
       if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
-      return <MessageReactionAction conversationId={cid} messageId={id} />
+      return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
     }, [cid, message.id])
 
     const messageActionNodes = useMemo(() => {

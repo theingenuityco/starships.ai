@@ -261,12 +261,6 @@ export function Navigation(props: NavigationProps) {
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      {
-        href: `/marketplace`,
-        label: 'Explore Agents',
-        icon: 'store',
-        isActive: pathname === '/marketplace',
-      },
       ...(isAuthenticated && starshipSlug
         ? [
             {

@@ -2,9 +2,11 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import Icon from '@/components/primitives/Icon'
 import { useNotificationsList } from '@/hooks/useNotifications'
 import type { StarshipModel } from '@starships/protocol'
 import { useMemo } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 
 function getInitials(name: string): string {
   const cleaned = (name || '').trim()
@@ -92,6 +94,10 @@ export function StarshipRail({
   onCreate?: () => void
 }) {
   const items = useMemo(() => (Array.isArray(starships) ? starships : []), [starships])
+  const pathname = usePathname()
+  const router = useRouter()
+
+  const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
   return (
     <div
@@ -107,6 +113,42 @@ export function StarshipRail({
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
         })}
+
+        <div className="my-1 h-px w-8 bg-border/60" aria-hidden />
+
+        <Tooltip delayDuration={250}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => router.push('/marketplace')}
+              className={[
+                'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
+                'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
+                isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
+              ].join(' ')}
+              aria-label="Marketplace"
+              aria-current={isMarketplaceActive ? 'page' : undefined}
+            >
+              {/* Discord-like active indicator */}
+              <span
+                className={[
+                  'absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity',
+                  isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0',
+                ].join(' ')}
+              />
+              <Icon name="store" className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
+            <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
+              <div className="mt-0.5">
+                <Icon name="store" className="h-[22px] w-[22px] text-muted-foreground" />
+              </div>
+              <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Marketplace</div>
+              <div className="col-span-2 text-xs text-muted-foreground">Explore agents</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

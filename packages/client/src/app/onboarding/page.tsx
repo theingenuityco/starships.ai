@@ -26,17 +26,17 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 const TOTAL_STEPS = 5
 
-/** Shared content width for steps 1, 2. */
+/** Shared content width for all steps. */
 const CONTENT_MAX_W = 'max-w-3xl'
-/** Steps 3–4: agent picker and connectors. */
-const CONTENT_MAX_W_STEP3_4 = 'max-w-4xl'
-/** Step 5: upgrade cards fill width nearly. */
-const CONTENT_MAX_W_STEP5 = 'max-w-5xl'
+/** Slightly wider width for global nav so buttons sit outside form card. */
+const NAV_MAX_W = 'max-w-5xl'
 /** Consistent input/field width across steps. */
 const INPUT_MAX_W = 'max-w-xl'
 /** Primary nav button (Next/Complete) min width and height. */
 const BTN_PRIMARY = 'min-w-[100px] h-10'
 const BTN_NAV_GHOST = 'h-10'
+/** Shared minimum height for each step card so nav stays aligned. */
+const STEP_MIN_H = 'min-h-[420px]'
 
 type OnboardingPersistedState = {
   step: number
@@ -241,6 +241,37 @@ export default function OnboardingPage() {
     }
   }, [completeWizard, queryClient, primaryStarship?.slug, router])
 
+  const primaryCtaLabel = (() => {
+    if (step === 1) {
+      return updateStarship.isPending ? 'Saving…' : 'Next ->'
+    }
+    if (step === 5) {
+      return completeWizard.isPending ? 'Finishing…' : 'Complete'
+    }
+    return 'Next ->'
+  })()
+
+  const isPrimaryCtaDisabled = (() => {
+    if (step === 1) {
+      return !starshipName.trim() || updateStarship.isPending
+    }
+    if (step === 2) {
+      return createInvite.isPending
+    }
+    if (step === 5) {
+      return completeWizard.isPending
+    }
+    return false
+  })()
+
+  const handlePrimaryCtaClick = useCallback(() => {
+    if (step === 1) return handleStep1Next()
+    if (step === 2) return handleStep2Next()
+    if (step === 3) return handleStep3Next()
+    if (step === 4) return handleStep4Next()
+    if (step === 5) return handleFinish()
+  }, [step, handleStep1Next, handleStep2Next, handleStep3Next, handleStep4Next, handleFinish])
+
   if (authLoading || !isAuthenticated || (hasStarship && starshipsLoading)) {
     return (
       <StarTheme theme="dark">
@@ -299,70 +330,62 @@ export default function OnboardingPage() {
           <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
         </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
-          <div className={`w-full mx-auto min-w-0 ${step === 5 ? CONTENT_MAX_W_STEP5 : step === 3 || step === 4 ? CONTENT_MAX_W_STEP3_4 : CONTENT_MAX_W}`}>
+        <main className="flex flex-1 flex-col items-center justify-center px-4 py-16 relative z-10">
+          <div className={`w-full mx-auto min-w-0 ${CONTENT_MAX_W} -mt-12`}>
             <p className="text-xs text-muted-foreground mb-1">
               Step {step} of {TOTAL_STEPS}
             </p>
 
             {step === 1 && (
-              <div className="mt-6 space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
-                </div>
-                <div className={`space-y-2 ${INPUT_MAX_W}`}>
-                  <Label htmlFor="starship-name">Starship name</Label>
-                  <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
-                </div>
-                <div className="flex items-center justify-end pt-6">
-                  <Button onClick={handleStep1Next} disabled={!starshipName.trim() || updateStarship.isPending} className={BTN_PRIMARY}>
-                    {updateStarship.isPending ? 'Saving…' : 'Next'}
-                  </Button>
+              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
+                <div className="space-y-6">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
+                  </div>
+                  <div className={`space-y-2 ${INPUT_MAX_W}`}>
+                    <Label htmlFor="starship-name">Starship name</Label>
+                    <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
+                  </div>
                 </div>
               </div>
             )}
 
             {step === 2 && (
-              <div className="mt-6 space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">Who else is on the {primaryStarship?.name ?? 'your workspace'} team?</p>
-                </div>
-                <div className={`space-y-3 ${INPUT_MAX_W}`}>
-                  <ul className="grid grid-cols-1 gap-3">
-                    {inviteEmailRows.map((email, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <Input type="email" value={email} onChange={e => setInviteEmailAt(idx, e.target.value)} placeholder="colleague@company.com" className="flex-1" />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => removeInviteEmailRow(idx)}
-                          disabled={inviteEmailRows.length <= 1}
-                          aria-label="Remove email"
-                        >
-                          <Icon name="x" className="w-3 h-3" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button type="button" variant="outline" size="sm" onClick={addInviteEmailRow} className="gap-1">
-                    <Icon name="plus" className="w-3.5 h-3.5" />
-                    Add another
-                  </Button>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-6">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(1)} className={BTN_NAV_GHOST}>
-                    Back
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
-                      Skip this step
-                    </Button>
-                    <Button onClick={handleStep2Next} disabled={createInvite.isPending} className={BTN_PRIMARY}>
-                      Next
+              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
+                <div className="space-y-6">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">Who else is on the {primaryStarship?.name ?? 'your workspace'} team?</p>
+                  </div>
+                  <div className={`space-y-3 ${INPUT_MAX_W}`}>
+                    <ul className="flex flex-col gap-3 w-full">
+                      {inviteEmailRows.map((email, idx) => (
+                        <li key={idx} className="flex items-center gap-2 w-full">
+                          <Input
+                            type="email"
+                            value={email}
+                            onChange={e => setInviteEmailAt(idx, e.target.value)}
+                            placeholder="colleague@company.com"
+                            className="flex-1 min-w-0"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removeInviteEmailRow(idx)}
+                            disabled={inviteEmailRows.length <= 1}
+                            aria-label="Remove email"
+                          >
+                            <Icon name="x" className="w-3 h-3" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button type="button" variant="outline" size="sm" onClick={addInviteEmailRow} className="gap-1">
+                      <Icon name="plus" className="w-3.5 h-3.5" />
+                      Add another
                     </Button>
                   </div>
                 </div>
@@ -370,7 +393,7 @@ export default function OnboardingPage() {
             )}
 
             {step === 3 && (
-              <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+              <div className={`mt-6 flex flex-col w-full ${STEP_MIN_H}`} style={{ maxHeight: 'min(calc(100dvh - 20rem), 560px)' }}>
                 <div className="shrink-0">
                   <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
                   <p className="mt-2 text-sm text-muted-foreground">You can add more from the marketplace later.</p>
@@ -394,19 +417,11 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 )}
-                <div className="flex items-center justify-between gap-3 pt-4 shrink-0 mt-4">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(2)} className={BTN_NAV_GHOST}>
-                    Back
-                  </Button>
-                  <Button onClick={handleStep3Next} className={BTN_PRIMARY}>
-                    Next
-                  </Button>
-                </div>
               </div>
             )}
 
             {step === 4 && (
-              <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+              <div className={`mt-6 flex flex-col w-full ${STEP_MIN_H}`} style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
                 <div className="shrink-0">
                   <h1 className="text-3xl font-bold tracking-tight">Connect your apps</h1>
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -432,40 +447,53 @@ export default function OnboardingPage() {
                     ) : null}
                   </div>
                 )}
-                <div className="flex items-center justify-between gap-3 pt-4 shrink-0 mt-4">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(3)} className={BTN_NAV_GHOST}>
-                    Back
-                  </Button>
-                  <Button onClick={handleStep4Next} className={BTN_PRIMARY}>
-                    Next
-                  </Button>
-                </div>
               </div>
             )}
 
             {step === 5 && (
-              <div className="mt-6 space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">You can continue with the free tier and upgrade anytime.</p>
-                </div>
-
-                {primaryStarship?.id ? (
-                  <div className="mt-4 w-full min-w-0">
-                    <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none w-full" hideDescription />
+              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
+                <div className="space-y-6">
+                  <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">You can continue with the free tier and upgrade anytime.</p>
                   </div>
-                ) : null}
 
-                <div className="flex items-center justify-between pt-6">
-                  <Button variant="ghost" size="sm" onClick={() => setStep(4)} className={BTN_NAV_GHOST}>
-                    Back
-                  </Button>
-                  <Button onClick={() => handleFinish()} disabled={completeWizard.isPending} className={BTN_PRIMARY}>
-                    {completeWizard.isPending ? 'Finishing…' : 'Complete'}
-                  </Button>
+                  {primaryStarship?.id ? (
+                    <div className="mt-4 w-full min-w-0">
+                      <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none w-full" hideDescription />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Global sticky navigation bar: consistent position across steps */}
+          <div className="fixed inset-x-0 bottom-16 px-4 pb-4 pointer-events-none">
+            <div className={`mx-auto w-full min-w-0 ${NAV_MAX_W} flex items-center justify-between gap-3 pointer-events-auto`}>
+              <div>
+                {step > 1 && step <= TOTAL_STEPS && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={BTN_NAV_GHOST}
+                    onClick={() => {
+                      if (step === 2) setStep(1)
+                      else if (step === 3) setStep(2)
+                      else if (step === 4) setStep(3)
+                      else if (step === 5) setStep(4)
+                    }}
+                  >
+                    {'<- Back'}
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button onClick={handlePrimaryCtaClick} disabled={isPrimaryCtaDisabled} className={BTN_PRIMARY}>
+                  {primaryCtaLabel}
+                </Button>
+              </div>
+            </div>
           </div>
         </main>
       </div>

@@ -801,6 +801,13 @@
     'onum' 1;
 }
 
+/* Slightly enlarge inline emojis in normal text (emoji-only messages use a separate path). */
+.emoji-inline {
+  display: inline-block;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
 /* Inline streaming caret removed: rendering now fully store-driven (gap loader only) */
 
 .message-timestamp {

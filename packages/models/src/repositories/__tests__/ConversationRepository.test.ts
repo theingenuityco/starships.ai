@@ -304,6 +304,36 @@ describe('ConversationRepository', () => {
     });
   });
 
+  describe('acquireTurnGuard', () => {
+    it('should acquire guard when turnActive is false', async () => {
+      mockConnection.queryOne.mockResolvedValue({ id: 'conv-123' });
+
+      const ok = await repository.acquireTurnGuard('conv-123', 'guard-abc');
+
+      expect(ok).toBe(true);
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('UPDATE conversations'), [
+        'conv-123',
+        expect.stringContaining('"turnActive":true'),
+      ]);
+    });
+
+    it('should return false when guard cannot be acquired (already active)', async () => {
+      mockConnection.queryOne.mockResolvedValue(null);
+
+      const ok = await repository.acquireTurnGuard('conv-123', 'guard-abc');
+
+      expect(ok).toBe(false);
+    });
+
+    it('should throw on missing conversationId', async () => {
+      await expect(repository.acquireTurnGuard('', 'guard-abc')).rejects.toThrow();
+    });
+
+    it('should throw on missing turnGuardId', async () => {
+      await expect(repository.acquireTurnGuard('conv-123', '')).rejects.toThrow();
+    });
+  });
+
   describe('error handling', () => {
     it('should handle database connection errors', async () => {
       mockConnection.query.mockRejectedValue(new Error('Connection failed'));

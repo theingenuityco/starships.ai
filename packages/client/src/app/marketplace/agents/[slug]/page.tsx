@@ -7,6 +7,7 @@ import { fetchPublicAgentTemplates, fetchPublicToolTemplates } from '@/lib/serve
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
+import { MarketplaceAgentMarketingFab } from '@/components/marketplace/MarketplaceAgentMarketingFab'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
@@ -451,6 +452,9 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
       </main>
 
       <PublicFooter fromPath={`/marketplace/agents/${encodeURIComponent(template.slug)}`} />
+
+      {/* Instance-admin-only: generate marketplace marketing content */}
+      <MarketplaceAgentMarketingFab templateId={template.id} />
     </>
   )
 }

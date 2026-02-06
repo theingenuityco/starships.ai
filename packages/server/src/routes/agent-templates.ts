@@ -1,12 +1,16 @@
 import { jwtAuthMiddleware, optionalJwtAuth } from '@/middleware/jwt-auth';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
-import { Request, Response, Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
+import type { AuthUser } from '@starships/protocol';
+import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
 
 const router: Router = Router();
 
@@ -21,6 +25,17 @@ function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<s
   delete template['avatarMimeType'];
   return template;
 }
+
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+    sendError(res, 'FORBIDDEN', 'Only instance admins can access agent template admin endpoints', 403);
+    return;
+  }
+  next();
+}
+
+// Enforce auth + instance-admin for all agent template admin endpoints.
+router.use('/admin/agent-templates', jwtAuthMiddleware, requireInstanceAdminMiddleware);
 
 // Zod schemas for validation
 // Using standard pagination schema for consistency
@@ -133,6 +148,28 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     sendSuccess(res, hydrated, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'loading templates');
+  }
+});
+
+// POST /admin/agent-templates/:id/marketing/generate - Generate marketing content for a published template (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/generate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+
+    const { id: templateId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const svc = new AgentTemplateMarketingService();
+    const result = await svc.generateTemplateMarketingContent(templateId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent template marketing content generated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENT-TEMPLATES] Error generating template marketing content:', error);
+    handleError(error, res, 'generating template marketing content');
   }
 });
 

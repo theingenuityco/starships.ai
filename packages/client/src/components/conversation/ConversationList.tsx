@@ -544,17 +544,19 @@ export function ConversationList({
                                 className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
                               {ch.isPrivate ? (
-                                <Icon
-                                  name="lock"
-                                  weight="fill"
-                                  label="Private channel"
-                                  title="Private channel"
+                                <span
                                   className={cn(
-                                    'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5',
+                                    'absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-[5px] transition-colors',
+                                    // Match the row background so the icon reads cleanly over the hash.
+                                    isActive ? 'bg-primary/10 group-hover:bg-primary/10' : 'bg-card group-hover:bg-muted',
                                     // Keep visible but not louder than unread/active styling.
                                     isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
                                   )}
-                                />
+                                  title="Private channel"
+                                  aria-label="Private channel"
+                                >
+                                  <Icon name="lock" weight="regular" className="h-3 w-3" />
+                                </span>
                               ) : null}
                             </div>
                             <div
@@ -709,16 +711,18 @@ export function ConversationList({
                             className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                           />
                           {ch.isPrivate ? (
-                            <Icon
-                              name="lock"
-                              weight="fill"
-                              label="Private channel"
-                              title="Private channel"
+                            <span
                               className={cn(
-                                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5',
+                                'absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-[5px] transition-colors',
+                                // Match the row background so the icon reads cleanly over the hash.
+                                isActive ? 'bg-muted/70 group-hover:bg-muted/70' : 'bg-card group-hover:bg-muted/50',
                                 isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
                               )}
-                            />
+                              title="Private channel"
+                              aria-label="Private channel"
+                            >
+                              <Icon name="lock" weight="regular" className="h-3 w-3" />
+                            </span>
                           ) : null}
                         </span>
                         <div className="flex-1 min-w-0">

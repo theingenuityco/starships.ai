@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'
-import { useGenerateAgentTemplateMarketingContent } from '@/hooks/useAdminAgentTemplates'
+import { useAgentTemplateMarketingJob, useGenerateAgentTemplateMarketingContent } from '@/hooks/useAdminAgentTemplates'
+import { cn } from '@/lib/utils'
 
 export function MarketplaceAgentMarketingFab(props: { templateId?: string | null }): React.JSX.Element | null {
   const { templateId } = props
@@ -17,9 +18,28 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
 
+  const [jobId, setJobId] = React.useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = React.useState(false)
+  const jobQuery = useAgentTemplateMarketingJob(jobId)
+  const job = jobQuery.data
+
+  React.useEffect(() => {
+    if (!job) return
+    if (job.status === 'completed') {
+      router.refresh()
+    }
+  }, [job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const hasTemplateId = !!(templateId && String(templateId).trim())
   const canShow = Boolean(mounted && isAuthenticated && isInstanceAdmin && hasTemplateId)
   if (!canShow) return null
+
+  const stepIcon = (status: string) => {
+    if (status === 'completed') return <Icon name="check-circle" className="h-4 w-4 text-emerald-600" />
+    if (status === 'failed') return <Icon name="x-circle" className="h-4 w-4 text-red-600" />
+    if (status === 'running') return <Icon name="loading" className="h-4 w-4 animate-spin text-primary" />
+    return <Icon name="circle" className="h-4 w-4 text-muted-foreground/60" />
+  }
 
   const node = (
     <div
@@ -28,20 +48,68 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
         bottom: `calc(32px + env(safe-area-inset-bottom, 0px))`,
       }}
     >
+      {panelOpen ? (
+        <div className="mb-3 w-[320px] rounded-xl border border-border/70 bg-background/95 shadow-lg backdrop-blur p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">Generating marketing content</div>
+              <div className="text-xs text-muted-foreground">
+                {job?.status === 'completed'
+                  ? 'Done'
+                  : job?.status === 'failed'
+                    ? 'Failed'
+                    : jobId
+                      ? 'In progress…'
+                      : 'Starting…'}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              onClick={() => setPanelOpen(false)}
+              aria-label="Close progress"
+            >
+              <Icon name="x" className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {(job?.steps || []).map(step => (
+              <div key={step.key} className="flex items-start gap-2">
+                <div className="mt-0.5">{stepIcon(step.status)}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-foreground">{step.label}</div>
+                  {step.status === 'failed' && step.error ? (
+                    <div className="text-[11px] text-red-600 line-clamp-2">{step.error}</div>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+
+            {job?.status === 'failed' && job.error ? (
+              <div className="mt-2 rounded-md border border-red-500/20 bg-red-500/5 p-2 text-[11px] text-red-700">
+                {job.error}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <Button
         size="sm"
         className="shadow-lg rounded-full px-4"
-        disabled={generateMutation.isPending}
+        disabled={generateMutation.isPending || (job?.status === 'running' && !!jobId)}
         onClick={() => {
           if (!hasTemplateId) return
+          setPanelOpen(true)
           generateMutation.mutate(String(templateId), {
-            onSuccess: () => {
-              router.refresh()
+            onSuccess: data => {
+              setJobId(data.jobId)
             },
           })
         }}
       >
-        {generateMutation.isPending ? (
+        {generateMutation.isPending || (job?.status === 'running' && !!jobId) ? (
           <>
             <Icon name="loading" className="h-4 w-4 mr-2 animate-spin" />
             Generating…
@@ -53,6 +121,21 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
           </>
         )}
       </Button>
+
+      {job?.status === 'completed' ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className={cn('mt-2 w-full justify-center text-xs text-muted-foreground hover:text-foreground')}
+          onClick={() => {
+            setPanelOpen(false)
+            setJobId(null)
+          }}
+        >
+          Clear
+        </Button>
+      ) : null}
     </div>
   )
 

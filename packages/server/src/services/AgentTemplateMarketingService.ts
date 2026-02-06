@@ -40,7 +40,21 @@ export class AgentTemplateMarketingService {
     this.marketingContentRepository = new MarketingContentRepository();
   }
 
-  async generateTemplateMarketingContent(templateId: string, adminUserId: string): Promise<{
+  async generateTemplateMarketingContent(
+    templateId: string,
+    adminUserId: string,
+    options?: {
+      onStep?: (key:
+        | 'load_template'
+        | 'resolve_parent_agent'
+        | 'build_runner_bundle'
+        | 'generate_avatar'
+        | 'generate_problem_statements'
+        | 'generate_profile_images'
+        | 'persist_template_assets'
+        | 'revalidate', status: 'running' | 'completed' | 'failed') => void;
+    }
+  ): Promise<{
     templateId: string;
     marketingContent: {
       avatarUrl?: string;
@@ -55,14 +69,18 @@ export class AgentTemplateMarketingService {
       throw new ForbiddenError('Only instance admins can generate template marketing content');
     }
 
+    options?.onStep?.('load_template', 'running');
     const template = await this.agentTemplateRepository.findInternalById(templateId);
     if (!template) throw new NotFoundError('AgentTemplate', templateId);
+    options?.onStep?.('load_template', 'completed');
 
     // We still need a starship context for remote runner + attachment storage.
+    options?.onStep?.('resolve_parent_agent', 'running');
     const parentAgent = await this.agentRepository.findParentAgentByPublishedTemplateId(templateId);
     if (!parentAgent) {
       throw new NotFoundError('Agent', `parent of template ${templateId}`);
     }
+    options?.onStep?.('resolve_parent_agent', 'completed');
 
     const env = getEnvConfig();
     const runtimeEnv: Record<string, unknown> = {
@@ -72,11 +90,13 @@ export class AgentTemplateMarketingService {
       SERVER_URL: env.SERVER_URL,
     };
 
+    options?.onStep?.('build_runner_bundle', 'running');
     const executionBundle = await buildAutopilotExecutionBundle({
       starshipId: parentAgent.starshipId,
       authUserId: adminUserId,
       runtimeEnv,
     });
+    options?.onStep?.('build_runner_bundle', 'completed');
 
     // Build an agent model used only for generation:
     // - starshipId comes from parent agent
@@ -101,6 +121,7 @@ export class AgentTemplateMarketingService {
     // ---------------------------------------------------------------------
     // 1) Generate avatarPrompt (mirror) + avatar image
     // ---------------------------------------------------------------------
+    options?.onStep?.('generate_avatar', 'running');
     const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
       agentName: agentForGeneration.name,
       agentDescription: agentForGeneration.description,
@@ -129,10 +150,12 @@ export class AgentTemplateMarketingService {
       mimeType: avatarResult.mimeType,
     });
     agentForGeneration.avatarAttachmentId = avatarAttachment.id;
+    options?.onStep?.('generate_avatar', 'completed');
 
     // ---------------------------------------------------------------------
     // 2) Generate problem statements text (marketing_content row for template)
     // ---------------------------------------------------------------------
+    options?.onStep?.('generate_problem_statements', 'running');
     const assignedToolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs : [];
     const toolInfos: Array<{ name?: string; slug?: string; description?: string }> = [];
     for (const slug of assignedToolSlugs) {
@@ -174,10 +197,12 @@ export class AgentTemplateMarketingService {
       textFormat: 'json',
       generationMetadata: { model: statementsResult.model },
     });
+    options?.onStep?.('generate_problem_statements', 'completed');
 
     // ---------------------------------------------------------------------
     // 3) Generate profile images (text-only) + copy attachments into template storage
     // ---------------------------------------------------------------------
+    options?.onStep?.('generate_profile_images', 'running');
     // Compute core capabilities + domain context similar to PublicationService
     let coreCapabilities = '';
     if (assignedToolSlugs.length > 0) {
@@ -233,8 +258,10 @@ export class AgentTemplateMarketingService {
         mimeType: genTry.mimeType,
       }),
     ]);
+    options?.onStep?.('generate_profile_images', 'completed');
 
     // Lookup attachment S3 keys (internal)
+    options?.onStep?.('persist_template_assets', 'running');
     const [avatarWithUrl, problemWithUrl, capsWithUrl, tryWithUrl] = await Promise.all([
       this.attachmentService.getAttachmentWithUrl(avatarAttachment.id, agentForGeneration.starshipId),
       this.attachmentService.getAttachmentWithUrl(problemAttachment.id, agentForGeneration.starshipId),
@@ -270,9 +297,12 @@ export class AgentTemplateMarketingService {
         updatedAt: tryWithUrl.createdAt || new Date().toISOString(),
       }),
     ]);
+    options?.onStep?.('persist_template_assets', 'completed');
 
     // Revalidate public ISR caches so the marketplace page updates quickly.
+    options?.onStep?.('revalidate', 'running');
     triggerNextRevalidate({ tags: ['public-agent-templates'] });
+    options?.onStep?.('revalidate', 'completed');
 
     // Compute cache-busting URLs based on updated storage timestamps.
     const avatarStorage = await this.agentTemplateRepository.getAvatarStorageById(templateId);

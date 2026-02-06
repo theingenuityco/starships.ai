@@ -1551,7 +1551,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       messages[idx] = {
         ...(messages[idx] as any),
         reactions: reactions && typeof reactions === 'object' ? reactions : {},
-        updatedAt: new Date().toISOString(),
       } as any
       return messages
     }

@@ -8,6 +8,7 @@ import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from 
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
 import {
@@ -184,9 +185,75 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     if (!bodyValidation) return;
 
     const { messageId } = paramValidation;
+    const authUserId = req.user?.id as string | undefined;
+
+    // Load message to enforce access + ownership rules
+    const messageService = new MessageService();
+    const message = await messageService.getMessage(messageId);
+    if (!message) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
+        resource: 'message',
+        id: messageId,
+      });
+      return;
+    }
+
+    const conversationId =
+      typeof (message as any)?.conversationId === 'string'
+        ? String((message as any).conversationId).trim()
+        : typeof (message as any)?.conversation_id === 'string'
+          ? String((message as any).conversation_id).trim()
+          : '';
+    const starshipId =
+      typeof (message as any)?.starshipId === 'string'
+        ? String((message as any).starshipId).trim()
+        : typeof (message as any)?.starship_id === 'string'
+          ? String((message as any).starship_id).trim()
+          : '';
+
+    if (!conversationId || !starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
+      return;
+    }
+
+    // Authorization: verify user has access to the starship + conversation membership.
+    if (authUserId) {
+      if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    }
+
+    const wantsContentUpdate = typeof (bodyValidation as any)?.content === 'string';
+    if (wantsContentUpdate) {
+      const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';
+      const authorUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId) : '';
+      if (!authUserId || role !== 'user' || !authorUserId || authorUserId !== authUserId) {
+        sendError(res, 'ACCESS_DENIED', 'You can only edit your own messages', 403, { resource: 'message', id: messageId });
+        return;
+      }
+      if (String((message as any)?.content || '') === DELETED_MESSAGE_MARKER) {
+        sendError(res, 'RESOURCE_CONFLICT', 'Deleted messages cannot be edited', 409, { resource: 'message', id: messageId });
+        return;
+      }
+    }
 
     // Delegate to service layer
-    const messageService = new MessageService();
     const updatedMessage = await messageService.updateMessage(messageId, bodyValidation);
 
     if (!updatedMessage) {
@@ -417,12 +484,11 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
     if (!paramValidation) return;
 
     const { messageId } = paramValidation;
+    const authUserId = req.user?.id as string | undefined;
 
-    // Delegate to service layer
     const messageService = new MessageService();
-    const deleted = await messageService.deleteMessage(messageId);
-
-    if (!deleted) {
+    const message = await messageService.getMessage(messageId);
+    if (!message) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
         resource: 'message',
         id: messageId,
@@ -430,7 +496,76 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
       return;
     }
 
-    sendSuccess(res, { message: 'Message deleted successfully' }, 200);
+    const conversationId =
+      typeof (message as any)?.conversationId === 'string'
+        ? String((message as any).conversationId).trim()
+        : typeof (message as any)?.conversation_id === 'string'
+          ? String((message as any).conversation_id).trim()
+          : '';
+    const starshipId =
+      typeof (message as any)?.starshipId === 'string'
+        ? String((message as any).starshipId).trim()
+        : typeof (message as any)?.starship_id === 'string'
+          ? String((message as any).starship_id).trim()
+          : '';
+
+    if (!conversationId || !starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
+      return;
+    }
+
+    if (authUserId) {
+      if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    }
+
+    const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';
+    const authorUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId) : '';
+    if (!authUserId || role !== 'user' || !authorUserId || authorUserId !== authUserId) {
+      sendError(res, 'ACCESS_DENIED', 'You can only delete your own messages', 403, { resource: 'message', id: messageId });
+      return;
+    }
+
+    if (String((message as any)?.content || '') === DELETED_MESSAGE_MARKER) {
+      sendSuccess(res, { message: 'Message already deleted', messageId }, 200);
+      return;
+    }
+
+    const deletedMessage = await messageService.deleteMessage(messageId);
+    if (!deletedMessage) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
+        resource: 'message',
+        id: messageId,
+      });
+      return;
+    }
+
+    // Realtime update: publish soft-delete update so clients replace the content.
+    try {
+      const bus = ConversationStreamBus.getInstance();
+      await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: deletedMessage as any } });
+    } catch {
+      /* best-effort */
+    }
+
+    sendSuccess(res, { message: deletedMessage }, 200);
   } catch (error) {
     handleError(error, res, 'deleting message');
   }

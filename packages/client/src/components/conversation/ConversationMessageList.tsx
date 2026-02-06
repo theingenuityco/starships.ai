@@ -3,12 +3,12 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 
-import type { MessageModel } from '@starships/protocol'
+import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useDeleteMessage, useStarshipDirectMessages, useUpdateMessage, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -22,7 +22,9 @@ import { isImageUrl } from '@/lib/isImageUrl'
 import { formatAgentDisplayName, formatAgentNameWithRole } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -2311,14 +2313,110 @@ function MessageDateDivider({ label }: { label: string }) {
   )
 }
 
-function MessageTimestamp({ value }: { value?: string | null }) {
+function MessageTimestamp({ value, isEdited = false, isDeleted = false }: { value?: string | null; isEdited?: boolean; isDeleted?: boolean }) {
   if (!value || typeof value !== 'string' || value.trim().length === 0) return null
   return (
     <div className="text-[11px] text-muted-foreground">
       <time dateTime={value} title={formatDate(value)}>
         <span className="tabular-nums leading-none">{formatTime(value)}</span>
       </time>
+      {isDeleted ? <span className="ml-1 text-[10px] uppercase tracking-wide">deleted</span> : isEdited ? <span className="ml-1 text-[10px] uppercase tracking-wide">edited</span> : null}
     </div>
+  )
+}
+
+function isDeletedMessageContent(content: unknown): boolean {
+  return typeof content === 'string' && content === DELETED_MESSAGE_MARKER
+}
+
+function isEditedMessage(message: { createdAt?: string; updatedAt?: string }): boolean {
+  if (!message?.createdAt || !message?.updatedAt) return false
+  const created = parseISO(message.createdAt)
+  const updated = parseISO(message.updatedAt)
+  if (Number.isNaN(created.getTime()) || Number.isNaN(updated.getTime())) return false
+  return updated.getTime() - created.getTime() >= 1000
+}
+
+function getDeletedMessageLabel(isAuthedUserMessage: boolean): string {
+  return isAuthedUserMessage ? 'Message deleted by you.' : 'Message deleted by user.'
+}
+
+function MessageOwnerActions({
+  messageId,
+  disabled,
+  isEditing,
+  onStartEdit,
+  onCancelEdit,
+}: {
+  messageId: string
+  disabled?: boolean
+  isEditing: boolean
+  onStartEdit: () => void
+  onCancelEdit: () => void
+}) {
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteMessage = useDeleteMessage()
+
+  const canDelete = !deleteMessage.isPending
+
+  if (disabled) return null
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={() => (isEditing ? onCancelEdit() : onStartEdit())}
+        aria-label={isEditing ? 'Cancel edit' : 'Edit message'}
+        title={isEditing ? 'Cancel edit' : 'Edit message'}
+      >
+        <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-destructive hover:text-destructive"
+        onClick={() => setDeleteOpen(true)}
+        aria-label="Delete message"
+        title="Delete message"
+        disabled={isEditing}
+      >
+        <Icon name="trash" className="h-4 w-4" />
+      </Button>
+
+      <Dialog open={deleteOpen} onOpenChange={open => setDeleteOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete message?</DialogTitle>
+            <DialogDescription>This will replace the message with a deleted placeholder for everyone in the conversation.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleteMessage.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={async () => {
+                if (!canDelete) return
+                try {
+                  await deleteMessage.mutateAsync(messageId)
+                  setDeleteOpen(false)
+                } catch {
+                  // Error toast handled in hook
+                }
+              }}
+              disabled={!canDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -2482,6 +2580,19 @@ const MemoizedMessageBubble = memo(
     const fromDirectory = messageUserId ? memberByUserId.get(messageUserId) : null
     const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
     const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
+    const isDeletedMessage = isDeletedMessageContent(message.content)
+    const messageDisplayContent = isDeletedMessage ? getDeletedMessageLabel(isAuthedUserMessage) : message.content
+    const showEditedLabel = !isDeletedMessage && isEditedMessage(message)
+    const updateMessage = useUpdateMessage()
+    const [isEditing, setIsEditing] = useState(false)
+    const [editDraft, setEditDraft] = useState(String(message.content ?? ''))
+    const trimmedEditDraft = editDraft.trim()
+    const canSaveEdit = trimmedEditDraft.length > 0 && trimmedEditDraft !== String(message.content ?? '') && !updateMessage.isPending
+
+    useEffect(() => {
+      if (isEditing) return
+      setEditDraft(String(message.content ?? ''))
+    }, [isEditing, message.content])
 
     const directoryUserName = fromDirectory?.displayName?.trim() || '' || undefined
     const effectiveUserName = userNameOverride ?? messageUserName ?? directoryUserName ?? (isAuthedUserMessage ? 'You' : undefined)
@@ -2514,6 +2625,7 @@ const MemoizedMessageBubble = memo(
 
     const threadActionButton = useMemo(() => {
       if (!enableChannelMessageThreads) return null
+      if (isDeletedMessage) return null
       // Only show on real messages (skip tool_result rows; they are not rendered here anyway)
       const label = linkedConversationId ? 'Open thread' : 'Start thread'
       return (
@@ -2533,26 +2645,48 @@ const MemoizedMessageBubble = memo(
           <Icon name="thread" className="h-4 w-4" />
         </Button>
       )
-    }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
+    }, [enableChannelMessageThreads, isActiveThreadLink, isDeletedMessage, linkedConversationId, message.content, message.id, onThreadAction])
 
     const reactionActionButton = useMemo(() => {
       const id = typeof message.id === 'string' ? message.id : ''
       if (!id) return null
+      if (isDeletedMessage) return null
       // Only for persisted messages in a real conversation.
       if (!cid) return null
       if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
       return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
-    }, [cid, message.id])
+    }, [cid, isDeletedMessage, message.id])
+
+    const ownerActionButtons = useMemo(() => {
+      const id = typeof message.id === 'string' ? message.id : ''
+      if (!id) return null
+      if (!isUser) return null
+      if (!isAuthedUserMessage) return null
+      if (isDeletedMessage) return null
+      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      return (
+        <MessageOwnerActions
+          messageId={id}
+          isEditing={isEditing}
+          onStartEdit={() => {
+            setEditDraft(String(message.content ?? ''))
+            setIsEditing(true)
+          }}
+          onCancelEdit={() => setIsEditing(false)}
+        />
+      )
+    }, [isAuthedUserMessage, isDeletedMessage, isEditing, isUser, message.content, message.id])
 
     const messageActionNodes = useMemo(() => {
-      if (!threadActionButton && !reactionActionButton) return null
+      if (!threadActionButton && !reactionActionButton && !ownerActionButtons) return null
       return (
         <>
           {reactionActionButton}
           {threadActionButton}
+          {ownerActionButtons}
         </>
       )
-    }, [reactionActionButton, threadActionButton])
+    }, [ownerActionButtons, reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2584,7 +2718,35 @@ const MemoizedMessageBubble = memo(
                     message.sending && 'opacity-70'
                   )}
                 >
-                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{renderTextWithHighlight(message.content, highlightTerm)}</div>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={async () => {
+                            if (!canSaveEdit) return
+                            try {
+                              await updateMessage.mutateAsync({ messageId: message.id, content: trimmedEditDraft })
+                              setIsEditing(false)
+                            } catch {
+                              // Error toast handled in hook
+                            }
+                          }}
+                          disabled={!canSaveEdit}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass, isDeletedMessage && 'italic text-muted-foreground')}>
+                      {renderTextWithHighlight(messageDisplayContent, highlightTerm)}
+                    </div>
+                  )}
                   {message.sending && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -2764,34 +2926,60 @@ const MemoizedMessageBubble = memo(
                       <span>{authorLabel}</span>
                     )}
                   </div>
-                  <MessageTimestamp value={messageTimestamp} />
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} isDeleted={isDeletedMessage} />
                 </div>
               )}
-              <ConversationMessageContent
-                content={message.content}
-                messageId={message.id}
-                enableMarkdown={true}
-                enableCopy={true}
-                extraActions={messageActionNodes}
-                enableLinkPreview={true}
-                isStreaming={false}
-                // Always compact (no "normal" padding mode).
-                compact={true}
-                className="text-foreground/80"
-                chunks={message.chunks}
-                reasoning={message.reasoning}
-                reasoningChunks={message.reasoningChunks}
-                agentName={userDisplayName}
-                toolCalls={message.toolCalls}
-                toolResults={message.toolResults}
-                messageType={message.messageType}
-                attachmentIds={message.attachmentIds}
-                starshipId={starshipId}
-                isAwaitingToolResults={isAwaitingToolResults}
-                isLastMessage={isLastMessage}
-                highlightTerm={highlightTerm}
-              />
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        if (!canSaveEdit) return
+                        try {
+                          await updateMessage.mutateAsync({ messageId: message.id, content: trimmedEditDraft })
+                          setIsEditing(false)
+                        } catch {
+                          // Error toast handled in hook
+                        }
+                      }}
+                      disabled={!canSaveEdit}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <ConversationMessageContent
+                  content={messageDisplayContent}
+                  messageId={message.id}
+                  enableMarkdown={true}
+                  enableCopy={!isDeletedMessage}
+                  extraActions={messageActionNodes}
+                  enableLinkPreview={true}
+                  isStreaming={false}
+                  // Always compact (no "normal" padding mode).
+                  compact={true}
+                  className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
+                  chunks={message.chunks}
+                  reasoning={message.reasoning}
+                  reasoningChunks={message.reasoningChunks}
+                  agentName={userDisplayName}
+                  toolCalls={message.toolCalls}
+                  toolResults={message.toolResults}
+                  messageType={message.messageType}
+                  attachmentIds={message.attachmentIds}
+                  starshipId={starshipId}
+                  isAwaitingToolResults={isAwaitingToolResults}
+                  isLastMessage={isLastMessage}
+                  highlightTerm={highlightTerm}
+                />
+              )}
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}
@@ -2877,16 +3065,16 @@ const MemoizedMessageBubble = memo(
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
-                  content={message.content}
+                  content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
-                  enableCopy={!isStreamingActive}
+                  enableCopy={!isStreamingActive && !isDeletedMessage}
                   extraActions={messageActionNodes}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
                   compact={true}
-                  className="text-foreground"
+                  className={cn('text-foreground', isDeletedMessage && 'italic text-muted-foreground')}
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
                   reasoning={message.reasoning}
@@ -2901,7 +3089,7 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
-                {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                   <MessageReactions
                     conversationId={cid}
                     starshipId={starshipId}
@@ -2989,20 +3177,20 @@ const MemoizedMessageBubble = memo(
                       <span className="font-mono">{assistantDisplayName}</span>
                     )}
                   </div>
-                  <MessageTimestamp value={messageTimestamp} />
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} isDeleted={isDeletedMessage} />
                 </div>
               )}
               <ConversationMessageContent
-                content={message.content}
+                content={messageDisplayContent}
                 messageId={message.id}
                 enableMarkdown={true}
-                enableCopy={!isStreamingActive}
+                enableCopy={!isStreamingActive && !isDeletedMessage}
                 extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
                 compact={true}
-                className="text-foreground/80"
+                className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                 chunks={message.chunks}
                 reasoning={message.reasoning}
                 reasoningChunks={message.reasoningChunks}
@@ -3016,7 +3204,7 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}

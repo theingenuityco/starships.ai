@@ -70,6 +70,10 @@ export interface Message extends Omit<LlmMessage, 'content'> {
   linkedConversationId?: string;
 }
 
+// Sentinel used to mark a message as deleted (soft delete).
+// UI renders a placeholder instead of the raw marker string.
+export const DELETED_MESSAGE_MARKER = '__deleted__';
+
 /**
  * Database Message interface - core API contract type
  * Extends Message from autopilot with additional database/persistence fields

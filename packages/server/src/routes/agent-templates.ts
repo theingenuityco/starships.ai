@@ -184,7 +184,16 @@ router.post('/admin/agent-templates/:id/marketing/generate', async (req: Request
         });
 
         // Ensure any still-pending steps are marked completed (defensive).
-        for (const step of ['load_template', 'resolve_parent_agent', 'build_runner_bundle', 'generate_avatar', 'generate_problem_statements', 'generate_profile_images', 'persist_template_assets', 'revalidate'] as const) {
+        for (const step of [
+          'load_template',
+          'generate_problem_statements',
+          'load_avatar_reference',
+          'generate_problem_image',
+          'generate_capabilities_image',
+          'generate_try_prompts_image',
+          'persist_template_assets',
+          'revalidate',
+        ] as const) {
           markJobStep(job.id, step, 'completed');
         }
 

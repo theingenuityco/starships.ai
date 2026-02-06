@@ -17,6 +17,7 @@ import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/pris
 import remarkGfm from 'remark-gfm'
 import { getMarkdownComponents, tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { rehypeHighlightText } from '@/components/markdown/rehypeHighlightText'
+import { rehypeWrapEmoji } from '@/components/markdown/rehypeWrapEmoji'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -468,6 +469,40 @@ function getEmojiOnlyInfo(input: string): EmojiOnlyInfo {
 
   if (emojiCount <= 0) return { isEmojiOnly: false, emojiCount: 0, trimmed }
   return { isEmojiOnly: true, emojiCount, trimmed }
+}
+
+const RE_QUICK_HAS_EMOJI = /(\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3)/u
+function renderTextWithEmojiSpans(text: string): ReactNode {
+  const s = String(text ?? '')
+  if (!s) return ''
+  if (!RE_QUICK_HAS_EMOJI.test(s)) return s
+
+  const graphemes = splitGraphemes(s)
+  let sawEmoji = false
+  const out: ReactNode[] = []
+  let buf = ''
+  const flush = () => {
+    if (!buf) return
+    out.push(buf)
+    buf = ''
+  }
+
+  for (const g of graphemes) {
+    if (isEmojiGrapheme(g)) {
+      sawEmoji = true
+      flush()
+      out.push(
+        <span key={`e:${out.length}`} className="emoji-inline">
+          {g}
+        </span>
+      )
+    } else {
+      buf += g
+    }
+  }
+
+  flush()
+  return sawEmoji ? out : s
 }
 
 export function ConversationMessageContent({
@@ -1070,15 +1105,17 @@ export function ConversationMessageContent({
   const contentContainerClassName = compact ? 'w-full rounded-lg px-2 py-0.5 -mx-2 transition-colors hover:bg-muted' : 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
 
   const emojiOnlyInfo = useMemo(() => getEmojiOnlyInfo(rawDisplayContent), [rawDisplayContent])
-  const shouldRenderLargeEmoji = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0 && emojiOnlyInfo.emojiCount <= 20)
-  const largeEmojiTextClass = useMemo(() => {
-    if (!shouldRenderLargeEmoji) return ''
+  const shouldRenderEmojiOnlyPlain = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0)
+  const emojiOnlyTextClass = useMemo(() => {
+    if (!shouldRenderEmojiOnlyPlain) return ''
     const n = emojiOnlyInfo.emojiCount
-    // Large for 1-5 (no "extra large" tier).
+    // 1-5: large (no "extra large" tier)
     if (n <= 5) return 'text-5xl sm:text-6xl leading-none'
     // 6-20: medium-large
-    return 'text-3xl sm:text-4xl leading-none'
-  }, [emojiOnlyInfo.emojiCount, shouldRenderLargeEmoji])
+    if (n <= 20) return 'text-3xl sm:text-4xl leading-none'
+    // >20: "normal" but a bit bigger than regular message text
+    return 'text-base sm:text-lg leading-snug'
+  }, [emojiOnlyInfo.emojiCount, shouldRenderEmojiOnlyPlain])
 
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
@@ -1111,12 +1148,12 @@ export function ConversationMessageContent({
                 contentContainerClassName
               )}
             >
-              {shouldRenderLargeEmoji ? (
-                <div className={cn('not-prose whitespace-pre-wrap break-words', largeEmojiTextClass)}>{emojiOnlyInfo.trimmed}</div>
+              {shouldRenderEmojiOnlyPlain ? (
+                <div className={cn('not-prose whitespace-pre-wrap break-words', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
               ) : (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined}
+                  rehypePlugins={[rehypeWrapEmoji, ...(highlightTerm ? ([[rehypeHighlightText, { highlightTerm }]] as any) : [])]}
                   components={markdownComponents}
                 >
                   {rawDisplayContent}
@@ -1133,12 +1170,13 @@ export function ConversationMessageContent({
   if (!enableMarkdown) {
     if (!hasCopyableContent) return null
     const emojiPlain = getEmojiOnlyInfo(String(displayContent ?? ''))
-    const shouldLargePlain = Boolean(emojiPlain.isEmojiOnly && emojiPlain.emojiCount > 0 && emojiPlain.emojiCount <= 20)
+    const shouldLargePlain = Boolean(emojiPlain.isEmojiOnly && emojiPlain.emojiCount > 0)
     const largePlainClass = (() => {
       if (!shouldLargePlain) return ''
       const n = emojiPlain.emojiCount
       if (n <= 5) return 'text-5xl sm:text-6xl leading-none'
-      return 'text-3xl sm:text-4xl leading-none'
+      if (n <= 20) return 'text-3xl sm:text-4xl leading-none'
+      return 'text-base sm:text-lg leading-snug'
     })()
     return (
       <div className={cn('relative group', className)}>
@@ -1148,7 +1186,7 @@ export function ConversationMessageContent({
             'whitespace-pre-wrap ph-mask-chat-message'
           )}
         >
-          {shouldLargePlain ? emojiPlain.trimmed : String(displayContent ?? '')}
+          {shouldLargePlain ? emojiPlain.trimmed : renderTextWithEmojiSpans(String(displayContent ?? ''))}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
       </div>
@@ -1179,7 +1217,11 @@ export function ConversationMessageContent({
                   <div className="pb-2">
                     <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
                       <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeWrapEmoji, ...(highlightTerm ? ([[rehypeHighlightText, { highlightTerm }]] as any) : [])]}
+                          components={markdownComponents}
+                        >
                           {String(displayReasoning ?? '')}
                         </ReactMarkdown>
                       </div>

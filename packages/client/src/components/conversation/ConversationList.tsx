@@ -439,27 +439,26 @@ export function ConversationList({
     }
 
     // Sidebar layout rule:
-    // - When BOTH sections have meaningful content (or are loading), they should split available height 50/50.
-    // - Each section should then scroll internally within its own allocation.
-    // - If a section is empty (and not loading) or collapsed, it should not consume half the sidebar.
-    const channelsHasContent = channelsLoading || channelsForDisplay.length > 0
-    const dmsHasContent = agentsLoading || membersLoading || directMessagesLoading || dmTargets.length > 0
-    const channelsWantsSharedSpace = Boolean(isChannelsExpanded && channelsHasContent)
-    const dmsWantsSharedSpace = Boolean(isDirectMessagesExpanded && dmsHasContent)
-    const splitEvenly = channelsWantsSharedSpace && dmsWantsSharedSpace
+    // - Channels + Direct messages should each grow naturally with content.
+    // - Each section should STOP growing once it reaches 50% of the available sidebar height.
+    // - If a section doesn't have enough content to reach 50%, it should NOT stretch.
+    // - When content exceeds 50%, the section should scroll internally.
 
     return (
       <>
         <div className="flex flex-col h-full min-h-0">
-          {/* Channels - content-sized so Direct messages starts right below */}
           <div
             className={cn(
-              'flex flex-col min-h-0 rounded-lg overflow-hidden',
-              splitEvenly || (channelsWantsSharedSpace && !dmsWantsSharedSpace) ? 'flex-1' : 'flex-none',
+              // Cap the section at 50% height; allow internal scrolling when needed.
+              'flex flex-col min-h-0 rounded-lg overflow-y-auto overscroll-contain max-h-[50%]',
               onboardingHighlight === 'channels' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8 pr-2">
+            <div
+              ref={onboardingChannelsAnchorRef}
+              data-onboarding-anchor="channels"
+              className="w-full flex items-center justify-between h-8 pr-2 sticky top-0 z-10 bg-card"
+            >
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -496,13 +495,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <ScrollArea
-                id="sidebar-channels-list"
-                className={cn(
-                  'min-h-0 overscroll-contain',
-                  splitEvenly || (channelsWantsSharedSpace && !dmsWantsSharedSpace) ? 'flex-1' : 'flex-none'
-                )}
-              >
+              <div id="sidebar-channels-list" className="min-h-0">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -587,21 +580,24 @@ export function ConversationList({
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             ) : null}
           </div>
 
           <div className="my-3 border-t border-border/60" />
 
-          {/* Direct messages - takes remaining space below Channels */}
           <div
             className={cn(
-              'flex flex-col min-h-0 rounded-lg overflow-hidden',
-              splitEvenly || (!channelsWantsSharedSpace && dmsWantsSharedSpace) ? 'flex-1' : 'flex-none',
+              // Cap the section at 50% height; allow internal scrolling when needed.
+              'flex flex-col min-h-0 rounded-lg overflow-y-auto overscroll-contain max-h-[50%]',
               onboardingHighlight === 'directMessages' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8 pr-2">
+            <div
+              ref={onboardingDirectMessagesAnchorRef}
+              data-onboarding-anchor="direct-messages"
+              className="w-full flex items-center justify-between h-8 pr-2 sticky top-0 z-10 bg-card"
+            >
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -631,24 +627,16 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <ScrollArea
-                id="sidebar-direct-messages-list"
-                className={cn(
-                  'min-h-0 overscroll-contain',
-                  splitEvenly || (!channelsWantsSharedSpace && dmsWantsSharedSpace) ? 'flex-1' : 'flex-none'
+              <div id="sidebar-direct-messages-list" className="flex flex-col min-h-0">
+                {dmTargets.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 px-2">
+                    <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
-              >
-                <div className="flex flex-col">
-                  {dmTargets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-6 px-2">
-                      <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                      <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
-                  )}
-                </div>
-              </ScrollArea>
+              </div>
             ) : null}
           </div>
         </div>

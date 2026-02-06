@@ -13,6 +13,49 @@ export class MessageRepository extends BaseRepository {
   }
 
   /**
+   * Atomically set `linked_conversation_id` for a message if (and only if) it is not already linked.
+   *
+   * Why this exists:
+   * Thread creation is a multi-step flow in the app (create child conversation → link message to it).
+   * Without an atomic "set-if-empty" update, two concurrent requests can both create a child thread
+   * and then race to write `messages.linked_conversation_id`, with the later write overwriting the
+   * earlier one. This method prevents that overwrite by making the write conditional at the DB level.
+   *
+   * Semantics:
+   * - If the message is unlinked, link it and return the updated message.
+   * - If the message is already linked to the same conversation, return the message (idempotent).
+   * - If the message is linked to a different conversation OR doesn't exist, return null.
+   *
+   * Note: Callers that need to distinguish "not found" vs "conflict" should follow up with `findById`.
+   */
+  async linkToThreadIfUnlinked(messageId: string, linkedConversationId: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(messageId || '').trim();
+        const linkedId = String(linkedConversationId || '').trim();
+        if (!id || !linkedId) return null;
+
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `
+          UPDATE messages
+          SET linked_conversation_id = $1, updated_at = NOW()
+          WHERE id = $2
+            AND (linked_conversation_id IS NULL OR linked_conversation_id = $1)
+          RETURNING *;
+          `,
+          [linkedId, id]
+        );
+
+        return row ? fromDatabase(MessageEntity, row) : null;
+      },
+      'linkToThreadIfUnlinked',
+      'Message',
+      messageId
+    );
+  }
+
+  /**
    * Get the maximum turn_seq value for a given turn.
    * Returns -1 when the turn has no messages yet.
    */

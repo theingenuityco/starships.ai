@@ -432,6 +432,12 @@ export function ConversationList({
       )
     }
 
+    // Sidebar layout rule:
+    // - Channels + Direct messages should each grow naturally with content.
+    // - Each section should STOP growing once it reaches 50% of the available sidebar height.
+    // - If a section doesn't have enough content to reach 50%, it should NOT stretch.
+    // - When content exceeds 50%, the section should scroll internally.
+
     return (
       <>
         <div className="flex flex-col h-full min-h-0">
@@ -474,7 +480,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <ScrollArea id="sidebar-channels-list" className="flex-none max-h-[40vh]">
+              <div id="sidebar-channels-list" className="min-h-0">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -559,7 +565,7 @@ export function ConversationList({
                     })}
                   </div>
                 )}
-              </ScrollArea>
+              </div>
             ) : null}
           </div>
 
@@ -597,18 +603,16 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <ScrollArea id="sidebar-direct-messages-list" className="min-h-0 flex-1">
-                <div className="flex flex-col">
-                  {dmTargets.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-6 px-2">
-                      <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                      <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
-                  )}
-                </div>
-              </ScrollArea>
+              <div id="sidebar-direct-messages-list" className="flex flex-col min-h-0">
+                {dmTargets.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 px-2">
+                    <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                )}
+              </div>
             ) : null}
           </div>
         </div>

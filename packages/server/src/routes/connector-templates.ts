@@ -10,6 +10,9 @@ import type {
   AdminConnectorTemplateImportResponse,
   AdminConnectorTemplateResponse,
   AdminConnectorTemplateDeleteResponse,
+  AdminConnectorTemplateActionsListResponse,
+  AdminConnectorTemplateActionResponse,
+  BulkReplaceConnectorTemplateActionsRequest,
   AuthUser,
   ConnectorAuthV2,
   ConnectorEndpointV2,
@@ -21,7 +24,12 @@ import type {
   ConnectorTemplateExportPayloadV1,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
-import { ConnectorTemplateEntity, ConnectorTemplateRepository, ConnectorRepository } from '@starships/models';
+import {
+  ConnectorTemplateActionRepository,
+  ConnectorTemplateEntity,
+  ConnectorTemplateRepository,
+  ConnectorRepository,
+} from '@starships/models';
 
 const router: Router = Router();
 
@@ -59,7 +67,6 @@ const UpdateConnectorTemplateSchema = z
     baseUrl: z.string().trim().min(1).max(2048).optional(),
     auth: AuthObjectSchema.optional(),
     variables: z.array(z.record(z.string(), z.unknown())).optional(),
-    endpoints: z.array(z.record(z.string(), z.unknown())).optional(),
     rateLimit: z.record(z.string(), z.unknown()).optional(),
     metadataSchema: z.record(z.string(), z.unknown()).optional(),
   })
@@ -73,7 +80,6 @@ const UpdateConnectorTemplateSchema = z
       body.baseUrl !== undefined ||
       body.auth !== undefined ||
       body.variables !== undefined ||
-      body.endpoints !== undefined ||
       body.rateLimit !== undefined ||
       body.metadataSchema !== undefined,
     { message: 'At least one field must be provided' }
@@ -91,7 +97,6 @@ const CreateConnectorTemplateSchema = z.object({
   baseUrl: z.string().trim().min(1).max(2048),
   auth: AuthObjectSchema,
   variables: z.array(z.record(z.string(), z.unknown())).optional(),
-  endpoints: z.array(z.record(z.string(), z.unknown())),
   rateLimit: z.record(z.string(), z.unknown()).optional(),
   metadataSchema: z.record(z.string(), z.unknown()).optional(),
 });
@@ -119,15 +124,45 @@ function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminMo
     baseUrl: entity.baseUrl,
     auth: entity.authJson as unknown as ConnectorAuthV2,
     variables: entity.variablesJson as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-    endpoints: entity.endpointsJson as unknown as ConnectorEndpointV2[],
     rateLimit: entity.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
     metadataSchema: entity.metadataSchemaJson as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
   };
 }
 
+async function loadTemplateByIdOrProvider(idOrProvider: string): Promise<ConnectorTemplateEntity | null> {
+  const repo = new ConnectorTemplateRepository();
+  return (await repo.findById(idOrProvider)) ?? (await repo.findByProvider(idOrProvider));
+}
+
 // ============================================================================
 // ADMIN CONNECTOR TEMPLATES (INSTANCE ADMIN ONLY)
 // ============================================================================
+
+/**
+ * GET /admin/connector-templates/:id/legacy-endpoints
+ * Read-only visibility into legacy connector_templates.endpoints_json.
+ *
+ * This is intentionally NOT part of the main template model contract; it exists only
+ * for transparent admin display and debugging. Runtime execution must use actions.
+ */
+router.get('/admin/connector-templates/:id/legacy-endpoints', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const repo = new ConnectorTemplateRepository();
+    const legacy = await repo.getLegacyEndpointsJsonByTemplateId(template.id);
+    sendSuccess(res, { LEGACY_endpoints: legacy });
+  } catch (error) {
+    handleError(error, res, 'fetching legacy connector template endpoints_json');
+  }
+});
 
 /**
  * GET /admin/connector-templates/:id/export
@@ -138,20 +173,20 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
     const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
-    const repo = new ConnectorTemplateRepository();
-    const template = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
+    const template = await loadTemplateByIdOrProvider(params.id);
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
       return;
     }
 
+    const actionRepo = new ConnectorTemplateActionRepository();
     const safeAuth = (template.authJson && typeof template.authJson === 'object' && !Array.isArray(template.authJson)
       ? template.authJson
       : { type: 'none' }) as unknown as ConnectorAuthV2;
     const safeVariables = (Array.isArray(template.variablesJson)
       ? template.variablesJson
       : undefined) as unknown as ConnectorTemplateRuntimeFieldsV2['variables'];
-    const safeEndpoints = (Array.isArray(template.endpointsJson) ? template.endpointsJson : []) as unknown as ConnectorEndpointV2[];
+    const actions = (await actionRepo.listActionsByTemplateId(template.id)) as unknown as ConnectorEndpointV2[];
     const safeRateLimit =
       template.rateLimitJson && typeof template.rateLimitJson === 'object' && !Array.isArray(template.rateLimitJson)
         ? (template.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'])
@@ -175,10 +210,10 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
         baseUrl: template.baseUrl,
         auth: safeAuth,
         variables: safeVariables,
-        endpoints: safeEndpoints,
         rateLimit: safeRateLimit,
         metadataSchema: safeMetadataSchema,
       },
+      actions,
     };
 
     const container: ImportExportContainerV1<'connector_template'> = {
@@ -233,10 +268,10 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           baseUrl: z.string().trim().min(1),
           auth: AuthObjectSchema,
           variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
-          endpoints: z.array(z.record(z.string(), z.unknown())),
           rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
           metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
         }),
+        actions: z.array(z.record(z.string(), z.unknown())).optional(),
       }),
     });
 
@@ -246,6 +281,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
     const warnings: string[] = [];
     // Zod schema intentionally validates a safe-but-loose JSON shape; cast through unknown to satisfy TS.
     const ctRaw = body.payload.connectorTemplate as unknown as CreateConnectorTemplateRequest;
+    const rawActions = (body.payload as unknown as { actions?: unknown }).actions;
     const ctRawNullable = ctRaw as unknown as {
       variables?: unknown;
       rateLimit?: unknown;
@@ -287,7 +323,6 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           baseUrl: ct.baseUrl,
           authJson: ct.auth as unknown as ConnectorAuthV2,
           variablesJson: ct.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-          endpointsJson: ct.endpoints as unknown as ConnectorEndpointV2[],
           rateLimitJson: ct.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
           metadataSchemaJson: ct.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
         })) ?? undefined;
@@ -300,6 +335,19 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
     } else {
       created = true;
       saved = await repo.create(ct);
+    }
+
+    // Optional: import action catalog (source of truth: connector_template_actions).
+    // We intentionally do NOT read/write the legacy connector_templates.endpoints_json field here.
+    if (rawActions !== undefined) {
+      if (!Array.isArray(rawActions)) {
+        throw new Error('payload.actions must be an array when provided');
+      }
+      const actionRepo = new ConnectorTemplateActionRepository();
+      await actionRepo.replaceAllActions({
+        templateId: saved.id,
+        actions: rawActions as unknown as ConnectorEndpointV2[],
+      });
     }
 
     const payload: AdminConnectorTemplateImportResponse = {
@@ -349,7 +397,6 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       baseUrl: body.baseUrl,
       auth: body.auth as unknown as ConnectorAuthV2,
       variables: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      endpoints: body.endpoints as unknown as ConnectorEndpointV2[],
       rateLimit: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
       metadataSchema: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     } satisfies CreateConnectorTemplateRequest);
@@ -370,8 +417,7 @@ router.get('/admin/connector-templates/:id', async (req: Request, res: Response)
     const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
-    const repo = new ConnectorTemplateRepository();
-    const template = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
+    const template = await loadTemplateByIdOrProvider(params.id);
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
       return;
@@ -414,7 +460,6 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
       baseUrl: body.baseUrl,
       authJson: body.auth as unknown as ConnectorAuthV2,
       variablesJson: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      endpointsJson: body.endpoints as unknown as ConnectorEndpointV2[],
       rateLimitJson: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
       metadataSchemaJson: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     });
@@ -431,6 +476,200 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     sendSuccess(res, payload);
   } catch (error) {
     handleError(error, res, 'updating connector template');
+  }
+});
+
+// ============================================================================
+// ADMIN CONNECTOR TEMPLATE ACTIONS (INSTANCE ADMIN ONLY)
+// ============================================================================
+
+const ActionsListQuerySchema = z
+  .object({
+    q: z.string().optional(),
+    limit: z.coerce.number().min(1).max(200).optional(),
+    offset: z.coerce.number().min(0).max(1_000_000).optional(),
+  })
+  .strict();
+
+// GET /admin/connector-templates/:id/actions - list action rows (paged)
+router.get('/admin/connector-templates/:id/actions', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const query = validateData(ActionsListQuerySchema, req.query, res, 'actions list query');
+    if (!query) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const actionRepo = new ConnectorTemplateActionRepository();
+    const rows = await actionRepo.listActionRowsByTemplateId({
+      templateId: template.id,
+      limit: query.limit,
+      offset: query.offset,
+      q: query.q,
+    });
+
+    // Keep response lightweight: return row summaries.
+    const actions = rows.map((r) => ({
+      templateId: r.template_id,
+      actionName: r.action_name,
+      ordinal: r.ordinal,
+      method: r.method,
+      path: r.path,
+      description: r.description ?? undefined,
+      baseUrlOverride: r.base_url_override ?? undefined,
+      timeoutMs: r.timeout_ms ?? undefined,
+      requestStyle: r.request_style ?? undefined,
+      updatedAt: r.updated_at,
+    }));
+
+    const payload: AdminConnectorTemplateActionsListResponse = {
+      actions: actions as unknown as AdminConnectorTemplateActionsListResponse['actions'],
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+      q: query.q ?? undefined,
+    };
+    sendSuccess(res, payload);
+  } catch (error) {
+    handleError(error, res, 'listing connector template actions');
+  }
+});
+
+// GET /admin/connector-templates/:id/actions/:actionName - fetch a full endpoint
+router.get('/admin/connector-templates/:id/actions/:actionName', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(
+      z.object({ id: TemplateIdOrProviderSchema, actionName: z.string().trim().min(1).max(255) }),
+      req.params,
+      res,
+      'connector template action params'
+    );
+    if (!params) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const actionRepo = new ConnectorTemplateActionRepository();
+    const action = await actionRepo.findAction(template.id, params.actionName);
+    if (!action) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template action not found', 404, { id: template.id, actionName: params.actionName });
+      return;
+    }
+
+    const payload: AdminConnectorTemplateActionResponse = { action };
+    sendSuccess(res, payload);
+  } catch (error) {
+    handleError(error, res, 'fetching connector template action');
+  }
+});
+
+const UpsertActionSchema = z
+  .object({
+    action: z.record(z.string(), z.unknown()),
+    ordinal: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+// PUT /admin/connector-templates/:id/actions/:actionName - upsert one action
+router.put('/admin/connector-templates/:id/actions/:actionName', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(
+      z.object({ id: TemplateIdOrProviderSchema, actionName: z.string().trim().min(1).max(255) }),
+      req.params,
+      res,
+      'connector template action params'
+    );
+    if (!params) return;
+
+    const body = validateData(UpsertActionSchema, req.body as unknown, res, 'upsert action body');
+    if (!body) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const action = body.action as unknown as ConnectorEndpointV2;
+    // Enforce name match for safety.
+    action.name = params.actionName;
+
+    const actionRepo = new ConnectorTemplateActionRepository();
+    await actionRepo.upsertAction({ templateId: template.id, action, ordinal: body.ordinal });
+
+    sendSuccess(res, { ok: true });
+  } catch (error) {
+    handleError(error, res, 'upserting connector template action');
+  }
+});
+
+// DELETE /admin/connector-templates/:id/actions/:actionName
+router.delete('/admin/connector-templates/:id/actions/:actionName', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(
+      z.object({ id: TemplateIdOrProviderSchema, actionName: z.string().trim().min(1).max(255) }),
+      req.params,
+      res,
+      'connector template action params'
+    );
+    if (!params) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const actionRepo = new ConnectorTemplateActionRepository();
+    const deleted = await actionRepo.deleteAction({ templateId: template.id, actionName: params.actionName });
+    if (!deleted) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template action not found', 404, { id: template.id, actionName: params.actionName });
+      return;
+    }
+
+    // NOTE: 204 is valid HTTP for DELETE, but our connector/workflow tooling expects a JSON ApiResponse payload.
+    // Returning a standard success payload avoids false-negative failures.
+    sendSuccess(res, { ok: true });
+  } catch (error) {
+    handleError(error, res, 'deleting connector template action');
+  }
+});
+
+// PUT /admin/connector-templates/:id/actions - bulk replace
+router.put('/admin/connector-templates/:id/actions', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const BodySchema = z.object({ actions: z.array(z.record(z.string(), z.unknown())) }).strict();
+    const body = validateData(
+      BodySchema,
+      req.body as unknown as BulkReplaceConnectorTemplateActionsRequest,
+      res,
+      'bulk replace actions body'
+    );
+    if (!body) return;
+
+    const template = await loadTemplateByIdOrProvider(params.id);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const actionRepo = new ConnectorTemplateActionRepository();
+    await actionRepo.replaceAllActions({ templateId: template.id, actions: body.actions as unknown as ConnectorEndpointV2[] });
+
+    sendSuccess(res, { ok: true });
+  } catch (error) {
+    handleError(error, res, 'bulk replacing connector template actions');
   }
 });
 

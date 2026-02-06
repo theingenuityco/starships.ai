@@ -111,6 +111,35 @@ function buildReusableJsonPrompt(args: {
       art_style: 'high-resolution comic strip style',
       lighting: 'clean, readable, professional',
       palette: 'warm, modern, readable',
+      // Keep the speech bubble consistent across generations.
+      speech_bubble_style: {
+        bubble_shape: 'rounded white speech bubble',
+        outline: { color: 'black', thickness: 'medium' },
+        fill: 'solid white',
+        tail: { required: true, points_to: 'subject mouth area', direction_hint: 'from upper-right toward subject' },
+        font: {
+          // Be very explicit. Providers may not have named fonts; treat these as strong hints with fallbacks.
+          family_primary: 'Arial',
+          family_fallbacks: ['Helvetica', 'sans-serif'],
+          case: 'preserve',
+          color: 'black',
+          weight: 500,
+          // Calibrated for a 1024×1024 image. Keep consistent across generations.
+          // (We state both px-equivalent and canvas-relative guidance.)
+          size_px_equivalent_range_1024: { min: 26, max: 34 },
+          size_canvas_height_percent_range: { min: 2.6, max: 3.4 },
+          line_height: 1.1,
+          letter_spacing: 0.0,
+          text_alignment: 'center',
+          max_lines: 2,
+          wrap_behavior: 'wrap words (no hyphenation)',
+        },
+        placement: {
+          anchor: 'upper-right',
+          margin_percent: 6,
+          max_width_percent: 55,
+        },
+      },
       background: {
         type: 'solid_or_subtle_gradient',
         color_hint: getBackgroundColor(template.category),
@@ -122,6 +151,9 @@ function buildReusableJsonPrompt(args: {
         no_frames: true,
         no_multiple_panels: true,
         no_real_person_likeness: true,
+        // Extra hard constraints for consistency:
+        speech_bubble_only_text: true,
+        speech_bubble_count: 1,
       },
     },
     subject: {
@@ -144,6 +176,9 @@ function buildReusableJsonPrompt(args: {
         required: true,
         text: speechBubbleText,
         exact_text_required: true,
+        // Reinforce standardization at the composition-level too.
+        anchor: 'upper-right',
+        style_ref: 'style.speech_bubble_style',
       },
     },
     slot: {

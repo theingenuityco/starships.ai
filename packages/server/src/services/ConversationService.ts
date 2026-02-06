@@ -1885,7 +1885,7 @@ export class ConversationService {
     ctx?: {
       authContext?: { userId: string; agentId?: string; starshipId?: string };
     },
-    opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string }
+    opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string; turnGuardId?: string }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -1906,12 +1906,19 @@ export class ConversationService {
 
     // Now check conversation state (async, but we're already protected by activeCancellations)
     const conversationStateCheck = await this.getConversationById(data.conversationId).catch(() => null);
-    const turnActive =
-      conversationStateCheck?.state &&
-      typeof conversationStateCheck.state === 'object' &&
-      (conversationStateCheck.state as { turnActive?: boolean }).turnActive === true;
+    const stateObj =
+      conversationStateCheck?.state && typeof conversationStateCheck.state === 'object'
+        ? (conversationStateCheck.state as { turnActive?: boolean; turnGuardId?: unknown })
+        : null;
+    const turnActive = stateObj?.turnActive === true;
+    const stateGuardId = typeof stateObj?.turnGuardId === 'string' ? String(stateObj.turnGuardId).trim() : '';
+    const callerGuardId = typeof opts?.turnGuardId === 'string' ? String(opts.turnGuardId).trim() : '';
+    const sameGuard = Boolean(turnActive && callerGuardId && stateGuardId && stateGuardId === callerGuardId);
 
-    if (turnActive) {
+    // IMPORTANT: turnActive is DB-backed so it works across server replicas.
+    // We allow the call to proceed only if the caller presents the matching guard id (meaning this request
+    // is the one that set turnActive=true just before handing control to the turn runner).
+    if (turnActive && !sameGuard) {
       // Remove placeholder since we're blocking
       ConversationService.activeCancellations.delete(data.conversationId);
       throw new ConflictError(

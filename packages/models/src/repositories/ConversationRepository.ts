@@ -145,6 +145,51 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Acquire a conversation-scoped "turn guard" by atomically setting `state.turnActive=true`
+   * only if it is not already true.
+   *
+   * Why this exists:
+   * - We bill credits *before* the async turn worker starts. If a client retries/double-submits
+   *   the same "send message" action while a turn is starting, we must reject the duplicate
+   *   request *before billing*.
+   * - In-memory guards (per server replica) are not sufficient; this must be DB-backed.
+   *
+   * The guard is represented by a caller-provided `turnGuardId` that is stored in state.
+   * Callers that own the guard can pass `turnGuardId` downstream so the turn runner can
+   * distinguish "my guard" vs "someone else's active turn".
+   */
+  async acquireTurnGuard(conversationId: string, turnGuardId: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!conversationId?.trim()) throw new Error('conversationId is required');
+        if (!turnGuardId?.trim()) throw new Error('turnGuardId is required');
+
+        const connection = this.getConnection();
+        const patch = JSON.stringify({ turnActive: true, turnGuardId, turnGuardAt: new Date().toISOString() });
+
+        const row = await connection.queryOne<{ id: string }>(
+          `
+            UPDATE conversations
+               SET state = COALESCE(state, '{}'::jsonb) || $2::jsonb,
+                   updated_at = NOW()
+             WHERE id = $1
+               AND COALESCE((state ->> 'turnActive')::boolean, false) = false
+            RETURNING id
+          `,
+          [conversationId, patch]
+        );
+
+        // If row is null, either conversation doesn't exist or a turn is already active.
+        // Callers that already verified existence should treat this as "guard not acquired".
+        return Boolean(row?.id);
+      },
+      'acquireTurnGuard',
+      'Conversation',
+      conversationId
+    );
+  }
+
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {

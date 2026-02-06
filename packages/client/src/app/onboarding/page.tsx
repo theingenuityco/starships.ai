@@ -35,9 +35,6 @@ const INPUT_MAX_W = 'max-w-xl'
 /** Primary nav button (Next/Complete) min width and height. */
 const BTN_PRIMARY = 'min-w-[100px] h-10'
 const BTN_NAV_GHOST = 'h-10'
-/** Shared minimum height for each step card so nav stays aligned. */
-const STEP_MIN_H = 'min-h-[420px]'
-
 type OnboardingPersistedState = {
   step: number
   starshipName: string
@@ -343,143 +340,133 @@ export default function OnboardingPage() {
         </header>
 
         <main className="flex flex-1 flex-col items-center justify-center px-4 py-16 relative z-10">
-          <div className={`w-full mx-auto min-w-0 ${CONTENT_MAX_W} -mt-12`}>
-            <p className="text-xs text-muted-foreground mb-1">
-              Step {step} of {TOTAL_STEPS}
-            </p>
+          <div className="w-full flex justify-center">
+            <div className={`w-full min-w-0 ${CONTENT_MAX_W}`}>
+              <p className="text-xs text-muted-foreground mb-1">
+                Step {step} of {TOTAL_STEPS}
+              </p>
 
-            {step === 1 && (
-              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
-                  </div>
-                  <div className={`space-y-2 ${INPUT_MAX_W}`}>
-                    <Label htmlFor="starship-name">Starship name</Label>
-                    <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">Who else is on the {primaryStarship?.name ?? 'your workspace'} team?</p>
-                  </div>
-                  <div className={`space-y-3 ${INPUT_MAX_W}`}>
-                    <ul className="flex flex-col gap-3 w-full">
-                      {inviteEmailRows.map((email, idx) => (
-                        <li key={idx} className="flex items-center gap-2 w-full">
-                          <Input
-                            type="email"
-                            value={email}
-                            onChange={e => setInviteEmailAt(idx, e.target.value)}
-                            placeholder="colleague@company.com"
-                            className="flex-1 min-w-0"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => removeInviteEmailRow(idx)}
-                            disabled={inviteEmailRows.length <= 1}
-                            aria-label="Remove email"
-                          >
-                            <Icon name="x" className="w-3 h-3" />
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button type="button" variant="outline" size="sm" onClick={addInviteEmailRow} className="gap-1">
-                      <Icon name="plus" className="w-3.5 h-3.5" />
-                      Add another
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className={`mt-6 flex flex-col w-full ${STEP_MIN_H}`} style={{ maxHeight: 'min(calc(100dvh - 20rem), 560px)' }}>
-                <div className="shrink-0">
-                  <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">You can add more from the marketplace later.</p>
-                </div>
-                {templatesLoading ? (
-                  <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
-                ) : allTemplates.length === 0 ? (
-                  <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
-                ) : (
-                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">
-                      {allTemplates.map(template => (
-                        <OnboardingAgentCard
-                          key={template.id}
-                          template={template}
-                          targetStarshipId={primaryStarship?.id ?? ''}
-                          onDeployed={handleAgentDeployed}
-                          onRemoved={handleAgentRemoved}
-                        />
-                      ))}
+              {step === 1 && (
+                <div className="mt-6 flex flex-col">
+                  <div className="space-y-6">
+                    <div>
+                      <h1 className="text-3xl font-bold tracking-tight">Name your workspace</h1>
+                      <p className="mt-2 text-sm text-muted-foreground">Choose a name your team will recognise, like your company or project.</p>
+                    </div>
+                    <div className={`space-y-2 ${INPUT_MAX_W}`}>
+                      <Label htmlFor="starship-name">Starship name</Label>
+                      <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className={`mt-6 flex flex-col w-full ${STEP_MIN_H}`} style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
-                <div className="shrink-0">
-                  <h1 className="text-3xl font-bold tracking-tight">Connect your apps</h1>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {connectorProviders.length > 0
-                      ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
-                      : 'No connectors required by your agents. You can connect apps anytime from your workspace.'}
-                  </p>
                 </div>
-                {primaryStarship?.id && (
-                  <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-                    {connectorsLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading connectors...</p>
-                    ) : connectorProviders.length > 0 ? (
-                      <StarshipConnectorsPanel
-                        starshipId={primaryStarship.id}
-                        onlyProviders={connectorProviders}
-                        hideSearch
-                        hideDisconnect={false}
-                        hideReconnect
-                        maxColumns={2}
-                        hideCardDescription
-                        connectButtonLabel="Connect"
-                        matchAgentCardStyle
-                      />
+              )}
+
+              {step === 2 && (
+                <div className="mt-6 flex flex-col">
+                  <div className="space-y-6">
+                    <div>
+                      <h1 className="text-3xl font-bold tracking-tight">Invite your team</h1>
+                      <p className="mt-2 text-sm text-muted-foreground">Who else is on the {primaryStarship?.name ?? 'your workspace'} team?</p>
+                    </div>
+                    <div className={`space-y-3 ${INPUT_MAX_W}`}>
+                      <ul className="flex flex-col gap-3 w-full">
+                        {inviteEmailRows.map((email, idx) => (
+                          <li key={idx} className="flex items-center gap-2 w-full">
+                            <Input type="email" value={email} onChange={e => setInviteEmailAt(idx, e.target.value)} placeholder="colleague@company.com" className="flex-1 min-w-0" />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => removeInviteEmailRow(idx)}
+                              disabled={inviteEmailRows.length <= 1}
+                              aria-label="Remove email"
+                            >
+                              <Icon name="x" className="w-3 h-3" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                      <Button type="button" variant="outline" size="sm" onClick={addInviteEmailRow} className="gap-1">
+                        <Icon name="plus" className="w-3.5 h-3.5" />
+                        Add another
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 20rem), 560px)' }}>
+                  <div className="shrink-0">
+                    <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">You can add more from the marketplace later.</p>
+                  </div>
+                  {templatesLoading ? (
+                    <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
+                  ) : allTemplates.length === 0 ? (
+                    <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
+                  ) : (
+                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">
+                        {allTemplates.map(template => (
+                          <OnboardingAgentCard key={template.id} template={template} targetStarshipId={primaryStarship?.id ?? ''} onDeployed={handleAgentDeployed} onRemoved={handleAgentRemoved} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
+                  <div className="shrink-0">
+                    <h1 className="text-3xl font-bold tracking-tight">Connect your apps</h1>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {connectorProviders.length > 0
+                        ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
+                        : 'No connectors required by your agents. You can connect apps anytime from your workspace.'}
+                    </p>
+                  </div>
+                  {primaryStarship?.id && (
+                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+                      {connectorsLoading ? (
+                        <p className="text-sm text-muted-foreground">Loading connectors...</p>
+                      ) : connectorProviders.length > 0 ? (
+                        <StarshipConnectorsPanel
+                          starshipId={primaryStarship.id}
+                          onlyProviders={connectorProviders}
+                          hideSearch
+                          hideDisconnect={false}
+                          hideReconnect
+                          maxColumns={2}
+                          hideCardDescription
+                          connectButtonLabel="Connect"
+                          matchAgentCardStyle
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 5 && (
+                <div className="mt-6 flex flex-col">
+                  <div className="space-y-6">
+                    <div>
+                      <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
+                      <p className="mt-2 text-sm text-muted-foreground">You can continue with the free tier and upgrade anytime.</p>
+                    </div>
+
+                    {primaryStarship?.id ? (
+                      <div className="mt-4 w-full min-w-0">
+                        <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none w-full" hideDescription />
+                      </div>
                     ) : null}
                   </div>
-                )}
-              </div>
-            )}
-
-            {step === 5 && (
-              <div className={`mt-6 flex flex-col ${STEP_MIN_H}`}>
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Your starship is ready!</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">You can continue with the free tier and upgrade anytime.</p>
-                  </div>
-
-                  {primaryStarship?.id ? (
-                    <div className="mt-4 w-full min-w-0">
-                      <StarshipUpgradeSection starshipId={primaryStarship.id} cardClassName="bg-transparent border-0 shadow-none w-full" hideDescription />
-                    </div>
-                  ) : null}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Global sticky navigation bar: consistent position across steps */}

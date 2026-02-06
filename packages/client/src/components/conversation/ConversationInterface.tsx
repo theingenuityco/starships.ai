@@ -961,7 +961,7 @@ export function ConversationInterface({
                       <Icon name="hash" weight="bold" className="h-5 w-5" />
                       {isCurrentChannelPrivate ? (
                         <span
-                          className="absolute bottom-0 right-0 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-muted-foreground"
+                          className="absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-foreground"
                           title="Private channel"
                           aria-label="Private channel"
                         >

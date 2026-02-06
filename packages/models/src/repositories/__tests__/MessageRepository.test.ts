@@ -271,6 +271,30 @@ describe('MessageRepository', () => {
     });
   });
 
+  describe('linkToThreadIfUnlinked', () => {
+    it('should atomically link a message to a thread when unlinked', async () => {
+      const mockUpdated = createMockMessage({ linkedConversationId: 'child-conv-1' });
+      mockConnection.queryOne.mockResolvedValue(mockUpdated);
+
+      const result = await repository.linkToThreadIfUnlinked('message-123', 'child-conv-1');
+
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('linked_conversation_id IS NULL'), [
+        'child-conv-1',
+        'message-123',
+      ]);
+      expect(result).toMatchObject({ linkedConversationId: 'child-conv-1' });
+    });
+
+    it('should return null when the message is already linked to a different thread', async () => {
+      mockConnection.queryOne.mockResolvedValue(null);
+
+      const result = await repository.linkToThreadIfUnlinked('message-123', 'child-conv-2');
+
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.any(String), ['child-conv-2', 'message-123']);
+      expect(result).toBeNull();
+    });
+  });
+
   describe('getMessageConversation', () => {
     it('should return conversation associated with message', async () => {
       const mockConversation = { id: 'conversation-123', title: 'Test Conversation', status: 'active' };

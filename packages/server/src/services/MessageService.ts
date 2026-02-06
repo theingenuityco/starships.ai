@@ -6,6 +6,7 @@
  */
 
 import { MessageRepository, AttachmentRepository, ConversationParticipantRepository } from '@starships/models';
+import { AppError } from '@starships/errors';
 import type { Message, MessageModel } from '@starships/protocol';
 
 /**
@@ -133,7 +134,49 @@ export class MessageService {
    * Update an existing message by id
    */
   async updateMessage(id: string, updates: Partial<MessageModel>): Promise<MessageModel | null> {
-    return this.messageRepository.update(id, updates);
+    // Thread-linking is a concurrency-sensitive update.
+    //
+    // Thread creation is a multi-step flow (create child conversation → link message to it).
+    // If two requests race to link the same message to different child conversations, a naive
+    // update would allow the later request to overwrite `linkedConversationId`, losing the
+    // first created thread reference. We prevent this by performing an atomic "set-if-empty"
+    // update at the repository layer, and surfacing a 409 on conflict.
+    const updateRecord = (updates ?? {}) as Record<string, unknown>;
+    const rawLinked = typeof updateRecord['linkedConversationId'] === 'string' ? String(updateRecord['linkedConversationId']).trim() : '';
+    const { linkedConversationId: _ignored, ...rest } = updateRecord;
+    void _ignored;
+
+    // Apply all non-thread-link updates normally.
+    const hasNonLinkUpdates = Object.keys(rest).length > 0;
+    const base = hasNonLinkUpdates ? await this.messageRepository.update(id, rest as Partial<MessageModel>) : await this.messageRepository.findById(id);
+    if (!base) return null;
+
+    // If no thread link update requested, we're done.
+    if (!rawLinked) {
+      return base;
+    }
+
+    // Atomically set link only if currently unlinked (or already linked to the same id).
+    const linked = await this.messageRepository.linkToThreadIfUnlinked(id, rawLinked);
+    if (linked) return linked;
+
+    // Distinguish not-found vs conflict by reloading the message.
+    const current = await this.messageRepository.findById(id);
+    if (!current) return null;
+
+    const existing = typeof (current as any).linkedConversationId === 'string' ? String((current as any).linkedConversationId).trim() : '';
+    if (existing && existing !== rawLinked) {
+      throw new AppError('Message is already linked to a different thread', 'RESOURCE_CONFLICT', 409, {
+        details: {
+          messageId: id,
+          existingLinkedConversationId: existing,
+          attemptedLinkedConversationId: rawLinked,
+        },
+      });
+    }
+
+    // If we get here, the message is either still unlinked (unexpected) or linked to the same id.
+    return current;
   }
 
   /**

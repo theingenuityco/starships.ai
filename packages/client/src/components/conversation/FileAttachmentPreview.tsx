@@ -87,7 +87,6 @@ export function FileAttachmentPreview({ file, onRemove, uploading, uploadProgres
           <Icon name="alert-circle" className={cn(minimal ? 'w-3 h-3' : 'w-3.5 h-3.5', 'text-destructive')} />
         ) : (
           <button
-            type="button"
             onClick={onRemove}
             className="p-0.5 rounded-full hover:bg-muted/50 transition-colors"
             aria-label="Remove file"

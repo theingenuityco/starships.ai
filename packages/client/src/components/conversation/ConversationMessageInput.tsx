@@ -280,6 +280,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Provide editor operations without referencing the editor before initialization
     const clearEditorRef = useRef<() => void>(() => {})
+    // TipTap editor props can capture stale closures; use a ref for the latest submit handler.
+    const submitRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
     const createDirectMessage = useCreateDirectMessage()
@@ -664,8 +666,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
+      const hasPendingAttachments = pendingFiles.length > 0
       // CRITICAL: Check if already blocked (synchronous ref check first)
-      if (!messageToSend || sending || disabled || isStreamingEffective || streamingRef.current) return
+      // Allow sending with ONLY file attachments (no text required).
+      if ((!messageToSend && !hasPendingAttachments) || sending || disabled || isStreamingEffective || streamingRef.current) return
 
       // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
       streamingRef.current = true
@@ -737,7 +741,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // - Default to the UI-selected agent for non-mention contexts (e.g. draft threads opened from an agent message).
       // - Then apply context rules (channel/DM/thread) and allow explicit leading @mention to override where applicable.
       let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
-      let contentToSend = messageToSend
+      // Server-side validation requires non-empty content. For attachment-only sends, send a single space so the UI renders as attachments-only.
+      let contentToSend = messageToSend || (hasPendingAttachments ? ' ' : '')
       if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
@@ -804,7 +809,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If a thread has *no* agent selected/mentioned and *no* linked agents,
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+      const isAttachmentOnlySend = Boolean(hasPendingAttachments && !messageToSend)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
@@ -843,7 +849,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return
       }
 
-      // contentToSend already validated via messageToSend trim
+      // contentToSend validated: non-empty text OR attachment-only placeholder space.
 
       if (!starshipId) {
         resetFlags()
@@ -1148,6 +1154,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [
       draftDirectMessageTarget,
       message,
+      pendingFiles,
       sending,
       disabled,
       isStreamingEffective,
@@ -1171,9 +1178,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       onAgentChange,
       starshipAgents,
+      uploadFile,
       queryClient,
       applyPendingWebBrowsing,
     ])
+
+    // Keep a stable ref for TipTap's Enter key handler.
+    useEffect(() => {
+      submitRef.current = () => {
+        void handleSubmit()
+      }
+    }, [handleSubmit])
 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
@@ -1377,7 +1392,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           : isMentionOnlyThread
             ? hasLeadingMentionToken
             : hasLeadingMentionToken || (isThreadConversation && linkedAgentCount === 1) || (isThreadContext && linkedAgentCount === 0)
-    const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
+    const hasPendingAttachments = pendingFiles.length > 0
+    const hasSendableContent = hasActualContent || hasPendingAttachments
+    // Preserve existing agent-target gating for text, but allow attachment-only sends without text.
+    const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
+    const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -2091,7 +2110,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               return true
             }
             event.preventDefault()
-            handleSubmit()
+            submitRef.current?.()
             return true
           }
           return false

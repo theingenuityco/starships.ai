@@ -642,6 +642,30 @@ export function useDeleteMessage() {
   })
 }
 
+// Update message
+export function useUpdateMessage() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.put(`/api/v1/messages/${messageId}`, { content })
+      return response.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+      })
+      toast.success('Message updated successfully!')
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to update message', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 // Link a message to a child conversation (used for channel "threads")
 export function useLinkMessageToConversation() {
   const queryClient = useQueryClient()

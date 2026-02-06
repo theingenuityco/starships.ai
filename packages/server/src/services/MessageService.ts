@@ -6,6 +6,7 @@
  */
 
 import { MessageRepository, AttachmentRepository, ConversationParticipantRepository } from '@starships/models';
+import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import type { Message, MessageModel } from '@starships/protocol';
 
 /**
@@ -157,7 +158,7 @@ export class MessageService {
   /**
    * Delete message and cleanup associated S3 files
    */
-  async deleteMessage(messageId: string): Promise<boolean> {
+  async deleteMessage(messageId: string): Promise<MessageModel | null> {
     // First, get the message with starshipId to access its attachments
     const connection = this.messageRepository['getConnection']();
     const messageData = await connection.queryOne<{
@@ -167,7 +168,7 @@ export class MessageService {
     }>('SELECT id, starship_id, attachment_ids FROM messages WHERE id = $1', [messageId]);
 
     if (!messageData) {
-      return false;
+      return null;
     }
 
     // Delete attachments and their S3 files before deleting the message
@@ -187,8 +188,11 @@ export class MessageService {
       }
     }
 
-    // Now delete the message (CASCADE will delete any remaining attachment records)
-    const deleted = await this.messageRepository.delete(messageId);
-    return deleted;
+    // Soft-delete the message so clients can render "deleted" placeholders.
+    const updated = await this.messageRepository.update(messageId, {
+      content: DELETED_MESSAGE_MARKER,
+      attachmentIds: [],
+    });
+    return updated;
   }
 }

@@ -7,11 +7,11 @@ export type AgentTemplateMarketingJobStatus = 'running' | 'completed' | 'failed'
 export type AgentTemplateMarketingStepKey =
   | 'validate_admin'
   | 'load_template'
-  | 'resolve_parent_agent'
-  | 'build_runner_bundle'
-  | 'generate_avatar'
   | 'generate_problem_statements'
-  | 'generate_profile_images'
+  | 'load_avatar_reference'
+  | 'generate_problem_image'
+  | 'generate_capabilities_image'
+  | 'generate_try_prompts_image'
   | 'persist_template_assets'
   | 'revalidate';
 
@@ -58,16 +58,16 @@ function stepLabel(key: AgentTemplateMarketingStepKey): string {
       return 'Validating permissions';
     case 'load_template':
       return 'Loading template';
-    case 'resolve_parent_agent':
-      return 'Resolving parent agent context';
-    case 'build_runner_bundle':
-      return 'Preparing runner bundle';
-    case 'generate_avatar':
-      return 'Generating avatar';
     case 'generate_problem_statements':
       return 'Generating problem statements';
-    case 'generate_profile_images':
-      return 'Generating profile images';
+    case 'load_avatar_reference':
+      return 'Loading avatar reference';
+    case 'generate_problem_image':
+      return 'Generating problem image';
+    case 'generate_capabilities_image':
+      return 'Generating capabilities image';
+    case 'generate_try_prompts_image':
+      return 'Generating try-these-prompts image';
     case 'persist_template_assets':
       return 'Saving assets to template';
     case 'revalidate':
@@ -81,11 +81,11 @@ function freshSteps(): AgentTemplateMarketingJobStep[] {
   const keys: AgentTemplateMarketingStepKey[] = [
     'validate_admin',
     'load_template',
-    'resolve_parent_agent',
-    'build_runner_bundle',
-    'generate_avatar',
     'generate_problem_statements',
-    'generate_profile_images',
+    'load_avatar_reference',
+    'generate_problem_image',
+    'generate_capabilities_image',
+    'generate_try_prompts_image',
     'persist_template_assets',
     'revalidate',
   ];

@@ -1268,6 +1268,52 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }
 
+  const toIsoTimestamp = (value: unknown): string | null => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString()
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const ms = value < 1e12 ? value * 1000 : value
+      const d = new Date(ms)
+      return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (!trimmed) return null
+      const asNumber = Number(trimmed)
+      if (Number.isFinite(asNumber)) {
+        const ms = asNumber < 1e12 ? asNumber * 1000 : asNumber
+        const d = new Date(ms)
+        return Number.isNaN(d.getTime()) ? null : d.toISOString()
+      }
+      const d = new Date(trimmed)
+      return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    }
+    return null
+  }
+
+  const normalizeMessageTimestamps = (input: any): ClientMessage => {
+    if (!input || typeof input !== 'object') return input as ClientMessage
+    const createdRaw =
+      input.createdAt ??
+      input.created_at ??
+      input.createdAtMs ??
+      input.created_at_ms ??
+      input.timestamp ??
+      input.time
+    const updatedRaw =
+      input.updatedAt ??
+      input.updated_at ??
+      input.updatedAtMs ??
+      input.updated_at_ms ??
+      input.updated_at ??
+      createdRaw
+    const createdAt = toIsoTimestamp(createdRaw)
+    const updatedAt = toIsoTimestamp(updatedRaw ?? createdRaw)
+    const next = { ...input } as any
+    if (createdAt) next.createdAt = createdAt
+    if (updatedAt) next.updatedAt = updatedAt
+    return next as ClientMessage
+  }
+
   const withStreaming = (m: ClientMessage, streaming: boolean): ClientMessage => ({ ...m, streaming })
   const emptyMessages: ClientMessage[] = []
 
@@ -1303,6 +1349,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const turn = chunk.data.turn
       const isActiveTurn = turn && (turn.status === 'active' || turn.status === 'waiting_for_tools')
       const snap = msgs.map(m => {
+        const normalized = normalizeMessageTimestamps(m as any)
         // Only mark the *stream placeholder* as streaming on snapshot.
         //
         // Why:
@@ -1310,9 +1357,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         // Marking *all* assistant messages in the active turn as `streaming=true` makes the UI
         // think multiple messages are "actively streaming", which can move the caret and confuse
         // which bubble should visually "continue" after refresh.
-        const isStreamPlaceholder = typeof (m as any)?.id === 'string' && typeof turn?.turnId === 'string' && String((m as any).id) === `stream-${turn.turnId}`
-        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && isStreamPlaceholder)
-        const withStream = withStreaming(m, shouldStream)
+        const isStreamPlaceholder = typeof (normalized as any)?.id === 'string' && typeof turn?.turnId === 'string' && String((normalized as any).id) === `stream-${turn.turnId}`
+        const shouldStream = Boolean(isActiveTurn && normalized.role === 'assistant' && isStreamPlaceholder)
+        const withStream = withStreaming(normalized, shouldStream)
         // Mark streaming placeholders from snapshots so we can detect stale deltas later
         if (shouldStream) {
           return { ...withStream, fromSnapshot: true }
@@ -1359,9 +1406,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     if (chunk.type === 'message.append') {
-      const msg = chunk.data?.message
+      const msgRaw = chunk.data?.message
       const messages = clone(acc)
-      if (!msg || !msg.id) return messages
+      if (!msgRaw || !msgRaw.id) return messages
+      const msg = normalizeMessageTimestamps(msgRaw)
       // If a message with the same id already exists, treat this as an update rather than a new message.
       // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
       const existingIdxById = messages.findIndex(m => m.id === msg.id)
@@ -2071,7 +2119,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           },
         })
         const payload = response.data.data as any
-        const older = Array.isArray(payload?.messages) ? (payload.messages as ClientMessage[]) : []
+        const olderRaw = Array.isArray(payload?.messages) ? (payload.messages as ClientMessage[]) : []
+        const older = olderRaw.map(m => normalizeMessageTimestamps(m as any))
         const hasMoreBefore = Boolean(payload?.hasMoreBefore)
         const oldestCursor = payload?.oldestCursor ?? null
 

@@ -280,6 +280,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Provide editor operations without referencing the editor before initialization
     const clearEditorRef = useRef<() => void>(() => {})
+    // TipTap editor props are not always reactive; use a ref so Enter uses latest submit handler.
+    const submitRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
     const createDirectMessage = useCreateDirectMessage()
@@ -1180,6 +1182,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       queryClient,
       applyPendingWebBrowsing,
     ])
+
+    // Ensure TipTap Enter handler uses latest submit logic (including attachments).
+    useEffect(() => {
+      submitRef.current = () => {
+        void handleSubmit()
+      }
+    }, [handleSubmit])
 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
@@ -2101,7 +2110,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               return true
             }
             event.preventDefault()
-            handleSubmit()
+            submitRef.current?.()
             return true
           }
           return false
@@ -2431,6 +2440,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
               {/* Attachment Button */}
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || fileUploading}
                 className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
@@ -2470,6 +2480,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* Web Browsing Toggle Button - Available from the start */}
               <button
+                type="button"
                 onClick={() => {
                   if (conversationId) {
                     // Update existing conversation

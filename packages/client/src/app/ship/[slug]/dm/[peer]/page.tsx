@@ -75,11 +75,22 @@ function parseDmPeer(peerRaw: string, agents: Array<{ id?: string; slug?: string
   return isValidId(peer) ? { dmType: 'user_user', peerUserId: peer } : null
 }
 
+/** Decode the peer route param; Next.js gives us the raw segment (e.g. a%3Aid) so we decode once at the URL boundary. */
+function decodePeerSegment(raw: string | undefined): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return s
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return s
+  }
+}
+
 export default function DmPeerPage() {
   const router = useRouter()
   const params = useParams<{ slug: string; peer: string }>()
   const slug = params.slug
-  const peer = params.peer
+  const peer = decodePeerSegment(params.peer)
   const peerStr = String(peer || '').trim()
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
   const markConversationRead = useMarkConversationRead()
@@ -223,8 +234,16 @@ export default function DmPeerPage() {
   const peerLooksLikeAgent =
     peerStr.toLowerCase().startsWith('a:') || peerStr.toLowerCase().startsWith('a-') || (!peerStr.toLowerCase().startsWith('u-') && peerStr.length > 0)
   const stillResolvingAgents = peerLooksLikeAgent && agentsFetching
+  // Don't bounce while we're still waiting for starship (agents query is disabled until starshipId is set).
+  const waitingForStarship = peerLooksLikeAgent && !starshipId && Boolean(slug)
   const shouldBounceToShip =
-    !dmTarget && !dmsLoading && !agentsLoading && !stillResolvingAgents && Boolean(slug)
+    !dmTarget &&
+    !dmsLoading &&
+    !agentsLoading &&
+    !stillResolvingAgents &&
+    !waitingForStarship &&
+    Boolean(slug)
+
   useEffect(() => {
     if (!shouldBounceToShip) return
     router.replace(`/ship/${slug}`)

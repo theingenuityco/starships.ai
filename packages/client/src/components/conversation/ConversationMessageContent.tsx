@@ -416,6 +416,60 @@ function extractWidgetLike(payload: unknown): Record<string, unknown> | null {
   return null
 }
 
+type EmojiOnlyInfo = {
+  /** Whether, ignoring whitespace, the message contains only emoji graphemes. */
+  isEmojiOnly: boolean
+  /** Count of emoji graphemes (whitespace excluded). */
+  emojiCount: number
+  /** Trimmed original string (useful for rendering without leading/trailing whitespace). */
+  trimmed: string
+}
+
+// `Intl.Segmenter` typing is not always enabled in TS lib configs; keep this `any` to avoid requiring `es2022.intl`.
+const GRAPHEME_SEGMENTER: any =
+  typeof Intl !== 'undefined' && typeof (Intl as any)?.Segmenter === 'function' ? new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' }) : null
+
+function splitGraphemes(input: string): string[] {
+  const s = String(input ?? '')
+  if (!s) return []
+  if (!GRAPHEME_SEGMENTER) return Array.from(s)
+  // Segmenter returns an iterable of { segment, index, isWordLike }.
+  return Array.from(GRAPHEME_SEGMENTER.segment(s), (x: any) => String(x?.segment ?? ''))
+}
+
+const RE_EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u
+const RE_FLAG = /^\p{Regional_Indicator}{2}$/u
+const RE_KEYCAP = /^[0-9#*]\uFE0F?\u20E3$/u
+
+function isEmojiGrapheme(grapheme: string): boolean {
+  const g = String(grapheme ?? '')
+  if (!g) return false
+  // Flags (🇺🇸) are regional indicator pairs (not Extended_Pictographic).
+  if (RE_FLAG.test(g)) return true
+  // Keycaps (1️⃣, #️⃣, *️⃣).
+  if (RE_KEYCAP.test(g)) return true
+  // Most emojis (including ZWJ sequences like 🧑‍💻) contain at least one Extended_Pictographic code point.
+  return RE_EXTENDED_PICTOGRAPHIC.test(g)
+}
+
+function getEmojiOnlyInfo(input: string): EmojiOnlyInfo {
+  const trimmed = String(input ?? '').trim()
+  if (!trimmed) return { isEmojiOnly: false, emojiCount: 0, trimmed: '' }
+
+  const graphemes = splitGraphemes(trimmed)
+  let emojiCount = 0
+
+  for (const g of graphemes) {
+    // Allow whitespace separators (spaces/newlines) without disqualifying "emoji-only".
+    if (!String(g).trim()) continue
+    if (!isEmojiGrapheme(g)) return { isEmojiOnly: false, emojiCount: 0, trimmed }
+    emojiCount++
+  }
+
+  if (emojiCount <= 0) return { isEmojiOnly: false, emojiCount: 0, trimmed }
+  return { isEmojiOnly: true, emojiCount, trimmed }
+}
+
 export function ConversationMessageContent({
   content,
   messageId,
@@ -1015,6 +1069,17 @@ export function ConversationMessageContent({
   const hasCopyableContent = rawDisplayContent.trim().length > 0
   const contentContainerClassName = compact ? 'w-full rounded-lg px-2 py-0.5 -mx-2 transition-colors hover:bg-muted' : 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
 
+  const emojiOnlyInfo = useMemo(() => getEmojiOnlyInfo(rawDisplayContent), [rawDisplayContent])
+  const shouldRenderLargeEmoji = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0 && emojiOnlyInfo.emojiCount <= 20)
+  const largeEmojiTextClass = useMemo(() => {
+    if (!shouldRenderLargeEmoji) return ''
+    const n = emojiOnlyInfo.emojiCount
+    // Large for 1-5 (no "extra large" tier).
+    if (n <= 5) return 'text-5xl sm:text-6xl leading-none'
+    // 6-20: medium-large
+    return 'text-3xl sm:text-4xl leading-none'
+  }, [emojiOnlyInfo.emojiCount, shouldRenderLargeEmoji])
+
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
@@ -1046,9 +1111,17 @@ export function ConversationMessageContent({
                 contentContainerClassName
               )}
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
-                {rawDisplayContent}
-              </ReactMarkdown>
+              {shouldRenderLargeEmoji ? (
+                <div className={cn('not-prose whitespace-pre-wrap break-words', largeEmojiTextClass)}>{emojiOnlyInfo.trimmed}</div>
+              ) : (
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined}
+                  components={markdownComponents}
+                >
+                  {rawDisplayContent}
+                </ReactMarkdown>
+              )}
             </div>
           </div>
         ) : null}
@@ -1059,10 +1132,23 @@ export function ConversationMessageContent({
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
     if (!hasCopyableContent) return null
+    const emojiPlain = getEmojiOnlyInfo(String(displayContent ?? ''))
+    const shouldLargePlain = Boolean(emojiPlain.isEmojiOnly && emojiPlain.emojiCount > 0 && emojiPlain.emojiCount <= 20)
+    const largePlainClass = (() => {
+      if (!shouldLargePlain) return ''
+      const n = emojiPlain.emojiCount
+      if (n <= 5) return 'text-5xl sm:text-6xl leading-none'
+      return 'text-3xl sm:text-4xl leading-none'
+    })()
     return (
       <div className={cn('relative group', className)}>
-        <div className={cn(contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed', 'whitespace-pre-wrap ph-mask-chat-message')}>
-          {String(displayContent ?? '')}
+        <div
+          className={cn(
+            shouldLargePlain ? largePlainClass : contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed',
+            'whitespace-pre-wrap ph-mask-chat-message'
+          )}
+        >
+          {shouldLargePlain ? emojiPlain.trimmed : String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
       </div>

@@ -1241,7 +1241,7 @@ export function ConversationMessageContent({
 
         {/* Message attachments (top) */}
         {messageAttachmentIds.length > 0 && starshipId && (
-          <div className="mb-1 inline-flex flex-col gap-2">
+          <div className="mt-2 mb-1 inline-flex flex-col gap-2">
             {isLoadingAttachments
               ? // Loading state
                 messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
@@ -1255,7 +1255,7 @@ export function ConversationMessageContent({
 
         {/* Tool-result attachments (below tool panel) */}
         {toolResultAttachmentIds.length > 0 && starshipId && (
-          <div className="mt-2 inline-flex flex-col gap-2">
+          <div className="mt-3 inline-flex flex-col gap-2">
             {isLoadingAttachments
               ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
               : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}

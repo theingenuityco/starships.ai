@@ -2313,14 +2313,19 @@ function MessageDateDivider({ label }: { label: string }) {
   )
 }
 
-function MessageTimestamp({ value, isEdited = false, isDeleted = false }: { value?: string | null; isEdited?: boolean; isDeleted?: boolean }) {
+function MessageTimestamp({ value, isEdited = false }: { value?: string | null; isEdited?: boolean }) {
   if (!value || typeof value !== 'string' || value.trim().length === 0) return null
   return (
-    <div className="text-[11px] text-muted-foreground">
+    <div className="inline-flex items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
       <time dateTime={value} title={formatDate(value)}>
-        <span className="tabular-nums leading-none">{formatTime(value)}</span>
+        <span className="tabular-nums leading-none text-foreground/70">{formatTime(value)}</span>
       </time>
-      {isDeleted ? <span className="ml-1 text-[10px] uppercase tracking-wide">deleted</span> : isEdited ? <span className="ml-1 text-[10px] uppercase tracking-wide">edited</span> : null}
+      {isEdited ? (
+        <span className="ml-1 inline-flex items-center gap-1 text-[10px] tracking-wide text-foreground/55 leading-none">
+          <Icon name="edit" className="h-3 w-3 align-middle" />
+          edited
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -2703,7 +2708,7 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-      const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
+      const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-4') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-8')
         // Always use the compact bubble padding (no "normal" padding mode).
         const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
@@ -2719,7 +2724,7 @@ const MemoizedMessageBubble = memo(
                   )}
                 >
                   {isEditing ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-2">
                       <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
@@ -2832,7 +2837,7 @@ const MemoizedMessageBubble = memo(
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
-              isConsecutiveSameUser ? 'mt-0' : 'mt-4'
+              isConsecutiveSameUser ? 'mt-0' : 'mt-6'
             )}
           >
             {isConsecutiveSameUser ? (
@@ -2926,11 +2931,11 @@ const MemoizedMessageBubble = memo(
                       <span>{authorLabel}</span>
                     )}
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} isDeleted={isDeletedMessage} />
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>
               )}
               {isEditing ? (
-                <div className="space-y-2">
+                <div className="space-y-2 mt-2">
                   <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
@@ -3177,7 +3182,7 @@ const MemoizedMessageBubble = memo(
                       <span className="font-mono">{assistantDisplayName}</span>
                     )}
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} isDeleted={isDeletedMessage} />
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>
               )}
               <ConversationMessageContent

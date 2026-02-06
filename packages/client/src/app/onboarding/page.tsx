@@ -440,9 +440,11 @@ export default function OnboardingPage() {
                         onlyProviders={connectorProviders}
                         hideSearch
                         hideDisconnect={false}
+                        hideReconnect
                         maxColumns={2}
                         hideCardDescription
                         connectButtonLabel="Connect"
+                        matchAgentCardStyle
                       />
                     ) : null}
                   </div>

@@ -1085,7 +1085,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastSseErrorAtRef = useRef<number | null>(null)
   const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
 
-  type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
+  type AwaitRequested = {
+    at: string
+    nodeRef: string
+    kind: 'connector_event'
+    spec: Record<string, unknown>
+  }
+
+  type TurnState = { turnId: string | null; status: StreamTurnStatus | null; awaitRequested?: AwaitRequested | null }
   type TurnUsage = {
     turnId: string
     at: string
@@ -1097,7 +1104,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   type LegacyChunk = { type: 'append'; message: ClientMessage } | { type: 'turn_started'; payload?: { local?: boolean } }
   type StreamErrorChunk = { type: 'error'; error: unknown }
-  type StreamedChunk = { type: ConversationStreamEvent['type']; data: any } | LegacyChunk | StreamErrorChunk
+  // NOTE: Some client deployments may lag protocol type generation; allow await_requested explicitly.
+  type StreamEventType = ConversationStreamEvent['type'] | 'await_requested'
+  type StreamedChunk = { type: StreamEventType; data: any } | LegacyChunk | StreamErrorChunk
 
   // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events.
   // IMPORTANT: This function does not use React local state; the entire event log lives in TanStack Query cache.
@@ -1200,6 +1209,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
               return
             case 'turn.usage':
               push({ type: 'turn.usage', data })
+              return
+            case 'await_requested':
+              push({ type: 'await_requested', data })
               return
             case 'assistant.delta':
               push({ type: 'assistant.delta', data })
@@ -1657,6 +1669,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (!status) return acc
       return { turnId: data?.turnId ?? acc.turnId, status }
     }
+    if (chunk.type === 'await_requested') {
+      const d: any = chunk.data as any
+      const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString()
+      const nodeRef = typeof d?.nodeRef === 'string' ? String(d.nodeRef) : ''
+      const kind = typeof d?.kind === 'string' ? String(d.kind) : ''
+      const spec = d?.spec && typeof d.spec === 'object' && !Array.isArray(d.spec) ? (d.spec as Record<string, unknown>) : null
+      if (!nodeRef || kind !== 'connector_event' || !spec) return acc
+      return { ...acc, awaitRequested: { at, nodeRef, kind: 'connector_event', spec } }
+    }
     // Back-compat for local pre-seed
     if (chunk.type === 'turn_started' && chunk.payload?.local === true) {
       return { turnId: acc.turnId ?? 'pending', status: 'active' }
@@ -1723,7 +1744,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastReducedChunkCountRef.current = 0
   }, [conversationId])
 
-  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null, awaitRequested: null }), [chunksRevisionKey])
 
   function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
     if (chunk.type === 'snapshot') {
@@ -2129,6 +2150,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     turnId: turnState.turnId,
     turnStatus: turnState.status,
+    awaitRequested: turnState.awaitRequested ?? null,
     turnUsageByTurnId,
     lastUIAction,
     hasMoreBefore: latestSnapshot.hasMoreBefore,

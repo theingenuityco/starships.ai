@@ -10,6 +10,8 @@ export { ConnectorSecretEntity } from './entities/ConnectorSecretEntity';
 export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
 export { ConnectorEntity } from './entities/ConnectorEntity';
 export { ConnectorTemplateEntity } from './entities/ConnectorTemplateEntity';
+export { ConnectorEventEntity } from './entities/ConnectorEventEntity';
+export { ConnectorWebhookBindingEntity } from './entities/ConnectorWebhookBindingEntity';
 export { ChannelEntity } from './entities/ChannelEntity';
 export { ConversationReadStateEntity } from './entities/ConversationReadStateEntity';
 export { DirectMessageEntity } from './entities/DirectMessageEntity';
@@ -38,6 +40,8 @@ export { WidgetEntity } from './entities/WidgetEntity';
 export { ScheduleEntity } from './entities/ScheduleEntity';
 export { ToolCallApprovalEntity } from './entities/ToolCallApprovalEntity';
 export { MarketingContentEntity } from './entities/MarketingContentEntity';
+export { AutopilotAwaitEntity } from './entities/AutopilotAwaitEntity';
+export { AutopilotAwaitFiringEntity } from './entities/AutopilotAwaitFiringEntity';
 // Turns
 
 /* Repository exports */
@@ -48,7 +52,10 @@ export { ConversationRepository } from './repositories/ConversationRepository';
 export { ConnectorSecretRepository } from './repositories/ConnectorSecretRepository';
 export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { ConnectorTemplateRepository } from './repositories/ConnectorTemplateRepository';
+export { ConnectorTemplateActionRepository } from './repositories/ConnectorTemplateActionRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
+export { ConnectorEventRepository } from './repositories/ConnectorEventRepository';
+export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebhookBindingRepository';
 export { ChannelRepository } from './repositories/ChannelRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';
@@ -77,6 +84,8 @@ export { PromoRedemptionRepository } from './repositories/PromoRedemptionReposit
 export { WidgetRepository } from './repositories/WidgetRepository';
 export { ConversationWidgetRepository } from './repositories/ConversationWidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';
+export { AutopilotAwaitRepository } from './repositories/AutopilotAwaitRepository';
+export { AutopilotAwaitFiringRepository } from './repositories/AutopilotAwaitFiringRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
 export { TurnRepository } from './repositories/TurnRepository';
 export { LlmModelRepository } from './repositories/LlmModelRepository';

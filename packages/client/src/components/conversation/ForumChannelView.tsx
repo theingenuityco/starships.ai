@@ -96,13 +96,19 @@ export function ForumChannelView(props: {
       <ConversationSummaryBar
         conversationId={props.channelConversationId}
         starshipId={props.starshipId}
-        titlePrefix={<Icon name="hash" className="h-5 w-5" />}
-        titleRightSlot={
-          props.channelIsPrivate ? (
-            <span className="inline-flex items-center" title="Private channel">
-              <Icon name="lock" label="Private channel" className="h-4 w-4 text-muted-foreground" />
-            </span>
-          ) : null
+        titlePrefix={
+          <span className="relative inline-flex items-center justify-center h-5 w-5">
+            <Icon name="hash" className="h-5 w-5" />
+            {props.channelIsPrivate ? (
+              <Icon
+                name="lock"
+                weight="fill"
+                label="Private channel"
+                title="Private channel"
+                className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-muted-foreground"
+              />
+            ) : null}
+          </span>
         }
         // Keep the header stable while conversation details load.
         fallbackTitle={label}

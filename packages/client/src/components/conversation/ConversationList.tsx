@@ -546,7 +546,7 @@ export function ConversationList({
                               {ch.isPrivate ? (
                                 <span
                                   className={cn(
-                                    'absolute bottom-0 right-0 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
+                                    'absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                     // Match the row background so the icon reads cleanly over the hash.
                                     // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
                                     isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted',
@@ -714,7 +714,7 @@ export function ConversationList({
                           {ch.isPrivate ? (
                             <span
                               className={cn(
-                                'absolute bottom-0 right-0 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
+                                'absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                 // Match the row background so the icon reads cleanly over the hash.
                                 // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
                                 isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted/50',

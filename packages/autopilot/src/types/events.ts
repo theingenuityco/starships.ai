@@ -8,6 +8,7 @@
 
 import { Execution } from './execution';
 import type { LLMUsage } from './llm';
+import type { AwaitKind, AwaitConnectorEventSpec } from './node-parameters';
 
 export interface BaseEvent {
   timestamp: string;
@@ -47,6 +48,15 @@ export interface UIActionEvent extends BaseEvent {
   };
 }
 
+export interface AwaitRequestedEvent extends BaseEvent {
+  type: 'await_requested';
+  data: {
+    nodeRef: string;
+    kind: AwaitKind;
+    spec: AwaitConnectorEventSpec;
+  };
+}
+
 export type ExecutionEventType =
   | 'workflow_started'
   | 'node_started'
@@ -67,7 +77,7 @@ export interface ExecutionEvent extends BaseEvent {
   };
 }
 
-export type AutopilotEvent = ExecutionEvent | LLMEvent | ToolEvent | UIActionEvent;
+export type AutopilotEvent = ExecutionEvent | LLMEvent | ToolEvent | UIActionEvent | AwaitRequestedEvent;
 
 export interface EventCallback {
   (event: AutopilotEvent): Promise<void>;

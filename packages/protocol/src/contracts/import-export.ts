@@ -1,5 +1,5 @@
 import type { AgentModel, CreateAgentRequest } from '../domains/agent';
-import type { CreateConnectorTemplateRequest } from '../domains/connector';
+import type { ConnectorEndpointV2, CreateConnectorTemplateRequest } from '../domains/connector';
 import type { ToolModel, CreateToolRequest } from '../domains/tool';
 
 export type ImportExportKind = 'agent' | 'tool' | 'connector_template';
@@ -66,6 +66,12 @@ export interface ToolExportPayloadV1 {
  */
 export interface ConnectorTemplateExportPayloadV1 {
   connectorTemplate: CreateConnectorTemplateRequest;
+  /**
+   * Connector action catalog (source of truth: connector_template_actions).
+   *
+   * NOTE: We intentionally do NOT export the legacy connector_templates.endpoints_json field.
+   */
+  actions?: ConnectorEndpointV2[];
 }
 
 export interface StarshipImportResponse {

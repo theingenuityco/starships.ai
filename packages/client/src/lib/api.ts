@@ -587,6 +587,19 @@ export const scheduleAPI = {
   },
 }
 
+export const autopilotAwaitAPI = {
+  listByStarship: async (starshipId: string, args?: { status?: string; limit?: number }) => {
+    const status = typeof args?.status === 'string' && args.status.trim().length > 0 ? args.status.trim() : null
+    const limit = typeof args?.limit === 'number' && Number.isFinite(args.limit) && args.limit > 0 ? Math.floor(args.limit) : null
+    const params = new URLSearchParams()
+    if (status) params.set('status', status)
+    if (limit) params.set('limit', String(limit))
+    const qs = params.toString()
+    const res = await api.get(`/api/v1/starships/${starshipId}/autopilot/awaits${qs ? `?${qs}` : ''}`)
+    return extractResponseData<any>(res as FetchResponse<ApiResponse<any>>)
+  },
+}
+
 // Tool API
 export const toolAPI = {
   getBySlug: async (starshipId: string, slug: string): Promise<Tool> => {

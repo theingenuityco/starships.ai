@@ -110,6 +110,8 @@ const NodeIcon: React.FC<{ nodeType: string; className?: string }> = React.memo(
       return <Icon name="cog" className={iconClassName} />
     case 'mutate':
       return <Icon name="edit-3" className={iconClassName} />
+    case 'await':
+      return <Icon name="clock" className={iconClassName} />
     default:
       return <Icon name="clock" className={iconClassName} />
   }
@@ -196,6 +198,12 @@ const getNodeColors = (nodeType: string) => {
       border: 'border-fuchsia-300 dark:border-fuchsia-700',
       text: 'text-fuchsia-700 dark:text-fuchsia-300',
       handle: '#d946ef',
+    },
+    await: {
+      bg: 'bg-orange-50 dark:bg-orange-950/30',
+      border: 'border-orange-300 dark:border-orange-700',
+      text: 'text-orange-700 dark:text-orange-300',
+      handle: '#f97316',
     },
     default: {
       bg: 'bg-gray-50 dark:bg-gray-950/30',
@@ -988,6 +996,25 @@ const NodeDetailsPanel: React.FC<{
 
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-3 space-y-3">
+          {/* Await (for await nodes) */}
+          {node.type === 'await' && (
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">Await</h4>
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-foreground">kind</div>
+                <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">
+                  {typeof (node as any)?.parameters?.kind === 'string' ? String((node as any).parameters.kind) : 'connector_event'}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-foreground">spec</div>
+                <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">
+                  {JSON.stringify(((node as any)?.parameters?.spec && typeof (node as any).parameters.spec === 'object' ? (node as any).parameters.spec : {}) as any, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
           {/* Code (for code nodes) */}
           {node.type === 'code' && typeof (node as any)?.parameters?.code === 'string' && (node as any).parameters.code.trim().length > 0 && (
             <div className="space-y-1.5">

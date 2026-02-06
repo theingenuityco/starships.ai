@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   const tags = Array.isArray((body as any)?.tags) ? ((body as any).tags as unknown[]).filter(t => typeof t === 'string' && t.trim()) : []
   const paths = Array.isArray((body as any)?.paths) ? ((body as any).paths as unknown[]).filter(p => typeof p === 'string' && p.trim()) : []
 
-  for (const t of tags) revalidateTag(String(t))
+  for (const t of tags) revalidateTag(String(t), 'default')
   for (const p of paths) revalidatePath(String(p))
 
   return Response.json({ ok: true, tags, paths })

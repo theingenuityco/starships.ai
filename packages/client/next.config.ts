@@ -13,13 +13,6 @@ const PRIVATE_NO_STORE = 'private, no-store'
 const IMMUTABLE_STATIC = 'public, max-age=31536000, immutable'
 
 const nextConfig: NextConfig = {
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-    // Use dirs to specify which directories to run ESLint on during next build
-    dirs: ['src'],
-  },
   typescript: {
     // Dangerously allow production builds to successfully complete even if
     // your project has type errors.

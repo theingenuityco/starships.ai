@@ -16,7 +16,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
+import { cn, formatDate, formatTime } from '@/lib/utils'
+import { format as formatDay, isToday, isYesterday, parseISO } from 'date-fns'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { formatAgentDisplayName, formatAgentNameWithRole } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
@@ -1864,7 +1865,11 @@ export function ConversationMessageList({
                 {renderMessages.map((message, idx) => {
                   const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
                   const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
-                  const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+                  const messageDateKey = getMessageDateKey(message)
+                  const prevDateKey = getMessageDateKey(prev)
+                  const dateLabel = messageDateKey && messageDateKey !== prevDateKey ? getMessageDateLabel(message) : null
+                  const timeGapBreaksGroup = hasGroupTimeGap(prev, message)
+                  const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant' && !timeGapBreaksGroup)
                   const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
                   const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
                   const userKey = (m: any): string | null => {
@@ -1893,16 +1898,16 @@ export function ConversationMessageList({
                   const prevUserKey = prev ? userKey(prev) : null
                   const currUserKey = userKey(message)
                   const nextUserKey = next ? userKey(next) : null
-                  const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
-                  const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
+                  const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey && !timeGapBreaksGroup)
+                  const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey && !hasGroupTimeGap(message, next))
                   // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
                   // message chrome so the spacing/padding is consistent (including the first message in the run).
                   const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
                   const prevAssistantKey = prev ? assistantKey(prev) : null
                   const currAssistantKey = assistantKey(message)
                   const nextAssistantKey = next ? assistantKey(next) : null
-                  const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
-                  const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
+                  const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey && !timeGapBreaksGroup)
+                  const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey && !hasGroupTimeGap(message, next))
                   const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
                   const startsNewGroup = (() => {
                     if (!prev) return false
@@ -1937,6 +1942,7 @@ export function ConversationMessageList({
 
                   return (
                     <Fragment key={message.id}>
+                      {dateLabel && <MessageDateDivider label={dateLabel} />}
                       <div
                         ref={el => {
                           messageRefs.current[message.id] = el
@@ -2237,6 +2243,7 @@ interface ConversationMessageBubbleProps {
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
+const GROUP_TIME_GAP_MS = 60 * 1000
 
 /** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. Cap term length to avoid ReDoS. */
 function renderTextWithHighlight(text: string, term: string | undefined): ReactNode {
@@ -2257,6 +2264,61 @@ function renderTextWithHighlight(text: string, term: string | undefined): ReactN
         )
       )}
     </>
+  )
+}
+
+function getMessageTimestampMs(message: any): number | null {
+  if (!message) return null
+  const raw = message?.createdAt ?? message?.updatedAt
+  const t = typeof raw === 'string' ? Date.parse(raw) : NaN
+  return Number.isFinite(t) ? t : null
+}
+
+function hasGroupTimeGap(prev: any, curr: any): boolean {
+  const prevMs = getMessageTimestampMs(prev)
+  const currMs = getMessageTimestampMs(curr)
+  if (prevMs == null || currMs == null) return false
+  return currMs - prevMs >= GROUP_TIME_GAP_MS
+}
+
+function getMessageDateKey(message: any): string | null {
+  const raw = message?.createdAt ?? message?.updatedAt
+  if (typeof raw !== 'string' || raw.trim() === '') return null
+  const parsed = parseISO(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatDay(parsed, 'yyyy-MM-dd')
+}
+
+function getMessageDateLabel(message: any): string | null {
+  const raw = message?.createdAt ?? message?.updatedAt
+  if (typeof raw !== 'string' || raw.trim() === '') return null
+  const parsed = parseISO(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  if (isToday(parsed)) return 'Today'
+  if (isYesterday(parsed)) return 'Yesterday'
+  return formatDay(parsed, 'MMM d, yyyy')
+}
+
+function MessageDateDivider({ label }: { label: string }) {
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border/60" />
+      <div className="rounded-full border border-border/60 bg-muted/40 px-3 py-0.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </div>
+      <div className="h-px flex-1 bg-border/60" />
+    </div>
+  )
+}
+
+function MessageTimestamp({ value }: { value?: string | null }) {
+  if (!value || typeof value !== 'string' || value.trim().length === 0) return null
+  return (
+    <div className="text-[11px] text-muted-foreground">
+      <time dateTime={value} title={formatDate(value)}>
+        <span className="tabular-nums leading-none">{formatTime(value)}</span>
+      </time>
+    </div>
   )
 }
 
@@ -2391,6 +2453,12 @@ const MemoizedMessageBubble = memo(
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
+    const messageTimestamp =
+      typeof message.updatedAt === 'string' && message.updatedAt.trim().length > 0
+        ? message.updatedAt
+        : typeof message.createdAt === 'string' && message.createdAt.trim().length > 0
+          ? message.createdAt
+          : null
     const { userId: authUserId } = useAuth()
     const sid = typeof starshipId === 'string' ? starshipId : ''
     const cid = typeof conversationId === 'string' ? conversationId : ''
@@ -2501,7 +2569,7 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
+      const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
         // Always use the compact bubble padding (no "normal" padding mode).
         const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
@@ -2686,14 +2754,17 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 text-sm font-bold font-mono text-foreground">
-                  {userProfileHref ? (
-                    <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                      {authorLabel}
-                    </Link>
-                  ) : (
-                    <span>{authorLabel}</span>
-                  )}
+                <div className="mb-0 flex items-center gap-2">
+                  <div className="text-sm font-bold font-mono text-foreground">
+                    {userProfileHref ? (
+                      <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                        {authorLabel}
+                      </Link>
+                    ) : (
+                      <span>{authorLabel}</span>
+                    )}
+                  </div>
+                  <MessageTimestamp value={messageTimestamp} />
                 </div>
               )}
               <ConversationMessageContent
@@ -2908,14 +2979,17 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 text-sm font-bold text-foreground">
-                  {assistantProfileHref ? (
-                    <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
-                      {assistantDisplayName}
-                    </Link>
-                  ) : (
-                    <span className="font-mono">{assistantDisplayName}</span>
-                  )}
+                <div className="mb-0 flex items-center gap-2">
+                  <div className="text-sm font-bold text-foreground">
+                    {assistantProfileHref ? (
+                      <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                        {assistantDisplayName}
+                      </Link>
+                    ) : (
+                      <span className="font-mono">{assistantDisplayName}</span>
+                    )}
+                  </div>
+                  <MessageTimestamp value={messageTimestamp} />
                 </div>
               )}
               <ConversationMessageContent

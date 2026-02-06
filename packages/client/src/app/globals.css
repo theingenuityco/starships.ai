@@ -1,9 +1,8 @@
+@import '@xyflow/react/dist/style.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ReactFlow styles - Required for proper functionality */
-@import '@xyflow/react/dist/style.css';
 
 /* ============================================================================
  * Public chrome toggling (client-only UX)

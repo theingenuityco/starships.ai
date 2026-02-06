@@ -1875,7 +1875,7 @@ router.post(
           if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
           sendError(
             res,
-            'CONFLICT',
+            'RESOURCE_LOCKED',
             'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.',
             409
           );

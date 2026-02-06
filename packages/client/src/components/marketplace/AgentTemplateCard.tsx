@@ -204,8 +204,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
               />
             </div>
           )}
-          {/* Soft overlay for readability */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/70 via-background/15 to-transparent" />
         </div>
 
         {/* Body */}

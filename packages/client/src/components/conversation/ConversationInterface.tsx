@@ -955,11 +955,19 @@ export function ConversationInterface({
               <ConversationSummaryBar
                 conversationId={currentConversationId}
                 starshipId={starshipId}
-                titlePrefix={isChannelConversation ? <Icon name="hash" weight="bold" className="h-5 w-5" /> : null}
-                titleRightSlot={
-                  isChannelConversation && isCurrentChannelPrivate ? (
-                    <span className="inline-flex items-center" title="Private channel">
-                      <Icon name="lock" label="Private channel" className="h-4 w-4 text-muted-foreground" />
+                titlePrefix={
+                  isChannelConversation ? (
+                    <span className="relative inline-flex items-center justify-center h-5 w-5">
+                      <Icon name="hash" weight="bold" className="h-5 w-5" />
+                      {isCurrentChannelPrivate ? (
+                        <Icon
+                          name="lock"
+                          weight="fill"
+                          label="Private channel"
+                          title="Private channel"
+                          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 text-muted-foreground"
+                        />
+                      ) : null}
                     </span>
                   ) : null
                 }

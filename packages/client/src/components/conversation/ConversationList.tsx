@@ -527,7 +527,7 @@ export function ConversationList({
                             onClick={() => handleChannelClick(String(ch.slug))}
                           >
                             <div
-                              className="flex-shrink-0"
+                              className="flex-shrink-0 relative"
                               style={{
                                 width: '1.25rem',
                                 height: '1.25rem',
@@ -543,6 +543,19 @@ export function ConversationList({
                                 weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
                                 className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
+                              {ch.isPrivate ? (
+                                <Icon
+                                  name="lock"
+                                  weight="fill"
+                                  label="Private channel"
+                                  title="Private channel"
+                                  className={cn(
+                                    'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5',
+                                    // Keep visible but not louder than unread/active styling.
+                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                                  )}
+                                />
+                              ) : null}
                             </div>
                             <div
                               className={cn(
@@ -551,18 +564,6 @@ export function ConversationList({
                               )}
                             >
                               <span className="truncate min-w-0">{label}</span>
-                              {ch.isPrivate ? (
-                                <Icon
-                                  name="lock"
-                                  label="Private channel"
-                                  title="Private channel"
-                                  className={cn(
-                                    'h-3.5 w-3.5 flex-shrink-0',
-                                    // Keep visible but not louder than unread/active styling.
-                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
-                                  )}
-                                />
-                              ) : null}
                             </div>
                             {notifCount > 0 ? (
                               <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
@@ -701,11 +702,25 @@ export function ConversationList({
                         className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
-                        <Icon
-                          name="hash"
-                          weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
-                          className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
-                        />
+                        <span className="relative inline-flex items-center justify-center h-4 w-4 flex-shrink-0">
+                          <Icon
+                            name="hash"
+                            weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
+                            className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
+                          />
+                          {ch.isPrivate ? (
+                            <Icon
+                              name="lock"
+                              weight="fill"
+                              label="Private channel"
+                              title="Private channel"
+                              className={cn(
+                                'absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5',
+                                isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                              )}
+                            />
+                          ) : null}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1 min-w-0 flex-1">
@@ -717,17 +732,6 @@ export function ConversationList({
                               >
                                 {label}
                               </p>
-                              {ch.isPrivate ? (
-                                <Icon
-                                  name="lock"
-                                  label="Private channel"
-                                  title="Private channel"
-                                  className={cn(
-                                    'h-3.5 w-3.5 flex-shrink-0',
-                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
-                                  )}
-                                />
-                              ) : null}
                             </div>
                             <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
                           </div>

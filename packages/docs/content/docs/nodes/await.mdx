@@ -1,0 +1,41 @@
+---
+title: await
+description: Pause a workflow and resume on an external event
+icon: Clock
+---
+
+import { Clock, ArrowRight, Bell } from 'lucide-react';
+
+<div style={{ position: 'relative', marginTop: '-140px', marginBottom: '100px', display: 'flex', justifyContent: 'flex-end' }}>
+  <CopyPageButton />
+</div>
+
+## What it does
+
+The `await` node pauses workflow execution and asks the host/server to resume later when an external event arrives.
+
+In hosted Starships execution, this powers **event-driven automations**.
+
+## Parameters (high-level)
+
+`await` is a discriminated configuration:
+
+- `kind: "connector_event"`
+- `spec`: optional filters (provider/connector/event types). Missing fields behave as wildcards.
+
+## Resume behavior (hosted)
+
+When the workflow pauses, the server persists an execution snapshot. On resume, the server:
+
+- finds a matching inbound event
+- injects the normalized event envelope as the await node’s output
+- continues from the next node after `await`
+
+## Where connector events come from
+
+Connector events are created by ingesting inbound connector webhooks at:
+
+- `POST /api/v1/webhooks/connectors/:provider`
+
+Routing is derived from the inbound request using connector template `webhooksJson` (`connector_templates.webhooks_json`).
+

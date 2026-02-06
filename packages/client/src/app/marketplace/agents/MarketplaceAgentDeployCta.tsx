@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
 import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 
 import { useAuth } from '@/hooks/useAuth'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
@@ -20,6 +21,7 @@ import { toast } from 'sonner'
 export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplateModel }) {
   const router = useRouter()
   const pathname = usePathname()
+  const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
   const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
@@ -87,7 +89,6 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
       })
 
       const agentId = (created as any)?.id as string | undefined
-      const agentSlug = (created as any)?.slug as string | undefined
       const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, targetStarship.slug, targetStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
@@ -101,9 +102,11 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         }
       }
 
-      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      // Marketplace UX: after deploy, take the user to the agent's chat.
+      // Refetch agents for this starship so the DM page finds the new agent when it mounts (avoids bounce to lobby).
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
         if (agentId) {
+          await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)

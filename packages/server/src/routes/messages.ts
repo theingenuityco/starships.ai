@@ -241,6 +241,27 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       }
     }
 
+    // Realtime update:
+    // When a message is updated (notably when it becomes linked to a thread via `linkedConversationId`),
+    // broadcast the updated message to all participants on the parent conversation stream.
+    //
+    // We reuse `message.append` intentionally: the client treats same-id `message.append` as an update,
+    // which avoids needing a new stream event type.
+    try {
+      const conversationId =
+        typeof (updatedMessage as any)?.conversationId === 'string'
+          ? String((updatedMessage as any).conversationId).trim()
+          : typeof (updatedMessage as any)?.conversation_id === 'string'
+            ? String((updatedMessage as any).conversation_id).trim()
+            : '';
+      if (conversationId) {
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: updatedMessage as any } });
+      }
+    } catch {
+      /* best-effort: persistence succeeded even if streaming publish fails */
+    }
+
     sendSuccess(res, updatedMessage, 200);
   } catch (error) {
     handleError(error, res, 'updating message');

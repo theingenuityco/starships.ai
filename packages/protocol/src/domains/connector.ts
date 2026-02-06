@@ -319,7 +319,6 @@ export interface ConnectorTemplateRuntimePublicModel {
 
   // runtime fields
   baseUrl: string;
-  endpoints: ConnectorEndpointV2[];
 }
 
 export interface ConnectorListResponse {
@@ -377,7 +376,6 @@ export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -423,7 +421,6 @@ export interface UpdateConnectorTemplateRequest {
   baseUrl?: string;
   auth?: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints?: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
@@ -448,9 +445,45 @@ export interface CreateConnectorTemplateRequest {
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
-  endpoints: ConnectorEndpointV2[];
   rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
   metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
+}
+
+// ============================================================================
+// ADMIN (INSTANCE ADMIN ONLY) - CONNECTOR TEMPLATE ACTION CATALOG
+// ============================================================================
+
+export interface ConnectorTemplateActionSummary {
+  templateId: string;
+  actionName: string;
+  ordinal: number;
+  method: HttpMethod;
+  path: string;
+  description?: string;
+  baseUrlOverride?: string;
+  timeoutMs?: number;
+  requestStyle?: RequestStyle;
+  updatedAt: string;
+}
+
+export interface AdminConnectorTemplateActionsListResponse {
+  actions: ConnectorTemplateActionSummary[];
+  limit: number;
+  offset: number;
+  q?: string;
+}
+
+export interface AdminConnectorTemplateActionResponse {
+  action: ConnectorEndpointV2;
+}
+
+export interface UpsertConnectorTemplateActionRequest {
+  action: ConnectorEndpointV2;
+  ordinal?: number;
+}
+
+export interface BulkReplaceConnectorTemplateActionsRequest {
+  actions: ConnectorEndpointV2[];
 }
 
 export interface ConnectWithApiKeyRequest {
@@ -518,4 +551,41 @@ export interface ConnectorActionResponse {
    * Optional convenience projection when endpoint.response.select is configured.
    */
   selected?: unknown;
+}
+
+// ============================================================================
+// CONNECTOR EVENTS (INBOUND)
+// ============================================================================
+
+/**
+ * Normalized connector event model, persisted server-side.
+ *
+ * NOTE: Connector providers vary widely; eventType is an open string.
+ */
+export interface ConnectorEventModel {
+  id: string;
+  starshipId: string;
+  connectorId: string;
+  provider: ConnectorProvider;
+  eventType: string;
+  /**
+   * Provider-supplied stable identifier for deduplication (nullable).
+   */
+  externalEventId?: string | null;
+  /**
+   * Normalized event payload (JSON-safe).
+   */
+  payloadJson: Record<string, unknown>;
+  /**
+   * Optional raw payload (for debugging/audit).
+   */
+  rawPayloadJson?: Record<string, unknown> | null;
+  /**
+   * Optional captured headers (for debugging; sensitive values should be redacted server-side).
+   */
+  headersJson?: Record<string, unknown> | null;
+  receivedAt: string;
+  processedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

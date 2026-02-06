@@ -664,8 +664,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
+      const hasPendingAttachments = pendingFiles.length > 0
       // CRITICAL: Check if already blocked (synchronous ref check first)
-      if (!messageToSend || sending || disabled || isStreamingEffective || streamingRef.current) return
+      // Allow file-only sends (attachments, no text).
+      if ((!messageToSend && !hasPendingAttachments) || sending || disabled || isStreamingEffective || streamingRef.current) return
 
       // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
       streamingRef.current = true
@@ -737,7 +739,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // - Default to the UI-selected agent for non-mention contexts (e.g. draft threads opened from an agent message).
       // - Then apply context rules (channel/DM/thread) and allow explicit leading @mention to override where applicable.
       let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
-      let contentToSend = messageToSend
+      // Server requires non-empty content; for file-only sends, send a single space so the message renders as "attachments only".
+      let contentToSend = messageToSend || (hasPendingAttachments ? ' ' : '')
       if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
@@ -804,7 +807,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If a thread has *no* agent selected/mentioned and *no* linked agents,
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+      const isFileOnlySend = Boolean(hasPendingAttachments && !messageToSend)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isFileOnlySend))
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
@@ -843,7 +847,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return
       }
 
-      // contentToSend already validated via messageToSend trim
+      // contentToSend validated: non-empty text, or file-only placeholder space.
 
       if (!starshipId) {
         resetFlags()
@@ -1148,6 +1152,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [
       draftDirectMessageTarget,
       message,
+      pendingFiles,
       sending,
       disabled,
       isStreamingEffective,
@@ -1171,6 +1176,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       onAgentChange,
       starshipAgents,
+      uploadFile,
       queryClient,
       applyPendingWebBrowsing,
     ])
@@ -1377,7 +1383,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           : isMentionOnlyThread
             ? hasLeadingMentionToken
             : hasLeadingMentionToken || (isThreadConversation && linkedAgentCount === 1) || (isThreadContext && linkedAgentCount === 0)
-    const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
+    const hasPendingAttachments = pendingFiles.length > 0
+    const hasSendableContent = hasActualContent || hasPendingAttachments
+    // File-only sends are allowed even when a specific agent can't be resolved (e.g. mention-only threads with attachments only).
+    const isFileOnlyDraft = hasPendingAttachments && String(message || '').trim().length === 0
+    const canSend = hasSendableContent && (hasTargetAgent || isFileOnlyDraft) && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 

@@ -12,7 +12,7 @@
 /**
  * Entity types that can have marketing content
  */
-export type MarketingContentEntityType = 'agent_template' | 'tool_template' | 'connector_template';
+export type MarketingContentEntityType = 'agent' | 'agent_template' | 'tool_template' | 'connector_template';
 
 /**
  * Content types for marketing content

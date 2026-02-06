@@ -397,6 +397,19 @@ export interface UIActionParams extends BaseParams {
   payload?: Record<string, unknown>;
 }
 
+export type AwaitKind = 'connector_event';
+
+export interface AwaitConnectorEventSpec {
+  provider?: string;
+  connectorId?: string;
+  eventTypes?: string[];
+}
+
+export interface AwaitParams extends BaseParams {
+  kind: AwaitKind;
+  spec: AwaitConnectorEventSpec;
+}
+
 /**
  * Union type for all workflow node parameters
  */
@@ -411,6 +424,7 @@ export type NodeParameters =
   | StartParams
   | EndParams
   | UIActionParams
+  | AwaitParams
   | ConditionalParams
   | TransformParams
   | MutateParams

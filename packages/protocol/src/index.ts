@@ -37,6 +37,7 @@ export * from './domains/connector-secrets';
 export * from './domains/system-env';
 export * from './domains/platform-secret';
 export * from './domains/connector';
+export * from './domains/autopilot-await';
 export * from './domains/tool';
 export * from './domains/tool-call-approval';
 export * from './domains/user';

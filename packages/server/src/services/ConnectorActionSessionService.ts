@@ -1,5 +1,5 @@
 import type { ConnectorProvider, ConnectorTemplateRuntimeFieldsV2, SecretRef } from '@starships/protocol';
-import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/models';
+import { ConnectorRepository, ConnectorTemplateActionRepository, ConnectorTemplateRepository } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
 import { generateJWT } from '@/utils/jwt';
@@ -17,6 +17,7 @@ export interface ConnectorActionSessionBundle {
 
 export class ConnectorActionSessionService {
   private templateRepo = new ConnectorTemplateRepository();
+  private actionRepo = new ConnectorTemplateActionRepository();
   private connectorRepo = new ConnectorRepository();
   private connectorSecrets = new ConnectorSecretService();
   private platformSecrets = new PlatformSecretService();
@@ -41,6 +42,27 @@ export class ConnectorActionSessionService {
 
     const decrypted = await this.connectorSecrets.getDecryptedSecrets(starshipId);
 
+    // Preload all action catalogs for enabled templates in one query.
+    const enabledTemplateIds = templates.filter((t) => t.isEnabled !== false).map((t) => t.id);
+    const actionRows = await this.actionRepo.listActionRowsByTemplateIds(enabledTemplateIds);
+    const endpointsByTemplateId = new Map<string, ConnectorTemplateRuntimeFieldsV2['endpoints']>();
+    for (const row of actionRows) {
+      const list = endpointsByTemplateId.get(row.template_id) ?? [];
+      list.push({
+        name: row.action_name,
+        description: row.description ?? undefined,
+        method: row.method as any,
+        path: row.path,
+        baseUrlOverride: row.base_url_override ?? undefined,
+        parameters: (row.parameters_json as any) ?? undefined,
+        requestStyle: (row.request_style as any) ?? undefined,
+        mapping: (row.mapping_json as any) ?? undefined,
+        response: (row.response_json as any) ?? undefined,
+        timeoutMs: row.timeout_ms ?? undefined,
+      });
+      endpointsByTemplateId.set(row.template_id, list);
+    }
+
     const connectorTemplates: Record<string, ConnectorTemplateRuntimeFieldsV2> = {};
     const connectorSessions: Record<string, ConnectorSession> = {};
     const connectorMetadata: Record<string, Record<string, unknown>> = {};
@@ -53,7 +75,7 @@ export class ConnectorActionSessionService {
         baseUrl: tpl.baseUrl,
         auth: tpl.authJson,
         variables: tpl.variablesJson,
-        endpoints: tpl.endpointsJson,
+        endpoints: endpointsByTemplateId.get(tpl.id) ?? [],
         rateLimit: tpl.rateLimitJson,
         metadataSchema: tpl.metadataSchemaJson,
       };

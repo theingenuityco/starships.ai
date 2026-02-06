@@ -6,7 +6,7 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor, HostRuntime } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
+import { Blueprint, Execution, ExecutionStatus, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation, ReducerSpec } from '@/types/node-parameters';
 import type { Runner } from '@/runner/Runner';
@@ -19,6 +19,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
   end: () => import('@/nodes/End').then((m) => m.End as NodeHandlerConstructor),
   ui_action: () => import('@/nodes/UIAction').then((m) => m.UIAction as NodeHandlerConstructor),
+  await: () => import('@/nodes/Await').then((m) => m.Await as NodeHandlerConstructor),
   agent: () => import('@/nodes/Agent').then((m) => m.Agent as NodeHandlerConstructor),
   workflow: () => import('@/nodes/Workflow').then((m) => m.Workflow as NodeHandlerConstructor),
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
@@ -312,6 +313,7 @@ export class Engine {
 
   private async executeLoop(blueprint: Blueprint, execution: Execution, startNode: Node): Promise<ExecutionItem[]> {
     let currentNode: Node | null = startNode;
+    const statusOf = (e: Execution): ExecutionStatus => e.status;
 
     // Initialize visit counter
     if (!execution.visitCounts) {
@@ -335,6 +337,17 @@ export class Engine {
 
         await this.executeNode(currentNode, execution);
         const nextNode = this.getNextNode(blueprint, execution);
+
+        // If a node paused the execution (e.g., await), stop immediately and
+        // set resume pointer to the next node.
+        // Note: TS narrows `execution.status` to "running" in this loop body; use a helper to re-read status.
+        if (statusOf(execution) === 'paused') {
+          if (nextNode) {
+            execution.currentNodeRef = nextNode.ref;
+          }
+          await this.emitEvent('workflow_paused', execution);
+          return ExecutionItemUtils.wrapSingle(execution.results);
+        }
 
         if (!nextNode) {
           execution.currentNodeRef = undefined;
@@ -390,7 +403,9 @@ export class Engine {
       }
     }
 
-    execution.currentNodeRef = undefined;
+    if (execution.status !== 'paused') {
+      execution.currentNodeRef = undefined;
+    }
     // If End node provided a final result, return it; otherwise return full execution results
     {
       const maybeFinal = this.extractEndOutputIfAny(blueprint, execution);

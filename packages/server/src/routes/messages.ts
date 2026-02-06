@@ -30,6 +30,10 @@ const CreateMessageSchema = z.object({
   agentId: IdSchema.optional(),
   memoryId: IdSchema.optional(),
   conversationId: IdSchema.optional(),
+  // Attachments are uploaded separately (multipart) and referenced here by id.
+  // This route is used by "persist-only" thread messages and system seed messages;
+  // it must support attachmentIds so those messages can carry files consistently.
+  attachmentIds: z.array(IdSchema).max(50).optional(),
   parentMessageId: IdSchema.optional(),
   linkedConversationId: IdSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),

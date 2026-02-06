@@ -38,6 +38,51 @@ const INPUT_MAX_W = 'max-w-xl'
 const BTN_PRIMARY = 'min-w-[100px] h-10'
 const BTN_NAV_GHOST = 'h-10'
 
+type OnboardingPersistedState = {
+  step: number
+  starshipName: string
+  inviteEmailRows: string[]
+  deployedTemplateIds: string[]
+}
+
+const ONBOARDING_STORAGE_PREFIX = 'starships:onboarding:wizard:'
+
+function readPersistedOnboardingState(starshipId?: string | null): OnboardingPersistedState | null {
+  if (!starshipId || typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(`${ONBOARDING_STORAGE_PREFIX}${starshipId}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<OnboardingPersistedState>
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      step: typeof parsed.step === 'number' ? parsed.step : 1,
+      starshipName: typeof parsed.starshipName === 'string' ? parsed.starshipName : '',
+      inviteEmailRows: Array.isArray(parsed.inviteEmailRows) && parsed.inviteEmailRows.length > 0 ? parsed.inviteEmailRows : [''],
+      deployedTemplateIds: Array.isArray(parsed.deployedTemplateIds) ? parsed.deployedTemplateIds : [],
+    }
+  } catch {
+    return null
+  }
+}
+
+function writePersistedOnboardingState(starshipId: string | null | undefined, state: OnboardingPersistedState) {
+  if (!starshipId || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(`${ONBOARDING_STORAGE_PREFIX}${starshipId}`, JSON.stringify(state))
+  } catch {
+    // Best-effort persistence — ignore quota / privacy errors
+  }
+}
+
+function clearPersistedOnboardingState(starshipId?: string | null) {
+  if (!starshipId || typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(`${ONBOARDING_STORAGE_PREFIX}${starshipId}`)
+  } catch {
+    // Ignore storage errors on clear
+  }
+}
+
 export default function OnboardingPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -57,7 +102,6 @@ export default function OnboardingPage() {
   const completeWizard = useCompleteWizardOnboarding()
 
   const { data: allTemplates = [], isLoading: templatesLoading } = useAgentTemplates(undefined, !!primaryStarship?.id && step === 3)
-  const curatedTemplates: AgentTemplateModel[] = allTemplates.slice(0, 8)
   const { data: starshipAgents = [] } = useStarshipAgents(primaryStarship?.id ?? '', step === 4 && !!primaryStarship?.id)
   const templateIdsForConnectors =
     deployedTemplateIds.length > 0 ? deployedTemplateIds : ([...new Set((starshipAgents as Array<{ sourceTemplateId?: string }>).map(a => a.sourceTemplateId).filter(Boolean))] as string[])
@@ -93,6 +137,36 @@ export default function OnboardingPage() {
       router.replace('/profile')
     }
   }, [authLoading, isAuthenticated, isWizardComplete, hasStarship, starshipsLoading, primaryStarship?.slug, router])
+
+  // Hydrate wizard state from localStorage once we know the primary starship.
+  useEffect(() => {
+    if (!primaryStarship?.id) return
+    const persisted = readPersistedOnboardingState(primaryStarship.id)
+    if (!persisted) return
+
+    const clampedStep = Math.min(Math.max(persisted.step, 1), TOTAL_STEPS)
+    setStep(clampedStep)
+    if (persisted.starshipName) {
+      setStarshipName(persisted.starshipName)
+    }
+    if (persisted.inviteEmailRows && persisted.inviteEmailRows.length > 0) {
+      setInviteEmailRows(persisted.inviteEmailRows)
+    }
+    if (persisted.deployedTemplateIds) {
+      setDeployedTemplateIds(persisted.deployedTemplateIds)
+    }
+  }, [primaryStarship?.id])
+
+  // Persist wizard state whenever it changes.
+  useEffect(() => {
+    if (!primaryStarship?.id) return
+    writePersistedOnboardingState(primaryStarship.id, {
+      step,
+      starshipName,
+      inviteEmailRows,
+      deployedTemplateIds,
+    })
+  }, [primaryStarship?.id, step, starshipName, inviteEmailRows, deployedTemplateIds])
 
   const handleStep1Next = useCallback(async () => {
     const name = starshipName.trim()
@@ -158,6 +232,7 @@ export default function OnboardingPage() {
 
   const handleFinish = useCallback(async () => {
     await completeWizard.mutateAsync()
+    clearPersistedOnboardingState(primaryStarship?.id)
     await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
     if (primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}`)
@@ -302,12 +377,12 @@ export default function OnboardingPage() {
                 </div>
                 {templatesLoading ? (
                   <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
-                ) : curatedTemplates.length === 0 ? (
+                ) : allTemplates.length === 0 ? (
                   <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
                 ) : (
                   <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">
-                      {curatedTemplates.map(template => (
+                      {allTemplates.map(template => (
                         <OnboardingAgentCard
                           key={template.id}
                           template={template}

@@ -278,6 +278,7 @@ export function MessageReactions({
           triggerStyle="pill"
           popoverAlign="start"
           className="h-6"
+          showQuick={false}
         />
       ) : null}
     </div>

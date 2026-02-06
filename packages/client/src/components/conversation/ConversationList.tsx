@@ -546,16 +546,17 @@ export function ConversationList({
                               {ch.isPrivate ? (
                                 <span
                                   className={cn(
-                                    'absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-[5px] transition-colors',
+                                    'absolute bottom-0 right-0 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                     // Match the row background so the icon reads cleanly over the hash.
-                                    isActive ? 'bg-primary/10 group-hover:bg-primary/10' : 'bg-card group-hover:bg-muted',
+                                    // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
+                                    isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted',
                                     // Keep visible but not louder than unread/active styling.
                                     isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
                                   )}
                                   title="Private channel"
                                   aria-label="Private channel"
                                 >
-                                  <Icon name="lock" weight="regular" className="h-3 w-3" />
+                                  <Icon name="lock" weight="fill" className="h-2 w-2" />
                                 </span>
                               ) : null}
                             </div>
@@ -713,15 +714,16 @@ export function ConversationList({
                           {ch.isPrivate ? (
                             <span
                               className={cn(
-                                'absolute -bottom-0.5 -right-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-[5px] transition-colors',
+                                'absolute bottom-0 right-0 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                 // Match the row background so the icon reads cleanly over the hash.
-                                isActive ? 'bg-muted/70 group-hover:bg-muted/70' : 'bg-card group-hover:bg-muted/50',
+                                // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
+                                isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted/50',
                                 isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
                               )}
                               title="Private channel"
                               aria-label="Private channel"
                             >
-                              <Icon name="lock" weight="regular" className="h-3 w-3" />
+                              <Icon name="lock" weight="fill" className="h-2 w-2" />
                             </span>
                           ) : null}
                         </span>

@@ -12,7 +12,6 @@ import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
-import { CapabilitiesLegendTooltip } from './CapabilitiesLegendTooltip'
 import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 import { PublicFooter } from '@/app/components/PublicFooter'
 
@@ -88,6 +87,12 @@ function possessiveLabel(name: string): string {
   if (!n) return 'This agent’s'
   // If the name ends in "s", prefer "Jess’" over "Jess’s".
   return /s$/i.test(n) ? `${n}’` : `${n}’s`
+}
+
+function agentSubjectLabel(name: string): string {
+  const n = String(name || '').trim()
+  if (!n) return 'This agent'
+  return n
 }
 
 function titleCase(input: string): string {
@@ -368,7 +373,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                 {hasCapabilitiesSection ? (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     {/* Capabilities */}
-                    <section className="space-y-10 lg:col-span-2">
+                    <section className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-2'}`}>
                       {(
                         [
                           { key: 'allow' as const, permissionLabel: 'Always allow' },
@@ -386,9 +391,15 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                                 aria-hidden
                               />
                               <h2 className={SECTION_TITLE_CLASS}>
-                                {group.key === 'allow' ? 'Always allowed' : group.key === 'ask' ? 'Ask first' : 'Not allowed'}
+                                {group.key === 'allow'
+                                  ? `${agentSubjectLabel(template.name)} can use`
+                                  : group.key === 'ask'
+                                    ? `${agentSubjectLabel(template.name)} will ask before using`
+                                    : `${agentSubjectLabel(template.name)} can’t use`}
                               </h2>
-                              {idx === 0 ? <CapabilitiesLegendTooltip /> : null}
+                              {group.key === 'deny' ? (
+                                <span className={SECTION_SUBTITLE_CLASS}>(can be changed after deploy)</span>
+                              ) : null}
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -425,47 +436,51 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     </section>
 
                     {/* Connectors / setup (styled to match Capabilities cards) */}
-                    <div className="space-y-10 lg:col-span-1">
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <h2 className={SECTION_TITLE_CLASS}>Connectors required</h2>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3">
-                          {requiredConnectorProviders.length > 0 ? (
-                            requiredConnectorProviders.map(p => (
-                              <div key={p} className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                    <div className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
+                      {!marketplaceMarketingRenderingDisabled ? (
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <h2 className={SECTION_TITLE_CLASS}>Connectors required</h2>
+                          </div>
+                          <div className="grid grid-cols-1 gap-3">
+                            {requiredConnectorProviders.length > 0 ? (
+                              requiredConnectorProviders.map(p => (
+                                <div key={p} className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                                  <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 flex-shrink-0">
+                                      <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
+                                        <ConnectorLogo provider={p} className="h-5 w-5" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-semibold leading-5 text-foreground">
+                                        {connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                      </div>
+                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                                        {connectorInfoByProvider.get(String(p).toLowerCase())?.description?.trim() || `Connect ${titleCase(p)} to enable this agent’s tools.`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className={`group relative ${NAV_CARD_CLASS} p-4`}>
                                 <div className="flex items-start gap-3">
                                   <div className="mt-0.5 flex-shrink-0">
                                     <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
-                                      <ConnectorLogo provider={p} className="h-5 w-5" />
+                                      <Icon name="check-circle" className="h-5 w-5 text-emerald-600" />
                                     </div>
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold leading-5 text-foreground">{connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}</div>
-                                    <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                                      {connectorInfoByProvider.get(String(p).toLowerCase())?.description?.trim() || `Connect ${titleCase(p)} to enable this agent’s tools.`}
-                                    </div>
+                                    <div className="text-sm font-semibold leading-5 text-foreground">None</div>
+                                    <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">No connectors required for this agent.</div>
                                   </div>
                                 </div>
                               </div>
-                            ))
-                          ) : (
-                            <div className={`group relative ${NAV_CARD_CLASS} p-4`}>
-                              <div className="flex items-start gap-3">
-                                <div className="mt-0.5 flex-shrink-0">
-                                  <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
-                                    <Icon name="check-circle" className="h-5 w-5 text-emerald-600" />
-                                  </div>
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold leading-5 text-foreground">None</div>
-                                  <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">No connectors required for this agent.</div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </section>
+                            )}
+                          </div>
+                        </section>
+                      ) : null}
 
                       {toolsRequiringSetup.length > 0 ? (
                         <section className="space-y-4">

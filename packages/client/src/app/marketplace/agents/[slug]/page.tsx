@@ -392,25 +392,28 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {group.items.map(item => (
                                 <div key={item.slug} className={`group relative ${NAV_CARD_CLASS} p-4`}>
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold leading-5 text-foreground">{item.title}</div>
-                                    {item.desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-1">{item.desc}</div> : null}
-
+                                  <div className="flex items-start gap-3">
                                     {Array.isArray(item.connectors) && item.connectors.length > 0 ? (
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                        {item.connectors.slice(0, 6).map(p => (
-                                          <div
-                                            key={p}
-                                            className="h-6 w-6 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
-                                            title={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
-                                            aria-label={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
-                                          >
-                                            <ConnectorLogo provider={p} className="h-4 w-4" />
-                                          </div>
-                                        ))}
-                                        {item.connectors.length > 6 ? <span className="text-[11px] text-muted-foreground">+{item.connectors.length - 6}</span> : null}
+                                      <div className="relative mt-0.5 flex-shrink-0">
+                                        <div
+                                          className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
+                                          title={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
+                                          aria-label={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
+                                        >
+                                          <ConnectorLogo provider={item.connectors[0]} className="h-5 w-5" />
+                                        </div>
+                                        {item.connectors.length > 1 ? (
+                                          <span className="absolute -bottom-1 -right-1 rounded-full border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm">
+                                            +{item.connectors.length - 1}
+                                          </span>
+                                        ) : null}
                                       </div>
                                     ) : null}
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-semibold leading-5 text-foreground">{item.title}</div>
+                                      {item.desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-1">{item.desc}</div> : null}
+                                    </div>
                                   </div>
                                 </div>
                               ))}

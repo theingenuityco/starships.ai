@@ -13,6 +13,15 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+function safeFormatDate(value?: string): string | null {
+  if (!value || typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const t = Date.parse(trimmed)
+  if (!Number.isFinite(t)) return null
+  return formatDate(new Date(t).toISOString())
+}
+
 export function UserProfileHoverCardContent({
   title,
   subtitle,
@@ -45,6 +54,7 @@ export function UserProfileHoverCardContent({
   const normalizedSubtitle = (subtitle || '').trim()
   const normalizedEmail = (email || '').trim()
   const showEmailRow = Boolean(normalizedEmail && normalizedEmail.toLowerCase() !== normalizedSubtitle.toLowerCase())
+  const memberSinceLabel = safeFormatDate(memberSince)
 
   return (
     <div className="flex items-start gap-3">
@@ -76,7 +86,7 @@ export function UserProfileHoverCardContent({
           {userIdShort ? <DetailRow label="User ID" value={userIdShort} /> : null}
           {showEmailRow ? <DetailRow label="Email" value={email!} /> : null}
           {roleLabel ? <DetailRow label="Role" value={roleLabel} /> : null}
-          {memberSince ? <DetailRow label="Member since" value={formatDate(memberSince)} /> : null}
+          {memberSinceLabel ? <DetailRow label="Member since" value={memberSinceLabel} /> : null}
           <DetailRow label="Status" value={statusLabel} />
         </div>
       </div>
@@ -128,8 +138,8 @@ export function AgentProfileHoverCardContent({
           {version ? <DetailRow label="Version" value={version} /> : null}
           {typeof toolsCount === 'number' && toolsCount > 0 ? <DetailRow label="Tools" value={String(toolsCount)} /> : null}
           {lastTurnSummary ? <DetailRow label="Last turn" value={lastTurnSummary} /> : null}
-          {createdAt ? <DetailRow label="Created" value={formatDate(createdAt)} /> : null}
-          {updatedAt ? <DetailRow label="Updated" value={formatDate(updatedAt)} /> : null}
+          {safeFormatDate(createdAt) ? <DetailRow label="Created" value={safeFormatDate(createdAt)!} /> : null}
+          {safeFormatDate(updatedAt) ? <DetailRow label="Updated" value={safeFormatDate(updatedAt)!} /> : null}
         </div>
       </div>
     </div>

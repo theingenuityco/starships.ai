@@ -25,7 +25,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -39,6 +38,8 @@ import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MessageReactions } from './MessageReactions'
 import { MessageReactionAction } from './MessageReactionAction'
+import { HoverProfilePopover } from './HoverProfilePopover'
+import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
 
 type TurnUsageForRing = {
   turnId: string
@@ -737,7 +738,30 @@ export function ConversationMessageList({
       const maxTokensNum = typeof maxTokensRaw === 'number' ? maxTokensRaw : typeof maxTokensRaw === 'string' ? Number(maxTokensRaw) : NaN
       const maxTokens = Number.isFinite(maxTokensNum) && maxTokensNum > 0 ? maxTokensNum : undefined
 
-      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl, modelId: model || undefined, maxTokens }
+      const role = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : undefined
+      const version = typeof (agent as any)?.version === 'string' ? String((agent as any).version).trim() : undefined
+      const category = typeof (agent as any)?.category === 'string' ? String((agent as any).category).trim() : undefined
+      const publicationStatus = typeof (agent as any)?.publicationStatus === 'string' ? String((agent as any).publicationStatus).trim() : undefined
+      const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs)
+        ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean)
+        : undefined
+      const createdAt = typeof (agent as any)?.createdAt === 'string' ? String((agent as any).createdAt).trim() : undefined
+      const updatedAt = typeof (agent as any)?.updatedAt === 'string' ? String((agent as any).updatedAt).trim() : undefined
+
+      return {
+        displayName: displayName.trim() || 'Assistant',
+        slug,
+        avatarUrl,
+        modelId: model || undefined,
+        maxTokens,
+        role,
+        version,
+        category,
+        publicationStatus,
+        assignedToolSlugs,
+        createdAt,
+        updatedAt,
+      }
     },
     [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
   )
@@ -1934,6 +1958,13 @@ export function ConversationMessageList({
                         avatarUrl: undefined,
                         modelId: undefined,
                         maxTokens: undefined,
+                        role: undefined,
+                        version: undefined,
+                        category: undefined,
+                        publicationStatus: undefined,
+                        assignedToolSlugs: undefined,
+                        createdAt: undefined,
+                        updatedAt: undefined,
                       } as const)
                     assistant = {
                       ...base,
@@ -1962,6 +1993,12 @@ export function ConversationMessageList({
                           conversationId={conversationId}
                           agentName={assistant?.displayName}
                           agentSlug={assistant?.slug}
+                          agentRole={assistant?.role}
+                          agentVersion={assistant?.version}
+                          agentCategory={assistant?.category}
+                          agentAssignedToolCount={Array.isArray(assistant?.assignedToolSlugs) ? assistant?.assignedToolSlugs.length : undefined}
+                          agentCreatedAt={assistant?.createdAt}
+                          agentUpdatedAt={assistant?.updatedAt}
                           starshipSlug={starshipSlug}
                           agentAvatarUrl={assistant?.avatarUrl}
                           agentModelId={assistant?.modelId}
@@ -2186,6 +2223,12 @@ interface ConversationMessageBubbleProps {
   conversationId: string | null
   agentName?: string
   agentSlug?: string
+  agentRole?: string
+  agentVersion?: string
+  agentCategory?: string
+  agentAssignedToolCount?: number
+  agentCreatedAt?: string
+  agentUpdatedAt?: string
   starshipSlug?: string
   agentAvatarUrl?: string
   /** Agent configured model id (fallback when provider usage omits model). */
@@ -2328,106 +2371,6 @@ function MessageTimestamp({ value, isEdited = false }: { value?: string | null; 
         </span>
       ) : null}
     </div>
-  )
-}
-
-function HoverProfilePopover({
-  trigger,
-  content,
-  align = 'start',
-  side = 'bottom',
-  sideOffset = 6,
-  contentClassName,
-}: {
-  trigger: ReactNode
-  content: ReactNode
-  align?: 'start' | 'center' | 'end'
-  side?: 'top' | 'bottom' | 'left' | 'right'
-  sideOffset?: number
-  contentClassName?: string
-}) {
-  const [open, setOpen] = useState(false)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const triggerRef = useRef<HTMLSpanElement | null>(null)
-  const contentRef = useRef<HTMLDivElement | null>(null)
-
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-  }, [])
-
-  const openPopover = useCallback(() => {
-    clearCloseTimer()
-    setOpen(prev => (prev ? prev : true))
-  }, [clearCloseTimer])
-
-  const closePopover = useCallback(
-    (delayMs = 160) => {
-      if (!open) return
-      if (closeTimerRef.current) return
-      closeTimerRef.current = setTimeout(() => {
-        closeTimerRef.current = null
-        setOpen(false)
-      }, delayMs)
-    },
-    [open]
-  )
-
-  const handleTriggerPointerLeave = useCallback(
-    (e: React.PointerEvent) => {
-      const next = e.relatedTarget as Node | null
-      const contentEl = contentRef.current
-      if (next && contentEl && contentEl.contains(next)) return
-      closePopover(200)
-    },
-    [closePopover]
-  )
-
-  const handleContentPointerLeave = useCallback(
-    (e: React.PointerEvent) => {
-      const next = e.relatedTarget as Node | null
-      const triggerEl = triggerRef.current
-      if (next && triggerEl && triggerEl.contains(next)) return
-      closePopover(200)
-    },
-    [closePopover]
-  )
-
-  useEffect(() => {
-    return () => {
-      clearCloseTimer()
-    }
-  }, [clearCloseTimer])
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span
-          ref={triggerRef}
-          className="inline-flex items-center"
-          onPointerEnter={openPopover}
-          onPointerLeave={handleTriggerPointerLeave}
-          onFocusCapture={openPopover}
-          onBlurCapture={() => closePopover(0)}
-        >
-          {trigger}
-        </span>
-      </PopoverTrigger>
-      <PopoverContent
-        ref={contentRef}
-        align={align}
-        side={side}
-        sideOffset={sideOffset}
-        onPointerEnter={openPopover}
-        onPointerLeave={handleContentPointerLeave}
-        onFocus={openPopover}
-        className={cn('w-64 p-3', contentClassName)}
-      >
-        {content}
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -2615,6 +2558,12 @@ const MemoizedMessageBubble = memo(
     conversationId,
     agentName,
     agentSlug,
+    agentRole,
+    agentVersion,
+    agentCategory,
+    agentAssignedToolCount,
+    agentCreatedAt,
+    agentUpdatedAt,
     starshipSlug,
     agentAvatarUrl,
     agentModelId,
@@ -2669,13 +2618,16 @@ const MemoizedMessageBubble = memo(
     const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
     const memberByUserId = useMemo(() => {
       const list = Array.isArray((membersData as any)?.members) ? (((membersData as any).members as any[]) ?? []) : []
-      const m = new Map<string, { displayName?: string | null; avatar?: string | null }>()
+      const m = new Map<string, { displayName?: string | null; avatar?: string | null; email?: string | null; role?: string | null; createdAt?: string | null }>()
       for (const it of list) {
         const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
         if (!id) continue
         m.set(id, {
           displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
           avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
+          email: typeof it?.email === 'string' ? String(it.email) : null,
+          role: typeof it?.role === 'string' ? String(it.role) : null,
+          createdAt: typeof it?.createdAt === 'string' ? String(it.createdAt) : null,
         })
       }
       return m
@@ -2927,59 +2879,38 @@ const MemoizedMessageBubble = memo(
       })()
       const userHoverDetail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
       const userHoverTitle = isAuthedUserMessage ? 'You' : userDisplayName
+      const emailForHover = (effectiveUserEmail || fromDirectory?.email || '').trim()
       const userHoverSub =
         (userHoverDetail && userHoverDetail !== userDisplayName ? userHoverDetail : '') ||
-        (effectiveUserEmail && effectiveUserEmail !== userDisplayName ? effectiveUserEmail : '')
+        (emailForHover && emailForHover !== userDisplayName ? emailForHover : '')
       const userIdShort = messageUserId ? `#${messageUserId.slice(0, 6)}` : ''
       const userPresenceLabel = showUserPresenceDot ? (showUserOnline ? 'Online' : 'Offline') : 'Unknown'
-      const userLastActive =
-        typeof messageTimestamp === 'string' && messageTimestamp.trim().length > 0 ? `${formatDate(messageTimestamp)} • ${formatTime(messageTimestamp)}` : ''
+      const userRoleRaw = typeof fromDirectory?.role === 'string' ? fromDirectory.role : ''
+      const userRoleLabel = userRoleRaw
+        ? userRoleRaw === 'owner'
+          ? 'Owner'
+          : userRoleRaw === 'admin'
+            ? 'Admin'
+            : userRoleRaw === 'collaborator'
+              ? 'Collaborator'
+              : userRoleRaw
+        : ''
       const userHoverCard = (
-        <div className="flex items-start gap-3">
-          <div className="relative h-9 w-9">
-            <Avatar className="h-9 w-9 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
-              {shouldUseExplicitUserAvatar ? (
-                <AvatarImage
-                  src={explicitUserAvatarUrl!}
-                  alt={userHoverTitle || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={36} rounded />
-              ) : shouldUseResolvedUserAvatar ? (
-                <AvatarImage
-                  src={effectiveUserAvatar!}
-                  alt={userHoverTitle || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
-                {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
-                ) : (
-                  initialsFromName(userHoverTitle || effectiveUserEmail)
-                )}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-semibold text-foreground truncate">{userHoverTitle}</div>
-              {isAuthedUserMessage ? <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">You</span> : null}
-            </div>
-            {userHoverSub ? <div className="text-xs text-muted-foreground truncate">{userHoverSub}</div> : null}
-            <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
-              {userIdShort ? <div>{`User ID ${userIdShort}`}</div> : null}
-              {effectiveUserEmail ? <div className="truncate">{effectiveUserEmail}</div> : null}
-              <div>{`Status: ${userPresenceLabel}`}</div>
-              {userLastActive ? <div className="whitespace-normal break-words">{`Last message: ${userLastActive}`}</div> : null}
-            </div>
-          </div>
-        </div>
+        <UserProfileHoverCardContent
+          title={userHoverTitle}
+          subtitle={userHoverSub || undefined}
+          isAuthedUser={isAuthedUserMessage}
+          explicitAvatarUrl={shouldUseExplicitUserAvatar ? explicitUserAvatarUrl : undefined}
+          resolvedAvatarUrl={shouldUseResolvedUserAvatar ? effectiveUserAvatar : undefined}
+          avatarSeed={userAvatarSeedOverride || undefined}
+          fallbackInitials={initialsFromName(userHoverTitle || effectiveUserEmail)}
+          fallbackVariant={fallbackVariant}
+          userIdShort={userIdShort || undefined}
+          email={emailForHover || undefined}
+          roleLabel={userRoleLabel || undefined}
+          memberSince={fromDirectory?.createdAt || undefined}
+          statusLabel={userPresenceLabel}
+        />
       )
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
@@ -3179,13 +3110,7 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
-      const assistantMetaParts = [
-        typeof agentModelId === 'string' && agentModelId.trim().length > 0 ? `Model: ${agentModelId.trim()}` : '',
-        typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? `Slug: ${agentSlug.trim()}` : '',
-      ].filter(Boolean)
       const assistantStatus = isConversationBusy ? 'Busy' : 'Available'
-      const assistantLastActive =
-        typeof messageTimestamp === 'string' && messageTimestamp.trim().length > 0 ? `${formatDate(messageTimestamp)} • ${formatTime(messageTimestamp)}` : ''
       const assistantUsageSummary = (() => {
         const u = turnUsage?.usage
         if (!u) return ''
@@ -3195,23 +3120,19 @@ const MemoizedMessageBubble = memo(
         return `${total.toLocaleString()} tokens${cost}`
       })()
       const assistantHoverCard = (
-        <div className="flex items-start gap-3">
-          <div className="relative h-9 w-9">
-            <div className="h-9 w-9 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-              <AgentAvatar seed={assistantDisplayName || 'AI'} imageUrl={agentAvatarUrl} size={36} rounded />
-            </div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-foreground truncate">{assistantDisplayName || 'Assistant'}</div>
-            {assistantMetaParts.length > 0 ? <div className="text-xs text-muted-foreground truncate">{assistantMetaParts.join(' • ')}</div> : null}
-            <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
-              <div>{`Status: ${assistantStatus}`}</div>
-              {typeof agentMaxTokens === 'number' && Number.isFinite(agentMaxTokens) ? <div>{`Max tokens: ${agentMaxTokens.toLocaleString()}`}</div> : null}
-              {assistantUsageSummary ? <div className="truncate">{`Last turn: ${assistantUsageSummary}`}</div> : null}
-              {assistantLastActive ? <div className="whitespace-normal break-words">{`Last message: ${assistantLastActive}`}</div> : null}
-            </div>
-          </div>
-        </div>
+        <AgentProfileHoverCardContent
+          name={assistantDisplayName || 'Assistant'}
+          avatarUrl={agentAvatarUrl}
+          modelId={agentModelId}
+          statusLabel={assistantStatus}
+          roleLabel={agentRole}
+          category={agentCategory}
+          version={agentVersion}
+          toolsCount={agentAssignedToolCount}
+          lastTurnSummary={assistantUsageSummary || undefined}
+          createdAt={agentCreatedAt}
+          updatedAt={agentUpdatedAt}
+        />
       )
       // Keep the avatar "slot" width stable across consecutive assistant messages.
       // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
@@ -3476,6 +3397,12 @@ const MemoizedMessageBubble = memo(
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
+    if ((prevProps.agentRole || '') !== (nextProps.agentRole || '')) return false
+    if ((prevProps.agentVersion || '') !== (nextProps.agentVersion || '')) return false
+    if ((prevProps.agentCategory || '') !== (nextProps.agentCategory || '')) return false
+    if (Number(prevProps.agentAssignedToolCount ?? 0) !== Number(nextProps.agentAssignedToolCount ?? 0)) return false
+    if ((prevProps.agentCreatedAt || '') !== (nextProps.agentCreatedAt || '')) return false
+    if ((prevProps.agentUpdatedAt || '') !== (nextProps.agentUpdatedAt || '')) return false
 
     // Re-render if the agent avatar URL changes (e.g. after attachments load)
     if ((prevProps.agentAvatarUrl || '') !== (nextProps.agentAvatarUrl || '')) return false

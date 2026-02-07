@@ -105,3 +105,23 @@ export function useRevalidateMarketplaceMarketingCaches() {
   })
 }
 
+export function useSetMarketplaceMarketingRenderingDisabled() {
+  return useMutation({
+    mutationFn: async (args: { templateId: string; disabled: boolean }): Promise<{ ok: true; disabled: boolean }> => {
+      const response: FetchResponse<ApiResponse<{ ok: true; disabled: boolean }>> = await api.post(
+        `/api/v1/admin/agent-templates/${args.templateId}/marketing/rendering`,
+        { disabled: args.disabled }
+      )
+      return response.data.data
+    },
+    onSuccess: data => {
+      toast.success(data.disabled ? 'Marketing rendering disabled' : 'Marketing rendering enabled')
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to update marketing rendering setting'
+      toast.error('Failed to update marketing rendering setting', { description: message })
+    },
+  })
+}
+

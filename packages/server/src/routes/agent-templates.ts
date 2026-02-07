@@ -248,6 +248,33 @@ router.post('/admin/agent-templates/:id/marketing/revalidate', async (req: Reque
   }
 });
 
+// POST /admin/agent-templates/:id/marketing/rendering - Enable/disable marketing sections rendering (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/rendering', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+    const bodyValidation = validateData(z.object({ disabled: z.boolean() }), req.body, res, 'rendering parameter');
+    if (!bodyValidation) return;
+
+    const { id: templateId } = paramValidation;
+    const { disabled } = bodyValidation;
+
+    const repo = new AgentTemplateRepository();
+    const updated = await repo.update(templateId, { marketplaceMarketingRenderingDisabled: disabled });
+    if (!updated) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, { resource: 'agent-template', id: templateId });
+      return;
+    }
+
+    // Revalidate the caches used by marketplace pages.
+    triggerNextRevalidate({ tags: ['public-agent-templates', 'public-tool-templates', 'public-connector-catalog'] });
+
+    sendSuccess(res, { ok: true, disabled }, 200);
+  } catch (error) {
+    handleError(error, res, 'updating marketing rendering setting');
+  }
+});
+
 // GET /agent-templates/:id/required-connectors - Get required connectors for an agent template (public)
 router.get('/agent-templates/:id/required-connectors', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
   try {

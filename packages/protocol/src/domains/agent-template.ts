@@ -83,6 +83,14 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
    * Array of strings describing the problems this agent solves.
    */
   problemStatementsText?: string[];
+
+  /**
+   * Instance-admin control to disable rendering of generated marketing sections
+   * (screenshots/problem statements/prompts) on the public marketplace details page.
+   *
+   * This is persisted server-side so ISR pages can revalidate with/without content.
+   */
+  marketplaceMarketingRenderingDisabled?: boolean;
 }
 
 // ============================================================================
@@ -118,4 +126,5 @@ export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMe
   previewPrompts?: string[];
   assignedToolSlugs?: string[];
   version?: string;
+  marketplaceMarketingRenderingDisabled?: boolean;
 }

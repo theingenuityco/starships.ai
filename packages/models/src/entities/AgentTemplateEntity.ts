@@ -10,6 +10,7 @@ import type { AgentTemplateModel, TemplateCategory } from '@starships/protocol';
 import { Exclude, Expose, Transform } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsISO8601,
   IsNumber,
@@ -276,6 +277,15 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @IsArray()
   @IsString({ each: true })
   previewPrompts?: string[];
+
+  /**
+   * Instance-admin control to disable rendering of generated marketing sections
+   * on the public marketplace details page.
+   */
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  marketplaceMarketingRenderingDisabled?: boolean;
 
   /**
    * Simple validation function using class-validator

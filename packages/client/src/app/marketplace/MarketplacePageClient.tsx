@@ -107,7 +107,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
             <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
           </div>
 
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6">
             {/* Header */}
             <div className="flex flex-col gap-5 sm:gap-6">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">

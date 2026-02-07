@@ -430,25 +430,6 @@ export class PublicationService {
     // Sync tools
     await this.syncToolsToTemplate(agent, templateId, adminUserId);
 
-    // Build execution bundle for LLM calls
-    const starship = await this.starshipRepository.findById(agent.starshipId);
-    if (!starship) {
-      throw new NotFoundError('Starship', agent.starshipId);
-    }
-
-    const env = getEnvConfig();
-    const runtimeEnv: Record<string, unknown> = {
-      STARSHIP_ID: agent.starshipId,
-      AGENT_ID: agent.id,
-      SERVER_URL: env.SERVER_URL,
-    };
-
-    const executionBundle = await buildAutopilotExecutionBundle({
-      starshipId: agent.starshipId,
-      authUserId: adminUserId,
-      runtimeEnv,
-    });
-
     const marketingContent: {
       avatarUrl?: string;
       problemStatementsText?: string[];
@@ -457,195 +438,52 @@ export class PublicationService {
       tryThesePromptsImageUrl?: string;
     } = {};
 
-    // 1. Ensure avatar exists (auto-generate if missing)
-    if (!agent.avatarPrompt || !agent.avatarAttachmentId) {
-      console.log('[PUBLICATION] Auto-generating avatar...');
-      const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
-        agentName: agent.name,
-        agentDescription: agent.description,
-        agentModel: agent.model,
-        agentBlueprint: agent.blueprint!,
-        agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
-        starshipId: agent.starshipId,
-        runtimeEnv,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const avatarResult = await this.avatarGenerationService.generateAvatar({
-        subjectName: agent.name,
-        subjectDescription: agent.description,
-        subjectAvatarPrompt: mirrorResult.description,
-        starshipId: agent.starshipId,
-        runtimeEnv,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const avatarAttachment = await this.attachmentService.createAttachment({
-        starshipId: agent.starshipId,
-        conversationId: `agent-avatar-${agent.id}`,
-        filename: `agent-${agent.slug || agent.id}-avatar.webp`,
-        buffer: avatarResult.buffer,
-        mimeType: avatarResult.mimeType,
-      });
-
-      await this.agentRepository.update(agent.id, {
-        avatarPrompt: mirrorResult.description,
-        avatarAttachmentId: avatarAttachment.id,
-      });
-
-      const updatedAgent = await this.agentRepository.findById(agentId);
-      if (updatedAgent) {
-        Object.assign(agent, updatedAgent);
-      }
-    }
-
     // Copy avatar to template
     marketingContent.avatarUrl = await this.copyAvatarToTemplate(agent, templateId);
 
-    // 2. Generate problem statements text (only if missing)
-    const existingProblemStatements = await this.marketingContentRepository.findByEntityAndType(
+    // Copy problem statements text to template (no generation in publication flow)
+    const existingTemplateStatements = await this.marketingContentRepository.findByEntityAndType(
       'agent_template',
       templateId,
       'problem_statements_text'
     );
+    if (!existingTemplateStatements?.textContent) {
+      const agentStatements = await this.marketingContentRepository.findByEntityAndType('agent', agent.id, 'problem_statements_text');
+      if (agentStatements?.textContent) {
+        await this.marketingContentRepository.createOrUpdate({
+          entityType: 'agent_template',
+          entityId: templateId,
+          contentType: 'problem_statements_text',
+          contentFormat: 'text',
+          textContent: agentStatements.textContent,
+          textFormat: agentStatements.textFormat || 'json',
+          generationMetadata: agentStatements.generationMetadata || {},
+          metadata: agentStatements.metadata || {},
+        });
+      }
+    }
 
-    if (!existingProblemStatements || !existingProblemStatements.textContent) {
-      console.log('[PUBLICATION] Generating problem statements text...');
-      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-
-      const statementsResult = await this.marketingContentGenerationService.generateProblemStatements({
-        agentName: agent.name,
-        agentRole: agent.role,
-        agentDescription: agent.description,
-        agentCategory: agent.category,
-        agentTools: agentTools.map((t) => ({ name: t.name, slug: t.slug, description: t.description })),
-        agentModel: agent.model,
-        agentBlueprint: agent.blueprint!,
-        starshipId: agent.starshipId,
-        runtimeEnv,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const statements = Array.isArray(statementsResult.statements)
-        ? statementsResult.statements.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-        : [];
-
-      await this.marketingContentRepository.createOrUpdate({
-        entityType: 'agent_template',
-        entityId: templateId,
-        contentType: 'problem_statements_text',
-        contentFormat: 'text',
-        textContent: JSON.stringify(statements),
-        textFormat: 'json',
-        generationMetadata: { model: statementsResult.model },
-      });
-
-      marketingContent.problemStatementsText = statements;
-    } else {
+    // Read problem statements text from template for preview payload
+    const templateStatements = await this.marketingContentRepository.findByEntityAndType(
+      'agent_template',
+      templateId,
+      'problem_statements_text'
+    );
+    if (templateStatements?.textContent) {
       try {
-        const parsed = JSON.parse(existingProblemStatements.textContent || '[]');
+        const parsed = JSON.parse(templateStatements.textContent || '[]');
         if (Array.isArray(parsed)) {
           marketingContent.problemStatementsText = parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
         }
-      } catch (err) {
-        console.warn('[PUBLICATION] Failed to parse existing problem statements:', err);
+      } catch {
+        // ignore
       }
     }
 
-    // 3. Generate profile images (only if missing)
-    const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-
-    let coreCapabilities = '';
-    if (agentTools.length > 0) {
-      coreCapabilities = agentTools.map((t) => t.name || t.slug).join(', ');
-    } else {
-      const parts: string[] = [];
-      if (agent.role) parts.push(agent.role);
-      if (agent.description) {
-        const desc = agent.description.length > 100 ? agent.description.slice(0, 100) + '...' : agent.description;
-        parts.push(desc);
-      }
-      coreCapabilities = parts.join(' — ') || 'general assistance';
-    }
-    if (coreCapabilities.length > 200) {
-      coreCapabilities = coreCapabilities.slice(0, 197) + '...';
-    }
-
-    const domainContext = agent.description ? agent.description.split(/[.!?]/)[0].trim().slice(0, 100) : agent.role || 'general assistance';
-
-    // Generate missing profile images
-    if (!agent.problemStatementsAttachmentId) {
-      console.log('[PUBLICATION] Generating problem statements image...');
-      const imageResult = await this.profileImageGenerationService.generateProfileImage(agent, 'problem_statements', {
-        coreCapabilities,
-        domainContext,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const attachment = await this.attachmentService.createAttachment({
-        starshipId: agent.starshipId,
-        conversationId: `agent-profile-${agent.id}-problem_statements`,
-        filename: `agent-${agent.slug || agent.id}-problem-statements.webp`,
-        buffer: imageResult.buffer,
-        mimeType: imageResult.mimeType,
-      });
-
-      await this.agentRepository.update(agent.id, {
-        problemStatementsAttachmentId: attachment.id,
-      });
-    }
-
-    if (!agent.capabilitiesAttachmentId) {
-      console.log('[PUBLICATION] Generating capabilities image...');
-      const imageResult = await this.profileImageGenerationService.generateProfileImage(agent, 'capabilities', {
-        coreCapabilities,
-        domainContext,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const attachment = await this.attachmentService.createAttachment({
-        starshipId: agent.starshipId,
-        conversationId: `agent-profile-${agent.id}-capabilities`,
-        filename: `agent-${agent.slug || agent.id}-capabilities.webp`,
-        buffer: imageResult.buffer,
-        mimeType: imageResult.mimeType,
-      });
-
-      await this.agentRepository.update(agent.id, {
-        capabilitiesAttachmentId: attachment.id,
-      });
-    }
-
-    if (!agent.tryThesePromptsAttachmentId) {
-      console.log('[PUBLICATION] Generating try these prompts image...');
-      const imageResult = await this.profileImageGenerationService.generateProfileImage(agent, 'try_these_prompts', {
-        coreCapabilities,
-        domainContext,
-        engineConfigFromHost: executionBundle.engineConfig,
-      });
-
-      const attachment = await this.attachmentService.createAttachment({
-        starshipId: agent.starshipId,
-        conversationId: `agent-profile-${agent.id}-try_these_prompts`,
-        filename: `agent-${agent.slug || agent.id}-try-these-prompts.webp`,
-        buffer: imageResult.buffer,
-        mimeType: imageResult.mimeType,
-      });
-
-      await this.agentRepository.update(agent.id, {
-        tryThesePromptsAttachmentId: attachment.id,
-      });
-    }
-
-    // Reload agent to get updated attachment IDs
+    // Copy any existing profile images to template (no generation in publication flow)
     const finalAgent = await this.agentRepository.findById(agentId);
-    if (!finalAgent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    // Copy all profile images to template
-    const profileImages = await this.profileImageService.copyAllProfileImagesToTemplate(finalAgent, templateId);
-    Object.assign(marketingContent, profileImages);
+    if (!finalAgent) throw new NotFoundError('Agent', agentId);
+    Object.assign(marketingContent, await this.profileImageService.copyAllProfileImagesToTemplate(finalAgent, templateId));
 
     return {
       agent: finalAgent,
@@ -907,6 +745,37 @@ export class PublicationService {
     // Copy profile images
     await this.profileImageService.ensureTemplateProfileImages(agent, templateId);
 
+    // Copy problem statements text from agent → template (no generation here)
+    try {
+      const templateStatements = await this.marketingContentRepository.findByEntityAndType(
+        'agent_template',
+        templateId,
+        'problem_statements_text'
+      );
+      if (!templateStatements?.textContent) {
+        const agentStatements = await this.marketingContentRepository.findByEntityAndType(
+          'agent',
+          agent.id,
+          'problem_statements_text'
+        );
+        if (agentStatements?.textContent) {
+          await this.marketingContentRepository.createOrUpdate({
+            entityType: 'agent_template',
+            entityId: templateId,
+            contentType: 'problem_statements_text',
+            contentFormat: 'text',
+            textContent: agentStatements.textContent,
+            textFormat: agentStatements.textFormat || 'json',
+            generationMetadata: agentStatements.generationMetadata || {},
+            metadata: agentStatements.metadata || {},
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[PUBLICATION] Failed to copy problem statements text:', err);
+      // Non-fatal - don't throw
+    }
+
     // Mark agent as published
     const updated = await this.agentRepository.update(agentId, {
       version: nextVersion,
@@ -979,15 +848,37 @@ export class PublicationService {
       nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
     }
 
-    const targetTemplateId = agent.publishedTemplateId;
-    if (!targetTemplateId) {
-      throw new ValidationError('Template not found. Please prepare publication first.');
-    }
+    // Confirm is now equivalent to approval/publish, without triggering marketing generation.
+    // Ensure template exists so we can publish even if /publication/prepare was never called.
+    const { templateId } = await this.ensureTemplate(agent, nextVersion);
 
-    const templateRepo = new AgentTemplateRepository();
-    const template = await templateRepo.findById(targetTemplateId);
-    if (!template) {
-      throw new NotFoundError('AgentTemplate', targetTemplateId);
+    // Sync tools + copy existing assets to template (best-effort)
+    await this.syncToolsToTemplate(agent, templateId, adminUserId);
+    await this.copyAvatarToTemplate(agent, templateId);
+    await this.profileImageService.ensureTemplateProfileImages(agent, templateId);
+    try {
+      const templateStatements = await this.marketingContentRepository.findByEntityAndType(
+        'agent_template',
+        templateId,
+        'problem_statements_text'
+      );
+      if (!templateStatements?.textContent) {
+        const agentStatements = await this.marketingContentRepository.findByEntityAndType('agent', agent.id, 'problem_statements_text');
+        if (agentStatements?.textContent) {
+          await this.marketingContentRepository.createOrUpdate({
+            entityType: 'agent_template',
+            entityId: templateId,
+            contentType: 'problem_statements_text',
+            contentFormat: 'text',
+            textContent: agentStatements.textContent,
+            textFormat: agentStatements.textFormat || 'json',
+            generationMetadata: agentStatements.generationMetadata || {},
+            metadata: agentStatements.metadata || {},
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[PUBLICATION] Failed to copy problem statements text during confirm:', err);
     }
 
     const updated = await this.agentRepository.update(agentId, {
@@ -995,7 +886,7 @@ export class PublicationService {
       publicationStatus: 'published',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),
-      publishedTemplateId: targetTemplateId,
+      publishedTemplateId: templateId,
     });
 
     if (!updated) {

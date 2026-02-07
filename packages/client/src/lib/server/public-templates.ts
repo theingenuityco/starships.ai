@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { ApiResponse, AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
+import type { ApiResponse, AgentTemplateModel, ConnectorCatalogResponse, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { getPublicEnvConfig } from '@starships/env/public'
 
 function normalizeBaseUrl(value: string): string {
@@ -90,6 +90,25 @@ export async function fetchPublicToolTemplates(args?: {
     return Array.isArray(json.data) ? json.data : []
   } catch (e) {
     console.warn('[public-templates] fetchPublicToolTemplates failed', {
+      error: e instanceof Error ? e.message : String(e),
+    })
+    return []
+  }
+}
+
+export async function fetchPublicConnectorCatalog(args?: { revalidateSeconds?: number }): Promise<ConnectorCatalogItem[]> {
+  try {
+    const base = getPublicBaseUrl()
+    const u = new URL('/api/v1/connectors/catalog', base)
+
+    const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
+      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-connector-catalog'] },
+      headers: { Accept: 'application/json' },
+    })
+    const list = (json.data as ConnectorCatalogResponse | undefined)?.connectors
+    return Array.isArray(list) ? list : []
+  } catch (e) {
+    console.warn('[public-templates] fetchPublicConnectorCatalog failed', {
       error: e instanceof Error ? e.message : String(e),
     })
     return []

@@ -440,9 +440,7 @@ export class ToolRepository extends BaseRepository {
           // Versioning fields
           version: data.version || '1.0.0',
           ...(data.templateSnapshotAt ? { templateSnapshotAt: data.templateSnapshotAt } : {}),
-          ...(data.requiredConnectorProviders
-            ? { requiredConnectorProviders: data.requiredConnectorProviders }
-            : {}),
+          ...(data.requiredConnectorProviders ? { requiredConnectorProviders: data.requiredConnectorProviders } : {}),
 
           // Database-specific fields
           createdAt: now,
@@ -476,14 +474,6 @@ export class ToolRepository extends BaseRepository {
           ...(sourceTemplateId !== undefined ? { sourceTemplateId } : {}),
           updatedAt: new Date().toISOString(),
         };
-
-        // Keep required_connector_providers in sync with blueprint updates.
-        // This mirrors ToolTemplateRepository behavior.
-        if (updates.blueprint !== undefined && updates.blueprint !== null) {
-          updateProps.requiredConnectorProviders = extractRequiredConnectorProviders(
-            updates.blueprint as Parameters<typeof extractRequiredConnectorProviders>[0]
-          );
-        }
 
         // Auto-regenerate slug on name updates
         if (updates.name !== undefined && updates.name !== null) {
@@ -577,9 +567,7 @@ export class ToolRepository extends BaseRepository {
           isEnabled: true,
           version: template.version, // Copy template version
           templateSnapshotAt: now, // Capture snapshot time
-          requiredConnectorProviders:
-            template.requiredConnectorProviders ??
-            extractRequiredConnectorProviders(template.blueprint),
+          requiredConnectorProviders: template.requiredConnectorProviders ?? extractRequiredConnectorProviders(template.blueprint),
         };
 
         // Ensure starship-scoped uniqueness via create and return tool
@@ -776,9 +764,7 @@ export class ToolRepository extends BaseRepository {
         if (template.condition !== null && template.condition !== undefined) {
           updates.condition = template.condition;
         }
-        updates.requiredConnectorProviders =
-          template.requiredConnectorProviders ??
-          extractRequiredConnectorProviders(template.blueprint);
+        updates.requiredConnectorProviders = template.requiredConnectorProviders ?? extractRequiredConnectorProviders(template.blueprint);
 
         const updated = await this.update(toolId, updates);
         if (!updated) {

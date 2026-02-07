@@ -83,25 +83,6 @@ const NAV_CARD_CLASS = 'rounded-lg border border-border/60 bg-card shadow-sm'
 const SECTION_TITLE_CLASS = 'text-sm font-semibold tracking-tight text-foreground'
 const SECTION_SUBTITLE_CLASS = 'text-xs text-muted-foreground'
 
-function extractRequiredConnectorProvidersFromBlueprint(blueprint: unknown): string[] {
-  const bp = blueprint as any
-  const nodes = bp?.nodes
-  if (!Array.isArray(nodes)) return []
-
-  const providers = new Set<string>()
-  for (const node of nodes) {
-    if (!node || typeof node !== 'object') continue
-    if (node.type !== 'connector_action') continue
-    const connector = (node.parameters as any)?.connector
-    if (typeof connector !== 'string') continue
-    const trimmed = connector.trim()
-    if (!trimmed) continue
-    if (trimmed.includes('{{')) continue
-    providers.add(trimmed.toLowerCase())
-  }
-  return Array.from(providers)
-}
-
 function possessiveLabel(name: string): string {
   const n = String(name || '').trim()
   if (!n) return 'This agent’s'
@@ -172,7 +153,19 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
   const connectorCatalog = await fetchPublicConnectorCatalog({ revalidateSeconds: revalidate })
   const toolInfoBySlug = new Map<string, ToolTemplateModel>()
   for (const t of toolTemplates) {
-    if (typeof t?.slug === 'string' && t.slug.trim()) toolInfoBySlug.set(t.slug, t)
+    if (typeof t?.slug !== 'string') continue
+    const full = t.slug.trim()
+    if (!full) continue
+    toolInfoBySlug.set(full.toLowerCase(), t)
+
+    // Back-compat: some agent templates store "base slugs" without the always-on
+    // random suffix (e.g. "gmail" vs "gmail-a1b2"). Index both to make marketplace
+    // lookups (descriptions/connectors) reliable.
+    const base = full.replace(/-[a-z0-9]{4}$/i, '')
+    const baseKey = base.trim().toLowerCase()
+    if (baseKey && baseKey !== full.toLowerCase() && !toolInfoBySlug.has(baseKey)) {
+      toolInfoBySlug.set(baseKey, t)
+    }
   }
 
   const connectorInfoByProvider = new Map<string, ConnectorCatalogItem>()
@@ -239,49 +232,53 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
   const requiredConnectorProviders = Array.from(
     new Set(
       toolSlugs
-        .flatMap(slug => {
-          const info = toolInfoBySlug.get(slug)
-          let list = info?.requiredConnectorProviders
-          if (!Array.isArray(list) || list.length === 0) {
-            list = extractRequiredConnectorProvidersFromBlueprint((info as any)?.blueprint)
-          }
-          return Array.isArray(list) ? list : []
-        })
+        .flatMap(slug => toolInfoBySlug.get(String(slug).trim().toLowerCase())?.requiredConnectorProviders ?? [])
         .filter(p => typeof p === 'string' && p.trim().length > 0)
-        .map(p => p.trim().toLowerCase())
-        .filter(p => p && p !== 'starships')
+        .map(p => p.trim())
     )
   )
 
   const toolsRequiringSetup = toolSlugs
     .map(slug => {
-      const info = toolInfoBySlug.get(slug)
+      const info = toolInfoBySlug.get(String(slug).trim().toLowerCase())
       if (!info) return null
       const requiresApiKey = Boolean(info.requiresApiKey)
       const requiredConfigCount = Array.isArray(info.configurationFields) ? info.configurationFields.filter(f => !!f?.required).length : 0
       const requiresConfig = requiredConfigCount > 0
       if (!requiresApiKey && !requiresConfig) return null
+      const connectors = Array.from(
+        new Set(
+          (info?.requiredConnectorProviders ?? [])
+            .filter(p => typeof p === 'string' && p.trim().length > 0)
+            .map(p => p.trim().toLowerCase())
+            .filter(p => p && p !== 'starships')
+        )
+      )
       return {
         slug,
         name: info.name?.trim() || slug,
         requiresApiKey,
         requiresConfig,
+        connectors,
       }
     })
-    .filter(Boolean) as Array<{ slug: string; name: string; requiresApiKey: boolean; requiresConfig: boolean }>
+    .filter(Boolean) as Array<{ slug: string; name: string; requiresApiKey: boolean; requiresConfig: boolean; connectors: string[] }>
 
   const capabilityItems = toolSlugs
     .map(slug => {
-      const info = toolInfoBySlug.get(slug)
+      const info = toolInfoBySlug.get(String(slug).trim().toLowerCase())
       const title = info?.name?.trim() || slug
       const desc = info?.description?.trim() || ''
       const templateDefault = (template.assignedToolDefaultPermissions?.[slug] ?? undefined) as CapabilityPermission | undefined
       const permission = templateDefault ?? inferCapabilityPermission(info)
-      let list = info?.requiredConnectorProviders
-      if (!Array.isArray(list) || list.length === 0) {
-        list = extractRequiredConnectorProvidersFromBlueprint((info as any)?.blueprint)
-      }
-      const connectors = Array.from(new Set((Array.isArray(list) ? list : []).map(p => String(p).trim().toLowerCase()).filter(p => p && p !== 'starships')))
+      const connectors = Array.from(
+        new Set(
+          (info?.requiredConnectorProviders ?? [])
+            .filter(p => typeof p === 'string' && p.trim().length > 0)
+            .map(p => p.trim().toLowerCase())
+            .filter(p => p && p !== 'starships')
+        )
+      )
       return { slug, title, desc, permission, connectors }
     })
     .filter(x => typeof x.slug === 'string' && x.slug.trim().length > 0)
@@ -487,6 +484,22 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                                           ? 'Requires an API key.'
                                           : 'Requires configuration.'}
                                     </div>
+
+                                    {Array.isArray(t.connectors) && t.connectors.length > 0 ? (
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                        {t.connectors.slice(0, 6).map(p => (
+                                          <div
+                                            key={p}
+                                            className="h-6 w-6 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
+                                            title={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                            aria-label={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                          >
+                                            <ConnectorLogo provider={p} className="h-4 w-4" />
+                                          </div>
+                                        ))}
+                                        {t.connectors.length > 6 ? <span className="text-[11px] text-muted-foreground">+{t.connectors.length - 6}</span> : null}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>

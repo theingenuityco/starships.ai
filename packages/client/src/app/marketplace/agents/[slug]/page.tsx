@@ -251,7 +251,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
           (info?.requiredConnectorProviders ?? [])
             .filter(p => typeof p === 'string' && p.trim().length > 0)
             .map(p => p.trim().toLowerCase())
-            .filter(p => p && p !== 'starships')
+            .filter(p => p)
         )
       )
       return {
@@ -276,7 +276,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
           (info?.requiredConnectorProviders ?? [])
             .filter(p => typeof p === 'string' && p.trim().length > 0)
             .map(p => p.trim().toLowerCase())
-            .filter(p => p && p !== 'starships')
+            .filter(p => p)
         )
       )
       return { slug, title, desc, permission, connectors }

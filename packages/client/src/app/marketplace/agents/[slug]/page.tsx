@@ -579,28 +579,28 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         </div>
                       </section>
                     ) : null}
-
-                    {/* Try These Prompts Row - 2 columns */}
-                    {hasTryPrompts ? (
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3">
-                          {previewPrompts.map((p, idx) => (
-                            <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
-                              <div className="flex items-start gap-3">
-                                <div className="mt-0.5 flex-shrink-0">
-                                  <Icon name="sparkles" className="h-4 w-4 text-primary" />
-                                </div>
-                                <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
                   </>
+                ) : null}
+
+                {/* Try These Prompts Row - sourced from template.previewPrompts (NOT marketing_content) */}
+                {hasTryPrompts ? (
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {previewPrompts.map((p, idx) => (
+                        <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex-shrink-0">
+                              <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                            </div>
+                            <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
                 ) : null}
               </div>
             </section>

@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -2330,6 +2331,106 @@ function MessageTimestamp({ value, isEdited = false }: { value?: string | null; 
   )
 }
 
+function HoverProfilePopover({
+  trigger,
+  content,
+  align = 'start',
+  side = 'bottom',
+  sideOffset = 6,
+  contentClassName,
+}: {
+  trigger: ReactNode
+  content: ReactNode
+  align?: 'start' | 'center' | 'end'
+  side?: 'top' | 'bottom' | 'left' | 'right'
+  sideOffset?: number
+  contentClassName?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }, [])
+
+  const openPopover = useCallback(() => {
+    clearCloseTimer()
+    setOpen(prev => (prev ? prev : true))
+  }, [clearCloseTimer])
+
+  const closePopover = useCallback(
+    (delayMs = 160) => {
+      if (!open) return
+      if (closeTimerRef.current) return
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null
+        setOpen(false)
+      }, delayMs)
+    },
+    [open]
+  )
+
+  const handleTriggerPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const contentEl = contentRef.current
+      if (next && contentEl && contentEl.contains(next)) return
+      closePopover(200)
+    },
+    [closePopover]
+  )
+
+  const handleContentPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const triggerEl = triggerRef.current
+      if (next && triggerEl && triggerEl.contains(next)) return
+      closePopover(200)
+    },
+    [closePopover]
+  )
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimer()
+    }
+  }, [clearCloseTimer])
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          ref={triggerRef}
+          className="inline-flex items-center"
+          onPointerEnter={openPopover}
+          onPointerLeave={handleTriggerPointerLeave}
+          onFocusCapture={openPopover}
+          onBlurCapture={() => closePopover(0)}
+        >
+          {trigger}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent
+        ref={contentRef}
+        align={align}
+        side={side}
+        sideOffset={sideOffset}
+        onPointerEnter={openPopover}
+        onPointerLeave={handleContentPointerLeave}
+        onFocus={openPopover}
+        className={cn('w-64 p-3', contentClassName)}
+      >
+        {content}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function isDeletedMessageContent(content: unknown): boolean {
   return typeof content === 'string' && content === DELETED_MESSAGE_MARKER
 }
@@ -2824,6 +2925,62 @@ const MemoizedMessageBubble = memo(
         if (detail && detail.toLowerCase() !== 'you') return `You (${detail})`
         return 'You'
       })()
+      const userHoverDetail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
+      const userHoverTitle = isAuthedUserMessage ? 'You' : userDisplayName
+      const userHoverSub =
+        (userHoverDetail && userHoverDetail !== userDisplayName ? userHoverDetail : '') ||
+        (effectiveUserEmail && effectiveUserEmail !== userDisplayName ? effectiveUserEmail : '')
+      const userIdShort = messageUserId ? `#${messageUserId.slice(0, 6)}` : ''
+      const userPresenceLabel = showUserPresenceDot ? (showUserOnline ? 'Online' : 'Offline') : 'Unknown'
+      const userLastActive =
+        typeof messageTimestamp === 'string' && messageTimestamp.trim().length > 0 ? `${formatDate(messageTimestamp)} • ${formatTime(messageTimestamp)}` : ''
+      const userHoverCard = (
+        <div className="flex items-start gap-3">
+          <div className="relative h-9 w-9">
+            <Avatar className="h-9 w-9 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+              {shouldUseExplicitUserAvatar ? (
+                <AvatarImage
+                  src={explicitUserAvatarUrl!}
+                  alt={userHoverTitle || 'User avatar'}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="rounded-full object-cover"
+                />
+              ) : userAvatarSeedOverride ? (
+                <AgentAvatar seed={userAvatarSeedOverride} size={36} rounded />
+              ) : shouldUseResolvedUserAvatar ? (
+                <AvatarImage
+                  src={effectiveUserAvatar!}
+                  alt={userHoverTitle || 'User avatar'}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="rounded-full object-cover"
+                />
+              ) : null}
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                {fallbackVariant === 'user-icon' ? (
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                ) : (
+                  initialsFromName(userHoverTitle || effectiveUserEmail)
+                )}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-semibold text-foreground truncate">{userHoverTitle}</div>
+              {isAuthedUserMessage ? <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">You</span> : null}
+            </div>
+            {userHoverSub ? <div className="text-xs text-muted-foreground truncate">{userHoverSub}</div> : null}
+            <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
+              {userIdShort ? <div>{`User ID ${userIdShort}`}</div> : null}
+              {effectiveUserEmail ? <div className="truncate">{effectiveUserEmail}</div> : null}
+              <div>{`Status: ${userPresenceLabel}`}</div>
+              {userLastActive ? <div className="whitespace-normal break-words">{`Last message: ${userLastActive}`}</div> : null}
+            </div>
+          </div>
+        </div>
+      )
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
@@ -2923,13 +3080,19 @@ const MemoizedMessageBubble = memo(
               {!isConsecutiveSameUser && (
                 <div className="mb-0 flex items-center gap-2">
                   <div className="text-sm font-bold font-mono text-foreground">
-                    {userProfileHref ? (
-                      <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                        {authorLabel}
-                      </Link>
-                    ) : (
-                      <span>{authorLabel}</span>
-                    )}
+                    <HoverProfilePopover
+                      trigger={
+                        userProfileHref ? (
+                          <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                            {authorLabel}
+                          </Link>
+                        ) : (
+                          <span>{authorLabel}</span>
+                        )
+                      }
+                      content={userHoverCard}
+                      side="right"
+                    />
                   </div>
                   <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>
@@ -3016,6 +3179,40 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
+      const assistantMetaParts = [
+        typeof agentModelId === 'string' && agentModelId.trim().length > 0 ? `Model: ${agentModelId.trim()}` : '',
+        typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? `Slug: ${agentSlug.trim()}` : '',
+      ].filter(Boolean)
+      const assistantStatus = isConversationBusy ? 'Busy' : 'Available'
+      const assistantLastActive =
+        typeof messageTimestamp === 'string' && messageTimestamp.trim().length > 0 ? `${formatDate(messageTimestamp)} • ${formatTime(messageTimestamp)}` : ''
+      const assistantUsageSummary = (() => {
+        const u = turnUsage?.usage
+        if (!u) return ''
+        const total = Number(u.totalTokens ?? 0)
+        if (!Number.isFinite(total) || total <= 0) return ''
+        const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? ` • $${u.cost.toFixed(2)}` : ''
+        return `${total.toLocaleString()} tokens${cost}`
+      })()
+      const assistantHoverCard = (
+        <div className="flex items-start gap-3">
+          <div className="relative h-9 w-9">
+            <div className="h-9 w-9 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+              <AgentAvatar seed={assistantDisplayName || 'AI'} imageUrl={agentAvatarUrl} size={36} rounded />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-foreground truncate">{assistantDisplayName || 'Assistant'}</div>
+            {assistantMetaParts.length > 0 ? <div className="text-xs text-muted-foreground truncate">{assistantMetaParts.join(' • ')}</div> : null}
+            <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-muted-foreground">
+              <div>{`Status: ${assistantStatus}`}</div>
+              {typeof agentMaxTokens === 'number' && Number.isFinite(agentMaxTokens) ? <div>{`Max tokens: ${agentMaxTokens.toLocaleString()}`}</div> : null}
+              {assistantUsageSummary ? <div className="truncate">{`Last turn: ${assistantUsageSummary}`}</div> : null}
+              {assistantLastActive ? <div className="whitespace-normal break-words">{`Last message: ${assistantLastActive}`}</div> : null}
+            </div>
+          </div>
+        </div>
+      )
       // Keep the avatar "slot" width stable across consecutive assistant messages.
       // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
       // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
@@ -3174,13 +3371,19 @@ const MemoizedMessageBubble = memo(
               {showAssistantAvatar && (
                 <div className="mb-0 flex items-center gap-2">
                   <div className="text-sm font-bold text-foreground">
-                    {assistantProfileHref ? (
-                      <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
-                        {assistantDisplayName}
-                      </Link>
-                    ) : (
-                      <span className="font-mono">{assistantDisplayName}</span>
-                    )}
+                    <HoverProfilePopover
+                      trigger={
+                        assistantProfileHref ? (
+                          <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                            {assistantDisplayName}
+                          </Link>
+                        ) : (
+                          <span className="font-mono">{assistantDisplayName}</span>
+                        )
+                      }
+                      content={assistantHoverCard}
+                      side="right"
+                    />
                   </div>
                   <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>

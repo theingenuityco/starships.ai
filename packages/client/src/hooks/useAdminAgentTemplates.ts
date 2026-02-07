@@ -88,3 +88,20 @@ export function useAgentTemplateMarketingJob(jobId?: string | null) {
   })
 }
 
+export function useRevalidateMarketplaceMarketingCaches() {
+  return useMutation({
+    mutationFn: async (templateId: string): Promise<{ ok: true }> => {
+      const response: FetchResponse<ApiResponse<{ ok: true }>> = await api.post(`/api/v1/admin/agent-templates/${templateId}/marketing/revalidate`)
+      return response.data.data
+    },
+    onSuccess: () => {
+      toast.success('Revalidated marketplace cache')
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to revalidate marketplace cache'
+      toast.error('Failed to revalidate marketplace cache', { description: message })
+    },
+  })
+}
+

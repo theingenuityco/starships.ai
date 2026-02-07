@@ -11,6 +11,7 @@ import { generatePresignedUrlInline } from '@/utils/s3-helper';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import type { AuthUser } from '@starships/protocol';
 import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
+import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 import {
   completeAgentTemplateMarketingJob,
   createAgentTemplateMarketingJob,
@@ -230,6 +231,20 @@ router.get('/admin/agent-templates/marketing/jobs/:jobId', async (req: Request, 
     sendSuccess(res, job, 200);
   } catch (error) {
     handleError(error, res, 'loading marketing job status');
+  }
+});
+
+// POST /admin/agent-templates/:id/marketing/revalidate - Revalidate public marketplace ISR caches (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/revalidate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+
+    // Revalidate the caches used by marketplace pages.
+    triggerNextRevalidate({ tags: ['public-agent-templates', 'public-tool-templates', 'public-connector-catalog'] });
+    sendSuccess(res, { ok: true }, 200);
+  } catch (error) {
+    handleError(error, res, 'revalidating marketplace caches');
   }
 });
 

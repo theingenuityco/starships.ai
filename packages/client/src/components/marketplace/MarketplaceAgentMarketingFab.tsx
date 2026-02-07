@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'
-import { useAgentTemplateMarketingJob, useGenerateAgentTemplateMarketingContent } from '@/hooks/useAdminAgentTemplates'
+import { useAgentTemplateMarketingJob, useGenerateAgentTemplateMarketingContent, useRevalidateMarketplaceMarketingCaches } from '@/hooks/useAdminAgentTemplates'
 import { cn } from '@/lib/utils'
 
 export function MarketplaceAgentMarketingFab(props: { templateId?: string | null }): React.JSX.Element | null {
@@ -14,6 +14,7 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
   const router = useRouter()
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const generateMutation = useGenerateAgentTemplateMarketingContent()
+  const revalidateMutation = useRevalidateMarketplaceMarketingCaches()
 
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
@@ -118,6 +119,33 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
           <>
             <Icon name="sparkles" className="h-4 w-4 mr-2" />
             Generate marketing
+          </>
+        )}
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="shadow-lg rounded-full px-4 ml-2 bg-background/70"
+        disabled={!hasTemplateId || revalidateMutation.isPending}
+        onClick={() => {
+          if (!hasTemplateId) return
+          revalidateMutation.mutate(String(templateId), {
+            onSuccess: () => {
+              router.refresh()
+            },
+          })
+        }}
+      >
+        {revalidateMutation.isPending ? (
+          <>
+            <Icon name="loading" className="h-4 w-4 mr-2 animate-spin" />
+            Revalidating…
+          </>
+        ) : (
+          <>
+            <Icon name="rotate-ccw" className="h-4 w-4 mr-2" />
+            Revalidate
           </>
         )}
       </Button>

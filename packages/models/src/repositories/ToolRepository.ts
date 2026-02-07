@@ -477,6 +477,14 @@ export class ToolRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
+        // Keep required_connector_providers in sync with blueprint updates.
+        // This mirrors ToolTemplateRepository behavior.
+        if (updates.blueprint !== undefined && updates.blueprint !== null) {
+          updateProps.requiredConnectorProviders = extractRequiredConnectorProviders(
+            updates.blueprint as Parameters<typeof extractRequiredConnectorProviders>[0]
+          );
+        }
+
         // Auto-regenerate slug on name updates
         if (updates.name !== undefined && updates.name !== null) {
           const baseFromName = generateSlug(String(updates.name)) || 'tool';

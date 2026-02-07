@@ -6,18 +6,34 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'
-import { useAgentTemplateMarketingJob, useGenerateAgentTemplateMarketingContent, useRevalidateMarketplaceMarketingCaches } from '@/hooks/useAdminAgentTemplates'
+import {
+  useAgentTemplateMarketingJob,
+  useGenerateAgentTemplateMarketingContent,
+  useRevalidateMarketplaceMarketingCaches,
+  useSetMarketplaceMarketingRenderingDisabled,
+} from '@/hooks/useAdminAgentTemplates'
 import { cn } from '@/lib/utils'
 
-export function MarketplaceAgentMarketingFab(props: { templateId?: string | null }): React.JSX.Element | null {
-  const { templateId } = props
+export function MarketplaceAgentMarketingFab(props: {
+  templateId?: string | null
+  marketingRenderingDisabled?: boolean
+}): React.JSX.Element | null {
+  const { templateId, marketingRenderingDisabled: initialMarketingRenderingDisabled } = props
   const router = useRouter()
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const generateMutation = useGenerateAgentTemplateMarketingContent()
   const revalidateMutation = useRevalidateMarketplaceMarketingCaches()
+  const setRenderingMutation = useSetMarketplaceMarketingRenderingDisabled()
 
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => setMounted(true), [])
+
+  const hasTemplateId = !!(templateId && String(templateId).trim())
+
+  const [marketingRenderDisabled, setMarketingRenderDisabled] = React.useState(Boolean(initialMarketingRenderingDisabled))
+  React.useEffect(() => {
+    setMarketingRenderDisabled(Boolean(initialMarketingRenderingDisabled))
+  }, [initialMarketingRenderingDisabled])
 
   const [jobId, setJobId] = React.useState<string | null>(null)
   const [panelOpen, setPanelOpen] = React.useState(false)
@@ -31,7 +47,6 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
     }
   }, [job?.status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasTemplateId = !!(templateId && String(templateId).trim())
   const canShow = Boolean(mounted && isAuthenticated && isInstanceAdmin && hasTemplateId)
   if (!canShow) return null
 
@@ -119,6 +134,45 @@ export function MarketplaceAgentMarketingFab(props: { templateId?: string | null
           <>
             <Icon name="sparkles" className="h-4 w-4 mr-2" />
             Generate marketing
+          </>
+        )}
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={cn(
+          'shadow-lg rounded-full px-4 ml-2 bg-background/70',
+          marketingRenderDisabled ? 'border-red-500/30 text-red-600 hover:text-red-700' : undefined
+        )}
+        disabled={!hasTemplateId || setRenderingMutation.isPending}
+        onClick={() => {
+          if (!hasTemplateId) return
+          const id = String(templateId)
+          const next = !marketingRenderDisabled
+          setMarketingRenderDisabled(next)
+          setRenderingMutation.mutate(
+            { templateId: id, disabled: next },
+            {
+              onSuccess: () => {
+                router.refresh()
+              },
+              onError: () => {
+                setMarketingRenderDisabled(!next)
+              },
+            }
+          )
+        }}
+      >
+        {marketingRenderDisabled ? (
+          <>
+            <Icon name="x-circle" className="h-4 w-4 mr-2" />
+            Marketing hidden
+          </>
+        ) : (
+          <>
+            <Icon name="check-circle" className="h-4 w-4 mr-2" />
+            Hide marketing
           </>
         )}
       </Button>

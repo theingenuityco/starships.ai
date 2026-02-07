@@ -200,6 +200,8 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
   const hasTryPrompts = previewPrompts.length > 0
 
+  const marketplaceMarketingRenderingDisabled = Boolean(template.marketplaceMarketingRenderingDisabled)
+
   const screenshots = [
     problemStatementsImageUrl
       ? {
@@ -514,87 +516,91 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   </div>
                 ) : null}
 
-                {/* Screenshots (marketplace-style) */}
-                {hasScreenshotsSection ? (
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className={SECTION_TITLE_CLASS}>Screenshots</h2>
-                    </div>
+                {!marketplaceMarketingRenderingDisabled ? (
+                  <>
+                    {/* Screenshots (marketplace-style) */}
+                    {hasScreenshotsSection ? (
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <h2 className={SECTION_TITLE_CLASS}>Screenshots</h2>
+                        </div>
 
-                    {/* Mobile: horizontal screenshot strip */}
-                    <div className="sm:hidden -mx-4 px-4 overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
-                      <div className="flex gap-4 snap-x snap-mandatory">
-                        {screenshots.map(s => (
-                          <div key={s.key} className={`snap-start shrink-0 w-[86%] ${NAV_CARD_CLASS} overflow-hidden`}>
-                            <div className="aspect-[16/10] bg-background/20">
-                              <AgentProfileImage
-                                src={s.src}
-                                alt={s.alt}
-                                className="w-full h-full"
-                                style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                              />
+                        {/* Mobile: horizontal screenshot strip */}
+                        <div className="sm:hidden -mx-4 px-4 overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
+                          <div className="flex gap-4 snap-x snap-mandatory">
+                            {screenshots.map(s => (
+                              <div key={s.key} className={`snap-start shrink-0 w-[86%] ${NAV_CARD_CLASS} overflow-hidden`}>
+                                <div className="aspect-[16/10] bg-background/20">
+                                  <AgentProfileImage
+                                    src={s.src}
+                                    alt={s.alt}
+                                    className="w-full h-full"
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                                  />
+                                </div>
+                                <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Desktop: 3-up grid */}
+                        <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {screenshots.map(s => (
+                            <div key={s.key} className={`${NAV_CARD_CLASS} overflow-hidden`}>
+                              <div className="aspect-[16/10] bg-background/20">
+                                <AgentProfileImage
+                                  src={s.src}
+                                  alt={s.alt}
+                                  className="w-full h-full"
+                                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                                />
+                              </div>
+                              <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s.label}</div>
                             </div>
-                            <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s.label}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Desktop: 3-up grid */}
-                    <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {screenshots.map(s => (
-                        <div key={s.key} className={`${NAV_CARD_CLASS} overflow-hidden`}>
-                          <div className="aspect-[16/10] bg-background/20">
-                            <AgentProfileImage
-                              src={s.src}
-                              alt={s.alt}
-                              className="w-full h-full"
-                              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                            />
-                          </div>
-                          <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s.label}</div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
+                      </section>
+                    ) : null}
 
-                {/* Problem Statements Section */}
-                {hasProblemSection ? (
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className={SECTION_TITLE_CLASS}>Problems this agent solves</h2>
-                      <span className={SECTION_SUBTITLE_CLASS}>(examples)</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      {problemStatementsText.slice(0, 3).map((statement, index) => (
-                        <div key={index} className={`${NAV_CARD_CLASS} p-4`}>
-                          <p className="text-sm leading-relaxed text-foreground">{statement}</p>
+                    {/* Problem Statements Section */}
+                    {hasProblemSection ? (
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <h2 className={SECTION_TITLE_CLASS}>Problems this agent solves</h2>
+                          <span className={SECTION_SUBTITLE_CLASS}>(examples)</span>
                         </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {/* Try These Prompts Row - 2 columns */}
-                {hasTryPrompts ? (
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      {previewPrompts.map((p, idx) => (
-                        <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex-shrink-0">
-                              <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                        <div className="grid grid-cols-1 gap-3">
+                          {problemStatementsText.slice(0, 3).map((statement, index) => (
+                            <div key={index} className={`${NAV_CARD_CLASS} p-4`}>
+                              <p className="text-sm leading-relaxed text-foreground">{statement}</p>
                             </div>
-                            <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </section>
+                      </section>
+                    ) : null}
+
+                    {/* Try These Prompts Row - 2 columns */}
+                    {hasTryPrompts ? (
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {previewPrompts.map((p, idx) => (
+                            <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex-shrink-0">
+                                  <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                                </div>
+                                <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             </section>
@@ -615,7 +621,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
       <PublicFooter fromPath={`/marketplace/agents/${encodeURIComponent(template.slug)}`} />
 
       {/* Instance-admin-only: generate marketplace marketing content */}
-      <MarketplaceAgentMarketingFab templateId={template.id} />
+      <MarketplaceAgentMarketingFab templateId={template.id} marketingRenderingDisabled={marketplaceMarketingRenderingDisabled} />
     </>
   )
 }

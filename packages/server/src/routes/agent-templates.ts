@@ -1,12 +1,24 @@
 import { jwtAuthMiddleware, optionalJwtAuth } from '@/middleware/jwt-auth';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
-import { Request, Response, Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
+import type { AuthUser } from '@starships/protocol';
+import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
+import { triggerNextRevalidate } from '@/utils/nextRevalidate';
+import {
+  completeAgentTemplateMarketingJob,
+  createAgentTemplateMarketingJob,
+  failAgentTemplateMarketingJob,
+  getAgentTemplateMarketingJob,
+  markJobStep,
+} from '@/services/AgentTemplateMarketingJobs';
 
 const router: Router = Router();
 
@@ -21,6 +33,17 @@ function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<s
   delete template['avatarMimeType'];
   return template;
 }
+
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+    sendError(res, 'FORBIDDEN', 'Only instance admins can access agent template admin endpoints', 403);
+    return;
+  }
+  next();
+}
+
+// Enforce auth + instance-admin for all agent template admin endpoints.
+router.use('/admin/agent-templates', jwtAuthMiddleware, requireInstanceAdminMiddleware);
 
 // Zod schemas for validation
 // Using standard pagination schema for consistency
@@ -133,6 +156,122 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     sendSuccess(res, hydrated, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'loading templates');
+  }
+});
+
+// POST /admin/agent-templates/:id/marketing/generate - Generate marketing content for a published template (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/generate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+
+    const { id: templateId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const job = createAgentTemplateMarketingJob(templateId, adminUserId);
+
+    // Kick off background job (best-effort; status is tracked in memory).
+    (async () => {
+      try {
+        markJobStep(job.id, 'validate_admin', 'running');
+        markJobStep(job.id, 'validate_admin', 'completed');
+
+        const svc = new AgentTemplateMarketingService();
+        const result = await svc.generateTemplateMarketingContent(templateId, adminUserId, {
+          onStep: (key, status) => {
+            // Map service step keys into job step keys (same strings, minus validate_admin)
+            markJobStep(job.id, key as any, status as any);
+          },
+        });
+
+        // Ensure any still-pending steps are marked completed (defensive).
+        for (const step of [
+          'load_template',
+          'generate_problem_statements',
+          'load_avatar_reference',
+          'generate_problem_image',
+          'generate_capabilities_image',
+          'generate_try_prompts_image',
+          'persist_template_assets',
+          'revalidate',
+        ] as const) {
+          markJobStep(job.id, step, 'completed');
+        }
+
+        completeAgentTemplateMarketingJob(job.id, result);
+      } catch (err) {
+        // Mark the currently-running step as failed is handled by step callbacks; store job-level error too.
+        failAgentTemplateMarketingJob(job.id, err);
+      }
+    })();
+
+    sendSuccess(res, {
+      message: 'Agent template marketing job started',
+      jobId: job.id,
+      job,
+    });
+  } catch (error) {
+    console.error('[AGENT-TEMPLATES] Error generating template marketing content:', error);
+    handleError(error, res, 'generating template marketing content');
+  }
+});
+
+// GET /admin/agent-templates/marketing/jobs/:jobId - Poll marketing generation progress (instance admin only)
+router.get('/admin/agent-templates/marketing/jobs/:jobId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ jobId: z.string().min(1).max(100) }), req.params, res, 'job parameter');
+    if (!paramValidation) return;
+
+    const job = getAgentTemplateMarketingJob(paramValidation.jobId);
+    if (!job) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Marketing job not found (expired or invalid id)', 404);
+      return;
+    }
+
+    sendSuccess(res, job, 200);
+  } catch (error) {
+    handleError(error, res, 'loading marketing job status');
+  }
+});
+
+// POST /admin/agent-templates/:id/marketing/revalidate - Revalidate public marketplace ISR caches (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/revalidate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+
+    // Revalidate the caches used by marketplace pages.
+    triggerNextRevalidate({ tags: ['public-agent-templates', 'public-tool-templates', 'public-connector-catalog'] });
+    sendSuccess(res, { ok: true }, 200);
+  } catch (error) {
+    handleError(error, res, 'revalidating marketplace caches');
+  }
+});
+
+// POST /admin/agent-templates/:id/marketing/rendering - Enable/disable marketing sections rendering (instance admin only)
+router.post('/admin/agent-templates/:id/marketing/rendering', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+    const bodyValidation = validateData(z.object({ disabled: z.boolean() }), req.body, res, 'rendering parameter');
+    if (!bodyValidation) return;
+
+    const { id: templateId } = paramValidation;
+    const { disabled } = bodyValidation;
+
+    const repo = new AgentTemplateRepository();
+    const updated = await repo.update(templateId, { marketplaceMarketingRenderingDisabled: disabled });
+    if (!updated) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, { resource: 'agent-template', id: templateId });
+      return;
+    }
+
+    // Revalidate the caches used by marketplace pages.
+    triggerNextRevalidate({ tags: ['public-agent-templates', 'public-tool-templates', 'public-connector-catalog'] });
+
+    sendSuccess(res, { ok: true, disabled }, 200);
+  } catch (error) {
+    handleError(error, res, 'updating marketing rendering setting');
   }
 });
 

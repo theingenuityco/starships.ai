@@ -41,6 +41,51 @@ export const ADMIN_AGENT_QUERY_KEYS = {
 } as const
 
 /**
+ * Generate marketing content for an agent (instance admin only).
+ * This is decoupled from publication/publishing.
+ */
+export function useGenerateAgentMarketingContent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (agentId: string): Promise<{
+      agent: AgentModel
+      marketingContent: {
+        avatarUrl?: string
+        problemStatementsText?: string[]
+        problemStatementsImageUrl?: string
+        capabilitiesImageUrl?: string
+        tryThesePromptsImageUrl?: string
+      }
+    }> => {
+      const response: FetchResponse<ApiResponse<{
+        agent: AgentModel
+        marketingContent: {
+          avatarUrl?: string
+          problemStatementsText?: string[]
+          problemStatementsImageUrl?: string
+          capabilitiesImageUrl?: string
+          tryThesePromptsImageUrl?: string
+        }
+      }>> = await api.post(`/api/v1/admin/agents/${agentId}/marketing/generate`)
+      return response.data.data
+    },
+    onSuccess: result => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_AGENT_QUERY_KEYS.all })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(result.agent.id) })
+      toast.success('Marketing content generated')
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to generate marketing content'
+      toast.error('Failed to generate marketing content', {
+        description: message,
+      })
+    },
+  })
+}
+
+/**
  * Fetch agents that are pending publication approval (instance admin only).
  */
 export function usePendingAgents(page: number = 1, limit: number = 20) {

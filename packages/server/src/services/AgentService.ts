@@ -36,6 +36,7 @@ import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { PublicationService } from './PublicationService';
+import { AgentMarketingService } from './AgentMarketingService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -905,5 +906,26 @@ export class AgentService {
   async confirmPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
     const publicationService = new PublicationService();
     return await publicationService.confirmPublication(agentId, adminUserId);
+  }
+
+  // ============================================================================
+  // AGENT MARKETING (instance admin tooling)
+  // ============================================================================
+
+  async generateAgentMarketingContent(
+    agentId: string,
+    adminUserId: string
+  ): Promise<{
+    agent: AgentModel;
+    marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    };
+  }> {
+    const svc = new AgentMarketingService();
+    return await svc.generateAgentMarketingContent(agentId, adminUserId);
   }
 }

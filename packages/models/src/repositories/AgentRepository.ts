@@ -26,6 +26,33 @@ export class AgentRepository extends BaseRepository {
     super('AgentRepository');
   }
 
+  /**
+   * Find the earliest agent that was promoted into a given template.
+   * Useful for tracing template lineage and for template-scoped operations that
+   * still require a starship context (remote runner, attachments, etc.).
+   */
+  async findParentAgentByPublishedTemplateId(templateId: string): Promise<AgentModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(templateId || '').trim();
+        if (!id) return null;
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `SELECT *
+           FROM agents
+           WHERE published_template_id = $1
+           ORDER BY created_at ASC
+           LIMIT 1`,
+          [id]
+        );
+        return row ? fromDatabase(AgentEntity, row) : null;
+      },
+      'findParentAgentByPublishedTemplateId',
+      'Agent',
+      templateId
+    );
+  }
+
   async findAll(): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {

@@ -51,6 +51,7 @@ import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
+import { stripStarshipsAttributionHeaderFromAssistantText } from '@/utils/messageAttribution';
 import {
   resolvePlugins,
   mergeConversationState,
@@ -157,6 +158,21 @@ export class ConversationService {
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
+  /**
+   * Raw (unmodified) assistant stream accumulator used ONLY for snapshot diffing.
+   *
+   * Some providers stream `message.content` snapshots rather than true token deltas.
+   * We keep a raw base so we can compute non-overlapping appends even if we strip
+   * Starships attribution headers from what we persist and stream to clients.
+   */
+  private streamingContentRaw: Map<string, string> = new Map();
+  /**
+   * Streaming-time header stripping state.
+   *
+   * We must not publish the attribution header even transiently, so we buffer the initial bytes
+   * until we can decide whether the first non-empty line matches our attribution format.
+   */
+  private pendingAttributionHeader: Map<string, { decided: boolean; buf: string }> = new Map();
   // Resume state per conversation generation
   private generationId: Map<string, string> = new Map();
   // DB-backed turn id (one conversation -> many turns)
@@ -473,6 +489,7 @@ export class ConversationService {
   private clearStreamingState(conversationId: string): void {
     // Per-turn / streaming accumulators
     this.streamingContent.delete(conversationId);
+    this.streamingContentRaw.delete(conversationId);
     this.streamingToolCalls.delete(conversationId);
     // IMPORTANT:
     // Do NOT clear streamingReasoning here.
@@ -486,6 +503,7 @@ export class ConversationService {
     this.snapshotPreferred.delete(conversationId);
     this.toolCallSeq.delete(conversationId);
     this.placeholderEmitted.delete(conversationId);
+    this.pendingAttributionHeader.delete(conversationId);
 
     // Resume / sequencing metadata
     this.generationId.delete(conversationId);
@@ -591,6 +609,10 @@ export class ConversationService {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+
+    // Ensure we never persist Starships attribution headers into user-facing content.
+    // (Some models may echo the internal attribution header back.)
+    partialContent = stripStarshipsAttributionHeaderFromAssistantText(partialContent).text;
 
     const pendingAttachmentIds = this.streamingGeneratedAttachmentIds.get(conversationId) || [];
 
@@ -943,6 +965,35 @@ export class ConversationService {
   }
 
   /**
+   * Strip the Starships attribution header from an assistant's *streamed* output.
+   *
+   * IMPORTANT:
+   * We must avoid publishing the header even transiently, so we buffer initial bytes until we
+   * can confidently decide whether the first non-empty line is the attribution header.
+   */
+  private stripAttributionHeaderFromAssistantStream(conversationId: string, delta: string): string {
+    const d = typeof delta === 'string' ? delta : '';
+    if (!d) return '';
+    const st = this.pendingAttributionHeader.get(conversationId) ?? { decided: false, buf: '' };
+    if (st.decided) return d;
+
+    st.buf += d;
+
+    // Wait until we can inspect at least the first line (or a reasonable cap).
+    const ready = st.buf.includes('\n') || st.buf.length >= 512;
+    if (!ready) {
+      this.pendingAttributionHeader.set(conversationId, st);
+      return '';
+    }
+
+    st.decided = true;
+    const res = stripStarshipsAttributionHeaderFromAssistantText(st.buf);
+    st.buf = '';
+    this.pendingAttributionHeader.set(conversationId, st);
+    return res.text;
+  }
+
+  /**
    * Extract image data URLs from a large text payload (typically tool_result JSON).
    *
    * We intentionally do not use regex over the whole string because tool results can contain multi-MB base64 payloads.
@@ -1255,7 +1306,16 @@ export class ConversationService {
    * Get messages for a conversation
    */
   async getConversationMessages(conversationId: string, orderDirection: 'asc' | 'desc' = 'asc'): Promise<MessageModel[]> {
-    return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
+    const msgs = await this.conversationRepository.getConversationMessages(conversationId, orderDirection);
+    // Ensure attribution headers are never sent to the client (legacy rows / echoed headers).
+    return (Array.isArray(msgs) ? msgs : []).map((m) => {
+      const role = typeof (m as any)?.role === 'string' ? String((m as any).role) : '';
+      if (role !== 'assistant') return m;
+      const content = typeof (m as any)?.content === 'string' ? String((m as any).content) : '';
+      if (!content) return m;
+      const stripped = stripStarshipsAttributionHeaderFromAssistantText(content).text;
+      return stripped === content ? m : ({ ...(m as any), content: stripped } as MessageModel);
+    });
   }
 
   async getConversationMessagesPage(args: {
@@ -1265,9 +1325,17 @@ export class ConversationService {
     beforeId?: string;
   }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
     const page = await this.conversationRepository.getConversationMessagesPage(args);
+    const messages = (Array.isArray(page.messages) ? page.messages : []).map((m) => {
+      const role = typeof (m as any)?.role === 'string' ? String((m as any).role) : '';
+      if (role !== 'assistant') return m;
+      const content = typeof (m as any)?.content === 'string' ? String((m as any).content) : '';
+      if (!content) return m;
+      const stripped = stripStarshipsAttributionHeaderFromAssistantText(content).text;
+      return stripped === content ? m : ({ ...(m as any), content: stripped } as MessageModel);
+    });
     const oldest = page.messages.length > 0 ? page.messages[0] : null;
     return {
-      messages: page.messages,
+      messages,
       hasMoreBefore: page.hasMoreBefore,
       oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
     };
@@ -1279,9 +1347,17 @@ export class ConversationService {
     offset: number;
   }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
     const page = await this.conversationRepository.getConversationMessagesTailOffsetPage(args);
+    const messages = (Array.isArray(page.messages) ? page.messages : []).map((m) => {
+      const role = typeof (m as any)?.role === 'string' ? String((m as any).role) : '';
+      if (role !== 'assistant') return m;
+      const content = typeof (m as any)?.content === 'string' ? String((m as any).content) : '';
+      if (!content) return m;
+      const stripped = stripStarshipsAttributionHeaderFromAssistantText(content).text;
+      return stripped === content ? m : ({ ...(m as any), content: stripped } as MessageModel);
+    });
     const oldest = page.messages.length > 0 ? page.messages[0] : null;
     return {
-      messages: page.messages,
+      messages,
       hasMoreBefore: page.hasMoreBefore,
       oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
     };
@@ -3521,6 +3597,8 @@ export class ConversationService {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
+        this.streamingContentRaw.delete(conversationId);
+        this.pendingAttributionHeader.delete(conversationId);
         // Use the DB-backed turn id as the stable generation id for resume/idempotency.
         const turnId = this.currentTurnId.get(conversationId) || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         this.generationId.set(conversationId, turnId);
@@ -3792,6 +3870,8 @@ export class ConversationService {
             // from typed delta events.
             if ((hasContent || hasToolCalls || hasReasoning || hasImages) && !this.streamingContent.has(conversationId)) {
               this.streamingContent.set(conversationId, '');
+              this.streamingContentRaw.set(conversationId, '');
+              this.pendingAttributionHeader.set(conversationId, { decided: false, buf: '' });
               this.placeholderEmitted.set(conversationId, true);
               this.streamingToolCalls.delete(conversationId);
               this.streamingGeneratedAttachmentIds.set(conversationId, []);
@@ -3878,36 +3958,51 @@ export class ConversationService {
                 append = incremental;
               } else if (snapshot) {
                 // Prefer using the whole snapshot with non-overlap normalization
-                const baseForSnapshot = this.streamingContent.get(conversationId) || '';
-                append = ConversationService.computeNonOverlappingAppend(baseForSnapshot, snapshot);
+                const baseForSnapshotRaw = this.streamingContentRaw.get(conversationId) || '';
+                append = ConversationService.computeNonOverlappingAppend(baseForSnapshotRaw, snapshot);
               }
 
               if (append) {
-                // CRITICAL FIX: Normalize content FIRST to know the chunk length
-                const latestBase = this.streamingContent.get(conversationId) || '';
-                const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
+                // Normalize against RAW base first (used for snapshot diffing).
+                const latestRawBase = this.streamingContentRaw.get(conversationId) || '';
+                const normalizedRaw = ConversationService.computeNonOverlappingAppend(latestRawBase, append);
 
-                if (normalized.length === 0) {
+                if (normalizedRaw.length === 0) {
                   // Nothing new to append - skip broadcasting
                 } else {
-                  // CRITICAL FIX: Read and increment position in ONE line to ensure atomicity
-                  const chunkPosition = this.nextChunkPosition.get(conversationId) || 0;
-                  this.nextChunkPosition.set(conversationId, chunkPosition + normalized.length);
+                  // Always advance RAW base so snapshot diffing stays correct even if we buffer/strip output.
+                  this.streamingContentRaw.set(conversationId, latestRawBase + normalizedRaw);
 
-                  // Update content
-                  const newContent = latestBase + normalized;
-                  this.streamingContent.set(conversationId, newContent);
+                  // UI/persistence: strip Starships attribution header from assistant output.
+                  const latestDisplayBase = this.streamingContent.get(conversationId) || '';
+                  const strippedCandidate = this.stripAttributionHeaderFromAssistantStream(conversationId, normalizedRaw);
+                  const normalizedDisplay = strippedCandidate
+                    ? ConversationService.computeNonOverlappingAppend(latestDisplayBase, strippedCandidate)
+                    : '';
 
-                  const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
-                  this.accumulatedLength.set(conversationId, newLen);
+                  if (normalizedDisplay.length === 0) {
+                    // Either we're still buffering the first line to decide (no output yet),
+                    // or there is no new displayable content to publish.
+                  } else {
+                    // CRITICAL FIX: Read and increment position in ONE line to ensure atomicity
+                    const chunkPosition = this.nextChunkPosition.get(conversationId) || 0;
+                    this.nextChunkPosition.set(conversationId, chunkPosition + normalizedDisplay.length);
 
-                  const rb = this.ringBuffer.get(conversationId) || [];
-                  rb.push({ position: chunkPosition, content: normalized, ts: Date.now() });
-                  if (rb.length > 200) rb.splice(0, rb.length - 200);
-                  this.ringBuffer.set(conversationId, rb);
+                    // Update user-facing content accumulator
+                    const newContent = latestDisplayBase + normalizedDisplay;
+                    this.streamingContent.set(conversationId, newContent);
 
-                  // Publish typed assistant delta (Redis Streams)
-                  this.enqueueDelta('content', conversationId, normalized);
+                    const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalizedDisplay.length;
+                    this.accumulatedLength.set(conversationId, newLen);
+
+                    const rb = this.ringBuffer.get(conversationId) || [];
+                    rb.push({ position: chunkPosition, content: normalizedDisplay, ts: Date.now() });
+                    if (rb.length > 200) rb.splice(0, rb.length - 200);
+                    this.ringBuffer.set(conversationId, rb);
+
+                    // Publish typed assistant delta (Redis Streams) - already stripped.
+                    this.enqueueDelta('content', conversationId, normalizedDisplay);
+                  }
                 }
               }
             }
@@ -4358,6 +4453,14 @@ export class ConversationService {
                       }
                     }
                   }
+                }
+
+                // IMPORTANT:
+                // Never persist Starships attribution headers into message.content.
+                // The server injects attribution into messages *sent to the LLM* for traceability, and some models
+                // may echo it back. Strip it here so the client never receives it and the DB stays clean.
+                if (role === 'assistant' && typeof contentToPersist === 'string' && contentToPersist.length > 0) {
+                  contentToPersist = stripStarshipsAttributionHeaderFromAssistantText(contentToPersist).text;
                 }
 
                 const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';

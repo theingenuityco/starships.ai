@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
+import { stripStarshipsAttributionHeaderFromAssistantText } from '@/utils/messageAttribution';
 import {
   ChannelRepository,
   ConversationParticipantRepository,
@@ -162,7 +163,16 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    sendSuccess(res, message, 200);
+    // Ensure we never return attribution headers as part of user-facing message content.
+    const cleaned = (() => {
+      const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';
+      if (role !== 'assistant') return message;
+      const content = typeof (message as any)?.content === 'string' ? String((message as any).content) : '';
+      if (!content) return message;
+      const stripped = stripStarshipsAttributionHeaderFromAssistantText(content).text;
+      return stripped === content ? message : ({ ...(message as any), content: stripped } as any);
+    })();
+    sendSuccess(res, cleaned, 200);
   } catch (error) {
     handleError(error, res, 'fetching message');
   }

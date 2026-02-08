@@ -40,7 +40,6 @@ import { MessageReactions } from './MessageReactions'
 import { MessageReactionAction } from './MessageReactionAction'
 import { HoverProfilePopover } from './HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
-import { stripStarshipsAttributionHeadersForDisplay } from '@/lib/messageAttribution'
 
 type TurnUsageForRing = {
   turnId: string
@@ -1568,8 +1567,7 @@ export function ConversationMessageList({
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const positions: { messageId: string }[] = []
     for (const msg of renderMessages) {
-      const rawContent = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
-      const content = stripStarshipsAttributionHeadersForDisplay({ role: (msg as any)?.role, text: rawContent }).text
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
       const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
       // Strip markdown from content so "The last **Avatar** movie" in message matches query "the last avatar movie"
       const plainContent = stripMarkdownToPlainText(`${content} ${reasoning}`)
@@ -1625,8 +1623,7 @@ export function ConversationMessageList({
     const results: import('./conversationSearch').SearchResult[] = []
     let firstIndexInPositions = 0
     for (const msg of renderMessages) {
-      const rawContent = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
-      const content = stripStarshipsAttributionHeadersForDisplay({ role: (msg as any)?.role, text: rawContent }).text
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
       const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
       const fullText = `${content} ${reasoning}`.trim()
       // Strip markdown so "The last **Avatar** movie" in message matches query "the last avatar movie"
@@ -3057,7 +3054,6 @@ const MemoizedMessageBubble = memo(
                 </div>
               ) : (
                 <ConversationMessageContent
-                  role={message.role}
                   content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
@@ -3192,7 +3188,6 @@ const MemoizedMessageBubble = memo(
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
-                  role={message.role}
                   content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
@@ -3315,7 +3310,6 @@ const MemoizedMessageBubble = memo(
                 </div>
               )}
               <ConversationMessageContent
-                role={message.role}
                 content={messageDisplayContent}
                 messageId={message.id}
                 enableMarkdown={true}

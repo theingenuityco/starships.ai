@@ -28,7 +28,6 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
-import { stripStarshipsAttributionHeadersForDisplay } from '@/lib/messageAttribution'
 
 interface StreamChunk {
   content: string
@@ -296,8 +295,6 @@ function useSlabTypewriterText({
 }
 
 interface MessageContentProps {
-  /** Message role, used for UI-only sanitization (e.g. stripping attribution headers). */
-  role?: MessageModel['role'] | string
   content: string
   messageId: string
   className?: string
@@ -509,7 +506,6 @@ function renderTextWithEmojiSpans(text: string): ReactNode {
 }
 
 export function ConversationMessageContent({
-  role,
   content,
   messageId,
   className,
@@ -756,15 +752,9 @@ export function ConversationMessageContent({
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming, messageId])
 
-  // UI-only sanitization: strip attribution header lines from assistant text so users never see metadata.
-  // This intentionally does NOT mutate any stored content; it only affects rendering/copy/snippets.
-  const fullContentForDisplay = useMemo(() => {
-    return stripStarshipsAttributionHeadersForDisplay({ role: role ?? null, text: fullContent }).text
-  }, [fullContent, role])
-
   const fullContentRenderable = useMemo(() => {
-    return replaceMentionTokens({ content: fullContentForDisplay, agentNameById, userNameById })
-  }, [fullContentForDisplay, agentNameById, userNameById])
+    return replaceMentionTokens({ content: fullContent, agentNameById, userNameById })
+  }, [fullContent, agentNameById, userNameById])
 
   const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0

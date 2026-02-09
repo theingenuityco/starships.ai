@@ -440,9 +440,13 @@ export function ConversationList({
 
     return (
       <>
-        <div className="flex flex-col h-full min-h-0">
+        <div
+          className="flex flex-col h-full min-h-0"
+          // Reserve space for the divider gap so 50% + 50% doesn't overflow.
+          style={{ ['--sidebar-half-h' as any]: 'calc((100% - 1.75rem) / 2)' }}
+        >
           {/* Channels - content-sized so Direct messages starts right below */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg">
+          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
             <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
@@ -480,7 +484,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <div id="sidebar-channels-list" className="min-h-0">
+              <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -587,8 +591,8 @@ export function ConversationList({
 
           <div className="my-3 border-t border-border/60" />
 
-          {/* Direct messages - takes remaining space below Channels */}
-          <div className="flex flex-col min-h-0 rounded-lg flex-1">
+          {/* Direct messages - content-sized; capped at 50% height like Channels */}
+          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
             <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
@@ -619,7 +623,7 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list" className="flex flex-col min-h-0">
+              <div id="sidebar-direct-messages-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {dmTargets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />

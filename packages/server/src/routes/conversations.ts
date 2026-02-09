@@ -18,6 +18,7 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ConversationRepository,
   ConversationMemberRepository,
   ConversationParticipantRepository,
   ConversationWidgetRepository,
@@ -48,6 +49,7 @@ import type {
   StandardErrorCode,
 } from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
+import crypto from 'crypto';
 
 const router: Router = Router();
 
@@ -1846,6 +1848,41 @@ router.post(
         }
       }
 
+      // Conversation-level DB-backed turn guard.
+      //
+      // CRITICAL BILLING SAFEGUARD:
+      // Duplicate client requests (double-submit, retries) can arrive while a turn is starting.
+      // Previously we would bill credits before `ConversationService.addConversationMessage()` could
+      // reject the duplicate as a conflicting in-progress turn, causing multiple 10-credit debits
+      // for what users perceive as a single agent turn.
+      //
+      // This guard is DB-backed so it works across multiple server replicas.
+      // The acquired `turnGuardId` is passed to ConversationService so it can proceed even though
+      // `state.turnActive` is already true (it "owns" the guard).
+      const conversationRepo = new ConversationRepository();
+      let turnGuardId: string | undefined;
+      let turnGuardAcquired = false;
+      if (willTriggerAgent) {
+        turnGuardId = crypto.randomUUID();
+        try {
+          turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId);
+        } catch (e) {
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          handleError(e, res, 'acquiring conversation turn guard');
+          return;
+        }
+        if (!turnGuardAcquired) {
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          sendError(
+            res,
+            'RESOURCE_LOCKED',
+            'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.',
+            409
+          );
+          return;
+        }
+      }
+
       // Persist the user message first (we need messageId for idempotent charging).
       // If this message will run an agent, debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
@@ -1899,8 +1936,14 @@ router.post(
               currentCredits: wallet?.balance ?? '0',
               requiredCredits: requiredCredits.toFixed(6),
             });
+            if (turnGuardAcquired) {
+              await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+            }
             if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
             return;
+          }
+          if (turnGuardAcquired) {
+            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
           }
           if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
           throw e;
@@ -1922,7 +1965,7 @@ router.post(
               ...(imageConfig && { imageConfig }),
             },
             { authContext: req.authContext },
-            { preCreatedUserMessage: userMessage, turnLeaseId }
+            { preCreatedUserMessage: userMessage, turnLeaseId, turnGuardId }
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
@@ -1979,7 +2022,7 @@ router.post(
             ...(imageConfig && { imageConfig }),
           },
           { authContext: req.authContext },
-          { preCreatedUserMessage: userMessage, turnLeaseId }
+          { preCreatedUserMessage: userMessage, turnLeaseId, turnGuardId }
         )
         .catch((error) => {
           // Background conversation processing failure; main request already acknowledged

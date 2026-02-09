@@ -240,13 +240,20 @@ export function Navigation(props: NavigationProps) {
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
-  // Handle logo click - memoized
+  // Handle logo/name click - memoized
   const handleLogoClick = useCallback(() => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-    // Always go to landing screen
+    // Prefer routing into the active starship (ship root redirects to default channel).
+    if (activeStarshipSlug) {
+      router.push(`/ship/${activeStarshipSlug}`)
+      if (isMobile && onClose) onClose()
+      return
+    }
+    // Fallback to landing screen
     router.push('/')
-  }, [router])
+    if (isMobile && onClose) onClose()
+  }, [activeStarshipSlug, isMobile, onClose, router])
 
   // Header click: expand when collapsed, otherwise go to landing
   const handleHeaderClick = useCallback(() => {
@@ -354,8 +361,8 @@ export function Navigation(props: NavigationProps) {
           <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
               className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
-              onClick={isMobile ? undefined : handleHeaderClick}
-              title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
+              onClick={handleHeaderClick}
+              title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Match the nav icon column width so the logo aligns with item icons */}

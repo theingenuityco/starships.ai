@@ -385,7 +385,8 @@ export function Navigation(props: NavigationProps) {
                 {/* When collapsed, show unread badge on the logo area (hide bell button). */}
                 {!isExpanded && unreadTotal > 0 ? (
                   <span
-                    className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
+                    // Match bell badge position (bell badge is anchored to a 16px icon centered in a 24px button)
+                    className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
                     aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
                     title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
                   />

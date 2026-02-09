@@ -68,8 +68,11 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return 480
   })
   const [isResizingThreadPane, setIsResizingThreadPane] = useState<boolean>(false)
+  const rootRef = useRef<HTMLDivElement>(null)
   const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
+  const resizeRafRef = useRef<number | null>(null)
+  const pendingThreadPaneWidthPxRef = useRef<number | null>(null)
 
   const clampThreadPaneWidthPx = useCallback((w: number) => {
     const min = 320
@@ -140,23 +143,48 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
       resizeStateRef.current = { startX, startWidth, prevUserSelect }
 
+      const applyWidth = (w: number) => {
+        try {
+          rootRef.current?.style.setProperty('--thread-pane-width', `${w}px`)
+        } catch {
+          // ignore
+        }
+      }
+
       const onMove = (ev: PointerEvent) => {
         const state = resizeStateRef.current
         if (!state) return
         // Pane is on the right; moving pointer right shrinks the pane.
         const dx = ev.clientX - state.startX
-        setThreadPaneWidthPx(clampThreadPaneWidthPx(state.startWidth - dx))
+        const next = clampThreadPaneWidthPx(state.startWidth - dx)
+        pendingThreadPaneWidthPxRef.current = next
+        if (resizeRafRef.current != null) return
+        resizeRafRef.current = window.requestAnimationFrame(() => {
+          resizeRafRef.current = null
+          const w = pendingThreadPaneWidthPxRef.current
+          if (typeof w === 'number') applyWidth(w)
+        })
       }
 
       const cleanup = () => {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+        if (resizeRafRef.current != null) {
+          window.cancelAnimationFrame(resizeRafRef.current)
+          resizeRafRef.current = null
+        }
         const state = resizeStateRef.current
         if (state) {
           document.body.style.userSelect = state.prevUserSelect
         }
         resizeStateRef.current = null
         resizeCleanupRef.current = null
+        const finalW = pendingThreadPaneWidthPxRef.current
+        pendingThreadPaneWidthPxRef.current = null
+        if (typeof finalW === 'number') {
+          applyWidth(finalW)
+          setThreadPaneWidthPx(finalW)
+        }
         setIsResizingThreadPane(false)
       }
 
@@ -574,7 +602,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   } as const
 
   return (
-    <div className="relative h-screen w-full flex flex-col md:flex-row min-w-0">
+    <div
+      ref={rootRef}
+      className="relative h-screen w-full flex flex-col md:flex-row min-w-0"
+      style={{
+        ['--thread-pane-width' as any]: `${threadPaneWidthPx}px`,
+      }}
+    >
       <div
         className="flex-1 min-w-0 h-full"
         style={{
@@ -638,7 +672,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         <div
           className={`hidden md:block h-full flex-shrink-0 ${isResizingThreadPane ? '' : 'transition-all duration-300 ease-in-out'}`}
           style={{
-            width: isThreadPaneOpen ? threadPaneWidthPx : 0,
+            width: isThreadPaneOpen ? 'var(--thread-pane-width)' : 0,
             willChange: 'width',
           }}
           aria-hidden="true"
@@ -648,8 +682,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         <aside
           className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
           style={{
-            width: threadPaneWidthPx,
-            transform: `translateX(${isThreadPaneOpen ? 0 : threadPaneWidthPx}px)`,
+            width: 'var(--thread-pane-width)',
+            transform: isThreadPaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
             transition: isResizingThreadPane ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out',
             willChange: 'transform, opacity',
             contain: 'layout style paint',

@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -2390,15 +2391,19 @@ function getDeletedMessageLabel(isAuthedUserMessage: boolean): string {
   return isAuthedUserMessage ? 'Message deleted by you.' : 'Message deleted by user.'
 }
 
-function MessageOwnerActions({
+function MessageMoreActions({
   messageId,
   disabled,
+  canEdit,
+  canDelete,
   isEditing,
   onStartEdit,
   onCancelEdit,
 }: {
   messageId: string
   disabled?: boolean
+  canEdit: boolean
+  canDelete: boolean
   isEditing: boolean
   onStartEdit: () => void
   onCancelEdit: () => void
@@ -2406,35 +2411,60 @@ function MessageOwnerActions({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const deleteMessage = useDeleteMessage()
 
-  const canDelete = !deleteMessage.isPending
+  const canConfirmDelete = !deleteMessage.isPending
 
   if (disabled) return null
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => (isEditing ? onCancelEdit() : onStartEdit())}
-        aria-label={isEditing ? 'Cancel edit' : 'Edit message'}
-        title={isEditing ? 'Cancel edit' : 'Edit message'}
-      >
-        <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-destructive hover:text-destructive"
-        onClick={() => setDeleteOpen(true)}
-        aria-label="Delete message"
-        title="Delete message"
-        disabled={isEditing}
-      >
-        <Icon name="trash" className="h-4 w-4" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="More options" title="More options">
+            <Icon name="dots-horizontal" className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[180px]">
+          <DropdownMenuItem
+            onSelect={async e => {
+              e.preventDefault()
+              try {
+                await navigator.clipboard.writeText(String(messageId))
+              } catch {
+                // ignore clipboard failures
+              }
+            }}
+          >
+            <Icon name="copy" className="h-4 w-4" />
+            Copy message ID
+          </DropdownMenuItem>
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+          {canEdit ? (
+            <DropdownMenuItem
+              onSelect={e => {
+                e.preventDefault()
+                isEditing ? onCancelEdit() : onStartEdit()
+              }}
+            >
+              <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
+              {isEditing ? 'Cancel edit' : 'Edit message'}
+            </DropdownMenuItem>
+          ) : null}
+          {canDelete ? (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              disabled={isEditing}
+              onSelect={e => {
+                e.preventDefault()
+                setDeleteOpen(true)
+              }}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+              Delete message
+            </DropdownMenuItem>
+          ) : null}
+          {!canEdit && !canDelete ? <DropdownMenuItem disabled>No other actions</DropdownMenuItem> : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={deleteOpen} onOpenChange={open => setDeleteOpen(open)}>
         <DialogContent className="sm:max-w-md">
@@ -2450,7 +2480,7 @@ function MessageOwnerActions({
               type="button"
               variant="destructive"
               onClick={async () => {
-                if (!canDelete) return
+                if (!canConfirmDelete) return
                 try {
                   await deleteMessage.mutateAsync(messageId)
                   setDeleteOpen(false)
@@ -2458,7 +2488,7 @@ function MessageOwnerActions({
                   // Error toast handled in hook
                 }
               }}
-              disabled={!canDelete}
+              disabled={!canConfirmDelete}
             >
               Delete
             </Button>
@@ -2715,17 +2745,20 @@ const MemoizedMessageBubble = memo(
       return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
     }, [cid, isDeletedMessage, message.id])
 
-    const ownerActionButtons = useMemo(() => {
+    const moreActionButton = useMemo(() => {
       const id = typeof message.id === 'string' ? message.id : ''
       if (!id) return null
-      if (!isUser) return null
-      if (!isAuthedUserMessage) return null
       if (isDeletedMessage) return null
-      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      const isEphemeral = id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')
+      // Allow the menu even for ephemeral IDs (useful during streaming/sending), but disable edit/delete.
+      const canEdit = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
+      const canDeleteMsg = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
       return (
-        <MessageOwnerActions
+        <MessageMoreActions
           messageId={id}
           isEditing={isEditing}
+          canEdit={canEdit}
+          canDelete={canDeleteMsg}
           onStartEdit={() => {
             setEditDraft(String(message.content ?? ''))
             setIsEditing(true)
@@ -2735,16 +2768,15 @@ const MemoizedMessageBubble = memo(
       )
     }, [isAuthedUserMessage, isDeletedMessage, isEditing, isUser, message.content, message.id])
 
-    const messageActionNodes = useMemo(() => {
-      if (!threadActionButton && !reactionActionButton && !ownerActionButtons) return null
+    const messageActionNodesBeforeCopy = useMemo(() => {
+      if (!threadActionButton && !reactionActionButton) return null
       return (
         <>
           {reactionActionButton}
           {threadActionButton}
-          {ownerActionButtons}
         </>
       )
-    }, [ownerActionButtons, reactionActionButton, threadActionButton])
+    }, [reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -3058,7 +3090,8 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
@@ -3192,7 +3225,8 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive && !isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
@@ -3314,7 +3348,8 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive && !isDeletedMessage}
-                extraActions={messageActionNodes}
+                extraActions={messageActionNodesBeforeCopy}
+                extraActionsAfterCopy={moreActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).

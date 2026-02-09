@@ -821,7 +821,7 @@ export function ConversationList({
                                       e.stopPropagation()
                                     }}
                                   >
-                                    <Icon name="dots-horizontal" className="w-4 h-4" />
+                                    <Icon name="dots-vertical" className="w-4 h-4" />
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
@@ -830,13 +830,15 @@ export function ConversationList({
                                   sideOffset={8}
                                   onClick={e => {
                                     // Prevent row navigation when interacting with the menu.
-                                    e.preventDefault()
                                     e.stopPropagation()
                                   }}
                                 >
                                   <DropdownMenuItem
+                                    className="cursor-pointer"
                                     onSelect={e => {
-                                      e.preventDefault()
+                                      // IMPORTANT:
+                                      // Do NOT call preventDefault() here; Radix uses it to keep the menu open.
+                                      e.stopPropagation()
                                       openEditChannel(ch)
                                     }}
                                   >
@@ -845,9 +847,9 @@ export function ConversationList({
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     disabled={isDefaultChannel}
-                                    className="text-destructive focus:text-destructive"
+                                    className="cursor-pointer text-destructive focus:text-destructive"
                                     onSelect={e => {
-                                      e.preventDefault()
+                                      e.stopPropagation()
                                       if (isDefaultChannel) return
                                       openDeleteChannel(ch)
                                     }}

@@ -359,7 +359,7 @@ export function Navigation(props: NavigationProps) {
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Match the nav icon column width so the logo aligns with item icons */}
-              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
+              <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
                 {isExpanded || isCollapsing || !isHovered ? (
                   <StarshipsLogo
                     width={22}
@@ -375,6 +375,14 @@ export function Navigation(props: NavigationProps) {
                 ) : (
                   <Icon name="sidebar" className="w-4 h-4" />
                 )}
+                {/* When collapsed, show unread badge on the logo area (hide bell button). */}
+                {!isExpanded && unreadTotal > 0 ? (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
+                    aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                    title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                  />
+                ) : null}
               </div>
               {isExpanded && (
                 <motion.span
@@ -392,7 +400,7 @@ export function Navigation(props: NavigationProps) {
             </div>
             {/* Right-side actions: notifications (icon only) + close/collapse */}
             <div className="flex items-center gap-0.5">
-              {isAuthenticated && starshipSlug && (
+              {isAuthenticated && starshipSlug && isExpanded && (
                 <button
                   type="button"
                   onClick={() => router.push(`/ship/${starshipSlug}/notifications`)}
@@ -402,11 +410,7 @@ export function Navigation(props: NavigationProps) {
                 >
                   <span className="relative inline-flex">
                     <Icon name="bell" className="h-4 w-4" />
-                    {unreadTotal > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500/90 px-1 text-[10px] font-semibold text-white">
-                        {unreadTotal > 99 ? '99+' : unreadTotal}
-                      </span>
-                    )}
+                    {unreadTotal > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden />}
                   </span>
                 </button>
               )}

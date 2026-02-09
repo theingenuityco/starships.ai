@@ -6,7 +6,7 @@
 
 import type { ChannelModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsBoolean, IsISO8601, IsIn, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsBoolean, IsISO8601, IsIn, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 export class ChannelEntity implements ChannelModel {
   @Expose()
@@ -22,6 +22,7 @@ export class ChannelEntity implements ChannelModel {
   @Expose()
   @IsString()
   @Length(1, 100)
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'slug must be lowercase alphanumeric with hyphens' })
   slug!: string;
 
   @Expose()

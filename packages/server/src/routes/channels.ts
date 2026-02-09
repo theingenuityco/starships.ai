@@ -18,8 +18,8 @@ const ChannelSlugSchema = z
   .string()
   .min(1)
   .max(100)
-  .transform((s) => s.trim())
-  .refine((s) => /^[a-z0-9][a-z0-9-_]*$/.test(s), 'slug must be lowercase and contain only letters, numbers, - or _');
+  .transform((s) => s.trim().toLowerCase())
+  .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
 
 /**
  * GET /starships/:starshipId/channels

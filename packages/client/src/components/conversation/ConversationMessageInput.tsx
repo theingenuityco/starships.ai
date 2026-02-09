@@ -2462,34 +2462,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               className="hidden"
             />
 
-            {/* Optional left-side controls in expanded mode */}
-            {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
-
-            {/* Text Input (TipTap) with attachments */}
-            <div
-              className={cn('flex-1 min-w-0 relative z-10')}
-              onPaste={handlePaste}
-              style={{
-                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
-              }}
-            >
-              <div className="max-h-[300px] overflow-y-auto">
-                <EditorContent editor={tiptap} />
-              </div>
-
-              {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
-              {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
-                  <div className="flex flex-wrap gap-2">
-                    {pendingFiles.map(file => (
-                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right-side Action Buttons Container */}
+            {/* Left-side Actions */}
             <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
               {/* Secondary actions (mobile: fade back while typing/focused) */}
               <div
@@ -2526,7 +2499,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   <PopoverPrimitive.Portal>
                     <PopoverPrimitive.Content
                       asChild
-                      align="end"
+                      align="start"
                       side="top"
                       sideOffset={8}
                       // NOTE: With `asChild`, these classes land on the picker element.
@@ -2537,7 +2510,46 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     </PopoverPrimitive.Content>
                   </PopoverPrimitive.Portal>
                 </Popover>
+              </div>
+            </div>
 
+            {/* Optional left-side controls in expanded mode */}
+            {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
+
+            {/* Text Input (TipTap) with attachments */}
+            <div
+              className={cn('flex-1 min-w-0 relative z-10')}
+              onPaste={handlePaste}
+              style={{
+                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
+              }}
+            >
+              <div className="max-h-[300px] overflow-y-auto">
+                <EditorContent editor={tiptap} />
+              </div>
+
+              {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
+              {!minimal && pendingFiles.length > 0 && (
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
+                  <div className="flex flex-wrap gap-2">
+                    {pendingFiles.map(file => (
+                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right-side Action Buttons Container */}
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
+                className={cn(
+                  'flex items-center gap-2 transition-opacity duration-200',
+                  isMobileComposerEngaged && 'opacity-30',
+                  'sm:opacity-100'
+                )}
+              >
                 {/* Web Browsing Toggle Button - Available from the start */}
                 <button
                   onClick={() => {
@@ -2661,13 +2673,22 @@ export function PlaceholderStyles() {
       /* Minimal mode placeholder: center it too (only applies when empty). */
       .tiptap.tiptap--minimal p.is-editor-empty:first-child {
         position: relative;
+        width: 100%;
+        overflow: hidden;
       }
       .tiptap.tiptap--minimal p.is-editor-empty:first-child::before {
         float: none;
         height: auto;
         position: absolute;
+        left: 0;
+        right: 0;
         top: 50%;
         transform: translateY(-50%);
+        display: block;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     `}</style>
   )

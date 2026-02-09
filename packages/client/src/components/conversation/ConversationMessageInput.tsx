@@ -1993,7 +1993,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
               )}
             </span>
-            <span className="font-medium text-base">@{display}</span>
+            <span className="font-medium text-sm">@{display}</span>
           </span>
         </NodeViewWrapper>
       )
@@ -2115,8 +2115,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            // Use a “normal” input font size for both starter + docked/minimal modes.
-            'text-base',
+            // Match the chat transcript's default message text size.
+            'text-sm leading-relaxed',
             // Minimal mode should still feel comfortable (not cramped).
             minimal ? 'min-h-[36px] max-h-[140px]' : isStarter ? 'min-h-[96px] max-h-[300px]' : 'min-h-[64px] max-h-[220px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',

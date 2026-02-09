@@ -22,12 +22,14 @@ export class ChannelEntity implements ChannelModel {
   @Expose()
   @IsString()
   @Length(1, 100)
+  @Matches(/^\S(?:.*\S)?$/, { message: 'slug must not have leading/trailing whitespace' })
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'slug must be lowercase alphanumeric with hyphens' })
   slug!: string;
 
   @Expose()
   @IsString()
   @Length(1, 100)
+  @Matches(/^\S(?:.*\S)?$/, { message: 'name must not have leading/trailing whitespace' })
   name!: string;
 
   @Expose()

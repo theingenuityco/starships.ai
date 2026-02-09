@@ -18,7 +18,8 @@ const ChannelSlugSchema = z
   .string()
   .min(1)
   .max(100)
-  .transform((s) => s.trim().toLowerCase())
+  .refine((s) => s === s.trim(), 'slug must not have leading/trailing whitespace')
+  .refine((s) => s === s.toLowerCase(), 'slug must be lowercase')
   .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
 
 /**
@@ -135,7 +136,8 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
           .string()
           .min(1)
           .max(100)
-          .transform((s) => s.trim()),
+          .refine((s) => s === s.trim(), 'name must not have leading/trailing whitespace')
+          .refine((s) => s.trim().length > 0, 'name cannot be empty'),
         isPrivate: z.boolean().optional(),
         topic: z.string().max(2000).optional().nullable(),
       }),

@@ -1102,8 +1102,17 @@ export function ConversationInterface({
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')} data-message-input>
+        <div
+          ref={inputContainerRef}
+          className={cn('px-3 sm:px-4 md:px-6 pb-3 pt-1.5', !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6 pb-6')}
+        >
+          <div
+            className={cn(
+              'w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto pointer-events-auto opacity-100 relative',
+              !showMessagesArea && 'mt-8 sm:mt-12 lg:mt-16',
+            )}
+            data-message-input
+          >
             {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
             <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
               <h1 className="text-3xl font-normal mb-2 text-foreground">{starterSlogan}</h1>

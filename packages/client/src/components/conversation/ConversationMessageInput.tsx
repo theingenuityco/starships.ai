@@ -2427,7 +2427,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
             // Desktop: keep the rounded composer card.
             'relative transition-all overflow-visible bg-card shadow-sm',
-            'border-y border-border/60 sm:border sm:rounded-2xl rounded-none',
+            // Mobile: full border but square corners so it reads as a native input bar.
+            'border border-border/80 sm:rounded-2xl rounded-none',
             'focus-within:border-primary/70',
             disabled && 'opacity-50'
           )}

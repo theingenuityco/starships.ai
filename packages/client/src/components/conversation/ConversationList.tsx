@@ -9,7 +9,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -102,7 +102,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
 
 type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel } | { kind: 'user'; key: string; label: string; user: StarshipMemberListItem }
 
-export function ConversationList({
+export const ConversationList = memo(function ConversationList({
   starshipId,
   starshipSlug,
   onConversationDelete,
@@ -1140,4 +1140,4 @@ export function ConversationList({
       {deleteChannelDialog}
     </div>
   )
-}
+})

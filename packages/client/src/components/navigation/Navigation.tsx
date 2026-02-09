@@ -351,9 +351,9 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
-              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
+              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
@@ -382,8 +382,9 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="text-sm font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
+                  className="block flex-1 min-w-0 text-sm font-medium tracking-tight leading-snug truncate"
                   style={{ marginLeft: '0.375rem' }}
+                  title={starshipData?.name || 'Starships.ai'}
                 >
                   {starshipData?.name || 'Starships.ai'}
                 </motion.span>

@@ -81,7 +81,12 @@ export function OnboardingAgentCard({ template, targetStarshipId, onDeployed, on
       size="sm"
       onClick={isAlreadyDeployed ? handleRemove : handleAdd}
       disabled={isDeploying || isRemoving}
-      className={cn('shrink-0 h-9', isAlreadyDeployed && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25')}
+      className={cn(
+        'shrink-0 h-9 border',
+        isAlreadyDeployed
+          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/15'
+      )}
     >
       {isAlreadyDeployed ? (
         <>

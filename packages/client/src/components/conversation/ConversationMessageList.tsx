@@ -3,12 +3,12 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 
-import type { MessageModel } from '@starships/protocol'
+import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useDeleteMessage, useStarshipDirectMessages, useUpdateMessage, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -16,12 +16,15 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
+import { cn, formatDate, formatTime } from '@/lib/utils'
+import { format as formatDay, isToday, isYesterday, parseISO } from 'date-fns'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { formatAgentDisplayName, formatAgentNameWithRole } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -35,6 +38,8 @@ import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MessageReactions } from './MessageReactions'
 import { MessageReactionAction } from './MessageReactionAction'
+import { HoverProfilePopover } from './HoverProfilePopover'
+import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
 
 type TurnUsageForRing = {
   turnId: string
@@ -733,7 +738,30 @@ export function ConversationMessageList({
       const maxTokensNum = typeof maxTokensRaw === 'number' ? maxTokensRaw : typeof maxTokensRaw === 'string' ? Number(maxTokensRaw) : NaN
       const maxTokens = Number.isFinite(maxTokensNum) && maxTokensNum > 0 ? maxTokensNum : undefined
 
-      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl, modelId: model || undefined, maxTokens }
+      const role = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : undefined
+      const version = typeof (agent as any)?.version === 'string' ? String((agent as any).version).trim() : undefined
+      const category = typeof (agent as any)?.category === 'string' ? String((agent as any).category).trim() : undefined
+      const publicationStatus = typeof (agent as any)?.publicationStatus === 'string' ? String((agent as any).publicationStatus).trim() : undefined
+      const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs)
+        ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean)
+        : undefined
+      const createdAt = typeof (agent as any)?.createdAt === 'string' ? String((agent as any).createdAt).trim() : undefined
+      const updatedAt = typeof (agent as any)?.updatedAt === 'string' ? String((agent as any).updatedAt).trim() : undefined
+
+      return {
+        displayName: displayName.trim() || 'Assistant',
+        slug,
+        avatarUrl,
+        modelId: model || undefined,
+        maxTokens,
+        role,
+        version,
+        category,
+        publicationStatus,
+        assignedToolSlugs,
+        createdAt,
+        updatedAt,
+      }
     },
     [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
   )
@@ -1864,7 +1892,11 @@ export function ConversationMessageList({
                 {renderMessages.map((message, idx) => {
                   const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
                   const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
-                  const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+                  const messageDateKey = getMessageDateKey(message)
+                  const prevDateKey = getMessageDateKey(prev)
+                  const dateLabel = messageDateKey && messageDateKey !== prevDateKey ? getMessageDateLabel(message) : null
+                  const timeGapBreaksGroup = hasGroupTimeGap(prev, message)
+                  const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant' && !timeGapBreaksGroup)
                   const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
                   const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
                   const userKey = (m: any): string | null => {
@@ -1893,16 +1925,16 @@ export function ConversationMessageList({
                   const prevUserKey = prev ? userKey(prev) : null
                   const currUserKey = userKey(message)
                   const nextUserKey = next ? userKey(next) : null
-                  const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
-                  const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
+                  const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey && !timeGapBreaksGroup)
+                  const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey && !hasGroupTimeGap(message, next))
                   // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
                   // message chrome so the spacing/padding is consistent (including the first message in the run).
                   const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
                   const prevAssistantKey = prev ? assistantKey(prev) : null
                   const currAssistantKey = assistantKey(message)
                   const nextAssistantKey = next ? assistantKey(next) : null
-                  const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
-                  const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
+                  const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey && !timeGapBreaksGroup)
+                  const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey && !hasGroupTimeGap(message, next))
                   const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
                   const startsNewGroup = (() => {
                     if (!prev) return false
@@ -1926,6 +1958,13 @@ export function ConversationMessageList({
                         avatarUrl: undefined,
                         modelId: undefined,
                         maxTokens: undefined,
+                        role: undefined,
+                        version: undefined,
+                        category: undefined,
+                        publicationStatus: undefined,
+                        assignedToolSlugs: undefined,
+                        createdAt: undefined,
+                        updatedAt: undefined,
                       } as const)
                     assistant = {
                       ...base,
@@ -1937,6 +1976,7 @@ export function ConversationMessageList({
 
                   return (
                     <Fragment key={message.id}>
+                      {dateLabel && <MessageDateDivider label={dateLabel} />}
                       <div
                         ref={el => {
                           messageRefs.current[message.id] = el
@@ -1953,6 +1993,12 @@ export function ConversationMessageList({
                           conversationId={conversationId}
                           agentName={assistant?.displayName}
                           agentSlug={assistant?.slug}
+                          agentRole={assistant?.role}
+                          agentVersion={assistant?.version}
+                          agentCategory={assistant?.category}
+                          agentAssignedToolCount={Array.isArray(assistant?.assignedToolSlugs) ? assistant?.assignedToolSlugs.length : undefined}
+                          agentCreatedAt={assistant?.createdAt}
+                          agentUpdatedAt={assistant?.updatedAt}
                           starshipSlug={starshipSlug}
                           agentAvatarUrl={assistant?.avatarUrl}
                           agentModelId={assistant?.modelId}
@@ -2177,6 +2223,12 @@ interface ConversationMessageBubbleProps {
   conversationId: string | null
   agentName?: string
   agentSlug?: string
+  agentRole?: string
+  agentVersion?: string
+  agentCategory?: string
+  agentAssignedToolCount?: number
+  agentCreatedAt?: string
+  agentUpdatedAt?: string
   starshipSlug?: string
   agentAvatarUrl?: string
   /** Agent configured model id (fallback when provider usage omits model). */
@@ -2237,6 +2289,7 @@ interface ConversationMessageBubbleProps {
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
+const GROUP_TIME_GAP_MS = 60 * 1000
 
 /** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. Cap term length to avoid ReDoS. */
 function renderTextWithHighlight(text: string, term: string | undefined): ReactNode {
@@ -2256,6 +2309,162 @@ function renderTextWithHighlight(text: string, term: string | undefined): ReactN
           part
         )
       )}
+    </>
+  )
+}
+
+function getMessageTimestampMs(message: any): number | null {
+  if (!message) return null
+  const raw = message?.createdAt ?? message?.updatedAt
+  const t = typeof raw === 'string' ? Date.parse(raw) : NaN
+  return Number.isFinite(t) ? t : null
+}
+
+function hasGroupTimeGap(prev: any, curr: any): boolean {
+  const prevMs = getMessageTimestampMs(prev)
+  const currMs = getMessageTimestampMs(curr)
+  if (prevMs == null || currMs == null) return false
+  return currMs - prevMs >= GROUP_TIME_GAP_MS
+}
+
+function getMessageDateKey(message: any): string | null {
+  const raw = message?.createdAt ?? message?.updatedAt
+  if (typeof raw !== 'string' || raw.trim() === '') return null
+  const parsed = parseISO(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatDay(parsed, 'yyyy-MM-dd')
+}
+
+function getMessageDateLabel(message: any): string | null {
+  const raw = message?.createdAt ?? message?.updatedAt
+  if (typeof raw !== 'string' || raw.trim() === '') return null
+  const parsed = parseISO(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  if (isToday(parsed)) return 'Today'
+  if (isYesterday(parsed)) return 'Yesterday'
+  return formatDay(parsed, 'MMM d, yyyy')
+}
+
+function MessageDateDivider({ label }: { label: string }) {
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border/60" />
+      <div className="rounded-full border border-border/60 bg-muted/40 px-3 py-0.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </div>
+      <div className="h-px flex-1 bg-border/60" />
+    </div>
+  )
+}
+
+function MessageTimestamp({ value, isEdited = false }: { value?: string | null; isEdited?: boolean }) {
+  if (!value || typeof value !== 'string' || value.trim().length === 0) return null
+  return (
+    <div className="inline-flex items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
+      <time dateTime={value} title={formatDate(value)}>
+        <span className="tabular-nums leading-none text-foreground/70">{formatTime(value)}</span>
+      </time>
+      {isEdited ? (
+        <span className="ml-1 inline-flex items-center gap-1 text-[10px] tracking-wide text-foreground/55 leading-none">
+          <Icon name="edit" className="h-3 w-3 align-middle" />
+          edited
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function isDeletedMessageContent(content: unknown): boolean {
+  return typeof content === 'string' && content === DELETED_MESSAGE_MARKER
+}
+
+function isEditedMessage(message: { createdAt?: string; updatedAt?: string }): boolean {
+  if (!message?.createdAt || !message?.updatedAt) return false
+  const created = parseISO(message.createdAt)
+  const updated = parseISO(message.updatedAt)
+  if (Number.isNaN(created.getTime()) || Number.isNaN(updated.getTime())) return false
+  return updated.getTime() - created.getTime() >= 1000
+}
+
+function getDeletedMessageLabel(isAuthedUserMessage: boolean): string {
+  return isAuthedUserMessage ? 'Message deleted by you.' : 'Message deleted by user.'
+}
+
+function MessageOwnerActions({
+  messageId,
+  disabled,
+  isEditing,
+  onStartEdit,
+  onCancelEdit,
+}: {
+  messageId: string
+  disabled?: boolean
+  isEditing: boolean
+  onStartEdit: () => void
+  onCancelEdit: () => void
+}) {
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const deleteMessage = useDeleteMessage()
+
+  const canDelete = !deleteMessage.isPending
+
+  if (disabled) return null
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={() => (isEditing ? onCancelEdit() : onStartEdit())}
+        aria-label={isEditing ? 'Cancel edit' : 'Edit message'}
+        title={isEditing ? 'Cancel edit' : 'Edit message'}
+      >
+        <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-destructive hover:text-destructive"
+        onClick={() => setDeleteOpen(true)}
+        aria-label="Delete message"
+        title="Delete message"
+        disabled={isEditing}
+      >
+        <Icon name="trash" className="h-4 w-4" />
+      </Button>
+
+      <Dialog open={deleteOpen} onOpenChange={open => setDeleteOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete message?</DialogTitle>
+            <DialogDescription>This will replace the message with a deleted placeholder for everyone in the conversation.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleteMessage.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={async () => {
+                if (!canDelete) return
+                try {
+                  await deleteMessage.mutateAsync(messageId)
+                  setDeleteOpen(false)
+                } catch {
+                  // Error toast handled in hook
+                }
+              }}
+              disabled={!canDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -2349,6 +2558,12 @@ const MemoizedMessageBubble = memo(
     conversationId,
     agentName,
     agentSlug,
+    agentRole,
+    agentVersion,
+    agentCategory,
+    agentAssignedToolCount,
+    agentCreatedAt,
+    agentUpdatedAt,
     starshipSlug,
     agentAvatarUrl,
     agentModelId,
@@ -2391,19 +2606,28 @@ const MemoizedMessageBubble = memo(
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
+    const messageTimestamp =
+      typeof message.updatedAt === 'string' && message.updatedAt.trim().length > 0
+        ? message.updatedAt
+        : typeof message.createdAt === 'string' && message.createdAt.trim().length > 0
+          ? message.createdAt
+          : null
     const { userId: authUserId } = useAuth()
     const sid = typeof starshipId === 'string' ? starshipId : ''
     const cid = typeof conversationId === 'string' ? conversationId : ''
     const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
     const memberByUserId = useMemo(() => {
       const list = Array.isArray((membersData as any)?.members) ? (((membersData as any).members as any[]) ?? []) : []
-      const m = new Map<string, { displayName?: string | null; avatar?: string | null }>()
+      const m = new Map<string, { displayName?: string | null; avatar?: string | null; email?: string | null; role?: string | null; createdAt?: string | null }>()
       for (const it of list) {
         const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
         if (!id) continue
         m.set(id, {
           displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
           avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
+          email: typeof it?.email === 'string' ? String(it.email) : null,
+          role: typeof it?.role === 'string' ? String(it.role) : null,
+          createdAt: typeof it?.createdAt === 'string' ? String(it.createdAt) : null,
         })
       }
       return m
@@ -2414,6 +2638,19 @@ const MemoizedMessageBubble = memo(
     const fromDirectory = messageUserId ? memberByUserId.get(messageUserId) : null
     const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
     const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
+    const isDeletedMessage = isDeletedMessageContent(message.content)
+    const messageDisplayContent = isDeletedMessage ? getDeletedMessageLabel(isAuthedUserMessage) : message.content
+    const showEditedLabel = !isDeletedMessage && isEditedMessage(message)
+    const updateMessage = useUpdateMessage()
+    const [isEditing, setIsEditing] = useState(false)
+    const [editDraft, setEditDraft] = useState(String(message.content ?? ''))
+    const trimmedEditDraft = editDraft.trim()
+    const canSaveEdit = trimmedEditDraft.length > 0 && trimmedEditDraft !== String(message.content ?? '') && !updateMessage.isPending
+
+    useEffect(() => {
+      if (isEditing) return
+      setEditDraft(String(message.content ?? ''))
+    }, [isEditing, message.content])
 
     const directoryUserName = fromDirectory?.displayName?.trim() || '' || undefined
     const effectiveUserName = userNameOverride ?? messageUserName ?? directoryUserName ?? (isAuthedUserMessage ? 'You' : undefined)
@@ -2446,6 +2683,7 @@ const MemoizedMessageBubble = memo(
 
     const threadActionButton = useMemo(() => {
       if (!enableChannelMessageThreads) return null
+      if (isDeletedMessage) return null
       // Only show on real messages (skip tool_result rows; they are not rendered here anyway)
       const label = linkedConversationId ? 'Open thread' : 'Start thread'
       return (
@@ -2465,26 +2703,48 @@ const MemoizedMessageBubble = memo(
           <Icon name="thread" className="h-4 w-4" />
         </Button>
       )
-    }, [enableChannelMessageThreads, isActiveThreadLink, linkedConversationId, message.content, message.id, onThreadAction])
+    }, [enableChannelMessageThreads, isActiveThreadLink, isDeletedMessage, linkedConversationId, message.content, message.id, onThreadAction])
 
     const reactionActionButton = useMemo(() => {
       const id = typeof message.id === 'string' ? message.id : ''
       if (!id) return null
+      if (isDeletedMessage) return null
       // Only for persisted messages in a real conversation.
       if (!cid) return null
       if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
-      return <MessageReactionAction conversationId={cid} messageId={id} />
-    }, [cid, message.id])
+      return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
+    }, [cid, isDeletedMessage, message.id])
+
+    const ownerActionButtons = useMemo(() => {
+      const id = typeof message.id === 'string' ? message.id : ''
+      if (!id) return null
+      if (!isUser) return null
+      if (!isAuthedUserMessage) return null
+      if (isDeletedMessage) return null
+      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      return (
+        <MessageOwnerActions
+          messageId={id}
+          isEditing={isEditing}
+          onStartEdit={() => {
+            setEditDraft(String(message.content ?? ''))
+            setIsEditing(true)
+          }}
+          onCancelEdit={() => setIsEditing(false)}
+        />
+      )
+    }, [isAuthedUserMessage, isDeletedMessage, isEditing, isUser, message.content, message.id])
 
     const messageActionNodes = useMemo(() => {
-      if (!threadActionButton && !reactionActionButton) return null
+      if (!threadActionButton && !reactionActionButton && !ownerActionButtons) return null
       return (
         <>
           {reactionActionButton}
           {threadActionButton}
+          {ownerActionButtons}
         </>
       )
-    }, [reactionActionButton, threadActionButton])
+    }, [ownerActionButtons, reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2501,7 +2761,7 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
+      const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-4') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-8')
         // Always use the compact bubble padding (no "normal" padding mode).
         const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
@@ -2516,7 +2776,35 @@ const MemoizedMessageBubble = memo(
                     message.sending && 'opacity-70'
                   )}
                 >
-                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{renderTextWithHighlight(message.content, highlightTerm)}</div>
+                  {isEditing ? (
+                    <div className="space-y-2 mt-2">
+                      <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={async () => {
+                            if (!canSaveEdit) return
+                            try {
+                              await updateMessage.mutateAsync({ messageId: message.id, content: trimmedEditDraft })
+                              setIsEditing(false)
+                            } catch {
+                              // Error toast handled in hook
+                            }
+                          }}
+                          disabled={!canSaveEdit}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass, isDeletedMessage && 'italic text-muted-foreground')}>
+                      {renderTextWithHighlight(messageDisplayContent, highlightTerm)}
+                    </div>
+                  )}
                   {message.sending && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -2589,6 +2877,41 @@ const MemoizedMessageBubble = memo(
         if (detail && detail.toLowerCase() !== 'you') return `You (${detail})`
         return 'You'
       })()
+      const userHoverDetail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
+      const userHoverTitle = isAuthedUserMessage ? 'You' : userDisplayName
+      const emailForHover = (effectiveUserEmail || fromDirectory?.email || '').trim()
+      const userHoverSub =
+        (userHoverDetail && userHoverDetail !== userDisplayName ? userHoverDetail : '') ||
+        (emailForHover && emailForHover !== userDisplayName ? emailForHover : '')
+      const userIdShort = messageUserId ? `#${messageUserId.slice(0, 6)}` : ''
+      const userPresenceLabel = showUserPresenceDot ? (showUserOnline ? 'Online' : 'Offline') : 'Unknown'
+      const userRoleRaw = typeof fromDirectory?.role === 'string' ? fromDirectory.role : ''
+      const userRoleLabel = userRoleRaw
+        ? userRoleRaw === 'owner'
+          ? 'Owner'
+          : userRoleRaw === 'admin'
+            ? 'Admin'
+            : userRoleRaw === 'collaborator'
+              ? 'Collaborator'
+              : userRoleRaw
+        : ''
+      const userHoverCard = (
+        <UserProfileHoverCardContent
+          title={userHoverTitle}
+          subtitle={userHoverSub || undefined}
+          isAuthedUser={isAuthedUserMessage}
+          explicitAvatarUrl={shouldUseExplicitUserAvatar ? explicitUserAvatarUrl : undefined}
+          resolvedAvatarUrl={shouldUseResolvedUserAvatar ? effectiveUserAvatar : undefined}
+          avatarSeed={userAvatarSeedOverride || undefined}
+          fallbackInitials={initialsFromName(userHoverTitle || effectiveUserEmail)}
+          fallbackVariant={fallbackVariant}
+          userIdShort={userIdShort || undefined}
+          email={emailForHover || undefined}
+          roleLabel={userRoleLabel || undefined}
+          memberSince={fromDirectory?.createdAt || undefined}
+          statusLabel={userPresenceLabel}
+        />
+      )
       // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
       // We keep the avatar visible, but overlay it so the row height is driven only by content.
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
@@ -2602,7 +2925,7 @@ const MemoizedMessageBubble = memo(
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
-              isConsecutiveSameUser ? 'mt-0' : 'mt-4'
+              isConsecutiveSameUser ? 'mt-0' : 'mt-6'
             )}
           >
             {isConsecutiveSameUser ? (
@@ -2686,41 +3009,76 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 text-sm font-bold font-mono text-foreground">
-                  {userProfileHref ? (
-                    <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                      {authorLabel}
-                    </Link>
-                  ) : (
-                    <span>{authorLabel}</span>
-                  )}
+                <div className="mb-0 flex items-center gap-2">
+                  <div className="text-sm font-bold font-mono text-foreground">
+                    <HoverProfilePopover
+                      trigger={
+                        userProfileHref ? (
+                          <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                            {authorLabel}
+                          </Link>
+                        ) : (
+                          <span>{authorLabel}</span>
+                        )
+                      }
+                      content={userHoverCard}
+                      side="right"
+                    />
+                  </div>
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>
               )}
-              <ConversationMessageContent
-                content={message.content}
-                messageId={message.id}
-                enableMarkdown={true}
-                enableCopy={true}
-                extraActions={messageActionNodes}
-                enableLinkPreview={true}
-                isStreaming={false}
-                // Always compact (no "normal" padding mode).
-                compact={true}
-                className="text-foreground/80"
-                chunks={message.chunks}
-                reasoning={message.reasoning}
-                reasoningChunks={message.reasoningChunks}
-                agentName={userDisplayName}
-                toolCalls={message.toolCalls}
-                toolResults={message.toolResults}
-                messageType={message.messageType}
-                attachmentIds={message.attachmentIds}
-                starshipId={starshipId}
-                isAwaitingToolResults={isAwaitingToolResults}
-                isLastMessage={isLastMessage}
-                highlightTerm={highlightTerm}
-              />
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+              {isEditing ? (
+                <div className="space-y-2 mt-2">
+                  <Textarea value={editDraft} onChange={e => setEditDraft(e.target.value)} className="min-h-[140px]" />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setIsEditing(false)} disabled={updateMessage.isPending}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        if (!canSaveEdit) return
+                        try {
+                          await updateMessage.mutateAsync({ messageId: message.id, content: trimmedEditDraft })
+                          setIsEditing(false)
+                        } catch {
+                          // Error toast handled in hook
+                        }
+                      }}
+                      disabled={!canSaveEdit}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <ConversationMessageContent
+                  content={messageDisplayContent}
+                  messageId={message.id}
+                  enableMarkdown={true}
+                  enableCopy={!isDeletedMessage}
+                  extraActions={messageActionNodes}
+                  enableLinkPreview={true}
+                  isStreaming={false}
+                  // Always compact (no "normal" padding mode).
+                  compact={true}
+                  className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
+                  chunks={message.chunks}
+                  reasoning={message.reasoning}
+                  reasoningChunks={message.reasoningChunks}
+                  agentName={userDisplayName}
+                  toolCalls={message.toolCalls}
+                  toolResults={message.toolResults}
+                  messageType={message.messageType}
+                  attachmentIds={message.attachmentIds}
+                  starshipId={starshipId}
+                  isAwaitingToolResults={isAwaitingToolResults}
+                  isLastMessage={isLastMessage}
+                  highlightTerm={highlightTerm}
+                />
+              )}
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}
@@ -2752,6 +3110,30 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
+      const assistantStatus = isConversationBusy ? 'Busy' : 'Available'
+      const assistantUsageSummary = (() => {
+        const u = turnUsage?.usage
+        if (!u) return ''
+        const total = Number(u.totalTokens ?? 0)
+        if (!Number.isFinite(total) || total <= 0) return ''
+        const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? ` • $${u.cost.toFixed(2)}` : ''
+        return `${total.toLocaleString()} tokens${cost}`
+      })()
+      const assistantHoverCard = (
+        <AgentProfileHoverCardContent
+          name={assistantDisplayName || 'Assistant'}
+          avatarUrl={agentAvatarUrl}
+          modelId={agentModelId}
+          statusLabel={assistantStatus}
+          roleLabel={agentRole}
+          category={agentCategory}
+          version={agentVersion}
+          toolsCount={agentAssignedToolCount}
+          lastTurnSummary={assistantUsageSummary || undefined}
+          createdAt={agentCreatedAt}
+          updatedAt={agentUpdatedAt}
+        />
+      )
       // Keep the avatar "slot" width stable across consecutive assistant messages.
       // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
       // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
@@ -2806,16 +3188,16 @@ const MemoizedMessageBubble = memo(
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
-                  content={message.content}
+                  content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
-                  enableCopy={!isStreamingActive}
+                  enableCopy={!isStreamingActive && !isDeletedMessage}
                   extraActions={messageActionNodes}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
                   compact={true}
-                  className="text-foreground"
+                  className={cn('text-foreground', isDeletedMessage && 'italic text-muted-foreground')}
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
                   reasoning={message.reasoning}
@@ -2830,7 +3212,7 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
-                {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+                {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                   <MessageReactions
                     conversationId={cid}
                     starshipId={starshipId}
@@ -2908,27 +3290,36 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 text-sm font-bold text-foreground">
-                  {assistantProfileHref ? (
-                    <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
-                      {assistantDisplayName}
-                    </Link>
-                  ) : (
-                    <span className="font-mono">{assistantDisplayName}</span>
-                  )}
+                <div className="mb-0 flex items-center gap-2">
+                  <div className="text-sm font-bold text-foreground">
+                    <HoverProfilePopover
+                      trigger={
+                        assistantProfileHref ? (
+                          <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                            {assistantDisplayName}
+                          </Link>
+                        ) : (
+                          <span className="font-mono">{assistantDisplayName}</span>
+                        )
+                      }
+                      content={assistantHoverCard}
+                      side="right"
+                    />
+                  </div>
+                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
                 </div>
               )}
               <ConversationMessageContent
-                content={message.content}
+                content={messageDisplayContent}
                 messageId={message.id}
                 enableMarkdown={true}
-                enableCopy={!isStreamingActive}
+                enableCopy={!isStreamingActive && !isDeletedMessage}
                 extraActions={messageActionNodes}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
                 compact={true}
-                className="text-foreground/80"
+                className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                 chunks={message.chunks}
                 reasoning={message.reasoning}
                 reasoningChunks={message.reasoningChunks}
@@ -2942,7 +3333,7 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && (
+              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}
@@ -3006,6 +3397,12 @@ const MemoizedMessageBubble = memo(
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
+    if ((prevProps.agentRole || '') !== (nextProps.agentRole || '')) return false
+    if ((prevProps.agentVersion || '') !== (nextProps.agentVersion || '')) return false
+    if ((prevProps.agentCategory || '') !== (nextProps.agentCategory || '')) return false
+    if (Number(prevProps.agentAssignedToolCount ?? 0) !== Number(nextProps.agentAssignedToolCount ?? 0)) return false
+    if ((prevProps.agentCreatedAt || '') !== (nextProps.agentCreatedAt || '')) return false
+    if ((prevProps.agentUpdatedAt || '') !== (nextProps.agentUpdatedAt || '')) return false
 
     // Re-render if the agent avatar URL changes (e.g. after attachments load)
     if ((prevProps.agentAvatarUrl || '') !== (nextProps.agentAvatarUrl || '')) return false

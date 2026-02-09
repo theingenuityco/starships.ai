@@ -3,6 +3,8 @@ import express from 'express';
 // Mocks must be declared before importing the router under test.
 const publishMock = jest.fn().mockResolvedValue({ streamId: '1-0' });
 const updateMessageMock = jest.fn();
+const getMessageMock = jest.fn();
+const getConversationByIdMock = jest.fn();
 
 jest.mock('@/middleware/jwt-auth', () => {
   return {
@@ -26,6 +28,7 @@ jest.mock('@/services/ConversationStreamBus', () => {
 jest.mock('@/services/MessageService', () => {
   return {
     MessageService: jest.fn().mockImplementation(() => ({
+      getMessage: getMessageMock,
       updateMessage: updateMessageMock,
     })),
   };
@@ -49,7 +52,22 @@ jest.mock('@starships/models', () => {
 
 // Not used in this test, but imported by the route module.
 jest.mock('@/services/ConversationService', () => {
-  return { ConversationService: jest.fn() };
+  return {
+    ConversationService: jest.fn().mockImplementation(() => ({
+      getConversationById: getConversationByIdMock,
+    })),
+  };
+});
+jest.mock('@/middleware/verify-starship-access', () => {
+  return {
+    verifyResourceAccess: jest.fn().mockResolvedValue(true),
+  };
+});
+jest.mock('@/utils/conversation-membership', () => {
+  return {
+    enforceDirectMessageMembership: jest.fn().mockResolvedValue(true),
+    enforcePrivateChannelMembership: jest.fn().mockResolvedValue(true),
+  };
 });
 jest.mock('@/services/NotificationStreamBus', () => {
   return { NotificationStreamBus: { getInstance: () => ({ publish: jest.fn() }) } };
@@ -61,6 +79,8 @@ describe('PUT /messages/:messageId streaming', () => {
   beforeEach(() => {
     publishMock.mockClear();
     updateMessageMock.mockReset();
+    getMessageMock.mockReset();
+    getConversationByIdMock.mockReset();
   });
 
   it('broadcasts a message.append update when a message is linked to a thread', async () => {
@@ -75,10 +95,26 @@ describe('PUT /messages/:messageId streaming', () => {
       content: 'hello',
       messageType: 'user_input',
       conversationId: parentConversationId,
+      starshipId: 'starship-1',
       userId: 'user-a',
       linkedConversationId: childConversationId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    });
+    getMessageMock.mockResolvedValue({
+      id: messageId,
+      role: 'user',
+      content: 'hello',
+      messageType: 'user_input',
+      conversationId: parentConversationId,
+      starshipId: 'starship-1',
+      userId: 'user-a',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    getConversationByIdMock.mockResolvedValue({
+      id: parentConversationId,
+      starshipId: 'starship-1',
     });
 
     const app = express();

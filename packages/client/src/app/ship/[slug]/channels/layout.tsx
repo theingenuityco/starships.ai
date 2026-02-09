@@ -264,6 +264,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return threadKey
   }, [threadKey])
 
+  const isThreadPaneOpen = Boolean(threadKey)
+  const THREAD_PANE_ANIM_MS = 300
+  const [isThreadPaneMounted, setIsThreadPaneMounted] = useState<boolean>(isThreadPaneOpen)
+
+  useEffect(() => {
+    if (isThreadPaneOpen) {
+      setIsThreadPaneMounted(true)
+      return
+    }
+    const t = window.setTimeout(() => setIsThreadPaneMounted(false), THREAD_PANE_ANIM_MS)
+    return () => window.clearTimeout(t)
+  }, [isThreadPaneOpen])
+
   useEffect(() => {
     const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
     if (!cid) return
@@ -522,8 +535,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     )
   }
 
-  const isThreadPaneOpen = Boolean(threadKey)
-
   const threadPaneSharedProps = {
     starshipId: starshipData.id,
     starshipSlug: routeParams.slug,
@@ -593,37 +604,49 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       </div>
 
       {/* Thread split pane (desktop/tablet) */}
-      {isThreadPaneOpen ? (
-        <>
-          {/* Draggable resize handle (desktop/tablet) */}
-          <div className="hidden md:flex relative h-full w-[1px] flex-shrink-0 bg-border">
-            <div
-              className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize thread pane"
-              onPointerDown={handleThreadResizePointerDown}
-              title="Drag to resize"
-            />
-          </div>
+      <>
+        {/* Draggable resize handle (desktop/tablet) */}
+        <div
+          className={`hidden md:flex relative h-full flex-shrink-0 bg-border overflow-hidden transition-all duration-300 ease-in-out ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{
+            width: isThreadPaneOpen ? 1 : 0,
+            willChange: 'width, opacity',
+          }}
+        >
+          <div
+            className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize thread pane"
+            onPointerDown={handleThreadResizePointerDown}
+            title="Drag to resize"
+          />
+        </div>
 
-          <aside
-            className="hidden md:block h-full flex-shrink-0 bg-background min-w-0"
-            style={{
-              width: threadPaneWidthPx,
-            }}
-          >
-            <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
-          </aside>
-        </>
-      ) : null}
+        <aside
+          className={`hidden md:block h-full flex-shrink-0 bg-background min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{
+            width: isThreadPaneOpen ? threadPaneWidthPx : 0,
+            willChange: 'width, opacity',
+            contain: 'layout style paint',
+          }}
+          aria-hidden={!isThreadPaneOpen}
+        >
+          {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" /> : null}
+        </aside>
+      </>
 
       {/* Thread in-flow pane (mobile) */}
-      {isThreadPaneOpen ? (
-        <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border bg-background min-w-0">
-          <ThreadPane {...threadPaneSharedProps} />
-        </aside>
-      ) : null}
+      <aside
+        className={`md:hidden flex-shrink-0 bg-background min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${isThreadPaneOpen ? 'border-t border-border opacity-100 pointer-events-auto' : 'border-t-0 opacity-0 pointer-events-none'}`}
+        style={{
+          height: isThreadPaneOpen ? '45vh' : '0px',
+          willChange: 'height, opacity',
+        }}
+        aria-hidden={!isThreadPaneOpen}
+      >
+        {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} /> : null}
+      </aside>
 
       {/* Hide children since ConversationInterface now handles everything */}
       <div style={{ display: 'none' }}>{children}</div>

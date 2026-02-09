@@ -3121,6 +3121,7 @@ const MemoizedMessageBubble = memo(
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={!isConsecutiveSameUser}
                   className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                   chunks={message.chunks}
                   reasoning={message.reasoning}
@@ -3256,6 +3257,7 @@ const MemoizedMessageBubble = memo(
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={true}
                   className={cn('text-foreground', isDeletedMessage && 'italic text-muted-foreground')}
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
@@ -3379,6 +3381,7 @@ const MemoizedMessageBubble = memo(
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
                 compact={true}
+                hasAuthorLine={Boolean(showAssistantAvatar)}
                 className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                 chunks={message.chunks}
                 reasoning={message.reasoning}

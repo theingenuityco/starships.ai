@@ -309,6 +309,11 @@ interface MessageContentProps {
   chunks?: StreamChunk[]
   /** When true, use tighter vertical padding for stacked consecutive messages. */
   compact?: boolean
+  /**
+   * Whether the author header line (name/timestamp) is shown immediately above this content.
+   * Used to prevent emoji-only messages (large, `leading-none`) from visually colliding with the header.
+   */
+  hasAuthorLine?: boolean
   // Optional reasoning content and chunks
   reasoning?: string
   reasoningChunks?: StreamChunk[]
@@ -519,6 +524,7 @@ export function ConversationMessageContent({
   isStreaming = false,
   chunks = [],
   compact = false,
+  hasAuthorLine = false,
   reasoning,
   reasoningChunks = [],
   agentName,
@@ -1109,6 +1115,7 @@ export function ConversationMessageContent({
 
   const emojiOnlyInfo = useMemo(() => getEmojiOnlyInfo(rawDisplayContent), [rawDisplayContent])
   const shouldRenderEmojiOnlyPlain = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0)
+  const emojiOnlyHeaderGapClass = shouldRenderEmojiOnlyPlain && hasAuthorLine ? 'mt-1' : ''
   const emojiOnlyTextClass = useMemo(() => {
     if (!shouldRenderEmojiOnlyPlain) return ''
     const n = emojiOnlyInfo.emojiCount
@@ -1149,7 +1156,8 @@ export function ConversationMessageContent({
               ref={messageContainerRef}
               className={cn(
                 // Keep internal padding; remove outside row-gap in the list instead.
-                contentContainerClassName
+                contentContainerClassName,
+                emojiOnlyHeaderGapClass
               )}
             >
               {shouldRenderEmojiOnlyPlain ? (
@@ -1187,7 +1195,8 @@ export function ConversationMessageContent({
         <div
           className={cn(
             shouldLargePlain ? largePlainClass : contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed',
-            'whitespace-pre-wrap ph-mask-chat-message'
+            'whitespace-pre-wrap ph-mask-chat-message',
+            shouldLargePlain && hasAuthorLine && 'mt-1'
           )}
         >
           {shouldLargePlain ? emojiPlain.trimmed : renderTextWithEmojiSpans(String(displayContent ?? ''))}

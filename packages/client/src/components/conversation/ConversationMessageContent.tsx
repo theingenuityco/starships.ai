@@ -1149,7 +1149,7 @@ export function ConversationMessageContent({
               )}
             >
               {shouldRenderEmojiOnlyPlain ? (
-                <div className={cn('not-prose whitespace-pre-wrap break-words', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
+                <div className={cn('not-prose whitespace-pre-wrap break-words text-foreground', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
               ) : (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}

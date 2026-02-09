@@ -2117,6 +2117,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             'tiptap w-full bg-transparent outline-none',
             // Match the chat transcript's default message text size.
             'text-sm leading-relaxed',
+            // Prevent leading mention pills (ring/shadow) from clipping on the left edge.
+            'pl-1 pr-0.5',
             // Minimal mode should still feel comfortable (not cramped).
             // NOTE: Do NOT set max-height here; the scroll container lives outside the ProseMirror node.
             // If ProseMirror has a max-height, overflowing content can be clipped without increasing the
@@ -2529,7 +2531,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             >
               <div
                 className={cn(
-                  'overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                  'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
                   minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
                 )}
                 style={{ WebkitOverflowScrolling: 'touch' }}

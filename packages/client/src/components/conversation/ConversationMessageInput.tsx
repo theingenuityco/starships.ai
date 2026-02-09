@@ -141,8 +141,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [sending, setSending] = useState(false)
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
     const isStarter = !conversationId
-    const { data: channelsData } = useStarshipChannels(starshipId, Boolean(starshipId && conversationId))
-    const isChannelConversation = useMemo(() => {
+    // Load channels so we can detect "channel context" for both channel roots AND channel threads.
+    // (Channel threads have conversationId != channelConversationId, so we must check parentConversationId.)
+    const { data: channelsData } = useStarshipChannels(
+      starshipId,
+      Boolean(starshipId && (conversationId || (typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)))
+    )
+
+    const isChannelRootConversation = useMemo(() => {
       const cid = typeof conversationId === 'string' ? conversationId : ''
       if (!cid) return false
       const channels = (channelsData as any)?.channels
@@ -150,8 +156,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return channels.some((c: any) => String(c?.conversationId || '') === cid)
     }, [channelsData, conversationId])
 
+    // Conversation state for web browsing toggle
+    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+
+    const isChannelContext = useMemo(() => {
+      const channels = (channelsData as any)?.channels
+      if (!Array.isArray(channels) || channels.length === 0) {
+        // Best-effort:
+        // - If we're creating a new child conversation and we don't yet have channel data,
+        //   assume it's a channel thread (thread drafts are only created from channels in the UI).
+        const draftParent = typeof newConversationParentConversationId === 'string' ? newConversationParentConversationId.trim() : ''
+        return Boolean(draftParent)
+      }
+
+      const inList = (id: string) => channels.some((c: any) => String(c?.conversationId || '') === id)
+
+      const cid = typeof conversationId === 'string' ? conversationId.trim() : ''
+      if (cid && inList(cid)) return true
+
+      const parentId = typeof conversation?.parentConversationId === 'string' ? conversation.parentConversationId.trim() : ''
+      if (parentId && inList(parentId)) return true
+
+      const draftParent = typeof newConversationParentConversationId === 'string' ? newConversationParentConversationId.trim() : ''
+      if (draftParent && inList(draftParent)) return true
+
+      return false
+    }, [channelsData, conversationId, conversation?.parentConversationId, newConversationParentConversationId])
+
     // DM context (used for mention restrictions)
-    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelConversation))
+    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelContext))
     type DmMentionAllowed = { kind: 'agent' | 'user' | null; id: string | null }
     const dmMentionAllowedRef = useRef<DmMentionAllowed>({ kind: null, id: null })
     useEffect(() => {
@@ -224,7 +257,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       // Existing DM: resolve from starship DM list (usually already cached by sidebar)
-      if (conversationId && !isChannelConversation) {
+      if (conversationId && !isChannelContext) {
         const cid = String(conversationId || '').trim()
         const list = (directMessagesData as any)?.directMessages
         const items = Array.isArray(list) ? (list as any[]) : []
@@ -249,7 +282,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelConversation, userId])
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelContext, userId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -367,8 +400,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const hasHistoryFold = Boolean(ctxUsage?.hasMoreBefore)
     const contextActive = Boolean(conversationId)
 
-    // Conversation state for web browsing toggle
-    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
     const { data: conversationAgents = [] } = useConversationAgents(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
 
@@ -428,14 +459,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (resolvedDmTarget?.dmType === 'user_user') return false
 
       // Mention-only contexts: only charge when an agent is explicitly mentioned.
-      if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
+      if (isChannelContext || isMentionOnlyThread) return draftHasAgentMention
 
       // Normal conversations: charge when there's either a mention or a linked fallback agent.
       // (Mirrors the server: hasMention || linkedAgentCount > 0)
       if (draftHasAgentMention) return true
       const linkedCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
       return linkedCount > 0
-    }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
+    }, [conversationId, draftDirectMessageTarget, isChannelContext, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
 
     // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
     const hasFunds = canManageBilling ? !requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE : true
@@ -699,7 +730,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Existing DM: resolve from starship DM list (usually already cached by sidebar)
-        if (conversationId && !isChannelConversation) {
+        if (conversationId && !isChannelContext) {
           const cid = String(conversationId || '').trim()
           const list = (directMessagesData as any)?.directMessages
           const items = Array.isArray(list) ? (list as any[]) : []
@@ -747,8 +778,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
       } else {
-        // Channels + mention-only threads: do not default; only run when an agent is explicitly mentioned.
-        if (isChannelConversation || isMentionOnlyThread) {
+        // Channel context + mention-only threads: do not default; only run when an agent is explicitly mentioned.
+        if (isChannelContext || isMentionOnlyThread) {
           effectiveAgent = null
         }
 
@@ -760,7 +791,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Threads (non-mention-only): if exactly 1 linked agent, allow it as a fallback.
-        if (!effectiveAgent && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+        // NOTE: channel threads are mention-only (no fallback agent).
+        if (!effectiveAgent && isThreadConversation && !isChannelContext && !isMentionOnlyThread && linkedAgentCount === 1) {
           const linked = Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []
           effectiveAgent = linked[0] ?? null
         }
@@ -798,7 +830,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       //
       // Without this, opening a thread via URL/refresh (or from a non-assistant message) can yield `selectedAgent === null`,
       // which incorrectly blocks sending with "Select an agent" even though the thread already has linked agents.
-      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isChannelContext && !isMentionOnlyThread && linkedAgentCount === 1) {
         const linked = Array.isArray(conversationAgents) ? conversationAgents : []
         if (linked.length > 0) {
           effectiveAgent = linked[0] ?? null
@@ -810,7 +842,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
       const isAttachmentOnlySend = Boolean(hasPendingAttachments && !messageToSend)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelContext && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
@@ -830,7 +862,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
 
         // Mention-only contexts only run when at least one agent is mentioned.
-        if (isChannelConversation || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
+        if (isChannelContext || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
 
         // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
         if (hasUserMentionToken && !hasAgentMention) return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention }
@@ -841,7 +873,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const willTriggerAgentBestEffort = routingPreview.willTriggerAgentBestEffort
 
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {
+      if (!effectiveAgent && !isChannelContext && !isUserUserDm && !shouldPersistOnly) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -1163,7 +1195,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       isThreadContext,
       isMentionOnlyThread,
       selectedAgent,
-      isChannelConversation,
+      isChannelContext,
       userId,
       conversationId,
       createConversation,
@@ -1342,7 +1374,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const contextAgentForUI: AgentModel | null = useMemo(() => {
       // Channels are mention-driven; never imply a default agent in the UI.
-      if (isChannelConversation) return null
+      if (isChannelContext) return null
 
       // DMs: lock UI hints to the DM target agent when applicable.
       if (resolvedDmTarget?.dmType === 'user_agent') {
@@ -1360,14 +1392,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationAgents, isChannelConversation, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
+    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
 
     const getPlaceholder = () => {
       const label = agentLabelForUI(contextAgentForUI)
       if (isStreamingEffective) return label ? `${label} is responding...` : 'AI is responding...'
       if (sending) return label ? `${label} is thinking...` : 'Thinking...'
 
-      if (isChannelConversation) return 'Message this channel (mention agents with @)'
+      // Channel roots: "message the channel"
+      if (isChannelRootConversation) return 'Message this channel (mention agents with @)'
+      // Channel threads: mention-only behavior, but still allow human chatter without an agent trigger.
+      if (isChannelContext) return 'Reply (mention an agent with @)…'
       if (resolvedDmTarget?.dmType === 'user_agent') return label ? `Message ${label}…` : 'Write a message…'
       if (resolvedDmTarget?.dmType === 'user_user') return 'Write a message…'
       if (isMentionOnlyThread) return 'Reply (mention an agent with @)…'
@@ -1383,7 +1418,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const t = String(message || '').trim()
       return t.startsWith('<@a:') || t.startsWith('@')
     })()
-    const hasTargetAgent = isChannelConversation
+    const hasTargetAgent = isChannelContext
       ? true
       : resolvedDmTarget?.dmType === 'user_user'
         ? true

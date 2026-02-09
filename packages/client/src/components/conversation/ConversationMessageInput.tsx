@@ -2433,7 +2433,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2.5' : 'px-3 py-2.5')}>
+          <div
+            className={cn(
+              'flex relative gap-2',
+              minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5'
+            )}
+          >
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2449,7 +2454,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-52 relative z-10')}
+              className={cn('flex-1 min-w-0 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
@@ -2461,7 +2466,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-52">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -2472,7 +2477,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
 
             {/* Right-side Action Buttons Container */}
-            <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
               {/* Attachment Button */}
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -2531,7 +2536,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 }}
                 disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
                 className={cn(
-                  'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
+                  'group flex items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
                   hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
                   'disabled:opacity-50 disabled:cursor-not-allowed'
                 )}
@@ -2544,7 +2549,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
                       <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <span className="text-xs font-medium whitespace-nowrap">Search</span>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
                   </>
                 ) : (
                   <Icon name="globe" className="h-5 w-5" />

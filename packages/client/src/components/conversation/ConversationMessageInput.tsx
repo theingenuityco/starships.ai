@@ -1433,6 +1433,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
     const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
 
+    // Mobile UX: Discord-like "focus mode" (secondary actions fade back once typing/focused).
+    const isMobileComposerEngaged = Boolean((isEditorFocused || hasActualContent) && !disabled && !isStreamingEffective)
+
     // TipTap editor with Mention extension to treat mentions as atomic units
 
     // Presence (online/offline) for mention suggestion avatars
@@ -1990,7 +1993,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
               )}
             </span>
-            <span className="font-medium text-base">@{display}</span>
+            <span className="font-medium text-sm">@{display}</span>
           </span>
         </NodeViewWrapper>
       )
@@ -2112,11 +2115,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            // Use a “normal” input font size for both starter + docked/minimal modes.
-            'text-base',
+            // Match the chat transcript's default message text size.
+            'text-sm leading-relaxed',
+            // Prevent leading mention pills (ring/shadow) from clipping on the left edge.
+            'pl-1 pr-0.5',
             // Minimal mode should still feel comfortable (not cramped).
-            minimal ? 'min-h-[36px] max-h-[140px]' : isStarter ? 'min-h-[96px] max-h-[300px]' : 'min-h-[64px] max-h-[220px]',
-            'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+            // NOTE: Do NOT set max-height here; the scroll container lives outside the ProseMirror node.
+            // If ProseMirror has a max-height, overflowing content can be clipped without increasing the
+            // parent's scrollHeight, making long inputs appear "non-scrollable".
+            minimal ? 'min-h-[36px]' : isStarter ? 'min-h-[96px]' : 'min-h-[64px]',
             // Minimal mode has a small min-height; center the baseline within that space.
             // This does not change font size or the overall component height.
             minimal && 'tiptap--minimal'
@@ -2419,7 +2426,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Input Container with Expandable Overlay */}
-        <div className={cn('relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm', 'focus-within:border-primary/70', disabled && 'opacity-50')}>
+        <div
+          className={cn(
+            // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
+            // Desktop: keep the rounded composer card.
+            'relative transition-all overflow-visible bg-card shadow-sm',
+            // Mobile: full border but square corners so it reads as a native input bar.
+            'border border-border/80 sm:rounded-2xl rounded-none',
+            'focus-within:border-primary/70',
+            disabled && 'opacity-50'
+          )}
+        >
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && (
             <ExpandableMessageOverlay
@@ -2433,7 +2450,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2.5' : 'px-3 py-2.5')}>
+          <div
+            className={cn(
+              'flex relative gap-2',
+              minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5'
+            )}
+          >
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2444,24 +2466,82 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               className="hidden"
             />
 
+            {/* Left-side Actions */}
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
+                className={cn(
+                  'flex items-center gap-1 transition-opacity duration-200',
+                  // Mobile: don't dim attachment/emoji while the editor is focused (they should still look tappable).
+                  isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                  'sm:opacity-100'
+                )}
+              >
+                {/* Attachment Button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || fileUploading}
+                  className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                  aria-label="Attach file"
+                  title="Attach file (images, PDFs)"
+                >
+                  <Icon name="paperclip" className="h-5 w-5" />
+                </button>
+
+                {/* Emoji Picker */}
+                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={!canEditComposer}
+                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      aria-label="Insert emoji"
+                      title="Insert emoji"
+                    >
+                      <Icon name="smiley" className="h-5 w-5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverPrimitive.Portal>
+                    <PopoverPrimitive.Content
+                      asChild
+                      align="start"
+                      side="top"
+                      sideOffset={8}
+                      // NOTE: With `asChild`, these classes land on the picker element.
+                      // Do not include bg/border/shadow resets here or we'll override the theme styling.
+                      className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                    >
+                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    </PopoverPrimitive.Content>
+                  </PopoverPrimitive.Portal>
+                </Popover>
+              </div>
+            </div>
+
             {/* Optional left-side controls in expanded mode */}
-            {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
+            {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-52 relative z-10')}
+              className={cn('flex-1 min-w-0 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
               }}
             >
-              <div className="max-h-[300px] overflow-y-auto">
+              <div
+                className={cn(
+                  'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                  minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
+                )}
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 <EditorContent editor={tiptap} />
               </div>
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-52">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -2472,84 +2552,56 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
 
             {/* Right-side Action Buttons Container */}
-            <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
-              {/* Attachment Button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || fileUploading}
-                className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                aria-label="Attach file"
-                title="Attach file (images, PDFs)"
-              >
-                <Icon name="paperclip" className="h-5 w-5" />
-              </button>
-
-              {/* Emoji Picker */}
-              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={!canEditComposer}
-                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                    aria-label="Insert emoji"
-                    title="Insert emoji"
-                  >
-                    <Icon name="smiley" className="h-5 w-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverPrimitive.Portal>
-                  <PopoverPrimitive.Content
-                    asChild
-                    align="end"
-                    side="top"
-                    sideOffset={8}
-                    // NOTE: With `asChild`, these classes land on the picker element.
-                    // Do not include bg/border/shadow resets here or we'll override the theme styling.
-                    className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
-                  >
-                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                  </PopoverPrimitive.Content>
-                </PopoverPrimitive.Portal>
-              </Popover>
-
-              {/* Web Browsing Toggle Button - Available from the start */}
-              <button
-                onClick={() => {
-                  if (conversationId) {
-                    // Update existing conversation
-                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
-                    updateConversationState.mutate({
-                      conversationId,
-                      state: {
-                        plugins: newPlugins,
-                      } as ConversationState,
-                    })
-                  } else {
-                    // Store preference for when conversation is created
-                    setPendingWebBrowsing(!pendingWebBrowsing)
-                  }
-                }}
-                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
                 className={cn(
-                  'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
-                  hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                  'flex items-center gap-2 transition-opacity duration-200',
+                  isMobileComposerEngaged && 'opacity-30',
+                  'sm:opacity-100'
                 )}
-                aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
               >
-                {hasWebBrowsing ? (
-                  <>
-                    <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                      <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                      <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="text-xs font-medium whitespace-nowrap">Search</span>
-                  </>
-                ) : (
-                  <Icon name="globe" className="h-5 w-5" />
-                )}
-              </button>
+                {/* Web Browsing Toggle Button - Available from the start */}
+                <button
+                  onClick={() => {
+                    if (conversationId) {
+                      // Update existing conversation
+                      const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                      updateConversationState.mutate({
+                        conversationId,
+                        state: {
+                          plugins: newPlugins,
+                        } as ConversationState,
+                      })
+                    } else {
+                      // Store preference for when conversation is created
+                      setPendingWebBrowsing(!pendingWebBrowsing)
+                    }
+                  }}
+                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                  className={cn(
+                    'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                    hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    // Mobile: when engaged, hide the toggle to keep the composer feeling focused.
+                    isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                  )}
+                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                >
+                  {hasWebBrowsing ? (
+                    <>
+                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                    </>
+                  ) : (
+                    <Icon name="globe" className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
 
               {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (
@@ -2587,6 +2639,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               )}
             </div>
           </div>
+
+          {/* Disclaimer: only show when an agent is tagged in the draft */}
+          {draftHasAgentMention && (
+            <div
+              className={cn(
+                'border-t border-border/40 text-[11px] leading-snug text-muted-foreground',
+                minimal ? 'px-3 py-1' : 'px-3 py-1.5'
+              )}
+            >
+              Agents use AI and may make mistakes. Double-check important details before sending.
+            </div>
+          )}
         </div>
 
         {/* Cost hint (non-minimal) - moved below the composer */}
@@ -2632,13 +2696,22 @@ export function PlaceholderStyles() {
       /* Minimal mode placeholder: center it too (only applies when empty). */
       .tiptap.tiptap--minimal p.is-editor-empty:first-child {
         position: relative;
+        width: 100%;
+        overflow: hidden;
       }
       .tiptap.tiptap--minimal p.is-editor-empty:first-child::before {
         float: none;
         height: auto;
         position: absolute;
+        left: 0;
+        right: 0;
         top: 50%;
         transform: translateY(-50%);
+        display: block;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     `}</style>
   )

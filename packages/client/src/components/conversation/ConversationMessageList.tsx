@@ -2386,7 +2386,7 @@ function MessageDateDivider({ label }: { label: string }) {
 function MessageTimestamp({ value, isEdited = false }: { value?: string | null; isEdited?: boolean }) {
   if (!value || typeof value !== 'string' || value.trim().length === 0) return null
   return (
-    <div className="inline-flex items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
+    <div className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
       <time dateTime={value} title={formatDate(value)}>
         <span className="tabular-nums leading-none text-foreground/70">{formatTime(value)}</span>
       </time>
@@ -3066,16 +3066,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 flex items-center gap-2">
-                  <div className="text-sm font-bold font-mono text-foreground">
+                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                  <div className="min-w-0 text-sm font-bold font-mono text-foreground">
                     <HoverProfilePopover
                       trigger={
                         userProfileHref ? (
-                          <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                          <Link href={userProfileHref} className="block max-w-full truncate hover:underline underline-offset-2">
                             {authorLabel}
                           </Link>
                         ) : (
-                          <span>{authorLabel}</span>
+                          <span className="block max-w-full truncate">{authorLabel}</span>
                         )
                       }
                       content={userHoverCard}
@@ -3121,6 +3121,7 @@ const MemoizedMessageBubble = memo(
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={!isConsecutiveSameUser}
                   className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                   chunks={message.chunks}
                   reasoning={message.reasoning}
@@ -3256,6 +3257,7 @@ const MemoizedMessageBubble = memo(
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={true}
                   className={cn('text-foreground', isDeletedMessage && 'italic text-muted-foreground')}
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
@@ -3349,16 +3351,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 flex items-center gap-2">
-                  <div className="text-sm font-bold text-foreground">
+                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                  <div className="min-w-0 text-sm font-bold text-foreground">
                     <HoverProfilePopover
                       trigger={
                         assistantProfileHref ? (
-                          <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                          <Link href={assistantProfileHref} className="block max-w-full truncate font-mono hover:underline underline-offset-2">
                             {assistantDisplayName}
                           </Link>
                         ) : (
-                          <span className="font-mono">{assistantDisplayName}</span>
+                          <span className="block max-w-full truncate font-mono">{assistantDisplayName}</span>
                         )
                       }
                       content={assistantHoverCard}
@@ -3379,6 +3381,7 @@ const MemoizedMessageBubble = memo(
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
                 compact={true}
+                hasAuthorLine={Boolean(showAssistantAvatar)}
                 className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                 chunks={message.chunks}
                 reasoning={message.reasoning}

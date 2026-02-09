@@ -268,6 +268,48 @@ export function useCreateChannel() {
   })
 }
 
+export function useUpdateChannel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; channelId: string; name?: string; isPrivate?: boolean; topic?: string | null }): Promise<ChannelModel> => {
+      const response: FetchResponse<ApiResponse<{ channel: ChannelModel }>> = await api.patch(`/api/v1/channels/${encodeURIComponent(args.channelId)}`, {
+        ...(args.name !== undefined ? { name: args.name } : null),
+        ...(args.isPrivate !== undefined ? { isPrivate: args.isPrivate } : null),
+        ...(args.topic !== undefined ? { topic: args.topic } : null),
+      })
+      return response.data.data.channel
+    },
+    onSuccess: (_channel, variables) => {
+      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
+      toast.success('Channel updated!')
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to update channel', { description: errorMessage })
+    },
+  })
+}
+
+export function useDeleteChannel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; channelId: string }) => {
+      const response: FetchResponse<ApiResponse<{ deleted: boolean }>> = await api.delete(`/api/v1/channels/${encodeURIComponent(args.channelId)}`)
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
+      // Conversations lists can include channel-backed conversations; invalidate broadly.
+      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId) })
+      toast.success('Channel deleted')
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to delete channel', { description: errorMessage })
+    },
+  })
+}
+
 export function useChildConversations(parentConversationId: string | null, enabled: boolean = true) {
   return useQuery({
     queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.children(parentConversationId) : (['__noop__'] as const),

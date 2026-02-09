@@ -1102,8 +1102,27 @@ export function ConversationInterface({
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')} data-message-input>
+        <div
+          ref={inputContainerRef}
+          className={cn(
+            // Mobile: edge-to-edge (no horizontal padding) + iOS safe-area padding.
+            // Desktop: keep comfortable gutters.
+            'px-0 sm:px-4 md:px-6 pt-1.5',
+            // Docked/mobile: sit flush to bottom edge; only keep safe-area inset.
+            showMessagesArea
+              ? 'sticky bottom-0 z-[3] bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:pb-3'
+              : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
+            !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6'
+          )}
+        >
+          <div
+            className={cn(
+              // Mobile: full width. Larger: constrain + center.
+              'w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative',
+              !showMessagesArea && 'mt-8 sm:mt-12 lg:mt-16',
+            )}
+            data-message-input
+          >
             {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
             <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
               <h1 className="text-3xl font-normal mb-2 text-foreground">{starterSlogan}</h1>

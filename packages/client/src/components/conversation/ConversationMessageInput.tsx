@@ -2118,8 +2118,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Match the chat transcript's default message text size.
             'text-sm leading-relaxed',
             // Minimal mode should still feel comfortable (not cramped).
-            minimal ? 'min-h-[36px] max-h-[140px]' : isStarter ? 'min-h-[96px] max-h-[300px]' : 'min-h-[64px] max-h-[220px]',
-            'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+            // NOTE: Do NOT set max-height here; the scroll container lives outside the ProseMirror node.
+            // If ProseMirror has a max-height, overflowing content can be clipped without increasing the
+            // parent's scrollHeight, making long inputs appear "non-scrollable".
+            minimal ? 'min-h-[36px]' : isStarter ? 'min-h-[96px]' : 'min-h-[64px]',
             // Minimal mode has a small min-height; center the baseline within that space.
             // This does not change font size or the overall component height.
             minimal && 'tiptap--minimal'
@@ -2524,7 +2526,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
               }}
             >
-              <div className="max-h-[300px] overflow-y-auto">
+              <div
+                className={cn(
+                  'overflow-y-auto scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                  minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
+                )}
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 <EditorContent editor={tiptap} />
               </div>
 

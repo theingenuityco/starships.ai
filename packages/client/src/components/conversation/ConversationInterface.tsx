@@ -1104,11 +1104,17 @@ export function ConversationInterface({
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
         <div
           ref={inputContainerRef}
-          className={cn('px-3 sm:px-4 md:px-6 pb-3 pt-1.5', !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6 pb-6')}
+          className={cn(
+            // Mobile: edge-to-edge (no horizontal padding) + iOS safe-area padding.
+            // Desktop: keep comfortable gutters.
+            'px-0 sm:px-4 md:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5',
+            !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+          )}
         >
           <div
             className={cn(
-              'w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto pointer-events-auto opacity-100 relative',
+              // Mobile: full width. Larger: constrain + center.
+              'w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative',
               !showMessagesArea && 'mt-8 sm:mt-12 lg:mt-16',
             )}
             data-message-input

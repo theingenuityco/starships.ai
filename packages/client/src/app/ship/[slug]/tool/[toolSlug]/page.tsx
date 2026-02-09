@@ -86,8 +86,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       )}
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.sourceTemplateId} />
       {conversationId && (
-        <div className="absolute left-0 right-0 bottom-[22px] px-3 sm:px-4 md:px-6 z-30 pointer-events-none">
-          <div className="max-w-2xl sm:max-w-3xl lg:max-w-4xl mx-auto pointer-events-auto">
+        <div className="absolute left-0 right-0 bottom-[22px] px-0 sm:px-4 md:px-6 pb-[env(safe-area-inset-bottom)] z-30 pointer-events-none">
+          <div className="w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto">
             <ConversationMessageInput
               ref={messageInputRef}
               selectedAgent={selectedAgent}

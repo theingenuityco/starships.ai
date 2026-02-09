@@ -1433,6 +1433,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
     const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
 
+    // Mobile UX: Discord-like "focus mode" (secondary actions fade back once typing/focused).
+    const isMobileComposerEngaged = Boolean((isEditorFocused || hasActualContent) && !disabled && !isStreamingEffective)
+
     // TipTap editor with Mention extension to treat mentions as atomic units
 
     // Presence (online/offline) for mention suggestion avatars
@@ -2419,7 +2422,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Input Container with Expandable Overlay */}
-        <div className={cn('relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm', 'focus-within:border-primary/70', disabled && 'opacity-50')}>
+        <div
+          className={cn(
+            // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
+            // Desktop: keep the rounded composer card.
+            'relative transition-all overflow-visible bg-card shadow-sm',
+            'border-y border-border/60 sm:border sm:rounded-2xl rounded-none',
+            'focus-within:border-primary/70',
+            disabled && 'opacity-50'
+          )}
+        >
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && (
             <ExpandableMessageOverlay
@@ -2478,83 +2490,94 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Right-side Action Buttons Container */}
             <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-              {/* Attachment Button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || fileUploading}
-                className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                aria-label="Attach file"
-                title="Attach file (images, PDFs)"
-              >
-                <Icon name="paperclip" className="h-5 w-5" />
-              </button>
-
-              {/* Emoji Picker */}
-              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={!canEditComposer}
-                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                    aria-label="Insert emoji"
-                    title="Insert emoji"
-                  >
-                    <Icon name="smiley" className="h-5 w-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverPrimitive.Portal>
-                  <PopoverPrimitive.Content
-                    asChild
-                    align="end"
-                    side="top"
-                    sideOffset={8}
-                    // NOTE: With `asChild`, these classes land on the picker element.
-                    // Do not include bg/border/shadow resets here or we'll override the theme styling.
-                    className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
-                  >
-                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                  </PopoverPrimitive.Content>
-                </PopoverPrimitive.Portal>
-              </Popover>
-
-              {/* Web Browsing Toggle Button - Available from the start */}
-              <button
-                onClick={() => {
-                  if (conversationId) {
-                    // Update existing conversation
-                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
-                    updateConversationState.mutate({
-                      conversationId,
-                      state: {
-                        plugins: newPlugins,
-                      } as ConversationState,
-                    })
-                  } else {
-                    // Store preference for when conversation is created
-                    setPendingWebBrowsing(!pendingWebBrowsing)
-                  }
-                }}
-                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
                 className={cn(
-                  'group flex items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
-                  hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                  'flex items-center gap-2 transition-opacity duration-200',
+                  isMobileComposerEngaged && 'opacity-30',
+                  'sm:opacity-100'
                 )}
-                aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
               >
-                {hasWebBrowsing ? (
-                  <>
-                    <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                      <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                      <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
-                  </>
-                ) : (
-                  <Icon name="globe" className="h-5 w-5" />
-                )}
-              </button>
+                {/* Attachment Button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || fileUploading}
+                  className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                  aria-label="Attach file"
+                  title="Attach file (images, PDFs)"
+                >
+                  <Icon name="paperclip" className="h-5 w-5" />
+                </button>
+
+                {/* Emoji Picker */}
+                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={!canEditComposer}
+                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      aria-label="Insert emoji"
+                      title="Insert emoji"
+                    >
+                      <Icon name="smiley" className="h-5 w-5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverPrimitive.Portal>
+                    <PopoverPrimitive.Content
+                      asChild
+                      align="end"
+                      side="top"
+                      sideOffset={8}
+                      // NOTE: With `asChild`, these classes land on the picker element.
+                      // Do not include bg/border/shadow resets here or we'll override the theme styling.
+                      className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                    >
+                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    </PopoverPrimitive.Content>
+                  </PopoverPrimitive.Portal>
+                </Popover>
+
+                {/* Web Browsing Toggle Button - Available from the start */}
+                <button
+                  onClick={() => {
+                    if (conversationId) {
+                      // Update existing conversation
+                      const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                      updateConversationState.mutate({
+                        conversationId,
+                        state: {
+                          plugins: newPlugins,
+                        } as ConversationState,
+                      })
+                    } else {
+                      // Store preference for when conversation is created
+                      setPendingWebBrowsing(!pendingWebBrowsing)
+                    }
+                  }}
+                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                  className={cn(
+                    'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                    hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    // Mobile: when engaged, hide the toggle to keep the composer feeling focused.
+                    isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                  )}
+                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                >
+                  {hasWebBrowsing ? (
+                    <>
+                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                    </>
+                  ) : (
+                    <Icon name="globe" className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
 
               {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (

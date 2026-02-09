@@ -260,13 +260,22 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const isThreadPaneOpen = Boolean(threadKey)
   const THREAD_PANE_ANIM_MS = 300
+  const THREAD_PANE_OPEN_CONTENT_DELAY_MS = 120
   const [isThreadPaneMounted, setIsThreadPaneMounted] = useState<boolean>(isThreadPaneOpen)
+  const openMountTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (isThreadPaneOpen) {
-      setIsThreadPaneMounted(true)
-      return
+      // Let the pane animate open immediately; mount heavy content shortly after.
+      if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+      openMountTimerRef.current = window.setTimeout(() => setIsThreadPaneMounted(true), THREAD_PANE_OPEN_CONTENT_DELAY_MS)
+      return () => {
+        if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+        openMountTimerRef.current = null
+      }
     }
+    if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+    openMountTimerRef.current = null
     const t = window.setTimeout(() => setIsThreadPaneMounted(false), THREAD_PANE_ANIM_MS)
     return () => window.clearTimeout(t)
   }, [isThreadPaneOpen])
@@ -703,7 +712,11 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           />
 
           <div className="h-full pl-[1px]">
-            {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" /> : null}
+            {isThreadPaneMounted ? (
+              <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
+            )}
           </div>
         </aside>
       </>
@@ -717,7 +730,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         }}
         aria-hidden={!isThreadPaneOpen}
       >
-        {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} /> : null}
+        {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} /> : <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>}
       </aside>
 
       {/* Hide children since ConversationInterface now handles everything */}

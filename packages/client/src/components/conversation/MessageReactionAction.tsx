@@ -34,7 +34,8 @@ export function MessageReactionAction({
   const userId = typeof authUserId === 'string' ? authUserId : ''
 
   const canReact = Boolean(!disabled && conversationId && messageId && userId)
-  const quickEmojis = useMemo(() => ['👍', '❤️', '😂', '😮', '🎉'], [])
+  // Keep the hover actions compact: only show 3 quick reactions.
+  const quickEmojis = useMemo(() => ['👍', '❤️', '😂'], [])
 
   const doToggle = (emojiRaw: string) => {
     const emoji = String(emojiRaw || '').trim()

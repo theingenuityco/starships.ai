@@ -2637,6 +2637,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               )}
             </div>
           </div>
+
+          {/* Disclaimer: only show when an agent is tagged in the draft */}
+          {draftHasAgentMention && (
+            <div
+              className={cn(
+                'border-t border-border/40 text-[11px] leading-snug text-muted-foreground',
+                minimal ? 'px-3 py-1' : 'px-3 py-1.5'
+              )}
+            >
+              Agents use AI and may make mistakes. Double-check important details before sending.
+            </div>
+          )}
         </div>
 
         {/* Cost hint (non-minimal) - moved below the composer */}

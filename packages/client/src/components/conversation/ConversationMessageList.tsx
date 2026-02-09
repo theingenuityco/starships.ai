@@ -1457,6 +1457,7 @@ export function ConversationMessageList({
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
   const lastAutoScrollThreadIdRef = useRef<string | null>(null)
+  const threadOpenAutoScrollTimeoutRef = useRef<number | null>(null)
   useLayoutEffect(() => {
     // When the thread pane opens, the main pane shrinks which can reflow text and
     // push the clicked "thread card" message out of view. Best-effort: scroll the
@@ -1477,38 +1478,62 @@ export function ConversationMessageList({
     const el = cardEl ?? messageRefs.current[messageId]
     if (!el) return
 
-    // Defer to next frame so layout reflow from pane resize is applied.
-    requestAnimationFrame(() => {
-      const c = scrollContainerRef.current
-      const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
-      if (!c || !node) return
+    const runScroll = (behavior: ScrollBehavior) => {
+      // Defer to next frame so layout reflow from pane resize is applied.
+      requestAnimationFrame(() => {
+        const c = scrollContainerRef.current
+        const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
+        if (!c || !node) return
 
-      const cRect = c.getBoundingClientRect()
-      const r = node.getBoundingClientRect()
-      const pad = 16
-      const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
-      // On thread-open we prefer centering the thread card even if it's already visible,
-      // to avoid it drifting out of view after the pane shrink/reflow.
-      if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
-        // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
-        // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
-        try {
-          const currentTop = c.scrollTop
-          const deltaTop = r.top - cRect.top
-          const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
-          const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
-          const nextTop = Math.max(0, Math.min(maxTop, desired))
-          // Update the "stick to bottom" lock immediately so we don't auto-snap back down
-          // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
-          isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
-          c.scrollTo({ top: nextTop, behavior: 'smooth' })
-        } catch {
-          /* ignore */
+        const cRect = c.getBoundingClientRect()
+        const r = node.getBoundingClientRect()
+        const pad = 16
+        const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
+        // On thread-open we prefer centering the thread card even if it's already visible,
+        // to avoid it drifting out of view after the pane shrink/reflow.
+        if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
+          // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
+          // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
+          try {
+            const currentTop = c.scrollTop
+            const deltaTop = r.top - cRect.top
+            const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
+            const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
+            const nextTop = Math.max(0, Math.min(maxTop, desired))
+            // Update the "stick to bottom" lock immediately so we don't auto-snap back down
+            // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
+            isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
+            c.scrollTo({ top: nextTop, behavior })
+          } catch {
+            /* ignore */
+          }
         }
-      } else {
-      }
+      })
+    }
+
+    // Cancel any prior scheduled correction.
+    if (threadOpenAutoScrollTimeoutRef.current != null) {
+      window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+      threadOpenAutoScrollTimeoutRef.current = null
+    }
+
+    // 1) Immediate best-effort scroll after the first reflow.
+    runScroll('smooth')
+
+    // 2) Correction scroll after the thread pane width transition completes (layout keeps shifting during the 300ms animation).
+    // This prevents occasional mis-calculation when we measure mid-transition.
+    threadOpenAutoScrollTimeoutRef.current = window.setTimeout(() => {
+      threadOpenAutoScrollTimeoutRef.current = null
+      runScroll('auto')
       lastAutoScrollThreadIdRef.current = tid
-    })
+    }, 320)
+
+    return () => {
+      if (threadOpenAutoScrollTimeoutRef.current != null) {
+        window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+        threadOpenAutoScrollTimeoutRef.current = null
+      }
+    }
   }, [activeThreadConversationId, activeThreadParentMessageId])
 
   // Optimized auto-scroll with debouncing (now supports streaming progress).

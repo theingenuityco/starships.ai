@@ -1107,8 +1107,12 @@ export function ConversationInterface({
           className={cn(
             // Mobile: edge-to-edge (no horizontal padding) + iOS safe-area padding.
             // Desktop: keep comfortable gutters.
-            'px-0 sm:px-4 md:px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-1.5',
-            !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'
+            'px-0 sm:px-4 md:px-6 pt-1.5',
+            // Docked/mobile: sit flush to bottom edge; only keep safe-area inset.
+            showMessagesArea
+              ? 'sticky bottom-0 z-[3] bg-background pb-[env(safe-area-inset-bottom)] sm:static sm:pb-3'
+              : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))]',
+            !showMessagesArea && 'pt-3 sm:pt-4 lg:pt-6'
           )}
         >
           <div

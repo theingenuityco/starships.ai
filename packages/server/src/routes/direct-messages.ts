@@ -217,10 +217,11 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
       return;
     }
 
-    const userAId = authUserId.localeCompare(peerUserId) < 0 ? authUserId : peerUserId;
-    const userBId = authUserId.localeCompare(peerUserId) < 0 ? peerUserId : authUserId;
-
-    const existing = await dmRepo.findUserUserDm(params.starshipId, userAId, userBId).catch(() => null);
+    // IMPORTANT:
+    // The DB enforces a normalized pair via CHECK (user_a_id < user_b_id) under Postgres collation.
+    // Do not use JS localeCompare() here (can disagree with Postgres ordering for some IDs).
+    // The repository normalizes in SQL using LEAST/GREATEST for both lookup and insert.
+    const existing = await dmRepo.findUserUserDm(params.starshipId, authUserId, peerUserId).catch(() => null);
     if (existing) {
       sendSuccess(res, { dm: existing, conversationId: existing.conversationId }, 200);
       return;
@@ -247,14 +248,14 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
         conversationId: conversation.id,
         starshipId: params.starshipId,
         dmType: 'user_user',
-        userAId,
-        userBId,
+        userAId: authUserId,
+        userBId: peerUserId,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt ?? conversation.createdAt,
       });
     } catch (e) {
       // Race condition safety: see user↔agent path above.
-      const winner = await dmRepo.findUserUserDm(params.starshipId, userAId, userBId).catch(() => null);
+      const winner = await dmRepo.findUserUserDm(params.starshipId, authUserId, peerUserId).catch(() => null);
       if (winner) {
         void conversationService.deleteConversation(conversation.id).catch(() => undefined);
         sendSuccess(res, { dm: winner, conversationId: winner.conversationId }, 200);

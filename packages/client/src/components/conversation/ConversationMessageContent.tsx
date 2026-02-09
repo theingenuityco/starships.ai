@@ -300,8 +300,10 @@ interface MessageContentProps {
   className?: string
   enableMarkdown?: boolean
   enableCopy?: boolean
-  /** Optional extra action buttons rendered next to copy/export (e.g. "Start thread"). */
+  /** Optional action buttons rendered in the floating actions pill (e.g. reactions, thread). */
   extraActions?: ReactNode
+  /** Optional action buttons rendered after the copy button (e.g. "More options"). */
+  extraActionsAfterCopy?: ReactNode
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
@@ -512,6 +514,7 @@ export function ConversationMessageContent({
   enableMarkdown = true,
   enableCopy = true,
   extraActions,
+  extraActionsAfterCopy,
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
@@ -1126,7 +1129,7 @@ export function ConversationMessageContent({
           <div className="relative w-full group/content-chunk">
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
-            {(enableCopy || extraActions) && (
+            {(enableCopy || extraActions || extraActionsAfterCopy) && (
               <div className="pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   {extraActions}
@@ -1137,6 +1140,7 @@ export function ConversationMessageContent({
                       </Button>
                     </>
                   )}
+                  {extraActionsAfterCopy}
                 </div>
               </div>
             )}
@@ -1149,7 +1153,7 @@ export function ConversationMessageContent({
               )}
             >
               {shouldRenderEmojiOnlyPlain ? (
-                <div className={cn('not-prose whitespace-pre-wrap break-words', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
+                <div className={cn('not-prose whitespace-pre-wrap break-words text-foreground', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
               ) : (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}

@@ -67,8 +67,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     if (w >= 1024) return 600
     return 480
   })
+  const [isResizingThreadPane, setIsResizingThreadPane] = useState<boolean>(false)
+  const rootRef = useRef<HTMLDivElement>(null)
   const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
+  const resizeRafRef = useRef<number | null>(null)
+  const pendingThreadPaneWidthPxRef = useRef<number | null>(null)
 
   const clampThreadPaneWidthPx = useCallback((w: number) => {
     const min = 320
@@ -132,29 +136,56 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
       const startX = e.clientX
       const startWidth = threadPaneWidthPx
+      setIsResizingThreadPane(true)
 
       const prevUserSelect = document.body.style.userSelect
       document.body.style.userSelect = 'none'
 
       resizeStateRef.current = { startX, startWidth, prevUserSelect }
 
+      const applyWidth = (w: number) => {
+        try {
+          rootRef.current?.style.setProperty('--thread-pane-width', `${w}px`)
+        } catch {
+          // ignore
+        }
+      }
+
       const onMove = (ev: PointerEvent) => {
         const state = resizeStateRef.current
         if (!state) return
         // Pane is on the right; moving pointer right shrinks the pane.
         const dx = ev.clientX - state.startX
-        setThreadPaneWidthPx(clampThreadPaneWidthPx(state.startWidth - dx))
+        const next = clampThreadPaneWidthPx(state.startWidth - dx)
+        pendingThreadPaneWidthPxRef.current = next
+        if (resizeRafRef.current != null) return
+        resizeRafRef.current = window.requestAnimationFrame(() => {
+          resizeRafRef.current = null
+          const w = pendingThreadPaneWidthPxRef.current
+          if (typeof w === 'number') applyWidth(w)
+        })
       }
 
       const cleanup = () => {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+        if (resizeRafRef.current != null) {
+          window.cancelAnimationFrame(resizeRafRef.current)
+          resizeRafRef.current = null
+        }
         const state = resizeStateRef.current
         if (state) {
           document.body.style.userSelect = state.prevUserSelect
         }
         resizeStateRef.current = null
         resizeCleanupRef.current = null
+        const finalW = pendingThreadPaneWidthPxRef.current
+        pendingThreadPaneWidthPxRef.current = null
+        if (typeof finalW === 'number') {
+          applyWidth(finalW)
+          setThreadPaneWidthPx(finalW)
+        }
+        setIsResizingThreadPane(false)
       }
 
       const onUp = () => cleanup()
@@ -226,6 +257,28 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     if (threadKey === 'draft') return null
     return threadKey
   }, [threadKey])
+
+  const isThreadPaneOpen = Boolean(threadKey)
+  const THREAD_PANE_ANIM_MS = 300
+  const THREAD_PANE_OPEN_CONTENT_DELAY_MS = 120
+  const [isThreadPaneMounted, setIsThreadPaneMounted] = useState<boolean>(isThreadPaneOpen)
+  const openMountTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (isThreadPaneOpen) {
+      // Let the pane animate open immediately; mount heavy content shortly after.
+      if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+      openMountTimerRef.current = window.setTimeout(() => setIsThreadPaneMounted(true), THREAD_PANE_OPEN_CONTENT_DELAY_MS)
+      return () => {
+        if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+        openMountTimerRef.current = null
+      }
+    }
+    if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+    openMountTimerRef.current = null
+    const t = window.setTimeout(() => setIsThreadPaneMounted(false), THREAD_PANE_ANIM_MS)
+    return () => window.clearTimeout(t)
+  }, [isThreadPaneOpen])
 
   useEffect(() => {
     const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
@@ -542,8 +595,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return null // Layout handles loading/error states
   }
 
-  const isThreadPaneOpen = Boolean(threadKey)
-
   // IMPORTANT: do not add hooks below conditional early-returns (starshipData loading, onboarding, etc.).
   // A plain object avoids violating Rules of Hooks when starshipData appears/disappears between renders.
   const threadPaneSharedProps = {
@@ -560,7 +611,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   } as const
 
   return (
-    <div className="h-screen w-full flex flex-col md:flex-row min-w-0">
+    <div
+      ref={rootRef}
+      className="relative h-screen w-full flex flex-col md:flex-row min-w-0"
+      style={{
+        ['--thread-pane-width' as any]: `${threadPaneWidthPx}px`,
+      }}
+    >
       <div
         className="flex-1 min-w-0 h-full"
         style={{
@@ -619,38 +676,62 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       </div>
 
       {/* Thread split pane (desktop/tablet) */}
-      {isThreadPaneOpen ? (
-        <>
-          {/* Draggable resize handle (desktop/tablet) */}
-          <div className="hidden md:flex relative h-full w-[1px] flex-shrink-0 bg-border">
-            {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
-            <div
-              className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize thread pane"
-              onPointerDown={handleThreadResizePointerDown}
-              title="Drag to resize"
-            />
-          </div>
+      <>
+        {/* Spacer (in flow): animates the main column width smoothly. */}
+        <div
+          className={`hidden md:block h-full flex-shrink-0 ${isResizingThreadPane ? '' : 'transition-all duration-300 ease-in-out'}`}
+          style={{
+            width: isThreadPaneOpen ? 'var(--thread-pane-width)' : 0,
+            willChange: 'width',
+          }}
+          aria-hidden="true"
+        />
 
-          <aside
-            className="hidden md:block h-full flex-shrink-0 bg-background min-w-0"
-            style={{
-              width: threadPaneWidthPx,
-            }}
-          >
-            <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
-          </aside>
-        </>
-      ) : null}
+        {/* Thread pane (overlay): slide using transform for smoothness. */}
+        <aside
+          className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{
+            width: 'var(--thread-pane-width)',
+            transform: isThreadPaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
+            transition: isResizingThreadPane ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out',
+            willChange: 'transform, opacity',
+            contain: 'layout style paint',
+          }}
+          aria-hidden={!isThreadPaneOpen}
+        >
+          {/* Divider + resize hit-area */}
+          <div className="absolute inset-y-0 left-0 w-[1px] bg-border" aria-hidden="true" />
+          {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
+          <div
+            className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize thread pane"
+            onPointerDown={handleThreadResizePointerDown}
+            title="Drag to resize"
+          />
+
+          <div className="h-full pl-[1px]">
+            {isThreadPaneMounted ? (
+              <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
+            )}
+          </div>
+        </aside>
+      </>
 
       {/* Thread in-flow pane (mobile) */}
-      {isThreadPaneOpen ? (
-        <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border bg-background min-w-0">
-          <ThreadPane {...threadPaneSharedProps} />
-        </aside>
-      ) : null}
+      <aside
+        className={`md:hidden flex-shrink-0 bg-background min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${isThreadPaneOpen ? 'border-t border-border opacity-100 pointer-events-auto' : 'border-t-0 opacity-0 pointer-events-none'}`}
+        style={{
+          height: isThreadPaneOpen ? '45vh' : '0px',
+          willChange: 'height, opacity',
+        }}
+        aria-hidden={!isThreadPaneOpen}
+      >
+        {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} /> : <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>}
+      </aside>
 
       {/* Hide children since ConversationInterface now handles everything */}
       <div style={{ display: 'none' }}>{children}</div>

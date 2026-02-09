@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -1456,6 +1457,7 @@ export function ConversationMessageList({
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
   const lastAutoScrollThreadIdRef = useRef<string | null>(null)
+  const threadOpenAutoScrollTimeoutRef = useRef<number | null>(null)
   useLayoutEffect(() => {
     // When the thread pane opens, the main pane shrinks which can reflow text and
     // push the clicked "thread card" message out of view. Best-effort: scroll the
@@ -1476,38 +1478,62 @@ export function ConversationMessageList({
     const el = cardEl ?? messageRefs.current[messageId]
     if (!el) return
 
-    // Defer to next frame so layout reflow from pane resize is applied.
-    requestAnimationFrame(() => {
-      const c = scrollContainerRef.current
-      const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
-      if (!c || !node) return
+    const runScroll = (behavior: ScrollBehavior) => {
+      // Defer to next frame so layout reflow from pane resize is applied.
+      requestAnimationFrame(() => {
+        const c = scrollContainerRef.current
+        const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
+        if (!c || !node) return
 
-      const cRect = c.getBoundingClientRect()
-      const r = node.getBoundingClientRect()
-      const pad = 16
-      const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
-      // On thread-open we prefer centering the thread card even if it's already visible,
-      // to avoid it drifting out of view after the pane shrink/reflow.
-      if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
-        // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
-        // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
-        try {
-          const currentTop = c.scrollTop
-          const deltaTop = r.top - cRect.top
-          const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
-          const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
-          const nextTop = Math.max(0, Math.min(maxTop, desired))
-          // Update the "stick to bottom" lock immediately so we don't auto-snap back down
-          // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
-          isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
-          c.scrollTo({ top: nextTop, behavior: 'smooth' })
-        } catch {
-          /* ignore */
+        const cRect = c.getBoundingClientRect()
+        const r = node.getBoundingClientRect()
+        const pad = 16
+        const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
+        // On thread-open we prefer centering the thread card even if it's already visible,
+        // to avoid it drifting out of view after the pane shrink/reflow.
+        if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
+          // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
+          // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
+          try {
+            const currentTop = c.scrollTop
+            const deltaTop = r.top - cRect.top
+            const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
+            const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
+            const nextTop = Math.max(0, Math.min(maxTop, desired))
+            // Update the "stick to bottom" lock immediately so we don't auto-snap back down
+            // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
+            isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
+            c.scrollTo({ top: nextTop, behavior })
+          } catch {
+            /* ignore */
+          }
         }
-      } else {
-      }
+      })
+    }
+
+    // Cancel any prior scheduled correction.
+    if (threadOpenAutoScrollTimeoutRef.current != null) {
+      window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+      threadOpenAutoScrollTimeoutRef.current = null
+    }
+
+    // 1) Immediate best-effort scroll after the first reflow.
+    runScroll('smooth')
+
+    // 2) Correction scroll after the thread pane width transition completes (layout keeps shifting during the 300ms animation).
+    // This prevents occasional mis-calculation when we measure mid-transition.
+    threadOpenAutoScrollTimeoutRef.current = window.setTimeout(() => {
+      threadOpenAutoScrollTimeoutRef.current = null
+      runScroll('auto')
       lastAutoScrollThreadIdRef.current = tid
-    })
+    }, 320)
+
+    return () => {
+      if (threadOpenAutoScrollTimeoutRef.current != null) {
+        window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+        threadOpenAutoScrollTimeoutRef.current = null
+      }
+    }
   }, [activeThreadConversationId, activeThreadParentMessageId])
 
   // Optimized auto-scroll with debouncing (now supports streaming progress).
@@ -2390,15 +2416,19 @@ function getDeletedMessageLabel(isAuthedUserMessage: boolean): string {
   return isAuthedUserMessage ? 'Message deleted by you.' : 'Message deleted by user.'
 }
 
-function MessageOwnerActions({
+function MessageMoreActions({
   messageId,
   disabled,
+  canEdit,
+  canDelete,
   isEditing,
   onStartEdit,
   onCancelEdit,
 }: {
   messageId: string
   disabled?: boolean
+  canEdit: boolean
+  canDelete: boolean
   isEditing: boolean
   onStartEdit: () => void
   onCancelEdit: () => void
@@ -2406,35 +2436,60 @@ function MessageOwnerActions({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const deleteMessage = useDeleteMessage()
 
-  const canDelete = !deleteMessage.isPending
+  const canConfirmDelete = !deleteMessage.isPending
 
   if (disabled) return null
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => (isEditing ? onCancelEdit() : onStartEdit())}
-        aria-label={isEditing ? 'Cancel edit' : 'Edit message'}
-        title={isEditing ? 'Cancel edit' : 'Edit message'}
-      >
-        <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-destructive hover:text-destructive"
-        onClick={() => setDeleteOpen(true)}
-        aria-label="Delete message"
-        title="Delete message"
-        disabled={isEditing}
-      >
-        <Icon name="trash" className="h-4 w-4" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="More options" title="More options">
+            <Icon name="dots-horizontal" className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[180px]">
+          <DropdownMenuItem
+            onSelect={async e => {
+              e.preventDefault()
+              try {
+                await navigator.clipboard.writeText(String(messageId))
+              } catch {
+                // ignore clipboard failures
+              }
+            }}
+          >
+            <Icon name="copy" className="h-4 w-4" />
+            Copy message ID
+          </DropdownMenuItem>
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+          {canEdit ? (
+            <DropdownMenuItem
+              onSelect={e => {
+                e.preventDefault()
+                isEditing ? onCancelEdit() : onStartEdit()
+              }}
+            >
+              <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
+              {isEditing ? 'Cancel edit' : 'Edit message'}
+            </DropdownMenuItem>
+          ) : null}
+          {canDelete ? (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              disabled={isEditing}
+              onSelect={e => {
+                e.preventDefault()
+                setDeleteOpen(true)
+              }}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+              Delete message
+            </DropdownMenuItem>
+          ) : null}
+          {!canEdit && !canDelete ? <DropdownMenuItem disabled>No other actions</DropdownMenuItem> : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={deleteOpen} onOpenChange={open => setDeleteOpen(open)}>
         <DialogContent className="sm:max-w-md">
@@ -2450,7 +2505,7 @@ function MessageOwnerActions({
               type="button"
               variant="destructive"
               onClick={async () => {
-                if (!canDelete) return
+                if (!canConfirmDelete) return
                 try {
                   await deleteMessage.mutateAsync(messageId)
                   setDeleteOpen(false)
@@ -2458,7 +2513,7 @@ function MessageOwnerActions({
                   // Error toast handled in hook
                 }
               }}
-              disabled={!canDelete}
+              disabled={!canConfirmDelete}
             >
               Delete
             </Button>
@@ -2715,17 +2770,20 @@ const MemoizedMessageBubble = memo(
       return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
     }, [cid, isDeletedMessage, message.id])
 
-    const ownerActionButtons = useMemo(() => {
+    const moreActionButton = useMemo(() => {
       const id = typeof message.id === 'string' ? message.id : ''
       if (!id) return null
-      if (!isUser) return null
-      if (!isAuthedUserMessage) return null
       if (isDeletedMessage) return null
-      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      const isEphemeral = id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')
+      // Allow the menu even for ephemeral IDs (useful during streaming/sending), but disable edit/delete.
+      const canEdit = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
+      const canDeleteMsg = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
       return (
-        <MessageOwnerActions
+        <MessageMoreActions
           messageId={id}
           isEditing={isEditing}
+          canEdit={canEdit}
+          canDelete={canDeleteMsg}
           onStartEdit={() => {
             setEditDraft(String(message.content ?? ''))
             setIsEditing(true)
@@ -2735,16 +2793,15 @@ const MemoizedMessageBubble = memo(
       )
     }, [isAuthedUserMessage, isDeletedMessage, isEditing, isUser, message.content, message.id])
 
-    const messageActionNodes = useMemo(() => {
-      if (!threadActionButton && !reactionActionButton && !ownerActionButtons) return null
+    const messageActionNodesBeforeCopy = useMemo(() => {
+      if (!threadActionButton && !reactionActionButton) return null
       return (
         <>
           {reactionActionButton}
           {threadActionButton}
-          {ownerActionButtons}
         </>
       )
-    }, [ownerActionButtons, reactionActionButton, threadActionButton])
+    }, [reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -3058,7 +3115,8 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
@@ -3192,7 +3250,8 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive && !isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
@@ -3314,7 +3373,8 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive && !isDeletedMessage}
-                extraActions={messageActionNodes}
+                extraActions={messageActionNodesBeforeCopy}
+                extraActionsAfterCopy={moreActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).

@@ -2470,7 +2470,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <div
                 className={cn(
                   'flex items-center gap-1 transition-opacity duration-200',
-                  isMobileComposerEngaged && 'opacity-30',
+                  // Mobile: don't dim attachment/emoji while the editor is focused (they should still look tappable).
+                  isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
                   'sm:opacity-100'
                 )}
               >

@@ -164,6 +164,38 @@ export async function uploadAgentTemplateAvatarToS3(options: {
 }
 
 /**
+ * Upload a public profile image for an agent template.
+ * These are served via API routes and stored in S3 under a stable prefix.
+ */
+export async function uploadAgentTemplateProfileImageToS3(options: {
+  templateId: string;
+  type: 'problem_statements' | 'capabilities' | 'try_these_prompts';
+  filename: string;
+  mimeType: string;
+  buffer: Buffer;
+}): Promise<string> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const timestamp = Date.now();
+  const sanitizedFilename = options.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const typeSlug = String(options.type).replace(/[^a-z0-9_-]/gi, '_');
+  const s3Key = `public/agent-templates/${options.templateId}/profile_${typeSlug}_${timestamp}_${sanitizedFilename}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+    Body: options.buffer,
+    ContentType: options.mimeType,
+  });
+
+  await getS3Client().send(command);
+  return s3Key;
+}
+
+/**
  * Delete file from S3
  *
  * @param s3Key - S3 object key to delete

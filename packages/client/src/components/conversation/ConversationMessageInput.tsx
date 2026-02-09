@@ -3,6 +3,8 @@
 import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger } from '@/components/ui/popover'
+import { EmojiPicker } from '@/components/emoji/EmojiPicker'
 import { useAuth } from '@/hooks/useAuth'
 import {
   CONVERSATION_QUERY_KEYS,
@@ -49,6 +51,7 @@ import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -136,6 +139,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
+    const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
     const isStarter = !conversationId
     const { data: channelsData } = useStarshipChannels(starshipId, Boolean(starshipId && conversationId))
     const isChannelConversation = useMemo(() => {
@@ -276,6 +280,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Provide editor operations without referencing the editor before initialization
     const clearEditorRef = useRef<() => void>(() => {})
+    // TipTap editor props can capture stale closures; use a ref for the latest submit handler.
+    const submitRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
     const createDirectMessage = useCreateDirectMessage()
@@ -343,6 +349,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const isStreamingEffective = Boolean(sending || hookBusy)
     const shouldShowStop = Boolean(sending || hookBusy)
     const showLoaderRing = Boolean(shouldShowStop)
+    const canEditComposer = Boolean(!disabled && !isStreamingEffective && !sending)
+
+    // Close the emoji picker whenever the composer becomes non-editable (streaming/disabled).
+    useEffect(() => {
+      if (!canEditComposer && emojiPickerOpen) setEmojiPickerOpen(false)
+    }, [canEditComposer, emojiPickerOpen])
 
     // Context-window usage (mirrors server behavior: last N persisted messages + optional fold message).
     // IMPORTANT: this is **not** lifetime token usage; it's a proxy for how "full" the next-turn context is
@@ -654,8 +666,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
+      const hasPendingAttachments = pendingFiles.length > 0
       // CRITICAL: Check if already blocked (synchronous ref check first)
-      if (!messageToSend || sending || disabled || isStreamingEffective || streamingRef.current) return
+      // Allow sending with ONLY file attachments (no text required).
+      if ((!messageToSend && !hasPendingAttachments) || sending || disabled || isStreamingEffective || streamingRef.current) return
 
       // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
       streamingRef.current = true
@@ -727,7 +741,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // - Default to the UI-selected agent for non-mention contexts (e.g. draft threads opened from an agent message).
       // - Then apply context rules (channel/DM/thread) and allow explicit leading @mention to override where applicable.
       let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
-      let contentToSend = messageToSend
+      // Server-side validation requires non-empty content. For attachment-only sends, send a single space so the UI renders as attachments-only.
+      let contentToSend = messageToSend || (hasPendingAttachments ? ' ' : '')
       if (isUserUserDm) {
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
@@ -794,7 +809,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // If a thread has *no* agent selected/mentioned and *no* linked agents,
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !isMentionOnlyThread && !effectiveAgent)
+      const isAttachmentOnlySend = Boolean(hasPendingAttachments && !messageToSend)
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
@@ -833,7 +849,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         return
       }
 
-      // contentToSend already validated via messageToSend trim
+      // contentToSend validated: non-empty text OR attachment-only placeholder space.
 
       if (!starshipId) {
         resetFlags()
@@ -1138,6 +1154,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [
       draftDirectMessageTarget,
       message,
+      pendingFiles,
       sending,
       disabled,
       isStreamingEffective,
@@ -1161,9 +1178,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       onAgentChange,
       starshipAgents,
+      uploadFile,
       queryClient,
       applyPendingWebBrowsing,
     ])
+
+    // Keep a stable ref for TipTap's Enter key handler.
+    useEffect(() => {
+      submitRef.current = () => {
+        void handleSubmit()
+      }
+    }, [handleSubmit])
 
     // Handle suggestion clicks
     const handleSuggestionSubmit = useCallback(
@@ -1367,7 +1392,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           : isMentionOnlyThread
             ? hasLeadingMentionToken
             : hasLeadingMentionToken || (isThreadConversation && linkedAgentCount === 1) || (isThreadContext && linkedAgentCount === 0)
-    const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
+    const hasPendingAttachments = pendingFiles.length > 0
+    const hasSendableContent = hasActualContent || hasPendingAttachments
+    // Preserve existing agent-target gating for text, but allow attachment-only sends without text.
+    const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
+    const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -2081,7 +2110,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               return true
             }
             event.preventDefault()
-            handleSubmit()
+            submitRef.current?.()
             return true
           }
           return false
@@ -2092,6 +2121,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setHasActualContent(Boolean(editor.getText().trim()))
       },
     })
+
+    const handleEmojiSelect = useCallback(
+      (emojiRaw: string) => {
+        const emoji = String(emojiRaw || '').trim()
+        if (!emoji) return
+        try {
+          // Requirement: append to the end of whatever is currently in the composer.
+          tiptap?.chain().focus('end').insertContent(emoji).run()
+        } catch {}
+        // Close after selection for a smooth UX.
+        setEmojiPickerOpen(false)
+      },
+      [tiptap]
+    )
 
     // Note: Removed forced dispatch that was causing cursor jumping issues
     // Modern TipTap should handle placeholder updates automatically
@@ -2371,7 +2414,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-40 relative z-10')}
+              className={cn('flex-1 min-w-0 pr-52 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
@@ -2383,7 +2426,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-40">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-52">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -2405,6 +2448,34 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               >
                 <Icon name="paperclip" className="h-5 w-5" />
               </button>
+
+              {/* Emoji Picker */}
+              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={!canEditComposer}
+                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                    aria-label="Insert emoji"
+                    title="Insert emoji"
+                  >
+                    <Icon name="smiley" className="h-5 w-5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverPrimitive.Portal>
+                  <PopoverPrimitive.Content
+                    asChild
+                    align="end"
+                    side="top"
+                    sideOffset={8}
+                    // NOTE: With `asChild`, these classes land on the picker element.
+                    // Do not include bg/border/shadow resets here or we'll override the theme styling.
+                    className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                  >
+                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                  </PopoverPrimitive.Content>
+                </PopoverPrimitive.Portal>
+              </Popover>
 
               {/* Web Browsing Toggle Button - Available from the start */}
               <button

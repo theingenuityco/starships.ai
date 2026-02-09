@@ -984,6 +984,28 @@ router.get('/admin/agents/:id/tools', async (req: Request, res: Response): Promi
   }
 });
 
+// POST /admin/agents/:id/marketing/generate - Generate agent marketing content (instance admin only)
+router.post('/admin/agents/:id/marketing/generate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.generateAgentMarketingContent(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Agent marketing content generated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error generating agent marketing content:', error);
+    handleError(error, res, 'generating agent marketing content');
+  }
+});
+
 // POST /agents/:id/publication/prepare - Prepare publication (generate missing marketing content)
 router.post('/agents/:id/publication/prepare', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -1108,9 +1130,8 @@ router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Pr
     const adminUserId = req.user!.id;
 
     const agentService = new AgentService();
-    // For backwards compatibility, prepare then confirm
-    await agentService.preparePublication(agentId, adminUserId);
-    const updated = await agentService.confirmPublication(agentId, adminUserId);
+    // For backwards compatibility, publish without triggering marketing-content generation.
+    const updated = await agentService.approvePublication(agentId, adminUserId);
 
     // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
     triggerNextRevalidate({ tags: ['public-agent-templates'] });

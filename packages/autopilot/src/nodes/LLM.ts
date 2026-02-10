@@ -582,6 +582,22 @@ export class LLM extends BaseNode<LlmParams> {
     const MAX_TOOL_TEXT_CHARS = 20_000;
     const MAX_ANY_TEXT_CHARS = 60_000;
 
+    const stripEmbeddedImageDataUrls = (raw: string): { stripped: string; count: number } => {
+      // Never send base64 image data URLs upstream. Providers either:
+      // - support HTTPS URLs (preferred; use presigned S3 URLs), or
+      // - require bytes (handled in provider adapters after fetching the URL).
+      //
+      // Tool outputs occasionally include `data:image/...;base64,...` inside JSON strings.
+      // Replace them with a small placeholder so we keep semantics without leaking huge blobs.
+      const re = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/g;
+      let count = 0;
+      const stripped = raw.replace(re, () => {
+        count++;
+        return '[embedded_image_omitted_use_attachments]';
+      });
+      return { stripped, count };
+    };
+
     const out: LlmMessage[] = [];
     for (const m of Array.isArray(messages) ? messages : []) {
       if (!m || typeof m !== 'object') continue;
@@ -595,8 +611,9 @@ export class LLM extends BaseNode<LlmParams> {
         continue;
       }
 
-      const s = content;
-      const looksLikeEmbeddedImage = s.includes('data:image/') && s.includes(';base64,');
+      // Enforce "URL-only" image handling: strip any embedded base64 data URLs before sending upstream.
+      const { stripped: s, count: strippedCount } = stripEmbeddedImageDataUrls(content);
+      const looksLikeEmbeddedImage = strippedCount > 0 || (s.includes('data:image/') && s.includes(';base64,'));
 
       const extractToolAttachmentPreviewUrls = (raw: string): string[] => {
         // Tool messages in Starships server-tools mode are JSON.stringify(payload),
@@ -624,7 +641,15 @@ export class LLM extends BaseNode<LlmParams> {
         // so vision models can see the image(s) without embedding huge base64 blobs.
         const previewUrls = extractToolAttachmentPreviewUrls(s);
         if (previewUrls.length > 0) {
-          out.push(m);
+          // Keep the tool message, but ensure we never send embedded base64 blobs.
+          out.push(
+            s === content
+              ? m
+              : ({
+                  ...(m as unknown as Record<string, unknown>),
+                  content: s,
+                } as LlmMessage)
+          );
           out.push({
             role: 'user',
             content: [
@@ -654,7 +679,15 @@ export class LLM extends BaseNode<LlmParams> {
         continue;
       }
 
-      out.push(m);
+      // If we stripped data URLs, send the stripped content (never the original).
+      out.push(
+        s === content
+          ? m
+          : ({
+              ...(m as unknown as Record<string, unknown>),
+              content: s,
+            } as LlmMessage)
+      );
     }
 
     return out;

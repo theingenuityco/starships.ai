@@ -681,7 +681,12 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    <AgentAvatar seed={cfg.agentSeed} imageUrl={agentAvatarUrlOverride} size={40} />
+                    <AgentAvatar
+                      seed={cfg.agentSeed}
+                      imageUrl={agentAvatarUrlOverride}
+                      size={40}
+                      instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`}
+                    />
                   </div>
                   <div className={cn('font-medium leading-none truncate', 'text-sm')}>{cfg.label}</div>
                 </div>

@@ -96,6 +96,7 @@ async function main(): Promise<void> {
       FROM marketing_content
       WHERE entity_type = 'agent_template'
         AND content_type = 'avatar'
+        AND is_active = true
         AND s3_key IS NOT NULL
         AND s3_key NOT LIKE 'public/agent-templates/%'
       ORDER BY updated_at DESC

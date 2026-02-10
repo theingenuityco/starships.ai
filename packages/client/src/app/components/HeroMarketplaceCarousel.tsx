@@ -157,7 +157,14 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
-                          <AgentAvatar seed={name} imageUrl={avatarUrl} fill clip className="w-full h-full rounded-2xl" />
+                          <AgentAvatar
+                            seed={name}
+                            idKey={`${template.id}-${idx}`}
+                            imageUrl={avatarUrl}
+                            fill
+                            clip
+                            className="w-full h-full rounded-2xl"
+                          />
                         </div>
                         <div className="min-w-0 w-full px-1 text-left">
                           <div className="text-sm font-semibold leading-tight truncate max-w-[20ch]">{primaryLabel}</div>

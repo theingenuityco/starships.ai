@@ -1,4 +1,4 @@
-import {withSentryConfig} from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs'
 import type { NextConfig } from 'next'
 import { loadEnvConfig } from '@next/env'
 import path from 'path'
@@ -101,9 +101,9 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "the-ingenuity-labs-inc",
+  org: 'the-ingenuity-labs-inc',
 
-  project: "starships-client",
+  project: 'starships-client',
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -128,4 +128,4 @@ export default withSentryConfig(nextConfig, {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   // automaticVercelMonitors: true,
-});
+})

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
-import { useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
@@ -42,8 +42,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
     if (selectedStarshipId) {
       return userStarships.find(s => s.id === selectedStarshipId) ?? null
     }
-    return userStarships[0] ?? null
-  }, [userStarships, pathStarshipSlug, selectedStarshipId])
+    return pickPrimaryStarshipForUser(userStarships, user?.id, selectedStarshipId)
+  }, [userStarships, pathStarshipSlug, selectedStarshipId, user?.id])
 
   // Fallback: if we're on /ship/:slug/* but userStarships hasn't loaded yet, fetch the starship by slug to get its ID.
   const { data: starshipBySlug } = useStarshipBySlug(pathStarshipSlug || '', !!pathStarshipSlug && isAuthenticated && !starshipFromList?.id)

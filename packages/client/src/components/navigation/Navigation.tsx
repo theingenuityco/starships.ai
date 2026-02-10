@@ -9,7 +9,7 @@ import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
@@ -130,22 +130,9 @@ export function Navigation(props: NavigationProps) {
       // If we're on a starship route, use that starship
       setNavigationStarshipSlug(pathStarshipSlug)
     } else {
-      // If we're not on a starship route, try to get a default starship
       const selectedStarshipId = getSelectedStarshipId()
-      if (selectedStarshipId && userStarships) {
-        const selectedStarship = userStarships.find(ship => ship.id === selectedStarshipId)
-        if (selectedStarship) {
-          setNavigationStarshipSlug(selectedStarship.slug)
-          return
-        }
-      }
-
-      // Fall back to the first available starship
-      if (userStarships && userStarships.length > 0) {
-        setNavigationStarshipSlug(userStarships[0].slug)
-      } else {
-        setNavigationStarshipSlug(null)
-      }
+      const primary = pickPrimaryStarshipForUser(userStarships ?? [], user?.id, selectedStarshipId)
+      setNavigationStarshipSlug(primary?.slug ?? null)
     }
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
@@ -15,8 +15,9 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
+  const { getSelectedStarshipId } = useSelectedStarship()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
-  const primaryStarship = starships[0]
+  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
   const pendingPrimaryActionRef = useRef<null | (() => void)>(null)

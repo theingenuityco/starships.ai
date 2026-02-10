@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships, useEnsureDefaultStarship } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useEnsureDefaultStarship, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 
 /**
@@ -14,6 +14,8 @@ import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 export default function ProfilePage(): React.JSX.Element {
   const router = useRouter()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { getSelectedStarshipId } = useSelectedStarship()
+  const selectedStarshipId = getSelectedStarshipId()
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
   const ensureDefault = useEnsureDefaultStarship()
   // Prevent double-call when effect re-runs (e.g. deps change); reset on error so user can retry.
@@ -26,7 +28,8 @@ export default function ProfilePage(): React.JSX.Element {
       return
     }
     if (starships && starships.length > 0) {
-      router.replace(`/ship/${starships[0].slug}`)
+      const primary = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
+      router.replace(`/ship/${(primary ?? starships[0]).slug}`)
       return
     }
     if (starships && starships.length === 0 && !ensureAttempted.current) {
@@ -38,7 +41,7 @@ export default function ProfilePage(): React.JSX.Element {
           ensureAttempted.current = false
         })
     }
-  }, [authLoading, starshipsLoading, isAuthenticated, starships, router, ensureDefault])
+  }, [authLoading, starshipsLoading, isAuthenticated, starships, router, ensureDefault, user?.id, selectedStarshipId])
 
   // Loading or creating workspace
   if (authLoading || starshipsLoading || (starships?.length === 0 && ensureDefault.isPending)) {

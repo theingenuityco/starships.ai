@@ -308,7 +308,18 @@ export class Agent implements NodeHandler {
             const toolResult = ctx.lastOutputOf("${toolNodeRef}") ?? {};
             const content = (typeof toolResult === 'string') ? toolResult : JSON.stringify(toolResult);
             const next = { ...(state || {}) };
-            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            // Providers require exactly one tool_result per tool_call id. If we retried a tool call,
+            // replace any prior tool result for the same id instead of appending duplicates.
+            const prev = Array.isArray(state?.messages) ? state.messages : [];
+            const filtered = toolCallId
+              ? prev.filter((m) => {
+                  if (!m || typeof m !== 'object') return true;
+                  if (m.role !== 'tool') return true;
+                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
+                  return String(existingId) !== String(toolCallId);
+                })
+              : prev;
+            next.messages = [...filtered, { role: 'tool', toolCallId, content }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {
               next.pendingToolCalls = [];
@@ -341,7 +352,16 @@ export class Agent implements NodeHandler {
             const next = { ...(state || {}) };
             const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
             const content = JSON.stringify(payload);
-            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            const prev = Array.isArray(state?.messages) ? state.messages : [];
+            const filtered = toolCallId
+              ? prev.filter((m) => {
+                  if (!m || typeof m !== 'object') return true;
+                  if (m.role !== 'tool') return true;
+                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
+                  return String(existingId) !== String(toolCallId);
+                })
+              : prev;
+            next.messages = [...filtered, { role: 'tool', toolCallId, content }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {
               next.pendingToolCalls = [];
@@ -633,7 +653,16 @@ export class Agent implements NodeHandler {
 
             const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
             const next = { ...(state || {}) };
-            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            const prev = Array.isArray(state?.messages) ? state.messages : [];
+            const filtered = toolCallId
+              ? prev.filter((m) => {
+                  if (!m || typeof m !== 'object') return true;
+                  if (m.role !== 'tool') return true;
+                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
+                  return String(existingId) !== String(toolCallId);
+                })
+              : prev;
+            next.messages = [...filtered, { role: 'tool', toolCallId, content }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {
               next.pendingToolCalls = [];
@@ -664,7 +693,16 @@ export class Agent implements NodeHandler {
             const toolCallId = tc?.id ?? '';
             const next = { ...(state || {}) };
             const payload = { success: false, data: { code: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." } };
-            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
+            const prev = Array.isArray(state?.messages) ? state.messages : [];
+            const filtered = toolCallId
+              ? prev.filter((m) => {
+                  if (!m || typeof m !== 'object') return true;
+                  if (m.role !== 'tool') return true;
+                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
+                  return String(existingId) !== String(toolCallId);
+                })
+              : prev;
+            next.messages = [...filtered, { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {
               next.pendingToolCalls = [];

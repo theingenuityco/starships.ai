@@ -62,9 +62,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
   }, [router, activeStarshipSlug])
 
   const handleAccountClick = useCallback(() => {
-    if (!activeStarshipSlug) return
-    router.push(`/ship/${activeStarshipSlug}/settings/my-profile`)
-  }, [router, activeStarshipSlug])
+    router.push('/account')
+  }, [router])
 
   const handleMyStarshipClick = useCallback(() => {
     if (!activeStarshipSlug) return
@@ -133,7 +132,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleAccountClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+        <DropdownMenuItem onClick={handleAccountClick} className={navMenuItemClassName}>
           <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
             <Icon name="user" className={navMenuItemIconClassName} />
           </div>

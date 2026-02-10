@@ -205,7 +205,7 @@ export function useCreateStarship() {
 
 /**
  * Ensure the current user has at least one starship (creates default if none).
- * Used on /profile when user has no starships; invite-joiners never need this.
+ * Used when user has no starships; invite-joiners never need this.
  */
 export function useEnsureDefaultStarship() {
   const queryClient = useQueryClient()

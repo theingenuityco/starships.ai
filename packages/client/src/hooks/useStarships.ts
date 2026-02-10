@@ -27,9 +27,11 @@ export const STARSHIP_QUERY_KEYS = {
  * Pick the "primary" starship for a user from an accessible list.
  *
  * Priority:
- * 1) Selected starship (persisted user choice)
- * 2) First owned starship (in the existing list order)
- * 3) First starship in the list
+ * 1) If the user owns any starships: prefer an owned starship
+ *    - Use selected starship only if it is also owned
+ *    - Otherwise use the first owned starship
+ * 2) If the user owns no starships: selected starship (if present)
+ * 3) Fallback: first starship in the list
  */
 export function pickPrimaryStarshipForUser(
   starships: StarshipModel[] | undefined | null,

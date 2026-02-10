@@ -877,6 +877,9 @@ export const ConversationList = memo(function ConversationList({
             ) : null}
           </div>
 
+          {/* Separator between Channels and Direct messages (keep this in navigation). */}
+          <div className="my-3 mx-1 border-t border-border/60" role="separator" aria-hidden />
+
           {/* Direct messages - content-sized; capped at 50% height like Channels */}
           <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
             <div className="w-full flex items-center justify-between h-8 pr-2">

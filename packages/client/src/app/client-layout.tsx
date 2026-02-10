@@ -80,7 +80,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path === '/reset-password') return 'Reset Password | Starships.ai'
       if (path === '/terms') return 'Terms of Service | Starships.ai'
       if (path === '/privacy') return 'Privacy Policy | Starships.ai'
-      if (path === '/profile') return 'Profile | Starships.ai'
+      if (path === '/account') return 'My Profile | Starships.ai'
       if (path === '/onboarding') return 'Set up your starship | Starships.ai'
       if (path.startsWith('/connectors/') && path.endsWith('/install')) return 'Connectors | Starships.ai'
 
@@ -180,7 +180,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   // Profile page (create workspace / redirect) - full page, no sidebar, so new users
   // never see the app chrome (e.g. Direct messages) while "Redirecting..." is shown.
-  if (pathname === '/profile') {
+  if (pathname === '/account') {
     return (
       <JwtAuthGate>
         <StarTheme>

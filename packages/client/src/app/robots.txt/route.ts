@@ -50,7 +50,7 @@ export async function GET(req: Request): Promise<Response> {
       'Allow: /',
       // Authenticated app area
       'Disallow: /ship',
-      'Disallow: /profile',
+      'Disallow: /account',
       // Admin
       'Disallow: /admin',
       // Next internals

@@ -2927,7 +2927,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
-      const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const userProfileHref = isAuthedUserMessage ? '/account' : null
       const authorLabel = (() => {
         if (!isAuthedUserMessage) return userDisplayName
         const detail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()

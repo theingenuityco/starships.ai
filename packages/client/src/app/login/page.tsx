@@ -87,7 +87,7 @@ function LoginContent() {
         const primary = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
         router.push(`/ship/${(primary ?? starships[0]).slug}`)
       } else {
-        router.push('/profile')
+        router.push('/account')
       }
     }
   }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout, user?.id, selectedStarshipId])

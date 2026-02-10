@@ -68,7 +68,7 @@ const nextConfig: NextConfig = {
       // Authenticated / app area (never cache)
       { source: '/ship/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       { source: '/admin/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
-      { source: '/profile', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/account', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       // Auth entry points (avoid caching login/register HTML)
       { source: '/login', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       { source: '/forgot-password', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },

@@ -52,6 +52,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
   const activeStarshipSlug = starshipFromList?.slug ?? pathStarshipSlug ?? null
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
 
+  const isOwner = Boolean(isAuthenticated && user?.id && (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
+
   const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
 
   const handleBillingClick = useCallback(() => {
@@ -137,12 +139,14 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           </div>
           My Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleMyStarshipClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
-          <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-            <Icon name="rocket" className={navMenuItemIconClassName} />
-          </div>
-          My Starship
-        </DropdownMenuItem>
+        {isOwner ? (
+          <DropdownMenuItem onClick={handleMyStarshipClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+            <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+              <Icon name="rocket" className={navMenuItemIconClassName} />
+            </div>
+            My Starship
+          </DropdownMenuItem>
+        ) : null}
         {canManageBilling ? (
           <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
             <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>

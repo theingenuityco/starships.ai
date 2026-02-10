@@ -3591,13 +3591,6 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
-        // but with a left-weighted fade (transparent → solid border → transparent).
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }
@@ -3635,11 +3628,6 @@ function DirectMessageHero({
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }

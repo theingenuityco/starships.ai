@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useId, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
@@ -48,6 +48,7 @@ export default function AgentAvatar({
   fill = false,
   clip = false,
 }: AgentAvatarProps) {
+  const reactId = useId()
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
   const showInitialsFallback = !hasImage && hasSeed
@@ -77,6 +78,10 @@ export default function AgentAvatar({
     const id = `av-${(h >>> 0).toString(16)}`
     return { c1, c2, c3, shape, id }
   }, [seed, hasSeed])
+
+  // Ensure <defs> IDs are unique per component instance to avoid DOM collisions
+  // when the same seed appears multiple times on a page.
+  const svgIdBase = generated ? `${generated.id}-${reactId.replace(/:/g, '')}` : null
 
   const outerStyle: React.CSSProperties = {
     width: fill ? '100%' : size,
@@ -131,44 +136,44 @@ export default function AgentAvatar({
                 aria-hidden="true"
               >
                 <defs>
-                  <linearGradient id={`${generated.id}-g`} x1="0" y1="0" x2="1" y2="1">
+                  <linearGradient id={`${svgIdBase}-g`} x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0" stopColor={generated.c1} />
                     <stop offset="0.55" stopColor={generated.c2} />
                     <stop offset="1" stopColor={generated.c3} />
                   </linearGradient>
-                  <filter id={`${generated.id}-blur`} x="-20%" y="-20%" width="140%" height="140%">
+                  <filter id={`${svgIdBase}-blur`} x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="6" />
                   </filter>
                 </defs>
 
-                <rect width="100" height="100" fill={`url(#${generated.id}-g)`} />
+                <rect width="100" height="100" fill={`url(#${svgIdBase}-g)`} />
 
                 {/* Soft “nebula” blobs (vary by shape) */}
                 {generated.shape === 0 ? (
                   <>
-                    <circle cx="28" cy="36" r="22" fill="rgba(255,255,255,0.16)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="78" cy="70" r="26" fill="rgba(255,255,255,0.10)" filter={`url(#${generated.id}-blur)`} />
+                    <circle cx="28" cy="36" r="22" fill="rgba(255,255,255,0.16)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="78" cy="70" r="26" fill="rgba(255,255,255,0.10)" filter={`url(#${svgIdBase}-blur)`} />
                   </>
                 ) : generated.shape === 1 ? (
                   <>
-                    <circle cx="70" cy="28" r="20" fill="rgba(255,255,255,0.14)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="34" cy="76" r="28" fill="rgba(255,255,255,0.10)" filter={`url(#${generated.id}-blur)`} />
+                    <circle cx="70" cy="28" r="20" fill="rgba(255,255,255,0.14)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="34" cy="76" r="28" fill="rgba(255,255,255,0.10)" filter={`url(#${svgIdBase}-blur)`} />
                   </>
                 ) : generated.shape === 2 ? (
                   <>
-                    <circle cx="22" cy="70" r="24" fill="rgba(255,255,255,0.14)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="80" cy="44" r="22" fill="rgba(255,255,255,0.10)" filter={`url(#${generated.id}-blur)`} />
+                    <circle cx="22" cy="70" r="24" fill="rgba(255,255,255,0.14)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="80" cy="44" r="22" fill="rgba(255,255,255,0.10)" filter={`url(#${svgIdBase}-blur)`} />
                   </>
                 ) : generated.shape === 3 ? (
                   <>
-                    <circle cx="52" cy="26" r="18" fill="rgba(255,255,255,0.12)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="56" cy="78" r="30" fill="rgba(255,255,255,0.10)" filter={`url(#${generated.id}-blur)`} />
+                    <circle cx="52" cy="26" r="18" fill="rgba(255,255,255,0.12)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="56" cy="78" r="30" fill="rgba(255,255,255,0.10)" filter={`url(#${svgIdBase}-blur)`} />
                   </>
                 ) : (
                   <>
-                    <circle cx="26" cy="30" r="20" fill="rgba(255,255,255,0.14)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="74" cy="32" r="18" fill="rgba(255,255,255,0.10)" filter={`url(#${generated.id}-blur)`} />
-                    <circle cx="54" cy="78" r="28" fill="rgba(255,255,255,0.08)" filter={`url(#${generated.id}-blur)`} />
+                    <circle cx="26" cy="30" r="20" fill="rgba(255,255,255,0.14)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="74" cy="32" r="18" fill="rgba(255,255,255,0.10)" filter={`url(#${svgIdBase}-blur)`} />
+                    <circle cx="54" cy="78" r="28" fill="rgba(255,255,255,0.08)" filter={`url(#${svgIdBase}-blur)`} />
                   </>
                 )}
 

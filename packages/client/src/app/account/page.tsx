@@ -36,7 +36,7 @@ export default function AccountPage(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Manage your account details, security, and preferences.</p>
             </div>
 
-            <section aria-labelledby="my-profile-section" className="bg-background">
+            <section aria-label="My profile" className="bg-background">
               <AccountForm />
             </section>
           </div>

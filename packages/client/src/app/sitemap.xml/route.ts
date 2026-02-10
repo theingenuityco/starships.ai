@@ -15,7 +15,8 @@ function getBaseUrlFromRequest(req: Request): string {
   const configured = trimTrailingSlashes(String(publicEnvConfig.PUBLIC_URL || '').trim())
   if (configured) return configured
 
-  const host = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
+  const rawHost = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
+  const host = rawHost.startsWith('www.') ? rawHost.slice(4) : rawHost
   if (!host) return ''
 
   const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'

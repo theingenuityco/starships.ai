@@ -42,17 +42,36 @@ export function pickPrimaryStarshipForUser(
   const uid = typeof userId === 'string' ? userId : ''
   const selectedId = typeof selectedStarshipId === 'string' && selectedStarshipId.trim() ? selectedStarshipId : null
 
-  if (selectedId) {
-    const selected = list.find(s => s.id === selectedId) ?? null
-    if (selected) return selected
+  const selected = selectedId ? (list.find(s => s.id === selectedId) ?? null) : null
+  const firstOwned = uid ? (list.find(s => s.ownerId === uid) ?? null) : null
+  const ownedCount = uid ? list.reduce((n, s) => (s.ownerId === uid ? n + 1 : n), 0) : 0
+
+  // If the user owns at least one starship, prefer an owned starship.
+  // Only honor selectedStarshipId when it is ALSO owned by the user.
+  let choice: StarshipModel | null = null
+  let reason:
+    | 'selected_owned'
+    | 'owned_first'
+    | 'selected_no_owned_available'
+    | 'fallback_first' = 'fallback_first'
+
+  if (uid && ownedCount > 0) {
+    if (selected && selected.ownerId === uid) {
+      choice = selected
+      reason = 'selected_owned'
+    } else {
+      choice = firstOwned
+      reason = 'owned_first'
+    }
+  } else if (selected) {
+    choice = selected
+    reason = 'selected_no_owned_available'
+  } else {
+    choice = list[0] ?? null
+    reason = 'fallback_first'
   }
 
-  if (uid) {
-    const firstOwned = list.find(s => s.ownerId === uid) ?? null
-    if (firstOwned) return firstOwned
-  }
-
-  return list[0] ?? null
+  return choice
 }
 
 /**

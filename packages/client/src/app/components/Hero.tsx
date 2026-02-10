@@ -14,14 +14,33 @@ import type { AgentTemplateModel } from '@starships/protocol'
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const router = useRouter()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, isLoading: authLoading, getToken } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
-  const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
   const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
   const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // IMPORTANT: Do NOT read localStorage/token during render.
+  // This component is server-rendered, and reading client-only state during render causes hydration mismatches.
+  const [hasClientAuthToken, setHasClientAuthToken] = useState(false)
+  const hasAuthToken = hasClientAuthToken
+
+  // If the user has a token, but auth/starships are still resolving, do NOT let the CTA
+  // behave like a logged-out CTA (push /login). This is the flicker we saw in logs.
+  const shouldBlockCtaWhileResolving = hasAuthToken && (authLoading || starshipsLoading)
+
+  useEffect(() => {
+    let has = false
+    try {
+      has = !!getToken()
+    } catch {
+      has = false
+    }
+    setHasClientAuthToken(has)
+  }, [getToken])
 
   useEffect(() => {
     return () => {
@@ -46,10 +65,15 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       return
     }
     router.push('/login')
-  }, [isAuthenticated, primaryStarship?.slug, router])
+  }, [authLoading, isAuthenticated, primaryStarship?.slug, router, starshipsLoading, starships])
 
   const handlePrimaryClick = useCallback(() => {
     if (isPrimaryAnimating) return
+
+    if (shouldBlockCtaWhileResolving) {
+      return
+    }
+
     track({ type: 'hero_cta_clicked' })
 
     setIsPrimaryAnimating(true)
@@ -66,7 +90,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     fallbackTimeoutRef.current = setTimeout(() => {
       runPendingPrimaryAction()
     }, 1100)
-  }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
+  }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
     <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
@@ -108,8 +132,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               size="lg"
               className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
-              disabled={isPrimaryAnimating}
-              aria-busy={isPrimaryAnimating}
+              disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
+              aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
             >
               <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
                 <StarshipsLogo
@@ -123,7 +147,12 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              {isAuthenticated ? (
+              {shouldBlockCtaWhileResolving ? (
+                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
+                  <span>Loading your starship</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
+                </span>
+              ) : isAuthenticated ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Enter my starship</span>
                   <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>

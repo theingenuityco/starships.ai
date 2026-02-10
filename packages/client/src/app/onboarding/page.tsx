@@ -136,7 +136,7 @@ export default function OnboardingPage() {
       return
     }
     if (!hasStarship && !starshipsLoading) {
-      router.replace('/profile')
+      router.replace('/account')
     }
   }, [authLoading, isAuthenticated, isWizardComplete, hasStarship, starshipsLoading, primaryStarship?.slug, router])
 

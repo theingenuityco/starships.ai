@@ -220,7 +220,7 @@ export function useLogin() {
           router.push(addWelcome(`/ship/${starship.slug}`))
         }
       } else {
-        router.push('/profile')
+        router.push('/account')
       }
 
       queryClient.invalidateQueries()
@@ -359,7 +359,7 @@ export function useOAuthLogin() {
           router.push(addWelcome(`/ship/${starship.slug}`))
         }
       } else {
-        router.push('/profile')
+        router.push('/account')
       }
 
       queryClient.invalidateQueries()

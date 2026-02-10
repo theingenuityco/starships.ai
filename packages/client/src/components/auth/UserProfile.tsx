@@ -42,7 +42,10 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     // Only navigate when current route contains a starship slug
     const parts = typeof pathname === 'string' ? pathname.split('/') : []
     const slug = parts[1] === 'ship' && parts.length > 2 ? parts[2] : null
-    if (!slug) return
+    if (!slug) {
+      router.push('/account')
+      return
+    }
     const defaultTab = isInstanceAdmin ? 'usage' : 'my-profile'
     router.push(`/ship/${slug}/settings/${defaultTab}`)
   }

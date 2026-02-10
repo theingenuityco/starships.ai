@@ -24,6 +24,38 @@ export const STARSHIP_QUERY_KEYS = {
 } as const
 
 /**
+ * Pick the "primary" starship for a user from an accessible list.
+ *
+ * Priority:
+ * 1) Selected starship (persisted user choice)
+ * 2) First owned starship (in the existing list order)
+ * 3) First starship in the list
+ */
+export function pickPrimaryStarshipForUser(
+  starships: StarshipModel[] | undefined | null,
+  userId: string | undefined | null,
+  selectedStarshipId?: string | null
+): StarshipModel | null {
+  const list = Array.isArray(starships) ? starships : []
+  if (!list.length) return null
+
+  const uid = typeof userId === 'string' ? userId : ''
+  const selectedId = typeof selectedStarshipId === 'string' && selectedStarshipId.trim() ? selectedStarshipId : null
+
+  if (selectedId) {
+    const selected = list.find(s => s.id === selectedId) ?? null
+    if (selected) return selected
+  }
+
+  if (uid) {
+    const firstOwned = list.find(s => s.ownerId === uid) ?? null
+    if (firstOwned) return firstOwned
+  }
+
+  return list[0] ?? null
+}
+
+/**
  * Get starship by ID
  */
 export function useStarship(starshipId: string, enabled: boolean = true) {

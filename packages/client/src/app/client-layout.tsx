@@ -14,7 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
-import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -51,7 +51,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { user, isAuthenticated } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
-  const primaryStarship = starships[0]
+  const selectedStarshipId = getSelectedStarshipId()
+  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
   const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')

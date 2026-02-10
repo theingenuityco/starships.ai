@@ -6,7 +6,8 @@ import path from 'path'
 // Load env from monorepo root for local dev
 // In production (Docker/K8s), env vars are injected directly into process.env
 const monorepoRoot = path.resolve(__dirname, '../..')
-loadEnvConfig(monorepoRoot)
+const isDev = process.env.NODE_ENV !== 'production'
+loadEnvConfig(monorepoRoot, isDev)
 
 const PUBLIC_HTML_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
 const PRIVATE_NO_STORE = 'private, no-store'

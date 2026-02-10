@@ -65,7 +65,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       return
     }
     router.push('/login')
-  }, [authLoading, isAuthenticated, primaryStarship?.slug, router, starshipsLoading, starships])
+  }, [isAuthenticated, primaryStarship?.slug, router])
 
   const handlePrimaryClick = useCallback(() => {
     if (isPrimaryAnimating) return

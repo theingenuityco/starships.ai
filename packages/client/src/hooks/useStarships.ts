@@ -51,26 +51,17 @@ export function pickPrimaryStarshipForUser(
   // If the user owns at least one starship, prefer an owned starship.
   // Only honor selectedStarshipId when it is ALSO owned by the user.
   let choice: StarshipModel | null = null
-  let reason:
-    | 'selected_owned'
-    | 'owned_first'
-    | 'selected_no_owned_available'
-    | 'fallback_first' = 'fallback_first'
 
   if (uid && ownedCount > 0) {
     if (selected && selected.ownerId === uid) {
       choice = selected
-      reason = 'selected_owned'
     } else {
       choice = firstOwned
-      reason = 'owned_first'
     }
   } else if (selected) {
     choice = selected
-    reason = 'selected_no_owned_available'
   } else {
     choice = list[0] ?? null
-    reason = 'fallback_first'
   }
 
   return choice

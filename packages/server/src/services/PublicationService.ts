@@ -30,6 +30,7 @@ import { MarketingContentGenerationService } from './MarketingContentGenerationS
 import { ProfileImageService } from './ProfileImageService';
 import { buildAutopilotExecutionBundle } from './autopilot-execution-bundle';
 import { getEnvConfig } from '@starships/env';
+import { buildAgentTemplatePublicAvatarS3Key, buildPublicS3ObjectUrl, copyObjectInS3 } from '@/utils/s3-helper';
 
 export class PublicationService {
   private agentRepository: AgentRepository;
@@ -249,13 +250,16 @@ export class PublicationService {
    * Copy avatar from agent to template
    */
   private async copyAvatarToTemplate(agent: AgentModel, templateId: string): Promise<string | undefined> {
-    if (!agent.avatarAttachmentId) {
-      return undefined;
-    }
-
     try {
       const templateRepo = new AgentTemplateRepository();
       const existingAvatar = await templateRepo.getAvatarStorageById(templateId);
+      const existingUrl = existingAvatar?.avatarS3Key ? buildPublicS3ObjectUrl(existingAvatar.avatarS3Key) : undefined;
+
+      // If the agent has no avatar, keep whatever the template already has.
+      if (!agent.avatarAttachmentId) {
+        return existingUrl;
+      }
+
       const existingAttachment = await this.attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
 
       const toMs = (s?: string) => {
@@ -272,15 +276,23 @@ export class PublicationService {
         (!Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs));
 
       if (shouldUpdateAvatar && existingAttachment?.s3Key) {
+        // Promote the agent's (private) attachment object into a *public* template avatar object.
+        // This lets marketplace/landing pages use a stable, direct S3 URL (no API avatar proxy endpoint).
+        const destKey = buildAgentTemplatePublicAvatarS3Key({
+          templateId,
+          filename: existingAttachment.filename || 'avatar.png',
+        });
+        await copyObjectInS3({ sourceKey: existingAttachment.s3Key, destKey });
+
         await templateRepo.updateAvatarStorage(templateId, {
-          avatarS3Key: existingAttachment.s3Key,
+          avatarS3Key: destKey,
           avatarMimeType: existingAttachment.mimeType || 'image/png',
           avatarUpdatedAt: existingAttachment.createdAt || new Date().toISOString(),
         });
-        return `/api/v1/agent-templates/${templateId}/avatar`;
+        return buildPublicS3ObjectUrl(destKey);
       }
 
-      return existingAvatar?.avatarS3Key ? `/api/v1/agent-templates/${templateId}/avatar` : undefined;
+      return existingUrl;
     } catch (err) {
       console.error('[PUBLICATION] Failed to copy avatar:', err);
       return undefined;

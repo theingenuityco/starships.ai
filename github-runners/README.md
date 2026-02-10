@@ -41,7 +41,7 @@ terraform apply
 ### Check Lambda logs
 
 ```bash
-aws logs tail /aws/lambda/github-runner-webhook --follow --region us-east-1
+aws logs tail /aws/lambda/github-runner-webhook --follow --region <control-plane-region>
 ```
 
 ### Monitor EC2 instances
@@ -49,7 +49,7 @@ aws logs tail /aws/lambda/github-runner-webhook --follow --region us-east-1
 ```bash
 aws ec2 describe-instances \
   --filters "Name=tag:Type,Values=github-runner" \
-  --region us-east-1 \
+  --region <region> \
   --output table
 ```
 
@@ -65,6 +65,21 @@ Instance type is selected from workflow `runs-on` labels (e.g. `t3.medium`, `t3.
 To support arm64 runners, you must set **`runner_ami_id_arm64`** in Terraform to an ARM64 Ubuntu AMI.
 
 If a job needs Docker (image builds), include the `docker` label so the ephemeral instance installs Docker during bootstrap.
+
+### Multi-region runner provisioning
+
+By default, the webhook Lambda provisions runners in the same region it is deployed to (Terraform `aws_region`).
+
+To enable multi-region provisioning (recommended when Spot capacity is uneven), set `runner_region_pool` to a comma-separated list of regions. The webhook Lambda will try regions in that pool until it finds capacity.
+
+Example (`github-runners/terraform/terraform.tfvars`):
+
+```hcl
+aws_region         = "us-east-1" # control plane (API Gateway + Lambdas)
+runner_region_pool = "us-east-1,us-east-2,us-west-2"
+```
+
+For multi-region, prefer AMI selection via Canonical’s public SSM parameters (see `terraform.tfvars.example`) so AMI IDs are correct per-region.
 
 ### Update Runner Version
 

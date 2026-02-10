@@ -9,9 +9,26 @@ import jwt
 import requests
 from botocore.exceptions import ClientError
 
-# AWS clients
-ec2 = boto3.client('ec2', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
-ssm = boto3.client('ssm', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+# Control-plane region (where this Lambda runs)
+CONTROL_PLANE_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+
+# Region-scoped AWS clients (cached)
+_EC2_CLIENTS = {}
+_SSM_CLIENTS = {}
+
+def get_ec2(region: str):
+    if not region:
+        region = CONTROL_PLANE_REGION
+    if region not in _EC2_CLIENTS:
+        _EC2_CLIENTS[region] = boto3.client('ec2', region_name=region)
+    return _EC2_CLIENTS[region]
+
+def get_ssm(region: str):
+    if not region:
+        region = CONTROL_PLANE_REGION
+    if region not in _SSM_CLIENTS:
+        _SSM_CLIENTS[region] = boto3.client('ssm', region_name=region)
+    return _SSM_CLIENTS[region]
 
 # Environment variables
 GITHUB_APP_ID = os.environ['GITHUB_APP_ID']
@@ -20,10 +37,22 @@ GITHUB_WEBHOOK_SECRET = os.environ['GITHUB_WEBHOOK_SECRET']
 GITHUB_INSTALLATION_ID = os.environ['GITHUB_INSTALLATION_ID']
 RUNNER_SECURITY_GROUP_ID = os.environ['RUNNER_SECURITY_GROUP_ID']
 RUNNER_INSTANCE_PROFILE_NAME = os.environ['RUNNER_INSTANCE_PROFILE_NAME']
-# Default AMIs (us-east-1, Ubuntu 24.04 LTS "noble", 2025-10-22)
-# These can be overridden via Lambda environment variables.
-RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', 'ami-0ecb62995f68bb549')
-RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', 'ami-01b9f1e7dc427266e')
+# Multi-region pool (CSV). If empty, defaults to just the control-plane region.
+RUNNER_REGION_POOL = os.environ.get('RUNNER_REGION_POOL', '')
+
+# Optional: AMI lookup via Canonical public SSM params (recommended for multi-region)
+RUNNER_AMI_SSM_PARAM_X64 = os.environ.get(
+    'RUNNER_AMI_SSM_PARAM_X64',
+    '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id',
+)
+RUNNER_AMI_SSM_PARAM_ARM64 = os.environ.get(
+    'RUNNER_AMI_SSM_PARAM_ARM64',
+    '/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id',
+)
+
+# Optional: pinned AMI IDs (safe for single-region; may not exist in other regions)
+RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', '')
+RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', '')
 RUNNER_SUBNET_ID = os.environ.get('RUNNER_SUBNET_ID')  # Optional, uses default if not specified
 RUNNER_SUBNET_IDS = os.environ.get('RUNNER_SUBNET_IDS')  # Optional CSV list; overrides RUNNER_SUBNET_ID
 

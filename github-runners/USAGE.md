@@ -152,7 +152,7 @@ jobs:
 
 ```bash
 aws ec2 describe-instances \
-  --region us-east-1 \
+  --region <region> \
   --filters "Name=tag:Type,Values=github-runner" "Name=instance-state-name,Values=running,pending" \
   --query "Reservations[].Instances[].[InstanceId,InstanceType,State.Name,LaunchTime,Tags[?Key=='JobId'].Value|[0]]" \
   --output table
@@ -161,7 +161,7 @@ aws ec2 describe-instances \
 ### Check Lambda logs
 
 ```bash
-aws logs tail /aws/lambda/github-runner-webhook --region us-east-1 --since 10m --follow
+aws logs tail /aws/lambda/github-runner-webhook --region <control-plane-region> --since 10m --follow
 ```
 
 ## Troubleshooting

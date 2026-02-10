@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "runner_region_pool" {
+  description = "Comma-separated list of AWS regions to try for launching runner instances (defaults to aws_region)"
+  type        = string
+  default     = ""
+}
+
 variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string
@@ -34,14 +40,26 @@ variable "github_installation_id" {
   sensitive   = true
 }
 
+variable "runner_ami_ssm_param_x64" {
+  description = "SSM parameter name for x64 Ubuntu AMI ID (defaults to Canonical 24.04 stable current)"
+  type        = string
+  default     = ""
+}
+
+variable "runner_ami_ssm_param_arm64" {
+  description = "SSM parameter name for arm64 Ubuntu AMI ID (defaults to Canonical 24.04 stable current)"
+  type        = string
+  default     = ""
+}
+
 variable "runner_ami_id_x64" {
-  description = "AMI ID for x64 runner instances"
+  description = "AMI ID for x64 runner instances (single-region only; multi-region deployments should use SSM parameters)"
   type        = string
   default     = ""
 }
 
 variable "runner_ami_id_arm64" {
-  description = "AMI ID for arm64 runner instances (required if you want [self-hosted, linux, arm64] runners)"
+  description = "AMI ID for arm64 runner instances (single-region only; multi-region deployments should use SSM parameters)"
   type        = string
   default     = ""
 }

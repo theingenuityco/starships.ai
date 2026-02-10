@@ -195,6 +195,14 @@ resource "aws_iam_role_policy" "lambda" {
           "ssm:GetParameter"
         ]
         Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/github-runner/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter"
+        ]
+        # Allow reading Canonical public Ubuntu AMI parameters in any region
+        Resource = "arn:aws:ssm:*:*:parameter/aws/service/canonical/ubuntu/*"
       }
     ]
   })
@@ -227,10 +235,14 @@ resource "aws_lambda_function" "webhook" {
         GITHUB_APP_PRIVATE_KEY_BASE64 = var.github_app_private_key_base64
         GITHUB_WEBHOOK_SECRET          = var.github_webhook_secret
         GITHUB_INSTALLATION_ID         = var.github_installation_id
+        # Comma-separated region pool for multi-region runner launches
+        RUNNER_REGION_POOL            = var.runner_region_pool != "" ? var.runner_region_pool : var.aws_region
         RUNNER_SECURITY_GROUP_ID       = aws_security_group.github_runner.id
         RUNNER_INSTANCE_PROFILE_NAME   = aws_iam_instance_profile.github_runner.name
         RUNNER_SUBNET_ID              = var.runner_subnet_id != "" ? var.runner_subnet_id : data.aws_subnets.default.ids[0]
       },
+      var.runner_ami_ssm_param_x64 != "" ? { RUNNER_AMI_SSM_PARAM_X64 = var.runner_ami_ssm_param_x64 } : {},
+      var.runner_ami_ssm_param_arm64 != "" ? { RUNNER_AMI_SSM_PARAM_ARM64 = var.runner_ami_ssm_param_arm64 } : {},
       var.runner_ami_id_x64 != "" ? { RUNNER_AMI_ID_X64 = var.runner_ami_id_x64 } : {},
       var.runner_ami_id_arm64 != "" ? { RUNNER_AMI_ID_ARM64 = var.runner_ami_id_arm64 } : {}
     )
@@ -312,6 +324,8 @@ resource "aws_lambda_function" "cleanup" {
   environment {
     variables = {
       MAX_INSTANCE_AGE_HOURS = "2"
+      # Keep cleanup consistent with runner provisioning region pool
+      RUNNER_REGION_POOL     = var.runner_region_pool != "" ? var.runner_region_pool : var.aws_region
     }
   }
 

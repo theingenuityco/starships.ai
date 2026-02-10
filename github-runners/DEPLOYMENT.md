@@ -34,6 +34,9 @@ github_app_private_key_base64 = "YOUR_BASE64_KEY"
 github_webhook_secret = "YOUR_WEBHOOK_SECRET"
 github_installation_id = "YOUR_INSTALLATION_ID"
 
+# Optional: multi-region pool (comma-separated). If unset, defaults to aws_region.
+# runner_region_pool = "us-east-1,us-east-2,us-west-2"
+
 # Recommended: pin AMIs per architecture (required for arm64 runners)
 runner_ami_id_x64 = "ami-0ecb62995f68bb549"
 runner_ami_id_arm64 = "ami-01b9f1e7dc427266e"
@@ -41,19 +44,19 @@ runner_ami_id_arm64 = "ami-01b9f1e7dc427266e"
 
 ### Finding the right Ubuntu AMIs (recommended)
 
-Canonical publishes Ubuntu AMI IDs to SSM Parameter Store. Example (us-east-1):
+Canonical publishes Ubuntu AMI IDs to SSM Parameter Store. Example (pick any region you run runners in):
 
 ```bash
-# Ubuntu 22.04 arm64 (Graviton)
+# Ubuntu 24.04 arm64 (Graviton)
 aws ssm get-parameter \
-  --name /aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id \
-  --region us-east-1 \
+  --name /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id \
+  --region <region> \
   --query 'Parameter.Value' --output text
 
-# Ubuntu 22.04 amd64/x64
+# Ubuntu 24.04 amd64/x64
 aws ssm get-parameter \
-  --name /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id \
-  --region us-east-1 \
+  --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id \
+  --region <region> \
   --query 'Parameter.Value' --output text
 ```
 

@@ -4,11 +4,22 @@
 aws_region = "us-east-1"
 environment = "prod"
 
+# Optional: Multi-region pool for runner instances (comma-separated).
+# If unset/empty, defaults to aws_region.
+# runner_region_pool = "us-east-1,us-east-2,us-west-2"
+
 # GitHub App Configuration
 github_app_id = "YOUR_GITHUB_APP_ID"
 github_app_private_key_base64 = "YOUR_BASE64_ENCODED_PRIVATE_KEY"
 github_webhook_secret = "YOUR_WEBHOOK_SECRET"
 github_installation_id = "YOUR_INSTALLATION_ID"
+
+# Optional: SSM parameters for region-correct Ubuntu AMIs (recommended for multi-region)
+# Defaults (if unset) are Canonical Ubuntu 24.04 stable current:
+# /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+# /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+# runner_ami_ssm_param_x64 = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+# runner_ami_ssm_param_arm64 = "/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"
 
 # AMIs per-architecture (required if you want arm64 runners)
 runner_ami_id_x64 = "ami-0ecb62995f68bb549"

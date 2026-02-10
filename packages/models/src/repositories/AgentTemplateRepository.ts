@@ -7,6 +7,28 @@ import { MarketingContentRepository } from '@/repositories/MarketingContentRepos
 import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 
+function encodeS3KeyForUrl(s3Key: string): string {
+  return String(s3Key || '')
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/');
+}
+
+/**
+ * Build a direct HTTPS URL for an S3 object.
+ *
+ * NOTE:
+ * This only works for publicly readable objects (e.g. those stored under a `public/` prefix with bucket policy).
+ * We intentionally avoid importing `@starships/env` here because `getEnvConfig()` hard-requires a full app env.
+ */
+function buildPublicS3ObjectUrl(s3Key: string): string | undefined {
+  const bucket = String(process.env.AWS_S3_BUCKET || '').trim();
+  const region = String(process.env.AWS_S3_REGION || '').trim();
+  const key = String(s3Key || '').trim();
+  if (!bucket || !region || !key) return undefined;
+  return `https://${bucket}.s3.${region}.amazonaws.com/${encodeS3KeyForUrl(key)}`;
+}
+
 export class AgentTemplateRepository extends BaseRepository {
   private marketingContentRepo: MarketingContentRepository;
 
@@ -478,7 +500,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
     // Avatar
     const avatarContent = contentMap.get('avatar');
-    const avatarUrl = avatarContent?.s3Key ? `/api/v1/agent-templates/${templateId}/avatar` : undefined;
+    const avatarUrl = avatarContent?.s3Key ? buildPublicS3ObjectUrl(avatarContent.s3Key) : undefined;
     const avatarUpdatedAt = avatarContent?.updatedAt;
 
     // Profile images

@@ -7,7 +7,7 @@ import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository } from '@starships/models';
-import { generatePresignedUrlInline } from '@/utils/s3-helper';
+import { buildPublicS3ObjectUrl, generatePresignedUrlInline } from '@/utils/s3-helper';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import type { AuthUser } from '@starships/protocol';
 import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
@@ -23,11 +23,13 @@ import {
 const router: Router = Router();
 
 function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<string, unknown> {
-  // Never expose raw S3 pointers even to creators (serve via API route).
+  // Never expose raw S3 pointers even to creators (serve via direct public URL).
   const hasAvatar = typeof template['avatarS3Key'] === 'string' && String(template['avatarS3Key']).length > 0;
   const id = typeof template['id'] === 'string' ? template['id'] : undefined;
   if (hasAvatar && id) {
-    template['avatarUrl'] = `/api/v1/agent-templates/${id}/avatar`;
+    const s3Key = String(template['avatarS3Key'] || '').trim();
+    const url = s3Key ? buildPublicS3ObjectUrl(s3Key) : undefined;
+    if (url) template['avatarUrl'] = url;
   }
   delete template['avatarS3Key'];
   delete template['avatarMimeType'];
@@ -344,54 +346,6 @@ router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Re
     sendSuccess(res, publicModel, 200);
   } catch (error) {
     handleError(error, res, 'loading template');
-  }
-});
-
-/**
- * GET /agent-templates/:id/avatar (public)
- * Streams the template avatar from S3 via a server-generated presigned URL.
- */
-router.get('/agent-templates/:id/avatar', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
-    if (!paramValidation) return;
-    const { id } = paramValidation;
-
-    const repo = new AgentTemplateRepository();
-    const storage = await repo.getAvatarStorageById(id);
-    if (!storage || !storage.avatarS3Key) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Template avatar not found', 404, { resource: 'agent-template-avatar', id });
-      return;
-    }
-
-    const url = await generatePresignedUrlInline(storage.avatarS3Key, 60);
-    const response = await fetch(url);
-    if (!response.ok) {
-      sendError(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch template avatar from storage', 500);
-      return;
-    }
-
-    res.setHeader('Content-Type', storage.avatarMimeType || response.headers.get('content-type') || 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-
-    if (storage.avatarUpdatedAt) {
-      res.setHeader('Last-Modified', new Date(storage.avatarUpdatedAt).toUTCString());
-    }
-
-    if (response.body) {
-      const reader = response.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) res.write(Buffer.from(value));
-      }
-      res.end();
-    } else {
-      const buf = await response.arrayBuffer();
-      res.send(Buffer.from(buf));
-    }
-  } catch (error) {
-    handleError(error, res, 'fetching template avatar');
   }
 });
 

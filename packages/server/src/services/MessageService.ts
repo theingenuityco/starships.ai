@@ -9,6 +9,89 @@ import { MessageRepository, AttachmentRepository, ConversationParticipantReposit
 import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import type { Message, MessageModel } from '@starships/protocol';
 
+// Postgres full-text (tsvector) has a hard per-row size limit (~1MB). Tool results can exceed this
+// (e.g. provider "raw_response" blobs or base64). Keep tool message content compact and store large
+// artifacts as attachments instead.
+const MAX_TOOL_MESSAGE_CONTENT_CHARS = 900_000;
+const TRUNCATED_STRING_CHARS = 50_000;
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '{"success":false,"error":{"code":"TOOL_RESULT_SERIALIZE_FAILED","message":"Failed to serialize tool result"}}';
+  }
+}
+
+function truncateString(value: string, maxChars: number): string {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars)}…[truncated ${value.length - maxChars} chars]`;
+}
+
+function deleteKnownLargeFields(value: unknown, seen = new WeakSet<object>()): void {
+  if (!value || typeof value !== 'object') return;
+  if (seen.has(value as object)) return;
+  seen.add(value as object);
+
+  const obj = value as Record<string, unknown>;
+
+  // Common large blobs we never need in the `messages` table.
+  if (Object.prototype.hasOwnProperty.call(obj, 'raw_response')) delete obj.raw_response;
+  if (Object.prototype.hasOwnProperty.call(obj, 'rawResponse')) delete obj.rawResponse;
+  if (Object.prototype.hasOwnProperty.call(obj, 'reasoningDetails')) delete obj.reasoningDetails;
+  if (Object.prototype.hasOwnProperty.call(obj, 'reasoning_details')) delete obj.reasoning_details;
+
+  for (const v of Object.values(obj)) {
+    if (v && typeof v === 'object') deleteKnownLargeFields(v, seen);
+  }
+}
+
+function truncateLongStrings(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (typeof value === 'string') return truncateString(value, TRUNCATED_STRING_CHARS);
+  if (!value || typeof value !== 'object') return value;
+  if (seen.has(value as object)) return value;
+  seen.add(value as object);
+
+  if (Array.isArray(value)) return value.map((v) => truncateLongStrings(v, seen));
+
+  const obj = value as Record<string, unknown>;
+  for (const [k, v] of Object.entries(obj)) {
+    obj[k] = truncateLongStrings(v, seen);
+  }
+  return obj;
+}
+
+function compactToolMessageContent(args: { role: string; messageType?: string; content: string; toolCallId?: string }): string {
+  const { role, messageType, content, toolCallId } = args;
+  const isToolMessage = role === 'tool' || messageType === 'tool_result';
+  if (!isToolMessage) return content;
+  if (typeof content !== 'string' || content.length <= MAX_TOOL_MESSAGE_CONTENT_CHARS) return content;
+
+  // Try structured compaction first (strip provider raw blobs, then truncate long strings).
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    deleteKnownLargeFields(parsed);
+    const truncated = truncateLongStrings(parsed);
+    const json = safeStringify(truncated);
+    if (json.length <= MAX_TOOL_MESSAGE_CONTENT_CHARS) return json;
+
+    // Still too large: keep a small envelope so persistence succeeds.
+    return safeStringify({
+      success: typeof (parsed as any)?.success === 'boolean' ? (parsed as any).success : false,
+      error: (parsed as any)?.error,
+      data: {
+        omitted: true,
+        reason: 'TOOL_RESULT_TOO_LARGE',
+        toolCallId: toolCallId || undefined,
+        originalLengthChars: content.length,
+      },
+    });
+  } catch {
+    // Not JSON: hard truncate as a last resort.
+    return truncateString(content, MAX_TOOL_MESSAGE_CONTENT_CHARS);
+  }
+}
+
 /**
  * Service class for managing messages and conversations
  */
@@ -31,10 +114,17 @@ export class MessageService {
    * Create a new message with streaming support
    */
   async createMessage(request: Message & { conversationId: string; attachmentIds?: string[] }): Promise<MessageModel> {
+    const compactedContent = compactToolMessageContent({
+      role: request.role,
+      messageType: request.messageType,
+      content: request.content,
+      toolCallId: request.toolCallId,
+    });
+
     // Create message with all available properties including toolCalls, toolCallId, agentId, agentName, and attachmentIds
     const message = await this.messageRepository.create({
       role: request.role,
-      content: request.content,
+      content: compactedContent,
       messageType: request.messageType,
       conversationId: request.conversationId,
       ...(request.reasoning && { reasoning: request.reasoning }),
@@ -81,9 +171,16 @@ export class MessageService {
   async upsertMessageByTurnSlot(
     request: Message & { conversationId: string; turnId: string; turnSeq: number; attachmentIds?: string[] }
   ): Promise<MessageModel> {
+    const compactedContent = compactToolMessageContent({
+      role: request.role,
+      messageType: request.messageType,
+      content: request.content,
+      toolCallId: request.toolCallId,
+    });
+
     const message = await this.messageRepository.upsertByTurnSlot({
       role: request.role,
-      content: request.content,
+      content: compactedContent,
       messageType: request.messageType,
       conversationId: request.conversationId,
       turnId: request.turnId,

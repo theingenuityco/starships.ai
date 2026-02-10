@@ -5,23 +5,21 @@ import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
   seed?: string | null
-  /**
-   * Stable, deterministic key used to generate internal SVG IDs.
-   *
-   * Why this exists:
-   * - SVG gradients/filters require `id=` values.
-   * - Those IDs must be stable across SSR + hydration to avoid React hydration warnings.
-   * - They also must be unique across the *document* to prevent collisions when the same seed appears multiple times.
-   *
-   * Prefer passing something like a template/agent id or a stable list key (e.g. `${template.id}-${idx}`).
-   */
-  idKey?: string | null
   imageUrl?: string | null
   size?: number
   className?: string
   emphasis?: boolean
   animation?: 'none' | 'wobble' | 'pulse'
   rounded?: boolean
+  /**
+   * Stable unique identifier for this component instance.
+   *
+   * Use this when `AgentAvatar` can appear in lists/carousels that may render a
+   * different number/order of children between SSR and initial hydration.
+   * (In those cases `useId()` can legitimately produce different values and
+   * cause hydration attribute mismatch warnings for SVG `<defs>` ids.)
+   */
+  instanceId?: string | number | null
   /**
    * When true, ignore `size` and stretch to fill the parent.
    * Useful for responsive containers (e.g. full-width square cards).
@@ -48,15 +46,21 @@ function pickFrom<T>(arr: readonly T[], idx: number): T {
   return arr[((idx % arr.length) + arr.length) % arr.length]!
 }
 
+function sanitizeIdPart(input: string): string {
+  // Keep ids simple + safe for SVG URL references: url(#id)
+  // (Avoid whitespace, quotes, etc.)
+  return input.replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
 export default function AgentAvatar({
   seed,
-  idKey,
   imageUrl,
   size = 40,
   className,
   emphasis = false,
   animation = 'none',
   rounded = false,
+  instanceId = null,
   fill = false,
   clip = false,
 }: AgentAvatarProps) {
@@ -75,9 +79,7 @@ export default function AgentAvatar({
 
   const generated = useMemo(() => {
     if (!hasSeed) return null
-    const baseSeed = String(seed).trim()
-    const stableKey = typeof idKey === 'string' && idKey.trim().length > 0 ? idKey.trim() : ''
-    const s = stableKey ? `${baseSeed}::${stableKey}` : baseSeed
+    const s = String(seed).trim()
     const h = hashSeed(s)
 
     // Brand-adjacent palette (deep neutrals + purples/indigos).
@@ -90,13 +92,18 @@ export default function AgentAvatar({
     const shape = h % 5
     const id = `av-${(h >>> 0).toString(16)}`
     return { c1, c2, c3, shape, id }
-  }, [seed, idKey, hasSeed])
+  }, [seed, hasSeed])
 
   // NOTE:
-  // SVG <defs> IDs must be stable across SSR + hydration. We intentionally avoid `useId()`
-  // because some client-side layout branches (carousels, media queries) can cause `useId()`
-  // sequences to differ between server and client, producing hydration mismatch warnings.
-  const svgIdBase = generated ? generated.id : null
+  // SVG <defs> IDs must be stable across SSR + hydration. Avoid `useId()` because
+  // responsive/client-only layout branches can legitimately change the ID sequence.
+  const instanceIdPart = useMemo(() => {
+    const raw = instanceId == null ? '' : String(instanceId)
+    return raw ? sanitizeIdPart(raw) : ''
+  }, [instanceId])
+
+  // If instanceId is provided, ensure uniqueness across repeated seeds on the same page.
+  const svgIdBase = generated ? (instanceIdPart ? `${generated.id}-${instanceIdPart}` : generated.id) : null
 
   const outerStyle: React.CSSProperties = {
     width: fill ? '100%' : size,

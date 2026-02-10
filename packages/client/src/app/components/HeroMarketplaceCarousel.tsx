@@ -159,8 +159,8 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
                           <AgentAvatar
                             seed={name}
-                            idKey={`${template.id}-${idx}`}
                             imageUrl={avatarUrl}
+                            instanceId={`hero-marketplace-${template.id}-${idx}`}
                             fill
                             clip
                             className="w-full h-full rounded-2xl"

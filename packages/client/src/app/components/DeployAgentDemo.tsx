@@ -122,8 +122,8 @@ export default function DeployAgentDemo() {
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
                           <AgentAvatar
                             seed={name}
-                            idKey={String((t as any)?.id ?? name)}
                             imageUrl={avatarUrl}
+                            instanceId={`deploy-agent-demo-${team.key}-${t.id}`}
                             fill
                             clip
                             className="w-full h-full rounded-2xl"
@@ -146,7 +146,14 @@ export default function DeployAgentDemo() {
                   >
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-full aspect-square rounded-2xl ring-1 ring-border/30 bg-background/20 overflow-hidden flex items-center justify-center">
-                        <AgentAvatar seed="Coming soon" imageUrl={undefined} fill clip className="w-full h-full rounded-2xl opacity-40" />
+                        <AgentAvatar
+                          seed="Coming soon"
+                          imageUrl={undefined}
+                          instanceId={`deploy-agent-demo-${team.key}-coming-soon-${idx}`}
+                          fill
+                          clip
+                          className="w-full h-full rounded-2xl opacity-40"
+                        />
                       </div>
                       <div className="min-w-0 w-full px-1 text-left">
                         <div className="text-xs font-semibold leading-tight truncate max-w-[16ch] text-muted-foreground">Coming soon</div>

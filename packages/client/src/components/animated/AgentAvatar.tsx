@@ -1,10 +1,21 @@
 'use client'
 
-import React, { useId, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
   seed?: string | null
+  /**
+   * Stable, deterministic key used to generate internal SVG IDs.
+   *
+   * Why this exists:
+   * - SVG gradients/filters require `id=` values.
+   * - Those IDs must be stable across SSR + hydration to avoid React hydration warnings.
+   * - They also must be unique across the *document* to prevent collisions when the same seed appears multiple times.
+   *
+   * Prefer passing something like a template/agent id or a stable list key (e.g. `${template.id}-${idx}`).
+   */
+  idKey?: string | null
   imageUrl?: string | null
   size?: number
   className?: string
@@ -39,6 +50,7 @@ function pickFrom<T>(arr: readonly T[], idx: number): T {
 
 export default function AgentAvatar({
   seed,
+  idKey,
   imageUrl,
   size = 40,
   className,
@@ -48,7 +60,6 @@ export default function AgentAvatar({
   fill = false,
   clip = false,
 }: AgentAvatarProps) {
-  const reactId = useId()
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
   const showInitialsFallback = !hasImage && hasSeed
@@ -64,7 +75,9 @@ export default function AgentAvatar({
 
   const generated = useMemo(() => {
     if (!hasSeed) return null
-    const s = String(seed).trim()
+    const baseSeed = String(seed).trim()
+    const stableKey = typeof idKey === 'string' && idKey.trim().length > 0 ? idKey.trim() : ''
+    const s = stableKey ? `${baseSeed}::${stableKey}` : baseSeed
     const h = hashSeed(s)
 
     // Brand-adjacent palette (deep neutrals + purples/indigos).
@@ -77,11 +90,13 @@ export default function AgentAvatar({
     const shape = h % 5
     const id = `av-${(h >>> 0).toString(16)}`
     return { c1, c2, c3, shape, id }
-  }, [seed, hasSeed])
+  }, [seed, idKey, hasSeed])
 
-  // Ensure <defs> IDs are unique per component instance to avoid DOM collisions
-  // when the same seed appears multiple times on a page.
-  const svgIdBase = generated ? `${generated.id}-${reactId.replace(/:/g, '')}` : null
+  // NOTE:
+  // SVG <defs> IDs must be stable across SSR + hydration. We intentionally avoid `useId()`
+  // because some client-side layout branches (carousels, media queries) can cause `useId()`
+  // sequences to differ between server and client, producing hydration mismatch warnings.
+  const svgIdBase = generated ? generated.id : null
 
   const outerStyle: React.CSSProperties = {
     width: fill ? '100%' : size,

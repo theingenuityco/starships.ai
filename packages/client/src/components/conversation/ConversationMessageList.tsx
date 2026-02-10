@@ -2927,7 +2927,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
-      const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const userProfileHref = isAuthedUserMessage ? '/account' : null
       const authorLabel = (() => {
         if (!isAuthedUserMessage) return userDisplayName
         const detail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
@@ -3591,13 +3591,6 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
-        // but with a left-weighted fade (transparent → solid border → transparent).
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }
@@ -3635,11 +3628,6 @@ function DirectMessageHero({
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }

@@ -877,7 +877,8 @@ export const ConversationList = memo(function ConversationList({
             ) : null}
           </div>
 
-          <div className="my-3 border-t border-border/60" />
+          {/* Separator between Channels and Direct messages (keep this in navigation). */}
+          <div className="my-3 mx-1 border-t border-border/60" role="separator" aria-hidden />
 
           {/* Direct messages - content-sized; capped at 50% height like Channels */}
           <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
@@ -1052,8 +1053,6 @@ export const ConversationList = memo(function ConversationList({
             )}
           </div>
 
-          <div className="my-3 border-t border-border/60" />
-
           <div className="mb-4">
             <div className="px-2 mb-2 flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground">Direct messages</p>
@@ -1130,7 +1129,7 @@ export const ConversationList = memo(function ConversationList({
       </ScrollArea>
 
       {/* Footer Stats */}
-      <div className="p-4 border-t frosted-glass-light">
+      <div className="p-4 frosted-glass-light">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{dmTargets.length} people</span>
         </div>

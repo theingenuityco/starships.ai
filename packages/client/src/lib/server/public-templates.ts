@@ -7,17 +7,28 @@ function normalizeBaseUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '')
 }
 
+let didWarnPublicUrlFallback = false
+
 function getPublicBaseUrl(): string {
   // Public marketing pages should fetch from the *public* origin so the HTML
   // they generate is consistent with what the browser can reach.
   // (Using SERVER_URL can succeed server-side, but the browser may not have the same routing.)
   const { PUBLIC_URL } = getPublicEnvConfig()
   const fromPublicEnv = normalizeBaseUrl(PUBLIC_URL || '')
-  if (!fromPublicEnv) {
-    // No fallbacks: this must be configured explicitly.
-    throw new Error('[public-templates] PUBLIC_URL is required for public marketing ISR fetches')
+  if (fromPublicEnv) return fromPublicEnv
+
+  // Fallback: Next in a monorepo can fail to load the root `.env` depending on how it’s started.
+  // In `pnpm dev`, we always start the reverse proxy on PROXY_PORT (default 8080), which exposes `/api/*`
+  // publicly. Using that origin keeps ISR HTML consistent with what the browser can reach.
+  //
+  // NOTE: We still recommend setting PUBLIC_URL explicitly in all environments.
+  const proxyPort = String(process.env.PROXY_PORT || '8080').trim() || '8080'
+  const fallback = `http://localhost:${proxyPort}`
+  if (!didWarnPublicUrlFallback) {
+    didWarnPublicUrlFallback = true
+    console.warn('[public-templates] PUBLIC_URL missing; falling back to', { fallback })
   }
-  return fromPublicEnv
+  return fallback
 }
 
 function absolutizePublicUrl(pathOrUrl: unknown, publicBaseUrl: string): string | undefined {

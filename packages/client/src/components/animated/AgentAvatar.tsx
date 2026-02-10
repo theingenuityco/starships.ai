@@ -12,6 +12,15 @@ export type AgentAvatarProps = {
   animation?: 'none' | 'wobble' | 'pulse'
   rounded?: boolean
   /**
+   * Stable unique identifier for this component instance.
+   *
+   * Use this when `AgentAvatar` can appear in lists/carousels that may render a
+   * different number/order of children between SSR and initial hydration.
+   * (In those cases `useId()` can legitimately produce different values and
+   * cause hydration attribute mismatch warnings for SVG `<defs>` ids.)
+   */
+  instanceId?: string | number | null
+  /**
    * When true, ignore `size` and stretch to fill the parent.
    * Useful for responsive containers (e.g. full-width square cards).
    */
@@ -37,6 +46,12 @@ function pickFrom<T>(arr: readonly T[], idx: number): T {
   return arr[((idx % arr.length) + arr.length) % arr.length]!
 }
 
+function sanitizeIdPart(input: string): string {
+  // Keep ids simple + safe for SVG URL references: url(#id)
+  // (Avoid whitespace, quotes, etc.)
+  return input.replace(/[^a-zA-Z0-9_-]/g, '_')
+}
+
 export default function AgentAvatar({
   seed,
   imageUrl,
@@ -45,6 +60,7 @@ export default function AgentAvatar({
   emphasis = false,
   animation = 'none',
   rounded = false,
+  instanceId = null,
   fill = false,
   clip = false,
 }: AgentAvatarProps) {
@@ -79,9 +95,14 @@ export default function AgentAvatar({
     return { c1, c2, c3, shape, id }
   }, [seed, hasSeed])
 
+  const instanceIdPart = useMemo(() => {
+    const raw = instanceId == null ? reactId : String(instanceId)
+    return sanitizeIdPart(raw)
+  }, [instanceId, reactId])
+
   // Ensure <defs> IDs are unique per component instance to avoid DOM collisions
   // when the same seed appears multiple times on a page.
-  const svgIdBase = generated ? `${generated.id}-${reactId.replace(/:/g, '')}` : null
+  const svgIdBase = generated ? `${generated.id}-${instanceIdPart}` : null
 
   const outerStyle: React.CSSProperties = {
     width: fill ? '100%' : size,

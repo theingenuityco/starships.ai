@@ -5,7 +5,7 @@
  * Uses AWS SDK v3 for modular imports and better tree-shaking.
  */
 
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEnvConfig } from '@starships/env';
 
@@ -133,6 +133,65 @@ export async function generatePresignedUrlInline(s3Key: string, expiresIn = 60):
   return getSignedUrl(getS3Client(), command, { expiresIn });
 }
 
+function encodeS3KeyForUrl(s3Key: string): string {
+  // Encode each segment but preserve forward slashes.
+  return String(s3Key || '')
+    .split('/')
+    .map((s) => encodeURIComponent(s))
+    .join('/');
+}
+
+/**
+ * Build a stable, direct HTTPS URL for an S3 object.
+ *
+ * Notes:
+ * - This only works if the object is publicly readable (e.g. via bucket policy for a `public/` prefix).
+ * - Prefer storing marketplace/template assets under a public prefix so we can serve them directly without API proxying.
+ */
+export function buildPublicS3ObjectUrl(s3Key: string): string | undefined {
+  const bucket = env.AWS_S3_BUCKET;
+  const region = env.AWS_S3_REGION;
+  const key = String(s3Key || '').trim();
+  if (!bucket || !region || !key) return undefined;
+  const encodedKey = encodeS3KeyForUrl(key);
+  return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
+}
+
+/**
+ * Generate a destination key for a public agent template avatar.
+ * Keys include a timestamp so updates naturally bust caches.
+ */
+export function buildAgentTemplatePublicAvatarS3Key(options: { templateId: string; filename: string }): string {
+  const timestamp = Date.now();
+  const sanitizedFilename = sanitizeFilename(options.filename || 'avatar.png');
+  return `public/agent-templates/${options.templateId}/avatar_${timestamp}_${sanitizedFilename}`;
+}
+
+/**
+ * Copy an object within the configured S3 bucket.
+ * Useful for promoting private uploads to a public prefix without downloading/re-uploading.
+ */
+export async function copyObjectInS3(options: { sourceKey: string; destKey: string }): Promise<void> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+  const sourceKey = String(options.sourceKey || '').trim();
+  const destKey = String(options.destKey || '').trim();
+  if (!sourceKey || !destKey) {
+    throw new Error('copyObjectInS3 requires sourceKey and destKey');
+  }
+
+  // CopySource must be URL-encoded as /{bucket}/{key}
+  const copySource = `${encodeURIComponent(bucket)}/${encodeS3KeyForUrl(sourceKey)}`;
+  const command = new CopyObjectCommand({
+    Bucket: bucket,
+    Key: destKey,
+    CopySource: copySource,
+  });
+  await getS3Client().send(command);
+}
+
 /**
  * Upload a public avatar image for an agent template.
  * These are served via API routes and stored in S3 under a stable prefix.
@@ -148,9 +207,7 @@ export async function uploadAgentTemplateAvatarToS3(options: {
     throw new Error('AWS_S3_BUCKET not configured');
   }
 
-  const timestamp = Date.now();
-  const sanitizedFilename = options.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const s3Key = `public/agent-templates/${options.templateId}/avatar_${timestamp}_${sanitizedFilename}`;
+  const s3Key = buildAgentTemplatePublicAvatarS3Key({ templateId: options.templateId, filename: options.filename });
 
   const command = new PutObjectCommand({
     Bucket: bucket,

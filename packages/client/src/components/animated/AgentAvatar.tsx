@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useId, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
@@ -64,7 +64,6 @@ export default function AgentAvatar({
   fill = false,
   clip = false,
 }: AgentAvatarProps) {
-  const reactId = useId()
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
   const showInitialsFallback = !hasImage && hasSeed
@@ -95,14 +94,16 @@ export default function AgentAvatar({
     return { c1, c2, c3, shape, id }
   }, [seed, hasSeed])
 
+  // NOTE:
+  // SVG <defs> IDs must be stable across SSR + hydration. Avoid `useId()` because
+  // responsive/client-only layout branches can legitimately change the ID sequence.
   const instanceIdPart = useMemo(() => {
-    const raw = instanceId == null ? reactId : String(instanceId)
-    return sanitizeIdPart(raw)
-  }, [instanceId, reactId])
+    const raw = instanceId == null ? '' : String(instanceId)
+    return raw ? sanitizeIdPart(raw) : ''
+  }, [instanceId])
 
-  // Ensure <defs> IDs are unique per component instance to avoid DOM collisions
-  // when the same seed appears multiple times on a page.
-  const svgIdBase = generated ? `${generated.id}-${instanceIdPart}` : null
+  // If instanceId is provided, ensure uniqueness across repeated seeds on the same page.
+  const svgIdBase = generated ? (instanceIdPart ? `${generated.id}-${instanceIdPart}` : generated.id) : null
 
   const outerStyle: React.CSSProperties = {
     width: fill ? '100%' : size,

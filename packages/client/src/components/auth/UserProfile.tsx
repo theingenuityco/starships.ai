@@ -46,7 +46,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
       router.push('/account')
       return
     }
-    const defaultTab = isInstanceAdmin ? 'usage' : 'my-profile'
+    const defaultTab = isInstanceAdmin ? 'usage' : 'my-starship'
     router.push(`/ship/${slug}/settings/${defaultTab}`)
   }
 

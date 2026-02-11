@@ -225,6 +225,7 @@ export function ConversationInterface({
   const [localSubmittedQuery, setLocalSubmittedQuery] = useState<string>('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [selectedMatchIndex, setSelectedMatchIndex] = useState<number | null>(null)
+  const [isSearchRunning, setIsSearchRunning] = useState<boolean>(false)
 
   const submittedQuery = searchContext?.submittedQuery ?? localSubmittedQuery
   const setSubmittedQuery = searchContext?.setSubmittedQuery ?? setLocalSubmittedQuery
@@ -236,12 +237,14 @@ export function ConversationInterface({
     setSubmittedQuery('')
     setSearchResults([])
     setSelectedMatchIndex(null)
+    setIsSearchRunning(false)
   }, [currentConversationId, setSubmittedQuery])
 
   const closeSearchSidebar = useCallback(() => {
     setSubmittedQuery('')
     setSearchResults([])
     setSelectedMatchIndex(null)
+    setIsSearchRunning(false)
     searchContext?.setSearchInputValue?.('')
   }, [setSubmittedQuery, searchContext])
 
@@ -1075,8 +1078,12 @@ export function ConversationInterface({
                     setSubmittedQuery(q)
                     setSearchResults([])
                     setSelectedMatchIndex(null)
+                    setIsSearchRunning(Boolean(q && q.trim()))
                   }}
-                  onSearchResults={setSearchResults}
+                  onSearchResults={results => {
+                    setSearchResults(results)
+                    setIsSearchRunning(false)
+                  }}
                   selectedMatchIndex={selectedMatchIndex}
                   hideSearchInput={hideSearchInputInList}
                   onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
@@ -1095,7 +1102,13 @@ export function ConversationInterface({
             </div>
             {submittedQuery.trim() ? (
               <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
-                <SearchResultsSidebar query={submittedQuery} results={searchResults} onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)} onClose={closeSearchSidebar} />
+                <SearchResultsSidebar
+                  query={submittedQuery}
+                  results={searchResults}
+                  isSearching={isSearchRunning}
+                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
+                  onClose={closeSearchSidebar}
+                />
               </div>
             ) : null}
           </div>

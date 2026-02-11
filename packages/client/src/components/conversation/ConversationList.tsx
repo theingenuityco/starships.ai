@@ -92,7 +92,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   return (
     <div className="relative">
       <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-        {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+        {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}

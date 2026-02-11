@@ -116,7 +116,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12 rounded-full ring-1 ring-border/40">
               {isImageUrl(userAvatar) ? (
-                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
               ) : null}
               <AvatarFallback className="rounded-full bg-muted/40">
                 <Icon name="user" className="h-5 w-5 text-muted-foreground" />

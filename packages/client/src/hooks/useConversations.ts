@@ -1150,6 +1150,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastSseOpenAtRef = useRef<number | null>(null)
   const lastSseErrorAtRef = useRef<number | null>(null)
   const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
+  const [appendGateRevision, setAppendGateRevision] = useState(0)
 
   type AwaitRequested = {
     at: string
@@ -1192,7 +1193,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const instanceController = new AbortController()
     try {
       const prev = activeSseGuards.get(convId)
-      if (prev) prev.abort()
+      if (prev) {
+        prev.abort()
+      }
     } catch {}
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
@@ -1216,6 +1219,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
       closed = true
+
       clearTimeout(timeoutId)
       controller.abort()
       instanceController.abort()
@@ -1390,7 +1394,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const emptyMessages: ClientMessage[] = []
 
   function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessage[] {
-    const clone = (arr: ClientMessage[]): ClientMessage[] => arr.map(m => ({ ...m }))
+    // IMPORTANT:
+    // Preserve object identity for unchanged messages.
+    // Re-cloning every message on every chunk causes React to re-render the entire message list
+    // for each delta, which can freeze the tab under high-frequency streaming.
+    const clone = (arr: ClientMessage[]): ClientMessage[] => arr.slice()
     const toolCallKey = (m: any): string => {
       const id = m?.id != null ? String(m.id) : ''
       if (!id) return ''
@@ -2024,11 +2032,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     // Store queued chunks
-    queuedAppendChunksRef.current = [...queuedAppendChunksRef.current, ...queued]
+    // IMPORTANT:
+    // Never accumulate queued chunks across renders. The source-of-truth `chunks` array already contains
+    // these items; we only need to remember what is currently gated for *this* render pass.
+    // Accumulating here can explode memory and lead to duplicated chunk insertion.
+    queuedAppendChunksRef.current = queued
     processedChunksRef.current = processed
 
     return processed
-  }, [chunksRevisionKey, turnState.status])
+  }, [chunksRevisionKey, turnState.status, appendGateRevision])
 
   const turnUsageByTurnId = useMemo<Record<string, TurnUsage>>(() => filteredChunks.reduce(reduceTurnUsage, {}), [chunksRevisionKey])
 
@@ -2043,14 +2055,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const shouldBypassAnimation = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
       if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
-        // Animation complete, add queued chunks to the query data
-        const queued = queuedAppendChunksRef.current.splice(0)
-        if (queued.length > 0 && conversationId) {
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
-            if (!Array.isArray(old)) return old
-            return [...old, ...queued]
-          })
-        }
+        // Animation complete: DO NOT mutate the TanStack Query cache (the queued chunks are already present in `chunks`).
+        // Instead, clear the queue and bump a local revision so `filteredChunks` recomputes and naturally includes them.
+        queuedAppendChunksRef.current = []
+        setAppendGateRevision(r => r + 1)
         return true
       }
       return false
@@ -2063,24 +2071,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         processQueued()
       }
       addPendingAppendCallback(callback)
-
-      // Also poll periodically as fallback
-      const intervalId = setInterval(() => {
-        if (processQueued()) {
-          clearInterval(intervalId)
-          removePendingAppendCallback(callback)
-        }
-      }, 100) // Check every 100ms
-
       return () => {
-        clearInterval(intervalId)
         removePendingAppendCallback(callback)
       }
     }
-  }, [filteredChunks, conversationId, queryClient, turnState.status])
+  }, [filteredChunks, conversationId, turnState.status])
 
   // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
-  // IMPORTANT: Deep copy previous messages to prevent mutation
   const computedMessages = useMemo(() => {
     const lastProcessedCount = lastReducedChunkCountRef.current // Use SEPARATE ref!
     const currentCount = filteredChunks.length
@@ -2100,17 +2097,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return lastComputedMessagesRef.current
     }
 
-    // CRITICAL: Deep copy previous messages to prevent reducer from mutating them
-    const previousMessagesCopy = lastComputedMessagesRef.current.map(msg => ({
-      ...msg,
-      content: msg.content,
-      reasoning: msg.reasoning,
-      toolCalls: msg.toolCalls ? [...msg.toolCalls] : undefined,
-      fromSnapshot: msg.fromSnapshot,
-    }))
-
     // Apply only new chunks to previous result (incremental)
-    const result = newChunks.reduce(reduceMessages, previousMessagesCopy)
+    // NOTE:
+    // `reduceMessages()` is implemented to avoid mutating its accumulator or message objects in-place,
+    // so we can safely reuse the previous array and preserve identity for unchanged rows.
+    const result = newChunks.reduce(reduceMessages, lastComputedMessagesRef.current)
     lastComputedMessagesRef.current = result
     lastReducedChunkCountRef.current = currentCount // Update the count!
 

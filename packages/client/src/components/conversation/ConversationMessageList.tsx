@@ -377,7 +377,7 @@ function LinkedConversationCard({
                       return (
                         <div key={p.key} className="h-7 w-7">
                           <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
                             <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                           </Avatar>
                         </div>
@@ -2866,7 +2866,7 @@ const MemoizedMessageBubble = memo(
                           src={explicitUserAvatarUrl!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : userAvatarSeedOverride ? (
@@ -2876,7 +2876,7 @@ const MemoizedMessageBubble = memo(
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : null}
@@ -2973,7 +2973,7 @@ const MemoizedMessageBubble = memo(
                           src={explicitUserAvatarUrl!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : userAvatarSeedOverride ? (
@@ -2983,7 +2983,7 @@ const MemoizedMessageBubble = memo(
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : null}
@@ -3010,7 +3010,7 @@ const MemoizedMessageBubble = memo(
                         src={explicitUserAvatarUrl!}
                         alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                         referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
+                        // NOTE: Do not set `crossOrigin` for simple avatar display.
                         className="rounded-full object-cover"
                       />
                     ) : userAvatarSeedOverride ? (
@@ -3020,7 +3020,7 @@ const MemoizedMessageBubble = memo(
                         src={effectiveUserAvatar!}
                         alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                         referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
+                        // NOTE: Do not set `crossOrigin` for simple avatar display.
                         className="rounded-full object-cover"
                       />
                     ) : null}

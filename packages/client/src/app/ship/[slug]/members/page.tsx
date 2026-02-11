@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { HoverProfilePopover } from '@/components/conversation/HoverProfilePopover'
+import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from '@/components/conversation/ProfileHoverCardContent'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
@@ -27,6 +29,27 @@ type Filter = 'all' | 'humans' | 'agents'
 type AgentWithAvatar = AgentModel & { avatarAttachmentId?: string | null }
 
 const SKELETON_CARD_COUNT = 2
+
+function initialsFromName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  if (parts.length === 0) return 'U'
+  return (
+    parts
+      .map(p => p[0]?.toUpperCase())
+      .filter(Boolean)
+      .join('') || 'U'
+  )
+}
+
+function formatMemberRoleLabel(role?: string | null): string {
+  const r = typeof role === 'string' ? role.trim().toLowerCase() : ''
+  if (!r) return ''
+  if (r === 'owner') return 'Owner'
+  if (r === 'admin') return 'Admin'
+  if (r === 'collaborator') return 'Collaborator'
+  return r.replace(/\b\w/g, c => c.toUpperCase())
+}
 
 function getUserLabel(m: StarshipMemberListItem): { primary: string; secondary?: string } {
   const displayName = typeof m.displayName === 'string' ? m.displayName.trim() : ''
@@ -150,13 +173,34 @@ export default function MembersPage() {
     const label = getUserLabel(m)
     const userId = typeof m.userId === 'string' ? m.userId.trim() : ''
     const isOnline = presence.isUserOnline(userId)
-    const href = slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : slug ? `/ship/${encodeURIComponent(slug)}` : '/'
     const avatarUrlRaw = typeof m.avatar === 'string' ? m.avatar.trim() : ''
     const avatarUrl = isImageUrl(avatarUrlRaw) ? avatarUrlRaw : null
     const presenceText = isOnline ? 'Online' : 'Offline'
+    const isAuthedUser = Boolean(user?.id && userId && String(user.id) === String(userId))
+    const displayName = typeof m.displayName === 'string' ? m.displayName.trim() : ''
+    const email = typeof m.email === 'string' ? m.email.trim() : ''
+    const userHoverTitle = isAuthedUser ? 'You' : label.primary
+    const userHoverSub = isAuthedUser ? (displayName || email || '') : email && email !== label.primary ? email : ''
+    const userHoverCard = (
+      <UserProfileHoverCardContent
+        title={userHoverTitle}
+        subtitle={userHoverSub || undefined}
+        isAuthedUser={isAuthedUser}
+        explicitAvatarUrl={avatarUrl || undefined}
+        resolvedAvatarUrl={undefined}
+        avatarSeed={label.primary || undefined}
+        fallbackInitials={initialsFromName(userHoverTitle || email || displayName || label.primary)}
+        fallbackVariant="initials"
+        userIdShort={userId ? `#${userId.slice(0, 6)}` : undefined}
+        email={email || undefined}
+        roleLabel={formatMemberRoleLabel(m.role) || undefined}
+        memberSince={m.createdAt || undefined}
+        statusLabel={presenceText}
+      />
+    )
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
-        <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
+        <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
           <div className="flex items-start gap-3">
             <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
@@ -179,7 +223,18 @@ export default function MembersPage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className={cn('text-sm font-medium truncate text-foreground')}>{label.primary}</span>
+                <HoverProfilePopover
+                  trigger={
+                    <button
+                      type="button"
+                      className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}
+                    >
+                      {label.primary}
+                    </button>
+                  }
+                  content={userHoverCard}
+                  side="right"
+                />
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className={cn('truncate', isOnline ? 'text-emerald-600 dark:text-emerald-400' : undefined)}>{presenceText}</span>
@@ -188,7 +243,7 @@ export default function MembersPage() {
               </div>
             </div>
           </div>
-        </Link>
+        </div>
       </div>
     )
   }
@@ -230,13 +285,29 @@ export default function MembersPage() {
     const status = getAgentMarketplaceStatus(a)
     const categoryMeta = getCategoryMeta(a.category)
     const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
-    const href = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : slug ? `/ship/${encodeURIComponent(slug)}/agents` : '/'
     const key = a.id || agentSlug || label.primary
     const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
     const avatarUrl = avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null : null
+    const toolsCount = Array.isArray((a as any)?.assignedToolSlugs) ? ((a as any).assignedToolSlugs as unknown[]).length : undefined
+    const modelIdRaw = (a as any)?.model
+    const modelId = typeof modelIdRaw === 'string' ? modelIdRaw : undefined
+    const agentHoverCard = (
+      <AgentProfileHoverCardContent
+        name={label.primary || 'Assistant'}
+        avatarUrl={avatarUrl || undefined}
+        modelId={modelId}
+        statusLabel="Available"
+        roleLabel={typeof a.role === 'string' ? a.role : undefined}
+        category={categoryMeta?.label || (typeof a.category === 'string' ? a.category : undefined)}
+        version={typeof a.version === 'string' ? a.version : undefined}
+        toolsCount={typeof toolsCount === 'number' ? toolsCount : undefined}
+        createdAt={typeof a.createdAt === 'string' ? a.createdAt : undefined}
+        updatedAt={typeof a.updatedAt === 'string' ? a.updatedAt : undefined}
+      />
+    )
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
-        <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
+        <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
           <div className="flex items-start gap-3">
             <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
@@ -252,7 +323,18 @@ export default function MembersPage() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className={cn('text-sm font-medium truncate text-foreground')}>{label.primary}</span>
+                <HoverProfilePopover
+                  trigger={
+                    <button
+                      type="button"
+                      className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}
+                    >
+                      {label.primary}
+                    </button>
+                  }
+                  content={agentHoverCard}
+                  side="right"
+                />
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="truncate text-emerald-600 dark:text-emerald-400">Online</span>
@@ -269,7 +351,7 @@ export default function MembersPage() {
               </div>
             </div>
           </div>
-        </Link>
+        </div>
       </div>
     )
   }

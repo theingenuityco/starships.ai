@@ -332,7 +332,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

@@ -9,7 +9,7 @@ import { AgentTemplateRepository, MarketingContentRepository, UserRepository } f
 import type { AgentTemplateModel, UserModel } from '@starships/protocol';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
-import { generatePresignedUrlInline, uploadAgentTemplateProfileImageToS3 } from '@/utils/s3-helper';
+import { buildPublicS3ObjectUrl, generatePresignedUrlInline, uploadAgentTemplateProfileImageToS3 } from '@/utils/s3-helper';
 import { TemplateMarketingImageGenerationService } from './TemplateMarketingImageGenerationService';
 import { ExecutionItemUtils, LLM } from '@starships/autopilot';
 import OpenAI from 'openai';
@@ -280,7 +280,7 @@ export class AgentTemplateMarketingService {
     const capsStorage = await this.agentTemplateRepository.getProfileImageStorageById(templateId, 'capabilities');
     const tryStorage = await this.agentTemplateRepository.getProfileImageStorageById(templateId, 'try_these_prompts');
 
-    const avatarV = avatarStorage?.avatarUpdatedAt ? new Date(avatarStorage.avatarUpdatedAt).getTime() : Date.now();
+    const publicAvatarUrl = avatarStorage?.avatarS3Key ? buildPublicS3ObjectUrl(avatarStorage.avatarS3Key) : undefined;
     const pv = problemStorage?.updatedAt ? new Date(problemStorage.updatedAt).getTime() : Date.now();
     const cv = capsStorage?.updatedAt ? new Date(capsStorage.updatedAt).getTime() : Date.now();
     const tv = tryStorage?.updatedAt ? new Date(tryStorage.updatedAt).getTime() : Date.now();
@@ -288,7 +288,7 @@ export class AgentTemplateMarketingService {
     return {
       templateId,
       marketingContent: {
-        avatarUrl: `/api/v1/agent-templates/${templateId}/avatar?v=${avatarV}`,
+        ...(publicAvatarUrl ? { avatarUrl: publicAvatarUrl } : {}),
         problemStatementsText: statements,
         problemStatementsImageUrl: `/api/v1/agent-templates/${templateId}/profile-images/problem-statements?v=${pv}`,
         capabilitiesImageUrl: `/api/v1/agent-templates/${templateId}/profile-images/capabilities?v=${cv}`,

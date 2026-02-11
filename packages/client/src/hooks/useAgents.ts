@@ -426,6 +426,33 @@ export function useDeleteAgent() {
 }
 
 /**
+ * Delete agent and delete any now-unassigned tool instances.
+ *
+ * Tools are deleted only if they are not assigned to any other agents after the agent deletion.
+ */
+export function useDeleteAgentWithUnusedTools() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (agentId: string) => {
+      const response: FetchResponse<ApiResponse<{ message: string; deletedToolIds?: string[] }>> = await api.delete(
+        `/api/v1/agents/${agentId}?deleteToolsIfUnused=true`
+      )
+      return response.data.data
+    },
+    onSuccess: (data, agentId) => {
+      queryClient.removeQueries({ queryKey: AGENT_QUERY_KEYS.detail(agentId) })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      const n = Array.isArray((data as any)?.deletedToolIds) ? ((data as any).deletedToolIds as unknown[]).length : 0
+      toast.success('Agent deleted', { description: n > 0 ? `Also deleted ${n} unused tool(s).` : undefined })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to delete agent', { description: getErrorMessage(error, 'Failed to delete agent') })
+    },
+  })
+}
+
+/**
  * Unpublish agent (revert published -> draft and remove marketplace template)
  */
 export function useUnpublishAgent() {

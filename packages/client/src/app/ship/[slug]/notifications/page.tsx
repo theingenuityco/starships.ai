@@ -220,7 +220,7 @@ export default function NotificationsPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pb-8">
+          <div className="pt-4 pb-8">
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
               <div className="flex justify-start">
                 <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">

@@ -258,7 +258,7 @@ export default function MembersPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="flex flex-wrap items-center gap-2 pb-4">
+          <div className="flex flex-wrap items-center gap-2 pb-8">
             <Button size="sm" className="h-8" variant={filter === 'all' ? 'default' : 'secondary'} onClick={() => setFilter('all')}>
               All
             </Button>

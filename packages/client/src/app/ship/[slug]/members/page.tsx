@@ -145,7 +145,7 @@ export default function MembersPage() {
               <PresenceIndicator
                 kind={isOnline ? 'online' : 'offline'}
                 active={true}
-                size="md"
+                size="sm"
                 placement="outset"
                 // Slightly more down/right for 40px avatar.
                 className="translate-x-[22%] translate-y-[6%]"
@@ -190,7 +190,7 @@ export default function MembersPage() {
                   rounded
                 />
               </span>
-              <PresenceIndicator kind="online" active={true} size="md" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
+              <PresenceIndicator kind="online" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

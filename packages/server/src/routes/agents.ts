@@ -966,6 +966,9 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
+    const deleteToolsIfUnusedRaw = typeof req.query?.deleteToolsIfUnused === 'string' ? String(req.query.deleteToolsIfUnused) : '';
+    const deleteToolsIfUnused = deleteToolsIfUnusedRaw === 'true' || deleteToolsIfUnusedRaw === '1';
+
     // Authorization: ensure caller owns the starship that owns this agent
     const agentService = new AgentService();
     const agent = await agentService.getAgent(paramValidation.id);
@@ -976,6 +979,20 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
 
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', paramValidation.id, res);
     if (!hasAccess) return;
+
+    if (deleteToolsIfUnused) {
+      const result = await agentService.deleteAgentAndUnusedTools(paramValidation.id);
+      if (!result.deleted) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
+        return;
+      }
+      sendSuccess(
+        res,
+        { message: 'Agent deleted successfully', deletedToolIds: result.deletedToolIds },
+        200
+      );
+      return;
+    }
 
     const deleted = await agentService.deleteAgent(paramValidation.id);
     if (!deleted) {

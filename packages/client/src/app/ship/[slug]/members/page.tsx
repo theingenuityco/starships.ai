@@ -16,7 +16,7 @@ import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAnd
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
 import { useRemoveStarshipMember } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
-import { useDeleteAgent, useUnpublishAgent } from '@/hooks/useAgents'
+import { useDeleteAgent, useDeleteAgentWithUnusedTools, useUnpublishAgent } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuth } from '@/hooks/useAuth'
@@ -151,6 +151,7 @@ export default function MembersPage() {
   const presence = useStarshipPresence(starshipIdStr ?? '', Boolean(starshipIdStr))
   const removeMember = useRemoveStarshipMember(starshipIdStr ?? '')
   const deleteAgent = useDeleteAgent()
+  const deleteAgentWithUnusedTools = useDeleteAgentWithUnusedTools()
   const unpublishAgent = useUnpublishAgent()
 
   const [confirmAction, setConfirmAction] = useState<
@@ -710,7 +711,7 @@ export default function MembersPage() {
                 : confirmAction?.kind === 'kickAgent'
                   ? 'This will remove the agent from this starship.'
                   : confirmAction?.kind === 'deleteAgent'
-                    ? 'This will permanently delete the agent.'
+                    ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
                     : confirmAction?.kind === 'unpublishAgent'
                       ? 'This will remove the agent from the Marketplace (it will stay deployed in your starship).'
                       : ''}
@@ -737,54 +738,95 @@ export default function MembersPage() {
             </div>
           ) : null}
 
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setConfirmAction(null)}
-              disabled={removeMember.isPending || deleteAgent.isPending || unpublishAgent.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={removeMember.isPending || deleteAgent.isPending || unpublishAgent.isPending}
-              onClick={async () => {
-                const action = confirmAction
-                if (!action) return
-                try {
-                  if (action.kind === 'kickHuman') {
-                    await removeMember.mutateAsync(action.userId)
-                  } else if (action.kind === 'kickAgent') {
+          {confirmAction?.kind === 'deleteAgent' ? (
+            <DialogFooter className="gap-2 sm:gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setConfirmAction(null)}
+                disabled={removeMember.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={deleteAgent.isPending || deleteAgentWithUnusedTools.isPending}
+                onClick={async () => {
+                  const action = confirmAction
+                  if (!action || action.kind !== 'deleteAgent') return
+                  try {
                     await deleteAgent.mutateAsync(action.agentId)
-                  } else if (action.kind === 'deleteAgent') {
-                    await deleteAgent.mutateAsync(action.agentId)
-                  } else if (action.kind === 'unpublishAgent') {
-                    await unpublishAgent.mutateAsync(action.agentId)
+                  } finally {
+                    setConfirmAction(null)
                   }
-                } finally {
-                  setConfirmAction(null)
-                }
-              }}
-            >
-              {confirmAction?.kind === 'kickHuman'
-                ? removeMember.isPending
-                  ? 'Kicking…'
-                  : 'Kick'
-                : confirmAction?.kind === 'kickAgent'
-                  ? deleteAgent.isPending
+                }}
+              >
+                {deleteAgent.isPending ? 'Deleting…' : 'Delete agent'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={deleteAgent.isPending || deleteAgentWithUnusedTools.isPending}
+                onClick={async () => {
+                  const action = confirmAction
+                  if (!action || action.kind !== 'deleteAgent') return
+                  try {
+                    await deleteAgentWithUnusedTools.mutateAsync(action.agentId)
+                  } finally {
+                    setConfirmAction(null)
+                  }
+                }}
+              >
+                {deleteAgentWithUnusedTools.isPending ? 'Deleting…' : 'Delete + unused tools'}
+              </Button>
+            </DialogFooter>
+          ) : (
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setConfirmAction(null)}
+                disabled={removeMember.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={removeMember.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+                onClick={async () => {
+                  const action = confirmAction
+                  if (!action) return
+                  try {
+                    if (action.kind === 'kickHuman') {
+                      await removeMember.mutateAsync(action.userId)
+                    } else if (action.kind === 'kickAgent') {
+                      await deleteAgent.mutateAsync(action.agentId)
+                    } else if (action.kind === 'unpublishAgent') {
+                      await unpublishAgent.mutateAsync(action.agentId)
+                    }
+                  } finally {
+                    setConfirmAction(null)
+                  }
+                }}
+              >
+                {confirmAction?.kind === 'kickHuman'
+                  ? removeMember.isPending
                     ? 'Kicking…'
                     : 'Kick'
-                  : confirmAction?.kind === 'deleteAgent'
+                  : confirmAction?.kind === 'kickAgent'
                     ? deleteAgent.isPending
-                      ? 'Deleting…'
-                      : 'Delete'
+                      ? 'Kicking…'
+                      : 'Kick'
                     : unpublishAgent.isPending
                       ? 'Unpublishing…'
                       : 'Unpublish'}
-            </Button>
-          </DialogFooter>
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

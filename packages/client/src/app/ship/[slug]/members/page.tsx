@@ -3,7 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
-import { getAttachmentPreviewUrl } from '@/hooks/useFileUpload'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
@@ -31,10 +31,33 @@ function getUserLabel(m: StarshipMemberListItem): { primary: string; secondary?:
 
 function getAgentLabel(a: AgentWithAvatar): { primary: string; secondary?: string } {
   const primary = formatAgentDisplayName(a)
-  const category = typeof a.category === 'string' ? a.category.trim() : ''
-  const isPublic = typeof a.isPublic === 'boolean' ? a.isPublic : null
-  const secondaryParts = [category ? category[0]?.toUpperCase() + category.slice(1) : null, isPublic === true ? 'Public' : isPublic === false ? 'Private' : null].filter(Boolean) as string[]
-  return { primary, secondary: secondaryParts.length ? secondaryParts.join(' · ') : undefined }
+  return { primary }
+}
+
+function getAgentMarketplaceStatus(a: AgentWithAvatar): { label: string; className: string } {
+  const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
+  if (fromMarketplace) return { label: 'Deployed from Marketplace', className: 'text-muted-foreground' }
+
+  const status = a.publicationStatus
+  if (status === 'published') return { label: 'Published to Marketplace', className: 'text-muted-foreground' }
+  if (status === 'pending_approval') return { label: 'Publish pending', className: 'text-muted-foreground' }
+  if (status === 'rejected') return { label: 'Publish rejected', className: 'text-destructive' }
+  return { label: 'Private', className: 'text-muted-foreground' }
+}
+
+function getCategoryMeta(category?: string): { label: string; className: string } | null {
+  const raw = typeof category === 'string' ? category.trim().toLowerCase() : ''
+  if (!raw) return null
+
+  if (raw === 'coding') return { label: 'Coding', className: 'text-muted-foreground' }
+  if (raw === 'creative') return { label: 'Creative', className: 'text-muted-foreground' }
+  if (raw === 'analysis') return { label: 'Analysis', className: 'text-muted-foreground' }
+  if (raw === 'support') return { label: 'Support', className: 'text-muted-foreground' }
+  if (raw === 'general') return { label: 'General', className: 'text-muted-foreground' }
+
+  // Fallback for other categories (utility, data, communication, automation, etc.)
+  const label = raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  return { label, className: 'text-muted-foreground' }
 }
 
 export default function MembersPage() {
@@ -67,6 +90,31 @@ export default function MembersPage() {
     if (filter === 'humans') return []
     return agents
   }, [agents, filter])
+
+  const starshipIdStr = starshipId ? String(starshipId) : null
+
+  const visibleAgentAvatarAttachmentIds = useMemo(() => {
+    if (!starshipIdStr) return []
+    if (filter === 'humans') return []
+    const ids = new Set<string>()
+    for (const a of filteredAgents) {
+      const id = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
+      if (id) ids.add(id)
+    }
+    return Array.from(ids)
+  }, [filteredAgents, filter, starshipIdStr])
+
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(visibleAgentAvatarAttachmentIds, starshipIdStr ?? undefined)
+
+  const agentAvatarUrlByAttachmentId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const att of agentAvatarAttachments) {
+      const id = typeof att?.id === 'string' ? att.id.trim() : ''
+      const url = typeof att?.previewUrl === 'string' ? att.previewUrl.trim() : ''
+      if (id && url) map.set(id, url)
+    }
+    return map
+  }, [agentAvatarAttachments])
 
   const renderHumanRow = (m: StarshipMemberListItem) => {
     const label = getUserLabel(m)
@@ -105,11 +153,13 @@ export default function MembersPage() {
 
   const renderAgentRow = (a: AgentWithAvatar) => {
     const label = getAgentLabel(a)
+    const status = getAgentMarketplaceStatus(a)
+    const categoryMeta = getCategoryMeta(a.category)
     const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
     const href = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : slug ? `/ship/${encodeURIComponent(slug)}/agents` : '/'
     const key = a.id || agentSlug || label.primary
     const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
-    const avatarUrl = avatarAttachmentId && starshipId ? getAttachmentPreviewUrl(avatarAttachmentId, String(starshipId)) : null
+    const avatarUrl = avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null : null
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
@@ -127,11 +177,17 @@ export default function MembersPage() {
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium truncate text-foreground')}>{label.primary}</span>
               </div>
-              {label.secondary ? (
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span className="truncate">{label.secondary}</span>
-                </div>
-              ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                {categoryMeta ? (
+                  <span className={cn('inline-flex items-center gap-1', categoryMeta.className)} aria-label={`Category: ${categoryMeta.label}`} title={`Category: ${categoryMeta.label}`}>
+                    <span>{categoryMeta.label}</span>
+                  </span>
+                ) : null}
+                {categoryMeta ? <span aria-hidden="true">·</span> : null}
+                <span className={cn('inline-flex items-center gap-1', status.className)} aria-label={status.label} title={status.label}>
+                  <span>{status.label}</span>
+                </span>
+              </div>
             </div>
           </div>
         </Link>

@@ -3,9 +3,12 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
-import { useMessageAttachments } from '@/hooks/useFileUpload'
-import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
-import { useStarshipBySlug, useStarshipAgents } from '@/hooks/useStarships'
+import { getAttachmentPreviewUrl } from '@/hooks/useFileUpload'
+import type { StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
+import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
+import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipBySlug } from '@/hooks/useStarships'
+import type { AgentModel } from '@starships/protocol'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { cn } from '@/lib/utils'
@@ -15,61 +18,45 @@ import { useMemo, useState } from 'react'
 
 type Filter = 'all' | 'humans' | 'agents'
 
-function getUserLabel(m: any): { primary: string; secondary?: string } {
-  const displayName = typeof m?.displayName === 'string' ? m.displayName.trim() : ''
-  const email = typeof m?.email === 'string' ? m.email.trim() : ''
+type AgentWithAvatar = AgentModel & { avatarAttachmentId?: string | null }
+
+function getUserLabel(m: StarshipMemberListItem): { primary: string; secondary?: string } {
+  const displayName = typeof m.displayName === 'string' ? m.displayName.trim() : ''
+  const email = typeof m.email === 'string' ? m.email.trim() : ''
   const primary = displayName || email || 'Unknown member'
-  const role = typeof m?.role === 'string' ? m.role.trim() : ''
+  const role = typeof m.role === 'string' ? m.role.trim() : ''
   const secondaryParts = [role ? role[0]?.toUpperCase() + role.slice(1) : null, displayName && email ? email : null].filter(Boolean) as string[]
   return { primary, secondary: secondaryParts.length ? secondaryParts.join(' · ') : undefined }
 }
 
-function getAgentLabel(a: any): { primary: string; secondary?: string } {
-  const primary = a ? formatAgentDisplayName(a) : 'Unknown agent'
-  const category = typeof a?.category === 'string' ? a.category.trim() : ''
-  const isPublic = typeof a?.isPublic === 'boolean' ? a.isPublic : null
+function getAgentLabel(a: AgentWithAvatar): { primary: string; secondary?: string } {
+  const primary = formatAgentDisplayName(a)
+  const category = typeof a.category === 'string' ? a.category.trim() : ''
+  const isPublic = typeof a.isPublic === 'boolean' ? a.isPublic : null
   const secondaryParts = [category ? category[0]?.toUpperCase() + category.slice(1) : null, isPublic === true ? 'Public' : isPublic === false ? 'Private' : null].filter(Boolean) as string[]
   return { primary, secondary: secondaryParts.length ? secondaryParts.join(' · ') : undefined }
 }
 
 export default function MembersPage() {
-  const params = useParams()
-  const slug = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
+  const { slug: slugParam } = useParams<{ slug: string }>()
+  const slug = typeof slugParam === 'string' ? slugParam : ''
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ?? null
 
   const [filter, setFilter] = useState<Filter>('all')
 
-  const { data: membersData, isLoading: membersLoading } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
-  const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(String(starshipId || ''), Boolean(starshipId))
+  const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50 })
+  const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC' })
 
   const humans = useMemo(() => {
-    const list = (membersData as any)?.members
-    return Array.isArray(list) ? list : []
-  }, [membersData])
+    const pages: StarshipMembersAndInvitesPage[] = humansQuery.data?.pages ?? []
+    return pages.flatMap(p => p.members)
+  }, [humansQuery.data])
 
-  const agents = useMemo(() => (Array.isArray(agentsData) ? agentsData : []), [agentsData])
-
-  const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const a of agents) {
-      const id = typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId).trim() : ''
-      if (id) ids.add(id)
-    }
-    return Array.from(ids)
-  }, [agents])
-
-  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId ? String(starshipId) : undefined)
-
-  const agentAvatarUrlByAttachmentId = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const att of agentAvatarAttachments as any[]) {
-      const id = typeof att?.id === 'string' ? att.id.trim() : ''
-      const previewUrl = typeof att?.previewUrl === 'string' ? att.previewUrl.trim() : ''
-      if (id && previewUrl) map.set(id, previewUrl)
-    }
-    return map
-  }, [agentAvatarAttachments])
+  const agents = useMemo(() => {
+    const pages = agentsQuery.data?.pages ?? []
+    return pages.flatMap(p => p.agents) as AgentWithAvatar[]
+  }, [agentsQuery.data])
 
   const filteredHumans = useMemo(() => {
     if (filter === 'agents') return []
@@ -81,11 +68,11 @@ export default function MembersPage() {
     return agents
   }, [agents, filter])
 
-  const renderHumanRow = (m: any) => {
+  const renderHumanRow = (m: StarshipMemberListItem) => {
     const label = getUserLabel(m)
-    const userId = typeof m?.userId === 'string' ? m.userId.trim() : ''
+    const userId = typeof m.userId === 'string' ? m.userId.trim() : ''
     const href = slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : slug ? `/ship/${encodeURIComponent(slug)}` : '/'
-    const avatarUrlRaw = typeof m?.avatar === 'string' ? m.avatar.trim() : ''
+    const avatarUrlRaw = typeof m.avatar === 'string' ? m.avatar.trim() : ''
     const avatarUrl = isImageUrl(avatarUrlRaw) ? avatarUrlRaw : null
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -116,13 +103,13 @@ export default function MembersPage() {
     )
   }
 
-  const renderAgentRow = (a: any) => {
+  const renderAgentRow = (a: AgentWithAvatar) => {
     const label = getAgentLabel(a)
-    const agentSlug = typeof a?.slug === 'string' ? a.slug.trim() : ''
+    const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
     const href = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : slug ? `/ship/${encodeURIComponent(slug)}/agents` : '/'
-    const key = typeof a?.id === 'string' ? a.id : agentSlug || label.primary
-    const avatarAttachmentId = typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId).trim() : ''
-    const avatarUrl = avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null : null
+    const key = a.id || agentSlug || label.primary
+    const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
+    const avatarUrl = avatarAttachmentId && starshipId ? getAttachmentPreviewUrl(avatarAttachmentId, String(starshipId)) : null
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
@@ -132,7 +119,7 @@ export default function MembersPage() {
                 seed={label.primary}
                 imageUrl={avatarUrl}
                 fill
-                instanceId={typeof (a as any)?.id === 'string' ? `member-a-${String((a as any).id)}` : `member-a-${label.primary}`}
+                instanceId={a.id ? `member-a-${a.id}` : `member-a-${label.primary}`}
                 rounded
               />
             </span>
@@ -152,10 +139,15 @@ export default function MembersPage() {
     )
   }
 
-  const isLoading = Boolean(membersLoading || agentsLoading)
+  const isLoading = Boolean(humansQuery.isLoading || agentsQuery.isLoading)
   const humansCount = humans.length
   const agentsCount = agents.length
   const totalCount = humansCount + agentsCount
+
+  const canLoadMoreHumans = Boolean(humansQuery.hasNextPage)
+  const canLoadMoreAgents = Boolean(agentsQuery.hasNextPage)
+  const isLoadingMoreHumans = Boolean(humansQuery.isFetchingNextPage)
+  const isLoadingMoreAgents = Boolean(agentsQuery.isFetchingNextPage)
 
   return (
     <div className="relative flex flex-col h-full min-w-0">
@@ -215,6 +207,13 @@ export default function MembersPage() {
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Humans</div>
                   <div className="space-y-2">{filteredHumans.map(renderHumanRow)}</div>
+                  {filter !== 'agents' && canLoadMoreHumans ? (
+                    <div className="flex justify-center pt-4">
+                      <Button variant="secondary" onClick={() => humansQuery.fetchNextPage()} disabled={isLoadingMoreHumans} className="h-8">
+                        {isLoadingMoreHumans ? 'Loading…' : 'Load more humans'}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -222,6 +221,13 @@ export default function MembersPage() {
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agents</div>
                   <div className="space-y-2">{filteredAgents.map(renderAgentRow)}</div>
+                  {filter !== 'humans' && canLoadMoreAgents ? (
+                    <div className="flex justify-center pt-4">
+                      <Button variant="secondary" onClick={() => agentsQuery.fetchNextPage()} disabled={isLoadingMoreAgents} className="h-8">
+                        {isLoadingMoreAgents ? 'Loading…' : 'Load more agents'}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

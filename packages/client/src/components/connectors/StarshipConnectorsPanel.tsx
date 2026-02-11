@@ -358,7 +358,8 @@ export function StarshipConnectorsPanel({
     return visibleCatalog.find((c: { provider: string }) => c.provider === provider)?.name ?? provider
   }
 
-  const isInitialCatalogLoading = isCatalogFetching && catalog.length === 0
+  const isSearching = Boolean(q) && isCatalogFetching
+  const isInitialCatalogLoading = !q && isCatalogFetching && catalog.length === 0
   const isPanelLoading = isLoading || isInitialCatalogLoading
 
   const sectionTitle = statusFilter === 'connected' ? 'Connected' : statusFilter === 'unconnected' ? 'Unconnected' : 'All connectors'
@@ -389,6 +390,14 @@ export function StarshipConnectorsPanel({
           <Skeleton className="h-8 w-28 rounded-2xl" />
           <Skeleton className="h-8 w-20 rounded-2xl" />
         </div>
+      </div>
+    )
+  }
+
+  const renderCenteredState = (message: string) => {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
       </div>
     )
   }
@@ -629,11 +638,6 @@ export function StarshipConnectorsPanel({
 
   return (
     <div className="space-y-6">
-      {isCatalogFetching ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
-      {filteredCatalog.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{q ? `No connectors match “${q}”.` : 'No connectors available.'}</p>
-      ) : null}
-
       {layout === 'list' ? (
         <div>
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -642,10 +646,23 @@ export function StarshipConnectorsPanel({
               <span className="text-sm text-muted-foreground tabular-nums">{sectionCount}</span>
             </div>
           </div>
-          <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
+          {isSearching ? (
+            renderCenteredState(`Searching “${q}”…`)
+          ) : filteredCatalog.length === 0 ? (
+            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
+          ) : (
+            <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
+          )}
         </div>
       ) : (
-        <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+        <div className="space-y-4">
+          {isSearching ? (
+            renderCenteredState(`Searching “${q}”…`)
+          ) : filteredCatalog.length === 0 ? (
+            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
+          ) : null}
+          <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+        </div>
       )}
 
       {!hideDisconnect ? (

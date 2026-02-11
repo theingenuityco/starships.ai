@@ -135,21 +135,11 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                           <span
-                            className="inline-flex items-center gap-1.5 font-medium leading-none text-emerald-600 dark:text-emerald-400 tabular-nums"
+                            className="inline-flex items-center font-medium leading-none text-muted-foreground tabular-nums"
                             aria-label={`${connectorStats.connected} connected`}
                             title={`${connectorStats.connected} connected`}
                           >
-                            <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                              {/* Reuse presence indicator visuals for consistency */}
-                              <span className="absolute inset-0">
-                                <span className="inline-block rounded-full ring-2 ring-background outline outline-1 outline-border bg-emerald-500 dark:bg-emerald-400" style={{ width: 6, height: 6 }} />
-                              </span>
-                            </span>
                             {connectorStats.connected} connected
-                          </span>
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span className="font-medium leading-none text-muted-foreground tabular-nums">
-                            {Math.max(0, connectorStats.total - connectorStats.connected)} unconnected
                           </span>
                         </span>
                       ) : null}

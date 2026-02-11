@@ -14,8 +14,9 @@ import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
 import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
+import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
 
-const ALL_TABS = ['my-profile', 'my-starship', 'billing', 'usage'] as const
+const ALL_TABS = ['my-profile', 'my-starship', 'upgrade', 'billing', 'usage'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
@@ -29,7 +30,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
   const canManageBilling = Boolean(isInstanceAdmin === true || (user?.id && starshipData?.ownerId && String(starshipData.ownerId) === String(user.id)))
 
   const baseTabs = (['my-profile', 'my-starship'] as const) satisfies readonly TabValue[]
-  const withBilling = (canManageBilling ? (['billing'] as const) : ([] as const)) satisfies readonly TabValue[]
+  const withBilling = (canManageBilling ? (['upgrade', 'billing'] as const) : ([] as const)) satisfies readonly TabValue[]
   const withAnalytics = (showAnalytics ? (['usage'] as const) : ([] as const)) satisfies readonly TabValue[]
   const visibleTabs: readonly TabValue[] = [...baseTabs, ...withBilling, ...withAnalytics]
 
@@ -46,7 +47,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
     if (authLoading) return
     if (starshipLoading) return
     if (!tab) return
-    if (tab !== 'billing') return
+    if (tab !== 'billing' && tab !== 'upgrade') return
     if (canManageBilling) return
     router.replace(`/ship/${slug}/settings/my-profile`)
   }, [authLoading, canManageBilling, router, slug, starshipLoading, tab])
@@ -75,6 +76,12 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="rocket" className="h-4 w-4" />
                     <span>My Starship</span>
                   </TabsTrigger>
+                  {canManageBilling ? (
+                    <TabsTrigger value="upgrade" className="gap-2 rounded-xl px-3 py-1">
+                      <Icon name="arrow-up" className="h-4 w-4" />
+                      <span>Upgrade</span>
+                    </TabsTrigger>
+                  ) : null}
                   {canManageBilling ? (
                     <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                       <Icon name="credit-card" className="h-4 w-4" />
@@ -109,6 +116,14 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                   </section>
                 </TabsContent>
               )}
+
+              {canManageBilling ? (
+                <TabsContent value="upgrade">
+                  <section aria-labelledby="upgrade-section" className="bg-background">
+                    {starshipData?.id ? <StarshipUpgradeSection starshipId={starshipData.id} /> : null}
+                  </section>
+                </TabsContent>
+              ) : null}
 
               {canManageBilling ? (
                 <TabsContent value="billing">

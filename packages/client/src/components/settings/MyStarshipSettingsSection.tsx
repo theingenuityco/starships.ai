@@ -18,7 +18,6 @@ import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } 
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
 import { StarshipToolsDefaultsSection } from '@/components/settings/StarshipToolsDefaultsSection'
 
 interface MyStarshipSettingsSectionProps {
@@ -62,11 +61,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const { data: deployedAgents, isLoading: isAgentsLoading } = useStarshipAgents(starship?.id ?? '', Boolean(starship?.id))
   const deployedAgentsCount = Array.isArray(deployedAgents) ? deployedAgents.length : 0
   const maxAgentsLabel = isAgentsLoading ? `…/${starship?.maxAgents ?? '—'}` : `${deployedAgentsCount}/${starship?.maxAgents ?? '—'}`
-
-  const canManageBilling = useMemo(() => {
-    if (!starship) return false
-    return Boolean(isInstanceAdmin || (userId && starship.ownerId === userId))
-  }, [starship, isInstanceAdmin, userId])
 
   const canEdit = useMemo(() => {
     if (!starship) return false
@@ -207,12 +201,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
       </div>
 
       <form id={formId} onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start">
-        {starship.id && canManageBilling && (
-          <div className="xl:col-span-2">
-            <StarshipUpgradeSection starshipId={starship.id} />
-          </div>
-        )}
-
         {/* Left column: overview */}
         <div className="space-y-6">
           <Card className={PROFILE_SECTION_CARD_CLASS}>

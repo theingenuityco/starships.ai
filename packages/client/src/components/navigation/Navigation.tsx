@@ -178,6 +178,7 @@ export function Navigation(props: NavigationProps) {
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
         isSchedulesRoute: false,
+        isMembersRoute: false,
       }
     }
     return {
@@ -185,10 +186,11 @@ export function Navigation(props: NavigationProps) {
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
+      isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -298,6 +300,12 @@ export function Navigation(props: NavigationProps) {
               label: 'My Agents',
               icon: 'bot',
               isActive: isAgentsRoute || isAgentBuilderRoute,
+            },
+            {
+              href: `/ship/${starshipSlug}/members`,
+              label: 'Members',
+              icon: 'users',
+              isActive: isMembersRoute,
             },
           ]
         : []),

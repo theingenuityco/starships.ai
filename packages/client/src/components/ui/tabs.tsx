@@ -56,7 +56,7 @@ const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     className={cn(
       // Default TabsList style should match the Settings page tabs.
       // Card-like surface + card border.
-      'inline-flex min-h-8 items-center justify-center rounded-2xl bg-card border border-border/60 p-1 text-muted-foreground shadow-sm',
+      'inline-flex h-9 items-center justify-center rounded-2xl bg-card border border-border/60 p-1 text-muted-foreground shadow-sm',
       className
     )}
     {...props}

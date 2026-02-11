@@ -365,7 +365,7 @@ export default function MembersPage() {
                       value={searchText}
                       onChange={(e) => setSearchText(e.target.value)}
                       placeholder="Search members"
-                      className="pl-9 h-8 py-1 text-[13px] rounded-2xl border-border/60 bg-card"
+                      className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
                       aria-label="Search members"
                     />
                   </div>

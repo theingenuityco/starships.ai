@@ -175,22 +175,18 @@ export function Navigation(props: NavigationProps) {
     if (!starshipSlug) {
       return {
         isConnectorsRoute: false,
-        isAgentsRoute: false,
-        isAgentBuilderRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
       }
     }
     return {
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
-      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
-      isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute, isMembersRoute } = routeChecks
+  const { isConnectorsRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -296,12 +292,6 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug
         ? [
             {
-              href: `/ship/${starshipSlug}/agents`,
-              label: 'My Agents',
-              icon: 'bot',
-              isActive: isAgentsRoute || isAgentBuilderRoute,
-            },
-            {
               href: `/ship/${starshipSlug}/members`,
               label: 'Members',
               icon: 'users',
@@ -340,7 +330,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isMembersRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

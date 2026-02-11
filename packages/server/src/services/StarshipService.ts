@@ -1,7 +1,7 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ensureDefaultChannelForStarship } from '@/utils/default-channel';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, StarshipMemberRepository, StarshipRepository, UserRepository } from '@starships/models';
+import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, ToolTemplateRepository, UserRepository } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -33,12 +33,51 @@ export class StarshipService {
   private agentRepository: AgentRepository;
   private userRepository: UserRepository;
   private starshipMemberRepository: StarshipMemberRepository;
+  private toolRepository: ToolRepository;
+  private toolTemplateRepository: ToolTemplateRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.userRepository = new UserRepository();
     this.starshipMemberRepository = new StarshipMemberRepository();
+    this.toolRepository = new ToolRepository();
+    this.toolTemplateRepository = new ToolTemplateRepository();
+  }
+
+  private async ensureBaselineStarshipToolsAllowed(starshipId: string): Promise<void> {
+    const requiredBaseTemplateSlugs = ['read-url', 'read-older-messages'] as const;
+
+    // Snapshot existing tools + starship-level permission rows so we can:
+    // - avoid re-deploy when a tool is already deployed
+    // - avoid creating duplicate starship_tools rows when an allow mapping already exists
+    const [tools, starshipToolPerms] = await Promise.all([
+      this.toolRepository.findByStarship(starshipId),
+      this.agentRepository.getStarshipToolPermissions(starshipId),
+    ]);
+    const slugToSourceTemplateId = new Map<string, string | null | undefined>(tools.map((t) => [t.slug, t.sourceTemplateId]));
+
+    for (const baseSlug of requiredBaseTemplateSlugs) {
+      const templateId = await this.toolTemplateRepository.resolveTemplateIdForAssignedSlug(baseSlug);
+      if (!templateId) continue;
+
+      // If a starship_tools mapping already exists for any tool instance created from this template,
+      // prefer updating THAT mapping to allow, to avoid creating duplicate mapped instances.
+      const mapped = starshipToolPerms.find((p) => slugToSourceTemplateId.get(p.toolSlug) === templateId);
+      if (mapped) {
+        if (mapped.permission !== 'allow') {
+          await this.agentRepository.setStarshipToolPermissionBySlug({ starshipId, toolSlug: mapped.toolSlug, permission: 'allow' });
+        }
+        continue;
+      }
+
+      // No mapping exists yet. Deploy tool instance if missing (by template linkage) and map it.
+      let deployed = await this.toolRepository.findByTemplateIdAndStarship(templateId, starshipId);
+      if (!deployed) {
+        deployed = await this.toolRepository.createFromTemplateId(templateId, starshipId, {});
+      }
+      await this.agentRepository.setStarshipToolPermissionBySlug({ starshipId, toolSlug: deployed.slug, permission: 'allow' });
+    }
   }
 
   /**
@@ -86,6 +125,14 @@ export class StarshipService {
         /* ignore */
       }
       throw err;
+    }
+
+    // Ensure required baseline tools are deployed and allowed at the starship level.
+    // Best-effort: avoid breaking starship creation if tool seeding/deploy hits a transient issue.
+    try {
+      await this.ensureBaselineStarshipToolsAllowed(starship.id);
+    } catch (err) {
+      console.error('[STARSHIP-SERVICE] Failed to ensure required tools for starship:', starship.id, err);
     }
 
     return starship;

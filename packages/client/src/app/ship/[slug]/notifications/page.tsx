@@ -7,6 +7,7 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useNotificationsStream } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { useStarshipChannels, useStarshipDirectMessages } from '@/hooks/useConversations'
@@ -224,19 +225,17 @@ export default function NotificationsPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="flex flex-wrap items-center gap-2 pb-4">
-            <Button size="sm" className="h-8" variant={filter === 'all' ? 'default' : 'secondary'} onClick={() => setFilter('all')}>
-              All
-            </Button>
-            <Button size="sm" className="h-8" variant={filter === 'mentions' ? 'default' : 'secondary'} onClick={() => setFilter('mentions')}>
-              Mentions
-            </Button>
-            <Button size="sm" className="h-8" variant={filter === 'dms' ? 'default' : 'secondary'} onClick={() => setFilter('dms')}>
-              Direct messages
-            </Button>
-            <Button size="sm" className="h-8" variant={filter === 'reactions' ? 'default' : 'secondary'} onClick={() => setFilter('reactions')}>
-              Reactions
-            </Button>
+          <div className="pb-6">
+            <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
+              <div className="flex justify-start">
+                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="mentions">Mentions</TabsTrigger>
+                  <TabsTrigger value="dms">Direct messages</TabsTrigger>
+                  <TabsTrigger value="reactions">Reactions</TabsTrigger>
+                </TabsList>
+              </div>
+            </Tabs>
           </div>
 
           {isLoading ? (

@@ -269,16 +269,10 @@ export default function MembersPage() {
               }}
             >
               <div className="flex justify-start">
-                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
-                  <TabsTrigger value="all" className="rounded-xl px-3 py-1">
-                    All
-                  </TabsTrigger>
-                  <TabsTrigger value="humans" className="rounded-xl px-3 py-1">
-                    Humans
-                  </TabsTrigger>
-                  <TabsTrigger value="agents" className="rounded-xl px-3 py-1">
-                    Agents
-                  </TabsTrigger>
+                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="humans">Humans</TabsTrigger>
+                  <TabsTrigger value="agents">Agents</TabsTrigger>
                 </TabsList>
               </div>
             </Tabs>
@@ -300,7 +294,7 @@ export default function MembersPage() {
                     {slug && canInviteUsers ? (
                       <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                         <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
-                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-2" />
+                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
                           Invite user
                         </Link>
                       </Button>
@@ -326,7 +320,7 @@ export default function MembersPage() {
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                       <Link href="/marketplace">
-                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-2" />
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
                         Explore agents
                       </Link>
                     </Button>

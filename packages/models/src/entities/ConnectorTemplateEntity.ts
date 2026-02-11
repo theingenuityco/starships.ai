@@ -51,7 +51,7 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @Length(1, 1024)
+  @Length(1, 120)
   description!: string;
 
   @Expose()

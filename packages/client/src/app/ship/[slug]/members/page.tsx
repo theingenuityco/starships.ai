@@ -761,15 +761,14 @@ export default function MembersPage() {
                     <p className="font-medium text-emerald-800 dark:text-emerald-300">
                       We have sent them an invite. You can also use this invite link:
                     </p>
-                    <div className="min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <code className="block min-w-0 flex-1 break-all rounded-md border border-border/60 bg-card/60 px-2 py-1 text-[12px]">
-                        {lastInviteUrl}
-                      </code>
+                    <div className="relative min-w-0">
                       <Button
                         type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="h-8"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1 h-7 w-7 text-muted-foreground hover:text-foreground"
+                        aria-label="Copy invite link"
+                        title="Copy invite link"
                         onClick={async () => {
                           try {
                             await navigator.clipboard.writeText(lastInviteUrl)
@@ -778,8 +777,11 @@ export default function MembersPage() {
                           }
                         }}
                       >
-                        Copy
+                        <Icon name="copy" className="h-4 w-4" />
                       </Button>
+                      <code className="block min-w-0 break-all rounded-md border border-border/60 bg-card/60 px-2 py-2 pr-9 text-[12px]">
+                        {lastInviteUrl}
+                      </code>
                     </div>
                   </div>
                 </div>

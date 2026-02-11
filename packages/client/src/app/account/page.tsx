@@ -49,7 +49,6 @@ export default function AccountPage(): React.JSX.Element {
                 <Icon name="user" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">My Profile</h1>
               </div>
-              <p className="text-sm text-muted-foreground">Manage your account details, security, and preferences.</p>
             </div>
 
             <Tabs

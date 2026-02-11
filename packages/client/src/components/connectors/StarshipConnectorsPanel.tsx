@@ -411,7 +411,7 @@ export function StarshipConnectorsPanel({
             <Skeleton className="h-4 w-8" />
           </div>
         </div>
-        <div className="space-y-2">{Array.from({ length: 6 }, (_, i) => renderConnectorRowSkeleton(`connector-skel-${i}`))}</div>
+        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderConnectorRowSkeleton(`connector-skel-${i}`))}</div>
       </div>
     )
   }

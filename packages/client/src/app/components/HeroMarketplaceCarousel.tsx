@@ -20,7 +20,11 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const useServerInitial = initialAgentTemplates.length > 0
   const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
-  const agentTemplates = (data ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
+  // IMPORTANT (hydration stability):
+  // When we render with server-provided `initialAgentTemplates`, do not let any pre-existing
+  // client-side React Query cache override them. Otherwise, on hydration we can "swap" to a
+  // stale/incomplete cached list (e.g. missing `avatarUrl`) and images appear to disappear.
+  const agentTemplates = (useServerInitial ? initialAgentTemplates : data ?? []) as AgentTemplateModel[]
   const agentTemplatesLoading = isLoading && !useServerInitial
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)

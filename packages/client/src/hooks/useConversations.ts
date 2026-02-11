@@ -1150,6 +1150,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastSseOpenAtRef = useRef<number | null>(null)
   const lastSseErrorAtRef = useRef<number | null>(null)
   const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
+  const [appendGateRevision, setAppendGateRevision] = useState(0)
 
   type AwaitRequested = {
     at: string
@@ -1158,7 +1159,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     spec: Record<string, unknown>
   }
 
-  type TurnState = { turnId: string | null; status: StreamTurnStatus | null; awaitRequested?: AwaitRequested | null }
+  type TurnState = {
+    turnId: string | null
+    status: StreamTurnStatus | null
+    agentId?: string | null
+    agentName?: string | null
+    awaitRequested?: AwaitRequested | null
+  }
   type TurnUsage = {
     turnId: string
     at: string
@@ -1186,7 +1193,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const instanceController = new AbortController()
     try {
       const prev = activeSseGuards.get(convId)
-      if (prev) prev.abort()
+      if (prev) {
+        prev.abort()
+      }
     } catch {}
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
@@ -1210,6 +1219,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
       closed = true
+
       clearTimeout(timeoutId)
       controller.abort()
       instanceController.abort()
@@ -1384,7 +1394,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const emptyMessages: ClientMessage[] = []
 
   function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessage[] {
-    const clone = (arr: ClientMessage[]): ClientMessage[] => arr.map(m => ({ ...m }))
+    // IMPORTANT:
+    // Preserve object identity for unchanged messages.
+    // Re-cloning every message on every chunk causes React to re-render the entire message list
+    // for each delta, which can freeze the tab under high-frequency streaming.
+    const clone = (arr: ClientMessage[]): ClientMessage[] => arr.slice()
     const toolCallKey = (m: any): string => {
       const id = m?.id != null ? String(m.id) : ''
       if (!id) return ''
@@ -1602,6 +1616,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const messageId = chunk.data.messageId
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
+      const agentId = typeof (chunk as any)?.data?.agentId === 'string' ? String((chunk as any).data.agentId).trim() : ''
+      const agentName = typeof (chunk as any)?.data?.agentName === 'string' ? String((chunk as any).data.agentName).trim() : ''
 
       // If there are duplicates (should be prevented, but can occur during edge-case merges),
       // always apply deltas to the LAST occurrence so streaming continues at the tail.
@@ -1626,6 +1642,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           createdAt: now,
           updatedAt: now,
           ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
+          ...(agentId ? { agentId } : null),
+          ...(agentName ? { agentName } : null),
           streaming: true,
         }
         return [...messages, shell]
@@ -1637,6 +1655,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
       cur.updatedAt = now
       cur.streaming = true
+      // Canonical identity stamping (no UI heuristics):
+      // once we learn the agent for this streaming placeholder, persist it on the message record.
+      if (agentId) (cur as any).agentId = agentId
+      if (agentName) (cur as any).agentName = agentName
 
       // If this message came from a snapshot and this is the first delta, REPLACE content instead of appending
       // to avoid stale content from snapshot. Clear the flag after first delta.
@@ -1770,26 +1792,58 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   function reduceTurn(acc: TurnState, chunk: StreamedChunk): TurnState {
     if (chunk.type === 'snapshot') {
-      if (chunk.data.turn) return { turnId: chunk.data.turn.turnId, status: chunk.data.turn.status }
+      if (chunk.data.turn)
+        return {
+          ...acc,
+          turnId: chunk.data.turn.turnId,
+          status: chunk.data.turn.status,
+          agentId: typeof (chunk.data.turn as any)?.agentId === 'string' ? String((chunk.data.turn as any).agentId) : acc.agentId ?? null,
+          agentName: typeof (chunk.data.turn as any)?.agentName === 'string' ? String((chunk.data.turn as any).agentName) : acc.agentName ?? null,
+        }
       return acc
     }
     if (chunk.type === 'turn.started') {
-      return { turnId: chunk.data.turnId, status: 'active' }
+      return {
+        ...acc,
+        turnId: chunk.data.turnId,
+        status: 'active',
+        agentId: typeof (chunk.data as any)?.agentId === 'string' ? String((chunk.data as any).agentId) : acc.agentId ?? null,
+        agentName: typeof (chunk.data as any)?.agentName === 'string' ? String((chunk.data as any).agentName) : acc.agentName ?? null,
+      }
     }
     if (chunk.type === 'turn.status') {
       const data = chunk.data
       const status = data?.status
       if (!status) return acc
-      return { turnId: data?.turnId ?? acc.turnId, status }
+      return { ...acc, turnId: data?.turnId ?? acc.turnId, status }
     }
     if (chunk.type === 'await_requested') {
-      const d: any = chunk.data as any
-      const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString()
-      const nodeRef = typeof d?.nodeRef === 'string' ? String(d.nodeRef) : ''
-      const kind = typeof d?.kind === 'string' ? String(d.kind) : ''
-      const spec = d?.spec && typeof d.spec === 'object' && !Array.isArray(d.spec) ? (d.spec as Record<string, unknown>) : null
+      const d = chunk.data as unknown
+      const rec = d && typeof d === 'object' ? (d as Record<string, unknown>) : null
+      const at = typeof rec?.at === 'string' ? String(rec.at) : new Date().toISOString()
+      const nodeRef = typeof rec?.nodeRef === 'string' ? String(rec.nodeRef) : ''
+      const kind = typeof rec?.kind === 'string' ? String(rec.kind) : ''
+      const specRaw = rec?.spec
+      const spec = specRaw && typeof specRaw === 'object' && !Array.isArray(specRaw) ? (specRaw as Record<string, unknown>) : null
       if (!nodeRef || kind !== 'connector_event' || !spec) return acc
       return { ...acc, awaitRequested: { at, nodeRef, kind: 'connector_event', spec } }
+    }
+    if (chunk.type === 'assistant.delta' || chunk.type === 'assistant.reasoning_delta') {
+      // If the server did not (or could not) emit turn.started with agent identity, learn it from the first delta.
+      const d = (chunk as { data?: unknown }).data
+      const rec = d && typeof d === 'object' ? (d as Record<string, unknown>) : null
+      const tid = typeof rec?.turnId === 'string' ? String(rec.turnId) : ''
+      if (!tid) return acc
+      if (acc.turnId && String(acc.turnId) !== tid) return acc
+      const agentId = typeof rec?.agentId === 'string' ? String(rec.agentId) : ''
+      const agentName = typeof rec?.agentName === 'string' ? String(rec.agentName) : ''
+      if (!agentId && !agentName) return acc
+      return {
+        ...acc,
+        turnId: acc.turnId ?? tid,
+        agentId: agentId || (acc.agentId ?? null),
+        agentName: agentName || (acc.agentName ?? null),
+      }
     }
     // Back-compat for local pre-seed
     if (chunk.type === 'turn_started' && chunk.payload?.local === true) {
@@ -1857,7 +1911,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastReducedChunkCountRef.current = 0
   }, [conversationId])
 
-  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null, awaitRequested: null }), [chunksRevisionKey])
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null, agentId: null, agentName: null, awaitRequested: null }), [chunksRevisionKey])
 
   function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
     if (chunk.type === 'snapshot') {
@@ -1978,11 +2032,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     // Store queued chunks
-    queuedAppendChunksRef.current = [...queuedAppendChunksRef.current, ...queued]
+    // IMPORTANT:
+    // Never accumulate queued chunks across renders. The source-of-truth `chunks` array already contains
+    // these items; we only need to remember what is currently gated for *this* render pass.
+    // Accumulating here can explode memory and lead to duplicated chunk insertion.
+    queuedAppendChunksRef.current = queued
     processedChunksRef.current = processed
 
     return processed
-  }, [chunksRevisionKey, turnState.status])
+  }, [chunksRevisionKey, turnState.status, appendGateRevision])
 
   const turnUsageByTurnId = useMemo<Record<string, TurnUsage>>(() => filteredChunks.reduce(reduceTurnUsage, {}), [chunksRevisionKey])
 
@@ -1997,14 +2055,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const shouldBypassAnimation = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
       if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
-        // Animation complete, add queued chunks to the query data
-        const queued = queuedAppendChunksRef.current.splice(0)
-        if (queued.length > 0 && conversationId) {
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
-            if (!Array.isArray(old)) return old
-            return [...old, ...queued]
-          })
-        }
+        // Animation complete: DO NOT mutate the TanStack Query cache (the queued chunks are already present in `chunks`).
+        // Instead, clear the queue and bump a local revision so `filteredChunks` recomputes and naturally includes them.
+        queuedAppendChunksRef.current = []
+        setAppendGateRevision(r => r + 1)
         return true
       }
       return false
@@ -2017,24 +2071,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         processQueued()
       }
       addPendingAppendCallback(callback)
-
-      // Also poll periodically as fallback
-      const intervalId = setInterval(() => {
-        if (processQueued()) {
-          clearInterval(intervalId)
-          removePendingAppendCallback(callback)
-        }
-      }, 100) // Check every 100ms
-
       return () => {
-        clearInterval(intervalId)
         removePendingAppendCallback(callback)
       }
     }
-  }, [filteredChunks, conversationId, queryClient, turnState.status])
+  }, [filteredChunks, conversationId, turnState.status])
 
   // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
-  // IMPORTANT: Deep copy previous messages to prevent mutation
   const computedMessages = useMemo(() => {
     const lastProcessedCount = lastReducedChunkCountRef.current // Use SEPARATE ref!
     const currentCount = filteredChunks.length
@@ -2054,17 +2097,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return lastComputedMessagesRef.current
     }
 
-    // CRITICAL: Deep copy previous messages to prevent reducer from mutating them
-    const previousMessagesCopy = lastComputedMessagesRef.current.map(msg => ({
-      ...msg,
-      content: msg.content,
-      reasoning: msg.reasoning,
-      toolCalls: msg.toolCalls ? [...msg.toolCalls] : undefined,
-      fromSnapshot: msg.fromSnapshot,
-    }))
-
     // Apply only new chunks to previous result (incremental)
-    const result = newChunks.reduce(reduceMessages, previousMessagesCopy)
+    // NOTE:
+    // `reduceMessages()` is implemented to avoid mutating its accumulator or message objects in-place,
+    // so we can safely reuse the previous array and preserve identity for unchanged rows.
+    const result = newChunks.reduce(reduceMessages, lastComputedMessagesRef.current)
     lastComputedMessagesRef.current = result
     lastReducedChunkCountRef.current = currentCount // Update the count!
 
@@ -2264,6 +2301,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     turnId: turnState.turnId,
     turnStatus: turnState.status,
+    turnAgentId: turnState.agentId ?? null,
+    turnAgentName: turnState.agentName ?? null,
     awaitRequested: turnState.awaitRequested ?? null,
     turnUsageByTurnId,
     lastUIAction,

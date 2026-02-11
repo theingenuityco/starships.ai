@@ -269,7 +269,7 @@ export default function MembersPage() {
               }}
             >
               <div className="flex justify-start">
-                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1">
+                <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="humans">Humans</TabsTrigger>
                   <TabsTrigger value="agents">Agents</TabsTrigger>

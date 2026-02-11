@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
-import type { StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
+import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -84,6 +84,11 @@ export default function MembersPage() {
     return pages.flatMap(p => p.members)
   }, [humansQuery.data])
 
+  const invites = useMemo(() => {
+    const pages: StarshipMembersAndInvitesPage[] = humansQuery.data?.pages ?? []
+    return pages.flatMap(p => p.invites)
+  }, [humansQuery.data])
+
   const agents = useMemo(() => {
     const pages = agentsQuery.data?.pages ?? []
     return pages.flatMap(p => p.agents) as AgentWithAvatar[]
@@ -93,6 +98,11 @@ export default function MembersPage() {
     if (filter === 'agents') return []
     return humans
   }, [humans, filter])
+
+  const filteredInvites = useMemo(() => {
+    if (filter === 'agents') return []
+    return invites
+  }, [invites, filter])
 
   const filteredAgents = useMemo(() => {
     if (filter === 'humans') return []
@@ -173,6 +183,38 @@ export default function MembersPage() {
     )
   }
 
+  const renderInviteRow = (inv: StarshipInviteListItem) => {
+    const emailRaw = typeof inv.invitedEmail === 'string' ? inv.invitedEmail.trim() : ''
+    const roleRaw = typeof inv.role === 'string' ? inv.role.trim() : ''
+    const roleLabel = roleRaw ? roleRaw[0]?.toUpperCase() + roleRaw.slice(1) : ''
+    const key = emailRaw ? `invite-${emailRaw}` : `invite-${inv.createdAt}`
+    const primary = emailRaw || 'Invited member'
+    return (
+      <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className={cn('min-w-0 flex-1 outline-none rounded-md')} aria-label={primary}>
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                <AgentAvatar seed={primary} imageUrl={null} fill instanceId={key} rounded />
+              </span>
+              <PresenceIndicator kind="offline" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className={cn('text-sm font-medium truncate text-foreground')}>{primary}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className="truncate">Invited</span>
+                {roleLabel ? <span aria-hidden="true">·</span> : null}
+                {roleLabel ? <span className="truncate">{roleLabel}</span> : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const renderAgentRow = (a: AgentWithAvatar) => {
     const label = getAgentLabel(a)
     const status = getAgentMarketplaceStatus(a)
@@ -224,6 +266,7 @@ export default function MembersPage() {
 
   const isLoading = Boolean(humansQuery.isLoading || agentsQuery.isLoading)
   const humansCount = humans.length
+  const invitesCount = invites.length
   const agentsCount = agents.length
   const totalCount = humansCount + agentsCount
 
@@ -351,16 +394,16 @@ export default function MembersPage() {
                 </div>
               ) : null}
             </div>
-          ) : filteredHumans.length === 0 && filteredAgents.length === 0 ? (
+          ) : filteredHumans.length === 0 && filteredInvites.length === 0 && filteredAgents.length === 0 ? (
             <div className="text-sm text-muted-foreground">No members found.</div>
           ) : (
             <div className="space-y-10">
-              {filteredHumans.length > 0 ? (
+              {filteredHumans.length > 0 || filteredInvites.length > 0 ? (
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
-                      <span className="text-sm text-muted-foreground tabular-nums">{humansCount}</span>
+                      <span className="text-sm text-muted-foreground tabular-nums">{humansCount + invitesCount}</span>
                     </div>
                     {slug && canInviteUsers ? (
                       <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
@@ -371,7 +414,10 @@ export default function MembersPage() {
                       </Button>
                     ) : null}
                   </div>
-                  <div className="space-y-2">{filteredHumans.map(renderHumanRow)}</div>
+                  <div className="space-y-2">
+                    {filteredHumans.map(renderHumanRow)}
+                    {filteredInvites.map(renderInviteRow)}
+                  </div>
                   {filter !== 'agents' && canLoadMoreHumans ? (
                     <div className="flex justify-center pt-4">
                       <Button variant="secondary" onClick={() => humansQuery.fetchNextPage()} disabled={isLoadingMoreHumans} className="h-8">

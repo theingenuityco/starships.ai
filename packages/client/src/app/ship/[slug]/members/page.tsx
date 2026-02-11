@@ -10,6 +10,7 @@ import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { useAuth } from '@/hooks/useAuth'
 import type { AgentModel } from '@starships/protocol'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { isImageUrl } from '@/lib/isImageUrl'
@@ -65,6 +66,7 @@ function getCategoryMeta(category?: string): { label: string; className: string 
 export default function MembersPage() {
   const { slug: slugParam } = useParams<{ slug: string }>()
   const slug = typeof slugParam === 'string' ? slugParam : ''
+  const { user, isInstanceAdmin } = useAuth()
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ?? null
 
@@ -226,6 +228,8 @@ export default function MembersPage() {
   const isLoadingMoreHumans = Boolean(humansQuery.isFetchingNextPage)
   const isLoadingMoreAgents = Boolean(agentsQuery.isFetchingNextPage)
 
+  const canInviteUsers = Boolean(starship?.id && (isInstanceAdmin === true || (user?.id && starship?.ownerId && String(starship.ownerId) === String(user.id))))
+
   return (
     <div className="relative flex flex-col h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -247,14 +251,6 @@ export default function MembersPage() {
                 </div>
               </div>
 
-              {/* Keep header right side aligned like Notifications (even if currently empty). */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {slug ? (
-                  <Button asChild size="sm" variant="secondary" className="h-8">
-                    <Link href={`/ship/${encodeURIComponent(slug)}/settings/management`}>Manage</Link>
-                  </Button>
-                ) : null}
-              </div>
             </div>
           </div>
         </div>
@@ -279,10 +275,22 @@ export default function MembersPage() {
           ) : filteredHumans.length === 0 && filteredAgents.length === 0 ? (
             <div className="text-sm text-muted-foreground">No members found.</div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-10">
               {filteredHumans.length > 0 ? (
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Humans</div>
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold leading-tight text-muted-foreground">Humans</h3>
+                    </div>
+                    {slug && canInviteUsers ? (
+                      <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                        <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
+                          <Icon name="user-plus" className="h-4 w-4 mr-2" />
+                          Invite user
+                        </Link>
+                      </Button>
+                    ) : null}
+                  </div>
                   <div className="space-y-2">{filteredHumans.map(renderHumanRow)}</div>
                   {filter !== 'agents' && canLoadMoreHumans ? (
                     <div className="flex justify-center pt-4">
@@ -296,7 +304,17 @@ export default function MembersPage() {
 
               {filteredAgents.length > 0 ? (
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Agents</div>
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold leading-tight text-muted-foreground">Agents</h3>
+                    </div>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                      <Link href="/marketplace">
+                        <Icon name="sparkles" className="h-4 w-4 mr-2" />
+                        Deploy agent
+                      </Link>
+                    </Button>
+                  </div>
                   <div className="space-y-2">{filteredAgents.map(renderAgentRow)}</div>
                   {filter !== 'humans' && canLoadMoreAgents ? (
                     <div className="flex justify-center pt-4">

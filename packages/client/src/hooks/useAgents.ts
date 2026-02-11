@@ -1,9 +1,34 @@
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest, ToolModel } from '@starships/protocol'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AgentModel, ApiResponse, CreateAgentRequest, PaginationMeta, UpdateAgentRequest, ToolModel } from '@starships/protocol'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
+
+type ApiErrorLike = {
+  message?: unknown
+  response?: {
+    data?: {
+      error?: unknown
+      message?: unknown
+    }
+  }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'string' && error.trim()) return error
+  if (error && typeof error === 'object') {
+    const e = error as ApiErrorLike
+    if (typeof e.response?.data?.error === 'string' && e.response.data.error.trim()) return e.response.data.error
+    if (e.response?.data?.error && typeof e.response.data.error === 'object') {
+      const errObj = e.response.data.error as { message?: unknown }
+      if (typeof errObj.message === 'string' && errObj.message.trim()) return errObj.message
+    }
+    if (typeof e.response?.data?.message === 'string' && e.response.data.message.trim()) return e.response.data.message
+    if (typeof e.message === 'string' && e.message.trim()) return e.message
+  }
+  return fallback
+}
 
 // Extended Agent interface for client compatibility with optimistic updates
 export interface ClientAgent extends AgentModel {
@@ -28,6 +53,8 @@ export const AGENT_QUERY_KEYS = {
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
+  byStarshipPaged: (starshipId: string, limit: number, order?: 'ASC' | 'DESC', search?: string | null) =>
+    [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'paged', { limit, order: order ?? null, search: search ?? null }] as const,
   byStarshipSlug: (starshipId: string, slug: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'slug', slug] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
@@ -88,6 +115,39 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true, o
     enabled: !!starshipId && enabled,
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+  })
+}
+
+export type StarshipAgentsPage = { agents: AgentModel[]; pagination: PaginationMeta | null }
+
+export function useInfiniteStarshipAgents(starshipId: string, enabled: boolean = true, options?: { limit?: number; order?: 'ASC' | 'DESC'; search?: string }) {
+  const limit = options?.limit ?? 50
+  const order = options?.order
+  const search = typeof options?.search === 'string' && options.search.trim().length > 0 ? options.search.trim() : null
+  return useInfiniteQuery({
+    queryKey: AGENT_QUERY_KEYS.byStarshipPaged(starshipId, limit, order, search),
+    enabled: !!starshipId && enabled,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }): Promise<StarshipAgentsPage> => {
+      const page = typeof pageParam === 'number' ? pageParam : Number(pageParam)
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`, {
+        params: {
+          page,
+          limit,
+          ...(order ? { order } : {}),
+          ...(search ? { search } : {}),
+        },
+      })
+      return { agents: response.data.data, pagination: response.data.meta?.pagination ?? null }
+    },
+    getNextPageParam: last => {
+      const p = last?.pagination
+      if (!p) return undefined
+      return p.has_next ? p.page + 1 : undefined
+    },
+    staleTime: 10 * 1000,
+    gcTime: 2 * 60 * 1000,
     refetchOnWindowFocus: true,
   })
 }
@@ -222,9 +282,8 @@ export function useGenerateAgentAvatar() {
       }
       toast.success('Avatar generated', { description: `Updated avatar for ${formatAgentDisplayName(agent)}` })
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate avatar'
-      toast.error('Avatar generation failed', { description: message })
+    onError: (error: unknown) => {
+      toast.error('Avatar generation failed', { description: getErrorMessage(error, 'Failed to generate avatar') })
     },
   })
 }
@@ -248,9 +307,8 @@ export function useGenerateProfileImage() {
       const typeName = variables.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
       toast.success(`${typeName} image generated`)
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to generate profile image'
-      toast.error('Generation failed', { description: message })
+    onError: (error: unknown) => {
+      toast.error('Generation failed', { description: getErrorMessage(error, 'Failed to generate profile image') })
     },
   })
 }
@@ -280,8 +338,8 @@ export function useCreateAgent() {
         description: `${formatAgentDisplayName(agent)} has been created and deployed to the starship.`,
       })
     },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create agent'
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error, 'Failed to create agent')
       toast.error('Failed to create agent', {
         description: errorMessage,
       })
@@ -311,8 +369,8 @@ export function useUpdateAgent() {
         description: `${formatAgentDisplayName(updatedAgent)} has been updated.`,
       })
     },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update agent'
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error, 'Failed to update agent')
       toast.error('Failed to update agent', {
         description: errorMessage,
       })
@@ -328,7 +386,7 @@ export function useDeleteAgent() {
 
   return useMutation({
     mutationFn: async (agentId: string) => {
-      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/agents/${agentId}`)
+      const response: FetchResponse<ApiResponse<unknown>> = await api.delete(`/api/v1/agents/${agentId}`)
       return response.data.data
     },
     onMutate: async agentId => {
@@ -358,19 +416,60 @@ export function useDeleteAgent() {
         toast.success('Agent deleted successfully!')
       }
     },
-    onError: (error: any, agentId, context) => {
-      // Extract error message - handle both object and string formats
-      let errorMessage = 'Failed to delete agent'
-      if (error?.response?.data?.error) {
-        const errorObj = error.response.data.error
-        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to delete agent'
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error, 'Failed to delete agent')
       toast.error('Failed to delete agent', {
         description: errorMessage,
       })
+    },
+  })
+}
+
+/**
+ * Delete agent and delete any now-unassigned tool instances.
+ *
+ * Tools are deleted only if they are not assigned to any other agents after the agent deletion.
+ */
+export function useDeleteAgentWithUnusedTools() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (agentId: string) => {
+      const response: FetchResponse<ApiResponse<{ message: string; deletedToolIds?: string[] }>> = await api.delete(
+        `/api/v1/agents/${agentId}?deleteToolsIfUnused=true`
+      )
+      return response.data.data
+    },
+    onSuccess: (data, agentId) => {
+      queryClient.removeQueries({ queryKey: AGENT_QUERY_KEYS.detail(agentId) })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      const n = Array.isArray((data as any)?.deletedToolIds) ? ((data as any).deletedToolIds as unknown[]).length : 0
+      toast.success('Agent deleted', { description: n > 0 ? `Also deleted ${n} unused tool(s).` : undefined })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to delete agent', { description: getErrorMessage(error, 'Failed to delete agent') })
+    },
+  })
+}
+
+/**
+ * Unpublish agent (revert published -> draft and remove marketplace template)
+ */
+export function useUnpublishAgent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (agentId: string): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publication/unpublish`)
+      return response.data.data.agent
+    },
+    onSuccess: agent => {
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(agent.id) })
+      toast.success('Agent unpublished', { description: `${formatAgentDisplayName(agent)} has been reverted to draft.` })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to unpublish agent', { description: getErrorMessage(error, 'Failed to unpublish agent') })
     },
   })
 }
@@ -407,16 +506,8 @@ export function useDeployAgent() {
         description: `${formatAgentDisplayName(agent)} has been deployed to the new starship.`,
       })
     },
-    onError: (error: any) => {
-      // Extract error message - handle both object and string formats
-      let errorMessage = 'Failed to deploy agent'
-      if (error?.response?.data?.error) {
-        const errorObj = error.response.data.error
-        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to deploy agent'
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error, 'Failed to deploy agent')
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })
@@ -432,7 +523,7 @@ export function useRateAgent() {
 
   return useMutation({
     mutationFn: async ({ agentId, rating }: { agentId: string; rating: number }) => {
-      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/ratings`, { rating })
+      const response: FetchResponse<ApiResponse<unknown>> = await api.post(`/api/v1/agents/${agentId}/ratings`, { rating })
       return response.data.data
     },
     onSuccess: (data, variables) => {
@@ -444,16 +535,8 @@ export function useRateAgent() {
         description: `You rated this agent ${variables.rating} stars.`,
       })
     },
-    onError: (error: any) => {
-      // Extract error message - handle both object and string formats
-      let errorMessage = 'Failed to rate agent'
-      if (error?.response?.data?.error) {
-        const errorObj = error.response.data.error
-        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to rate agent'
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-
+    onError: (error: unknown) => {
+      const errorMessage = getErrorMessage(error, 'Failed to rate agent')
       toast.error('Failed to rate agent', {
         description: errorMessage,
       })
@@ -469,7 +552,7 @@ export function useTrackAgentUsage() {
 
   return useMutation({
     mutationFn: async (agentId: string) => {
-      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/usage`)
+      const response: FetchResponse<ApiResponse<unknown>> = await api.post(`/api/v1/agents/${agentId}/usage`)
       return response.data.data
     },
     onSuccess: (data, agentId) => {
@@ -482,7 +565,7 @@ export function useTrackAgentUsage() {
       // Invalidate analytics to get fresh usage stats
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.analytics(agentId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Failed to track agent usage:', error)
       // Silent error - usage tracking is not critical for UX
     },

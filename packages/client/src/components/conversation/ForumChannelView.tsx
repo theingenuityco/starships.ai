@@ -8,7 +8,7 @@ import { useChildConversationsPaged } from '@/hooks/useConversations'
 import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 
 export function ForumChannelView(props: {
   starshipId: string
@@ -28,30 +28,6 @@ export function ForumChannelView(props: {
     enabled: true,
     limit: 10,
   })
-
-  // Infinite scrolling: when the sentinel becomes visible, fetch the next page automatically.
-  const loadMoreRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (!hasMoreBefore) return
-    if (isFetchingNextPage) return
-    const el = loadMoreRef.current
-    if (!el) return
-
-    const obs = new IntersectionObserver(
-      entries => {
-        const first = entries[0]
-        if (!first?.isIntersecting) return
-        if (!hasMoreBefore) return
-        if (isFetchingNextPage) return
-        void fetchNextPage()
-      },
-      // Trigger a little before bottom so it feels seamless.
-      { root: null, rootMargin: '200px 0px 200px 0px', threshold: 0 }
-    )
-
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [fetchNextPage, hasMoreBefore, isFetchingNextPage])
 
   const sortedChildren = useMemo(() => {
     const list = Array.isArray(children) ? children.slice() : []
@@ -195,9 +171,6 @@ export function ForumChannelView(props: {
                   </Button>
                 </div>
               ) : null}
-
-              {/* Sentinel for infinite scrolling */}
-              <div ref={loadMoreRef} className="h-px w-full" aria-hidden="true" />
             </div>
           )}
         </div>

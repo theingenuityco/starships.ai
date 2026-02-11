@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -23,6 +24,8 @@ import { useMemo, useState } from 'react'
 type Filter = 'all' | 'humans' | 'agents'
 
 type AgentWithAvatar = AgentModel & { avatarAttachmentId?: string | null }
+
+const SKELETON_CARD_COUNT = 2
 
 function getUserLabel(m: StarshipMemberListItem): { primary: string; secondary?: string } {
   const displayName = typeof m.displayName === 'string' ? m.displayName.trim() : ''
@@ -233,6 +236,32 @@ export default function MembersPage() {
 
   const isFilterValue = (value: string): value is Filter => value === 'all' || value === 'humans' || value === 'agents'
 
+  const renderMemberCardSkeleton = (key: string) => {
+    return (
+      <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              {/* Presence dot placeholder to keep spacing stable */}
+              <Skeleton className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-40 max-w-[70%]" />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Skeleton className="h-3 w-14" />
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex flex-col h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -279,7 +308,49 @@ export default function MembersPage() {
           </div>
 
           {isLoading ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <div className="space-y-10">
+              {filter !== 'agents' ? (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
+                      <Skeleton className="h-4 w-8" />
+                    </div>
+                    {slug && canInviteUsers ? (
+                      <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                        <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
+                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
+                          Invite user
+                        </Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`human-skel-${i}`))}
+                  </div>
+                </div>
+              ) : null}
+
+              {filter !== 'humans' ? (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
+                      <Skeleton className="h-4 w-8" />
+                    </div>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                      <Link href="/marketplace">
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
+                        Explore agents
+                      </Link>
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`agent-skel-${i}`))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : filteredHumans.length === 0 && filteredAgents.length === 0 ? (
             <div className="text-sm text-muted-foreground">No members found.</div>
           ) : (

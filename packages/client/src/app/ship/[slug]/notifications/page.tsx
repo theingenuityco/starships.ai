@@ -208,7 +208,7 @@ export default function NotificationsPage() {
                   <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Notifications</h3>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                   <span className="font-medium leading-none">{unread?.totalUnread ? `${unread.totalUnread} unread` : 'All caught up'}</span>
                 </div>
               </div>

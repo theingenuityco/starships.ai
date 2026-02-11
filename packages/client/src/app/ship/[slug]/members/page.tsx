@@ -123,6 +123,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     if (!inviteOpen) return
+    setInviteEmail('')
     setLastInviteUrl(null)
   }, [inviteOpen])
 
@@ -733,7 +734,12 @@ export default function MembersPage() {
         open={inviteOpen}
         onOpenChange={open => {
           setInviteOpen(open)
-          if (!open) setLastInviteUrl(null)
+          if (open) {
+            setInviteEmail('')
+            setLastInviteUrl(null)
+          } else {
+            setLastInviteUrl(null)
+          }
         }}
       >
         <DialogContent className="sm:max-w-[520px]">

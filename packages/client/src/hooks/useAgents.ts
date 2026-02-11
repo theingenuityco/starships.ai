@@ -426,6 +426,28 @@ export function useDeleteAgent() {
 }
 
 /**
+ * Unpublish agent (revert published -> draft and remove marketplace template)
+ */
+export function useUnpublishAgent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (agentId: string): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publication/unpublish`)
+      return response.data.data.agent
+    },
+    onSuccess: agent => {
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(agent.id) })
+      toast.success('Agent unpublished', { description: `${formatAgentDisplayName(agent)} has been reverted to draft.` })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to unpublish agent', { description: getErrorMessage(error, 'Failed to unpublish agent') })
+    },
+  })
+}
+
+/**
  * Deploy agent to starship (update starship assignment)
  */
 export function useDeployAgent() {

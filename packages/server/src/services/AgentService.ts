@@ -923,6 +923,15 @@ export class AgentService {
     return await publicationService.confirmPublication(agentId, adminUserId);
   }
 
+  /**
+   * Unpublish: remove the marketplace template and revert to draft.
+   * Delegates to PublicationService.
+   */
+  async unpublishAgent(agentId: string): Promise<AgentModel> {
+    const publicationService = new PublicationService();
+    return await publicationService.unpublishAgent(agentId);
+  }
+
   // ============================================================================
   // AGENT MARKETING (instance admin tooling)
   // ============================================================================

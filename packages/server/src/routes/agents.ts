@@ -875,6 +875,47 @@ router.post('/agents/:id/publish-request', jwtAuthMiddleware, async (req: Reques
   }
 });
 
+// POST /agents/:id/publication/unpublish - Unpublish a published agent (owner or instance admin)
+router.post('/agents/:id/publication/unpublish', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Must have collaborator access to the agent's starship.
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    // Extra guard: only starship owners or instance admins can unpublish.
+    const starshipService = new StarshipService();
+    const isOwner = await starshipService.hasOwnerAccess(userId, agent.starshipId);
+    const isAdmin = isInstanceAdmin(req.user as AuthUser | null | undefined);
+    if (!isOwner && !isAdmin) {
+      sendError(res, 'FORBIDDEN', 'Only starship owners or instance admins can unpublish agents', 403);
+      return;
+    }
+
+    const updated = await agentService.unpublishAgent(agentId);
+
+    // Revalidate marketplace caches (templates list + details).
+    triggerNextRevalidate({ tags: ['public-agent-templates'] });
+
+    sendSuccess(res, { message: 'Agent unpublished', agent: updated });
+  } catch (error) {
+    console.error('[AGENTS] Error unpublishing agent:', error);
+    handleError(error, res, 'unpublishing agent');
+  }
+});
+
 // PUT /agents/:id - Update agent (OpenAPI pattern)
 router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

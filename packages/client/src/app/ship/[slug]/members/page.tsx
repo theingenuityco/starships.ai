@@ -7,12 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HoverProfilePopover } from '@/components/conversation/HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from '@/components/conversation/ProfileHoverCardContent'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
+import { useRemoveStarshipMember } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
+import { useDeleteAgent, useUnpublishAgent } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuth } from '@/hooks/useAuth'
@@ -145,6 +149,17 @@ export default function MembersPage() {
   const starshipIdStr = starshipId ? String(starshipId) : null
 
   const presence = useStarshipPresence(starshipIdStr ?? '', Boolean(starshipIdStr))
+  const removeMember = useRemoveStarshipMember(starshipIdStr ?? '')
+  const deleteAgent = useDeleteAgent()
+  const unpublishAgent = useUnpublishAgent()
+
+  const [confirmAction, setConfirmAction] = useState<
+    | { kind: 'kickHuman'; userId: string; label: string }
+    | { kind: 'kickAgent'; agentId: string; label: string }
+    | { kind: 'deleteAgent'; agentId: string; label: string }
+    | { kind: 'unpublishAgent'; agentId: string; label: string }
+    | null
+  >(null)
 
   const visibleAgentAvatarAttachmentIds = useMemo(() => {
     if (!starshipIdStr) return []
@@ -199,6 +214,7 @@ export default function MembersPage() {
       />
     )
     const chatHref = !isAuthedUser && slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : null
+    const canKick = Boolean(!isAuthedUser && m.role !== 'owner' && userId)
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
@@ -246,11 +262,42 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {chatHref ? (
-          <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
-            <Link href={chatHref}>Chat</Link>
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {chatHref ? (
+            <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
+              <Link href={chatHref}>Chat</Link>
+            </Button>
+          ) : null}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                aria-label="More options"
+              >
+                <Icon name="dots-vertical" className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {canKick ? (
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction({ kind: 'kickHuman', userId, label: label.primary })}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
+                >
+                  <Icon name="x-circle" className="h-4 w-4" />
+                  Kick
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  No actions
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     )
   }
@@ -315,6 +362,11 @@ export default function MembersPage() {
     const detailsHref = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : null
     const dmPeerKey = agentSlug || (typeof a.id === 'string' && a.id.trim().length > 0 ? `a:${a.id.trim()}` : '')
     const chatHref = slug && dmPeerKey ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(dmPeerKey)}` : null
+    const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
+    const isPublished = a.publicationStatus === 'published'
+    const canKickAgent = Boolean(fromMarketplace && a.id)
+    const canUnpublish = Boolean(!fromMarketplace && isPublished && a.id)
+    const canDelete = Boolean(!fromMarketplace && !isPublished && a.id)
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
@@ -364,11 +416,58 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {chatHref ? (
-          <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
-            <Link href={chatHref}>Chat</Link>
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {chatHref ? (
+            <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
+              <Link href={chatHref}>Chat</Link>
+            </Button>
+          ) : null}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                aria-label="More options"
+              >
+                <Icon name="dots-vertical" className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {canKickAgent ? (
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction({ kind: 'kickAgent', agentId: a.id, label: label.primary })}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
+                >
+                  <Icon name="x-circle" className="h-4 w-4" />
+                  Kick
+                </DropdownMenuItem>
+              ) : canUnpublish ? (
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction({ kind: 'unpublishAgent', agentId: a.id, label: label.primary })}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
+                >
+                  <Icon name="globe" className="h-4 w-4" />
+                  Unpublish
+                </DropdownMenuItem>
+              ) : canDelete ? (
+                <DropdownMenuItem
+                  onClick={() => setConfirmAction({ kind: 'deleteAgent', agentId: a.id, label: label.primary })}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
+                >
+                  <Icon name="trash" className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  No actions
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     )
   }
@@ -579,6 +678,109 @@ export default function MembersPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={confirmAction !== null}
+        onOpenChange={open => {
+          if (!open) setConfirmAction(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">
+              {confirmAction?.kind === 'kickHuman'
+                ? 'Kick member'
+                : confirmAction?.kind === 'kickAgent'
+                  ? 'Kick agent'
+                  : confirmAction?.kind === 'deleteAgent'
+                    ? 'Delete agent'
+                    : confirmAction?.kind === 'unpublishAgent'
+                      ? 'Unpublish agent'
+                      : 'Confirm'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.kind === 'kickHuman'
+                ? 'This will remove this member’s access to the starship immediately.'
+                : confirmAction?.kind === 'kickAgent'
+                  ? 'This will remove the agent from this starship.'
+                  : confirmAction?.kind === 'deleteAgent'
+                    ? 'This will permanently delete the agent.'
+                    : confirmAction?.kind === 'unpublishAgent'
+                      ? 'This will remove the agent from the Marketplace (it will stay deployed in your starship).'
+                      : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmAction ? (
+            <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/10 text-sm">
+              <div className="flex items-start gap-2">
+                <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-medium text-destructive">You’re about to:</p>
+                  <p className="text-destructive/80 break-words">
+                    {confirmAction.kind === 'kickHuman'
+                      ? `Kick ${confirmAction.label}`
+                      : confirmAction.kind === 'kickAgent'
+                        ? `Kick ${confirmAction.label}`
+                        : confirmAction.kind === 'deleteAgent'
+                          ? `Delete ${confirmAction.label}`
+                          : `Unpublish ${confirmAction.label}`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmAction(null)}
+              disabled={removeMember.isPending || deleteAgent.isPending || unpublishAgent.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removeMember.isPending || deleteAgent.isPending || unpublishAgent.isPending}
+              onClick={async () => {
+                const action = confirmAction
+                if (!action) return
+                try {
+                  if (action.kind === 'kickHuman') {
+                    await removeMember.mutateAsync(action.userId)
+                  } else if (action.kind === 'kickAgent') {
+                    await deleteAgent.mutateAsync(action.agentId)
+                  } else if (action.kind === 'deleteAgent') {
+                    await deleteAgent.mutateAsync(action.agentId)
+                  } else if (action.kind === 'unpublishAgent') {
+                    await unpublishAgent.mutateAsync(action.agentId)
+                  }
+                } finally {
+                  setConfirmAction(null)
+                }
+              }}
+            >
+              {confirmAction?.kind === 'kickHuman'
+                ? removeMember.isPending
+                  ? 'Kicking…'
+                  : 'Kick'
+                : confirmAction?.kind === 'kickAgent'
+                  ? deleteAgent.isPending
+                    ? 'Kicking…'
+                    : 'Kick'
+                  : confirmAction?.kind === 'deleteAgent'
+                    ? deleteAgent.isPending
+                      ? 'Deleting…'
+                      : 'Delete'
+                    : unpublishAgent.isPending
+                      ? 'Unpublishing…'
+                      : 'Unpublish'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

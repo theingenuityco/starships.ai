@@ -56,6 +56,45 @@ export class PublicationService {
   }
 
   /**
+   * Unpublish an agent: remove its marketplace template and revert to draft.
+   *
+   * IMPORTANT:
+   * - This is intended for agents that are currently `publicationStatus === 'published'`.
+   * - This deletes the associated `agent_templates` row referenced by `publishedTemplateId`.
+   *   Deployed agents created from that template will have their `sourceTemplateId` set NULL
+   *   by FK ON DELETE behavior.
+   */
+  async unpublishAgent(agentId: string): Promise<AgentModel> {
+    const id = String(agentId || '').trim();
+    if (!id) throw new ValidationError('Agent id is required');
+
+    const agent = await this.agentRepository.findById(id);
+    if (!agent) throw new NotFoundError('Agent', id);
+
+    if (agent.publicationStatus !== 'published') {
+      throw new ValidationError('Only published agents can be unpublished');
+    }
+
+    // Best-effort: delete the published template row so it no longer appears in marketplace listings.
+    // (FK constraints will detach deployed agents.)
+    const templateId = typeof agent.publishedTemplateId === 'string' ? agent.publishedTemplateId.trim() : '';
+    if (templateId) {
+      try {
+        const templateRepo = new AgentTemplateRepository();
+        await templateRepo.delete(templateId);
+      } catch (err) {
+        // If template deletion fails, do not silently proceed: we'd end up with a "draft" agent
+        // that still has a public template listing.
+        throw err;
+      }
+    }
+
+    // Revert agent to draft and clear publication metadata/linkage.
+    const updated = await this.agentRepository.unpublishAgent(id);
+    return updated;
+  }
+
+  /**
    * Guard: agents deployed from marketplace templates are immutable.
    */
   private assertAgentIsEditable(agent: AgentModel, action: string): void {

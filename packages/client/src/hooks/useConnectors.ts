@@ -19,16 +19,27 @@ import { toast } from 'sonner'
 export const CONNECTOR_QUERY_KEYS = {
   all: ['connectors'] as const,
   catalog: () => [...CONNECTOR_QUERY_KEYS.all, 'catalog'] as const,
+  catalogSearch: (args: { q?: string | null; limit?: number | null }) => [...CONNECTOR_QUERY_KEYS.catalog(), args] as const,
   byStarship: (starshipId: string) => [...CONNECTOR_QUERY_KEYS.all, 'starship', starshipId] as const,
 } as const
 
-export function useConnectorCatalog() {
+export function useConnectorCatalog(args?: { q?: string; limit?: number; enabled?: boolean }) {
+  const q = typeof args?.q === 'string' ? args.q.trim() : ''
+  const limit = typeof args?.limit === 'number' && Number.isFinite(args.limit) ? args.limit : undefined
+  const enabled = args?.enabled ?? true
+
   return useQuery({
-    queryKey: CONNECTOR_QUERY_KEYS.catalog(),
+    queryKey: CONNECTOR_QUERY_KEYS.catalogSearch({ q: q || null, limit: limit ?? null }),
     queryFn: async (): Promise<ConnectorCatalogItem[]> => {
-      const response: FetchResponse<ApiResponse<ConnectorCatalogResponse>> = await api.get('/api/v1/connectors/catalog')
+      const response: FetchResponse<ApiResponse<ConnectorCatalogResponse>> = await api.get('/api/v1/connectors/catalog', {
+        params: {
+          q: q || undefined,
+          limit: limit ?? undefined,
+        },
+      })
       return response.data.data.connectors
     },
+    enabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

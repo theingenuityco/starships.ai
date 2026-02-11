@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,10 +24,10 @@ interface StarshipConnectorsPanelProps {
    * Optional onboarding mode: show only a subset of connectors (by provider).
    */
   onlyProviders?: string[]
-  /**
-   * Hide the search bar (useful for embedded onboarding experiences).
-   */
-  hideSearch?: boolean
+  /** Optional server-side search query (catalog endpoint supports `q`). */
+  catalogQuery?: string
+  /** Filter which connectors to show. */
+  statusFilter?: 'all' | 'connected' | 'unconnected'
   /**
    * Hide disconnect UI (useful for onboarding).
    */
@@ -51,6 +51,12 @@ interface StarshipConnectorsPanelProps {
    * (e.g. bg-card/10, border-border/40) for visual consistency.
    */
   matchAgentCardStyle?: boolean
+  /**
+   * Optional callback to surface connector counts to a parent header/subtitle.
+   * `total` counts the visible catalog (after onlyProviders filter), and `connected`
+   * counts how many of those are currently connected.
+   */
+  onStatsChange?: (stats: { total: number; connected: number }) => void
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -70,24 +76,26 @@ function getConnectorLogoSrc(provider: string): string {
 export function StarshipConnectorsPanel({
   starshipId,
   onlyProviders,
-  hideSearch = false,
+  catalogQuery,
+  statusFilter = 'all',
   hideDisconnect = false,
   maxColumns = 3,
   hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
   matchAgentCardStyle = false,
+  onStatsChange,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { data: catalog = [] } = useConnectorCatalog()
+  const q = typeof catalogQuery === 'string' ? catalogQuery.trim() : ''
+  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q })
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
   const apiKeyMutation = useConnectApiKeyConnector(starshipId)
   const basicMutation = useConnectBasicAuthConnector(starshipId)
 
-  const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
   const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
@@ -290,13 +298,6 @@ export function StarshipConnectorsPanel({
   //   setGithubDialogOpen(false)
   // }
 
-  const normalizedQuery = searchQuery.trim().toLowerCase()
-
-  const matchesQuery = useMemo(
-    () => (entry: { name: string; description: string }) => !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
-    [normalizedQuery]
-  )
-
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
     const base = catalog.filter(item => item.provider !== 'starships')
@@ -306,6 +307,36 @@ export function StarshipConnectorsPanel({
     }
     return base
   }, [catalog, onlyProviders])
+
+  const connectedProviderSet = useMemo(() => {
+    return new Set((connectors ?? []).filter(c => (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
+  }, [connectors])
+
+  const connectedCount = useMemo(() => {
+    const providerSet = new Set(visibleCatalog.map(c => String(c.provider)))
+    const connectedProviders = new Set(
+      (connectors ?? [])
+        .filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected')
+        .map(c => String((c as any)?.provider))
+    )
+    return connectedProviders.size
+  }, [connectors, visibleCatalog])
+
+  const filteredCatalog = useMemo(() => {
+    if (statusFilter === 'connected') return visibleCatalog.filter(c => connectedProviderSet.has(String(c.provider)))
+    if (statusFilter === 'unconnected') return visibleCatalog.filter(c => !connectedProviderSet.has(String(c.provider)))
+    return visibleCatalog
+  }, [connectedProviderSet, statusFilter, visibleCatalog])
+
+  const lastStatsRef = useRef<{ total: number; connected: number } | null>(null)
+  useEffect(() => {
+    if (!onStatsChange) return
+    const next = { total: visibleCatalog.length, connected: connectedCount }
+    const prev = lastStatsRef.current
+    if (prev && prev.total === next.total && prev.connected === next.connected) return
+    lastStatsRef.current = next
+    onStatsChange(next)
+  }, [connectedCount, onStatsChange, visibleCatalog.length])
 
   const getProviderLabel = (provider: string | null | undefined) => {
     if (!provider) return ''
@@ -320,15 +351,9 @@ export function StarshipConnectorsPanel({
     )
   }
 
-  const hasAnyVisibleConnector = visibleCatalog.some(item => {
-    return matchesQuery({ name: item.name, description: item.description })
-  })
-
   const renderConnectorCard = (provider: string) => {
     const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
-    if (!catalogItem || !matchesQuery({ name: catalogItem.name, description: catalogItem.description })) {
-      return null
-    }
+    if (!catalogItem) return null
 
     const state = getConnectorState(provider)
     const isConnected = state?.status === 'connected'
@@ -438,25 +463,12 @@ export function StarshipConnectorsPanel({
 
   return (
     <div className="space-y-6">
-      {/* Search - match Environment page styling */}
-      {!hideSearch ? (
-        <div className="mb-8 sticky top-6 z-30">
-          <div className="relative max-w-md mb-6 mx-auto">
-            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search connectors..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent text-sm"
-            />
-          </div>
-        </div>
+      {isCatalogFetching ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
+      {filteredCatalog.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{q ? `No connectors match “${q}”.` : 'No connectors available.'}</p>
       ) : null}
 
-      {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
-
-      <div className={gridClassName}>{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+      <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
 
       {!hideDisconnect ? (
         <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>

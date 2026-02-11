@@ -102,13 +102,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     var prefersDark = null;
     try { prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { prefersDark = null; }
     var isDark = theme === 'dark' ? true : theme === 'light' ? false : !!prefersDark;
-    var tile = isDark ? '#0b1220' : '#ffffff';
-    var tileBorder = isDark ? '#1f2937' : '#e5e7eb';
+    // Match app theme background:
+    // - light: hsl(38 30% 97.5%) ≈ #fbf9f7
+    // - dark:  hsl(0 0% 0%)     = #000000
+    var tile = isDark ? '#000000' : '#fbf9f7';
     var stroke = isDark ? '#ffffff' : '#111827';
-    var opacity = isDark ? '1' : '0.7';
+    var opacity = isDark ? '1' : '0.75';
+    var strokeWidth = '1.25';
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" data-ts="' + now + '">' +
-      '<rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="' + tile + '" stroke="' + tileBorder + '" stroke-width="1"/>' +
-      '<g fill="none" stroke="' + stroke + '" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" vector-effect="non-scaling-stroke" transform="translate(2.5 2.5) scale(0.7916667)">' +
+      '<rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="' + tile + '"/>' +
+      '<g fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" vector-effect="non-scaling-stroke" transform="translate(2.5 2.5) scale(0.7916667)">' +
       '<path d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>' +
       '<path d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>' +
       '<path d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>' +

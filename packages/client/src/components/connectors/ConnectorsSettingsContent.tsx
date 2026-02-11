@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { AgentDeploymentModal } from '@/components/connectors/AgentDeploymentModal'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useAgent } from '@/hooks/useAgents'
@@ -111,6 +112,10 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
     if (!canManage) return null
   }
 
+  const totalCount = typeof connectorStats?.total === 'number' ? connectorStats.total : null
+  const connectedCount = typeof connectorStats?.connected === 'number' ? connectorStats.connected : null
+  const unconnectedCount = typeof totalCount === 'number' && typeof connectedCount === 'number' ? Math.max(0, totalCount - connectedCount) : null
+
   return (
     <div className="relative flex flex-col h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -126,27 +131,9 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  {typeof connectorStats?.total === 'number' ? (
-                    <>
-                      <span className="font-medium leading-none text-muted-foreground tabular-nums">
-                        {connectorStats.total ? `${connectorStats.total} total` : 'No connectors yet'}
-                      </span>
-                      {connectorStats.total ? (
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span
-                            className="inline-flex items-center font-medium leading-none text-muted-foreground tabular-nums"
-                            aria-label={`${connectorStats.connected} connected`}
-                            title={`${connectorStats.connected} connected`}
-                          >
-                            {connectorStats.connected} connected
-                          </span>
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="font-medium leading-none text-muted-foreground">Loading…</span>
-                  )}
+                  <span className="font-medium leading-none text-muted-foreground">
+                    Connect services and apps to give your starship access to the tools and data it needs.
+                  </span>
                 </div>
               </div>
             </div>
@@ -172,9 +159,45 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
                   <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="connected">Connected</TabsTrigger>
-                    <TabsTrigger value="unconnected">Unconnected</TabsTrigger>
+                    <TabsTrigger value="all">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>All</span>
+                        {typeof totalCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'all' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {totalCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="connected">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Connected</span>
+                        {typeof connectedCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'connected' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {connectedCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="unconnected">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Unconnected</span>
+                        {typeof unconnectedCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'unconnected' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {unconnectedCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
                   </TabsList>
                 </div>
                 <div className="w-full sm:w-64">

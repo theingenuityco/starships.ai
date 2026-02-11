@@ -22,6 +22,7 @@ import {
   MAX_AGENT_TIMEOUT_MS,
   MIN_AGENT_MAX_TOKENS,
   MIN_AGENT_TIMEOUT_MS,
+  getConnection,
 } from '@starships/models';
 import type {
   PendingAgentSummary,
@@ -217,6 +218,52 @@ export class AgentService {
    */
   async deleteAgent(agentId: string): Promise<boolean> {
     return await this.agentRepository.delete(agentId);
+  }
+
+  /**
+   * Delete agent and (optionally) delete tool instances that become unassigned.
+   *
+   * This only deletes a tool instance if, after the agent is deleted, that tool id no longer
+   * appears in `agent_tools` (i.e. it's not assigned to any other agent).
+   */
+  async deleteAgentAndUnusedTools(agentId: string): Promise<{ deleted: boolean; deletedToolIds: string[] }> {
+    const id = String(agentId || '').trim();
+    if (!id) throw new ValidationError('Agent id is required');
+
+    const agent = await this.agentRepository.findById(id);
+    if (!agent) return { deleted: false, deletedToolIds: [] };
+
+    const starshipId = String(agent.starshipId || '').trim();
+    const conn = getConnection();
+
+    const result = await conn.transaction(async (client) => {
+      const toolRows = await client.query<{ tool_id: string }>(`SELECT tool_id FROM agent_tools WHERE agent_id = $1`, [id]);
+      const toolIds = (toolRows.rows || [])
+        .map((r) => (typeof r?.tool_id === 'string' ? r.tool_id.trim() : ''))
+        .filter(Boolean);
+
+      const delRes = await client.query(`DELETE FROM agents WHERE id = $1`, [id]);
+      const deleted = (delRes.rowCount ?? 0) > 0;
+      if (!deleted) return { deleted: false, deletedToolIds: [] };
+
+      if (toolIds.length === 0) return { deleted: true, deletedToolIds: [] };
+
+      const remainingRows = await client.query<{ tool_id: string }>(
+        `SELECT DISTINCT tool_id FROM agent_tools WHERE tool_id = ANY($1::text[])`,
+        [toolIds]
+      );
+      const stillAssigned = new Set((remainingRows.rows || []).map((r) => String(r.tool_id || '').trim()).filter(Boolean));
+      const unusedToolIds = toolIds.filter((tid) => !stillAssigned.has(tid));
+
+      if (unusedToolIds.length > 0) {
+        // Defensive: ensure we only delete tool instances belonging to the same starship.
+        await client.query(`DELETE FROM tools WHERE id = ANY($1::text[]) AND starship_id = $2`, [unusedToolIds, starshipId]);
+      }
+
+      return { deleted: true, deletedToolIds: unusedToolIds };
+    });
+
+    return result;
   }
 
   /**
@@ -447,7 +494,8 @@ export class AgentService {
     userId: string,
     page: number = 1,
     limit: number = 50,
-    order: 'ASC' | 'DESC' = 'DESC'
+    order: 'ASC' | 'DESC' = 'DESC',
+    search?: string
   ): Promise<{
     agents: AgentModel[];
     total: number;
@@ -465,8 +513,22 @@ export class AgentService {
     // Get all agents for the starship
     const allAgents = await this.getAgentsByStarship(starshipId);
 
+    const searchTerm = typeof search === 'string' && search.trim().length > 0 ? search.trim().toLowerCase() : null;
+
+    const filteredAgents = searchTerm
+      ? allAgents.filter((a) => {
+          const name = typeof a?.name === 'string' ? a.name : '';
+          const role = typeof a?.role === 'string' ? a.role : '';
+          const desc = typeof a?.description === 'string' ? a.description : '';
+          const slug = typeof a?.slug === 'string' ? a.slug : '';
+          const category = typeof a?.category === 'string' ? a.category : '';
+          const hay = `${name} ${role} ${desc} ${slug} ${category}`.toLowerCase();
+          return hay.includes(searchTerm);
+        })
+      : allAgents;
+
     // Sort agents by createdAt, then by name for stability
-    const sortedAgents = [...allAgents].sort((a, b) => {
+    const sortedAgents = [...filteredAgents].sort((a, b) => {
       const aTs = a?.createdAt ? new Date(a.createdAt as string).getTime() : 0;
       const bTs = b?.createdAt ? new Date(b.createdAt as string).getTime() : 0;
       if (aTs !== bTs) {
@@ -906,6 +968,15 @@ export class AgentService {
   async confirmPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
     const publicationService = new PublicationService();
     return await publicationService.confirmPublication(agentId, adminUserId);
+  }
+
+  /**
+   * Unpublish: remove the marketplace template and revert to draft.
+   * Delegates to PublicationService.
+   */
+  async unpublishAgent(agentId: string): Promise<AgentModel> {
+    const publicationService = new PublicationService();
+    return await publicationService.unpublishAgent(agentId);
   }
 
   // ============================================================================

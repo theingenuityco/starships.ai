@@ -18,8 +18,8 @@ export function buildFaviconBaseSvg(args: {
   // Keep this SVG tiny: no whitespace beyond what's needed.
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" data-ts="${ts}">` +
-    `<rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="${tile}"/>` +
-    `<g fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}" vector-effect="non-scaling-stroke" transform="translate(2.5 2.5) scale(0.7916667)">` +
+    `<rect x="0" y="0" width="24" height="24" rx="5.25" fill="${tile}"/>` +
+    `<g fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" opacity="${opacity}" vector-effect="non-scaling-stroke" transform="translate(0.5 0.5) scale(0.9583333)">` +
     FAVICON_ICON_PATHS +
     `</g></svg>`
   )
@@ -53,8 +53,8 @@ export function buildFaviconInitScriptSource(): string {
     var strokeWidth = '1.25';
     var paths = ${pathsJson};
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" data-ts="' + now + '">' +
-      '<rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="' + tile + '"/>' +
-      '<g fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" vector-effect="non-scaling-stroke" transform="translate(2.5 2.5) scale(0.7916667)">' +
+      '<rect x="0" y="0" width="24" height="24" rx="5.25" fill="' + tile + '"/>' +
+      '<g fill="none" stroke="' + stroke + '" stroke-width="' + strokeWidth + '" stroke-linecap="round" stroke-linejoin="round" opacity="' + opacity + '" vector-effect="non-scaling-stroke" transform="translate(0.5 0.5) scale(0.9583333)">' +
       paths +
       '</g></svg>';
     var href = 'data:image/svg+xml,' + encodeURIComponent(svg);

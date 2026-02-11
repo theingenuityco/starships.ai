@@ -14,7 +14,7 @@
     }
   </style>
 
-  <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="var(--tile)" stroke="var(--tile-border)" stroke-width="1" />
+  <rect x="0.5" y="0.5" width="23" height="23" rx="5.25" fill="var(--tile)" stroke="var(--tile-border)" stroke-width="1" />
 
   <g
     fill="none"
@@ -25,7 +25,7 @@
     shape-rendering="geometricPrecision"
     opacity="0.7"
     vector-effect="non-scaling-stroke"
-    transform="translate(2.5 2.5) scale(0.7916667)"
+    transform="translate(0.75 0.75) scale(0.9375)"
   >
     <path d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
     <path d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0" />

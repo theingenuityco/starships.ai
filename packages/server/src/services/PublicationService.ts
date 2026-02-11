@@ -20,6 +20,7 @@ import {
   MIN_AGENT_MAX_TOKENS,
   MIN_AGENT_TIMEOUT_MS,
   MarketingContentRepository,
+  getConnection,
 } from '@starships/models';
 import type { AgentModel, UserModel, ToolModel } from '@starships/protocol';
 import { isInstanceAdmin } from '../utils/auth-helpers';
@@ -30,7 +31,7 @@ import { MarketingContentGenerationService } from './MarketingContentGenerationS
 import { ProfileImageService } from './ProfileImageService';
 import { buildAutopilotExecutionBundle } from './autopilot-execution-bundle';
 import { getEnvConfig } from '@starships/env';
-import { buildAgentTemplatePublicAvatarS3Key, buildPublicS3ObjectUrl, copyObjectInS3 } from '@/utils/s3-helper';
+import { buildAgentTemplatePublicAvatarS3Key, buildPublicS3ObjectUrl, copyObjectInS3, deleteFromS3 } from '@/utils/s3-helper';
 
 export class PublicationService {
   private agentRepository: AgentRepository;
@@ -53,6 +54,172 @@ export class PublicationService {
     this.marketingContentGenerationService = new MarketingContentGenerationService();
     this.profileImageService = new ProfileImageService();
     this.marketingContentRepository = new MarketingContentRepository();
+  }
+
+  /**
+   * Unpublish an agent: remove its marketplace template and revert to draft.
+   *
+   * IMPORTANT:
+   * - This is intended for agents that are currently `publicationStatus === 'published'`.
+   * - This deletes the associated `agent_templates` row referenced by `publishedTemplateId`.
+   *   Deployed agents created from that template will have their `sourceTemplateId` set NULL
+   *   by FK ON DELETE behavior.
+   */
+  async unpublishAgent(agentId: string): Promise<AgentModel> {
+    const id = String(agentId || '').trim();
+    if (!id) throw new ValidationError('Agent id is required');
+
+    const agent = await this.agentRepository.findById(id);
+    if (!agent) throw new NotFoundError('Agent', id);
+
+    if (agent.publicationStatus !== 'published') {
+      throw new ValidationError('Only published agents can be unpublished');
+    }
+
+    const templateId = typeof agent.publishedTemplateId === 'string' ? agent.publishedTemplateId.trim() : '';
+
+    // No published template pointer: still revert the agent metadata to draft.
+    if (!templateId) {
+      const updated = await this.agentRepository.update(id, {
+        publicationStatus: 'draft',
+        publicationRequestedBy: undefined,
+        publicationApprovedBy: undefined,
+        publicationApprovedAt: undefined,
+        publicationVersionBump: undefined,
+        publicationRequestedVersion: undefined,
+        publicationChangelog: undefined,
+        publishedTemplateId: undefined,
+      });
+      if (!updated) throw new NotFoundError('Agent', id);
+      return updated;
+    }
+
+    // Guard: do not allow unpublish if this template is currently deployed anywhere.
+    // ("Deployed from marketplace" agents reference the template via `source_template_id`.)
+    // Exclude the agent being unpublished (defensive).
+    const preConn = getConnection();
+    const deployedCountRow = await preConn.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM agents
+       WHERE source_template_id = $1
+         AND id <> $2`,
+      [templateId, id]
+    );
+    const deployedCount = Number(deployedCountRow?.count ?? 0);
+    if (Number.isFinite(deployedCount) && deployedCount > 0) {
+      throw new ValidationError('Cannot unpublish: this agent template is still deployed to one or more starships.');
+    }
+
+    // We need to:
+    // - remove the agent_template
+    // - remove any tool_templates that were only assigned to this agent_template
+    // - remove marketing_content for the template + any deleted tool_templates (and delete their S3 blobs)
+    const conn = getConnection();
+
+    const { s3KeysToDelete } = await conn.transaction(async (client) => {
+      // 1) Collect tool template ids assigned to this agent template
+      const toolRows = await client.query<{ tool_template_id: string }>(
+        `SELECT tool_template_id
+         FROM agent_template_tool_templates
+         WHERE agent_template_id = $1`,
+        [templateId]
+      );
+      const toolTemplateIds = (toolRows.rows || [])
+        .map((r) => (typeof r?.tool_template_id === 'string' ? r.tool_template_id.trim() : ''))
+        .filter(Boolean);
+
+      // 2) Count usage across ALL agent templates (so we only delete truly orphaned tool templates)
+      const countRows =
+        toolTemplateIds.length > 0
+          ? await client.query<{ tool_template_id: string; cnt: string }>(
+              `SELECT tool_template_id, COUNT(*)::text AS cnt
+               FROM agent_template_tool_templates
+               WHERE tool_template_id = ANY($1)
+               GROUP BY tool_template_id`,
+              [toolTemplateIds]
+            )
+          : { rows: [] as Array<{ tool_template_id: string; cnt: string }> };
+
+      const usageByToolTemplateId = new Map<string, number>();
+      for (const row of countRows.rows || []) {
+        const tid = typeof row?.tool_template_id === 'string' ? row.tool_template_id.trim() : '';
+        const n = Number(row?.cnt ?? 0);
+        if (tid) usageByToolTemplateId.set(tid, Number.isFinite(n) ? n : 0);
+      }
+
+      const orphanToolTemplateIds = toolTemplateIds.filter((tid) => (usageByToolTemplateId.get(tid) ?? 0) <= 1);
+
+      // 3) Collect marketing content S3 keys for cleanup (template + orphan tool templates)
+      const mktRows = await client.query<{ id: string; s3_key: string | null }>(
+        `SELECT id, s3_key
+         FROM marketing_content
+         WHERE is_active = true
+           AND (
+             (entity_type = 'agent_template' AND entity_id = $1)
+             OR (entity_type = 'tool_template' AND entity_id = ANY($2::text[]))
+           )`,
+        [templateId, orphanToolTemplateIds]
+      );
+
+      const marketingContentIds = (mktRows.rows || [])
+        .map((r) => (typeof r?.id === 'string' ? r.id.trim() : ''))
+        .filter(Boolean);
+      const s3KeysToDelete = (mktRows.rows || [])
+        .map((r) => (typeof r?.s3_key === 'string' ? r.s3_key.trim() : ''))
+        .filter(Boolean);
+
+      // 4) Soft-delete marketing content rows (so marketplace pages stop rendering them)
+      if (marketingContentIds.length > 0) {
+        await client.query(
+          `UPDATE marketing_content
+           SET is_active = false, updated_at = NOW()
+           WHERE id = ANY($1::text[])`,
+          [marketingContentIds]
+        );
+      }
+
+      // 5) Delete agent template row (removes it from marketplace listings; cascades junction relationships)
+      await client.query(`DELETE FROM agent_templates WHERE id = $1`, [templateId]);
+
+      // 6) Delete orphan tool templates
+      if (orphanToolTemplateIds.length > 0) {
+        await client.query(`DELETE FROM tool_templates WHERE id = ANY($1::text[])`, [orphanToolTemplateIds]);
+      }
+
+      // 7) Revert agent publication metadata to draft
+      await client.query(
+        `
+        UPDATE agents
+        SET
+          publication_status = 'draft',
+          publication_requested_by = NULL,
+          publication_approved_by = NULL,
+          publication_approved_at = NULL,
+          publication_version_bump = NULL,
+          publication_requested_version = NULL,
+          publication_changelog = NULL,
+          published_template_id = NULL,
+          updated_at = NOW()
+        WHERE id = $1
+        `,
+        [id]
+      );
+
+      return { s3KeysToDelete };
+    });
+
+    // Best-effort: delete the actual blobs from S3 (non-blocking).
+    for (const key of s3KeysToDelete) {
+      try {
+        await deleteFromS3(key);
+      } catch (err) {
+        console.warn('[PUBLICATION] Failed to delete marketing content from S3:', err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    const updated = await this.agentRepository.findById(id);
+    if (!updated) throw new NotFoundError('Agent', id);
+    return updated;
   }
 
   /**

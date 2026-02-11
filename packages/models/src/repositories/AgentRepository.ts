@@ -27,6 +27,53 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Unpublish an agent: revert publication status to draft and clear publication metadata.
+   *
+   * Note: This is intended to be paired with deletion of the associated agent_template
+   * (published_template_id) at the service layer.
+   */
+  async unpublishAgent(id: string): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const agentId = String(id || '').trim();
+        if (!agentId) {
+          this.handleNotFound('Agent', id);
+        }
+
+        const connection = this.getConnection();
+        const res = await connection.query<Record<string, unknown>>(
+          `
+          UPDATE agents
+          SET
+            publication_status = 'draft',
+            publication_requested_by = NULL,
+            publication_approved_by = NULL,
+            publication_approved_at = NULL,
+            publication_version_bump = NULL,
+            publication_requested_version = NULL,
+            publication_changelog = NULL,
+            published_template_id = NULL,
+            updated_at = NOW()
+          WHERE id = $1
+          RETURNING *
+          `,
+          [agentId]
+        );
+
+        const row = res?.[0];
+        if (!row) {
+          this.handleNotFound('Agent', agentId);
+        }
+
+        return fromDatabase(AgentEntity, row as Record<string, unknown>);
+      },
+      'unpublishAgent',
+      'Agent',
+      id
+    );
+  }
+
+  /**
    * Find the earliest agent that was promoted into a given template.
    * Useful for tracing template lineage and for template-scoped operations that
    * still require a starship context (remote runner, attachments, etc.).

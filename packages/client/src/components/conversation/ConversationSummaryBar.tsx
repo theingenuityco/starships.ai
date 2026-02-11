@@ -621,7 +621,7 @@ export function ConversationSummaryBar({
                   {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                 </div>
                 {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                   {isDraftHeader ? (
                     <>
                       {hasDraftParticipants ? (
@@ -814,7 +814,7 @@ export function ConversationSummaryBar({
               </div>
 
               {/* Agents + updated row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                 {effectiveParticipantItems.length > 0 ? (
                   <>
                     {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}

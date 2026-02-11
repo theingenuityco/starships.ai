@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
-const DEFAULT_SETTINGS_TAB = 'profile'
+const DEFAULT_SETTINGS_TAB = 'my-starship'
 
 export default function ShipSettingsIndexPage() {
   const router = useRouter()

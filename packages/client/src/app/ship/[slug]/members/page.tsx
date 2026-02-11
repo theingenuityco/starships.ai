@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
@@ -230,6 +231,8 @@ export default function MembersPage() {
 
   const canInviteUsers = Boolean(starship?.id && (isInstanceAdmin === true || (user?.id && starship?.ownerId && String(starship.ownerId) === String(user.id))))
 
+  const isFilterValue = (value: string): value is Filter => value === 'all' || value === 'humans' || value === 'agents'
+
   return (
     <div className="relative flex flex-col h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -258,16 +261,19 @@ export default function MembersPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="flex flex-wrap items-center gap-2 pb-8">
-            <Button size="sm" className="h-8" variant={filter === 'all' ? 'default' : 'secondary'} onClick={() => setFilter('all')}>
-              All
-            </Button>
-            <Button size="sm" className="h-8" variant={filter === 'humans' ? 'default' : 'secondary'} onClick={() => setFilter('humans')}>
-              Humans
-            </Button>
-            <Button size="sm" className="h-8" variant={filter === 'agents' ? 'default' : 'secondary'} onClick={() => setFilter('agents')}>
-              Agents
-            </Button>
+          <div className="pb-8">
+            <Tabs
+              value={filter}
+              onValueChange={value => {
+                if (isFilterValue(value)) setFilter(value)
+              }}
+            >
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="humans">Humans</TabsTrigger>
+                <TabsTrigger value="agents">Agents</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           {isLoading ? (

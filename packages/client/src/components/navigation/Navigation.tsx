@@ -364,7 +364,7 @@ export function Navigation(props: NavigationProps) {
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className={`group flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
+        className={`group/navigation flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
         style={{ willChange: isMobile ? 'transform' : 'width', cursor: !isMobile && !isExpanded ? 'e-resize' : 'auto' }}
         onClick={handleSidebarBackgroundClick}
       >
@@ -393,7 +393,7 @@ export function Navigation(props: NavigationProps) {
                 <div
                   className={[
                     'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover:opacity-0' : 'opacity-100',
+                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover/navigation:opacity-0' : 'opacity-100',
                   ].join(' ')}
                 >
                   <StarshipsLogo
@@ -411,7 +411,7 @@ export function Navigation(props: NavigationProps) {
                 <div
                   className={[
                     'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover:opacity-100' : 'opacity-0',
+                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover/navigation:opacity-100' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 >

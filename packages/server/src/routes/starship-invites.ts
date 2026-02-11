@@ -8,13 +8,21 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { StarshipInviteTokenRepository, StarshipMemberRepository, getConnection } from '@starships/models';
 import type { CreateStarshipInviteRequest } from '@starships/protocol';
-import { IdSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
 const router: Router = Router();
 const env = getEnvConfig();
+
+type InviteRow = {
+  invited_email: string;
+  invited_by_user_id: string | null;
+  role: 'admin' | 'collaborator';
+  created_at: string;
+  expires_at: string;
+};
 
 function requireUserId(req: Request, res: Response): string | null {
   const userId = req.user?.id as string | undefined;
@@ -53,6 +61,13 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     if (!params) return;
     const starshipId = params.id;
 
+    const wantsPagination = Object.prototype.hasOwnProperty.call(req.query ?? {}, 'page') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'limit') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'offset');
+    const paginationQuery = wantsPagination ? validateData(PaginationSchema, req.query, res, 'pagination query') : null;
+    if (wantsPagination && !paginationQuery) return;
+    const page = paginationQuery?.page ?? 1;
+    const limit = paginationQuery?.limit ?? 50;
+    const offset = paginationQuery?.offset ?? (page - 1) * limit;
+
     const starshipService = new StarshipService();
     const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
@@ -68,70 +83,119 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     const canViewEmails = canViewInvites;
 
     const connection = getConnection();
-    const [memberRows, inviteRows, ownerRow] = await Promise.all([
-      connection.query<{
-        user_id: string;
-        role: 'admin' | 'collaborator';
-        created_at: string;
-        email: string | null;
-        display_name: string | null;
-        avatar: string | null;
-      }>(
-        `SELECT m.user_id,
-                m.role,
-                m.created_at,
-                u.email,
-                u.display_name,
-                COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
-           FROM starship_members m
-           JOIN users u ON u.id = m.user_id
-            LEFT JOIN LATERAL (
-              SELECT (profile_data->>'avatar') as oauth_avatar
-                FROM oauth_accounts
-               WHERE user_id = u.id
-               ORDER BY updated_at DESC
-               LIMIT 1
-            ) oa ON true
-          WHERE m.starship_id = $1
-          ORDER BY m.created_at ASC`,
-        [starshipId]
-      ),
-      canViewInvites
-        ? connection.query<{
-            invited_email: string;
-            invited_by_user_id: string | null;
-            role: 'admin' | 'collaborator';
-            created_at: string;
-            expires_at: string;
-          }>(
-            `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
-               FROM starship_invite_tokens
-              WHERE starship_id = $1
-                AND NOT consumed
-                AND expires_at > NOW()
-              ORDER BY created_at DESC`,
-            [starshipId]
-          )
-        : Promise.resolve([] as Array<{ invited_email: string; invited_by_user_id: string | null; role: 'admin' | 'collaborator'; created_at: string; expires_at: string }>),
-      connection.queryOne<{
-        email: string | null;
-        display_name: string | null;
-        avatar: string | null;
-      }>(
-        `SELECT u.email,
-                u.display_name,
-                COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
-           FROM users u
-           LEFT JOIN LATERAL (
-             SELECT (profile_data->>'avatar') as oauth_avatar
-               FROM oauth_accounts
-              WHERE user_id = u.id
-              ORDER BY updated_at DESC
-              LIMIT 1
-           ) oa ON true
-          WHERE u.id = $1`,
-        [starship.ownerId]
-      ),
+    const inviteRowsPromise: Promise<InviteRow[]> = canViewInvites
+      ? connection.query<InviteRow>(
+          `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+             FROM starship_invite_tokens
+            WHERE starship_id = $1
+              AND NOT consumed
+              AND expires_at > NOW()
+            ORDER BY created_at DESC`,
+          [starshipId]
+          ) as unknown as Promise<InviteRow[]>
+      : Promise.resolve([] as InviteRow[]);
+
+    const ownerRowPromise = connection.queryOne<{
+      email: string | null;
+      display_name: string | null;
+      avatar: string | null;
+    }>(
+      `SELECT u.email,
+              u.display_name,
+              COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+         FROM users u
+         LEFT JOIN LATERAL (
+           SELECT (profile_data->>'avatar') as oauth_avatar
+             FROM oauth_accounts
+            WHERE user_id = u.id
+            ORDER BY updated_at DESC
+            LIMIT 1
+         ) oa ON true
+        WHERE u.id = $1`,
+      [starship.ownerId]
+    );
+
+    if (!wantsPagination) {
+      const [memberRows, inviteRows, ownerRow] = await Promise.all([
+        connection.query<{
+          user_id: string;
+          role: 'admin' | 'collaborator';
+          created_at: string;
+          email: string | null;
+          display_name: string | null;
+          avatar: string | null;
+        }>(
+          `SELECT m.user_id,
+                  m.role,
+                  m.created_at,
+                  u.email,
+                  u.display_name,
+                  COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+             FROM starship_members m
+             JOIN users u ON u.id = m.user_id
+              LEFT JOIN LATERAL (
+                SELECT (profile_data->>'avatar') as oauth_avatar
+                  FROM oauth_accounts
+                 WHERE user_id = u.id
+                 ORDER BY updated_at DESC
+                 LIMIT 1
+              ) oa ON true
+            WHERE m.starship_id = $1
+            ORDER BY m.created_at ASC`,
+          [starshipId]
+        ),
+        inviteRowsPromise,
+        ownerRowPromise,
+      ]);
+
+      const owner = {
+        userId: starship.ownerId,
+        role: 'owner' as const,
+        createdAt: starship.createdAt,
+        email: canViewEmails ? (ownerRow?.email ?? null) : null,
+        displayName: ownerRow?.display_name ?? null,
+        avatar: ownerRow?.avatar ?? null,
+      };
+
+      const members = [
+        owner,
+        ...memberRows.map((m) => ({
+          userId: String(m.user_id),
+          role: m.role,
+          createdAt: String(m.created_at),
+          email: canViewEmails ? (m.email ?? null) : null,
+          displayName: m.display_name ?? null,
+          avatar: m.avatar ?? null,
+        })),
+      ];
+
+      const invites = canViewInvites
+        ? inviteRows.map((r) => ({
+            invitedEmail: String(r.invited_email),
+            invitedByUserId: r.invited_by_user_id ?? null,
+            role: r.role,
+            createdAt: String(r.created_at),
+            expiresAt: String(r.expires_at),
+          }))
+        : [];
+
+      sendSuccess(res, { members, invites }, 200);
+      return;
+    }
+
+    // Paginated behavior (opt-in via query params): used by Members page to avoid huge payloads.
+    const totalRow = await connection.queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text as count
+         FROM starship_members
+        WHERE starship_id = $1`,
+      [starshipId]
+    );
+    const total = 1 + Number(totalRow?.count ?? 0);
+
+    const [inviteRows, ownerRow] = await Promise.all([
+      // Only include invites on the first page (best-effort); Members UI doesn't need them.
+      offset === 0 ? inviteRowsPromise : Promise.resolve([] as InviteRow[]),
+      ownerRowPromise,
     ]);
 
     const owner = {
@@ -143,8 +207,44 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       avatar: ownerRow?.avatar ?? null,
     };
 
+    const remaining = Math.max(0, limit - (offset === 0 ? 1 : 0));
+    const memberLimit = offset === 0 ? remaining : limit;
+    const memberOffset = offset === 0 ? 0 : Math.max(0, offset - 1);
+
+    const memberRows = memberLimit > 0
+      ? await connection.query<{
+          user_id: string;
+          role: 'admin' | 'collaborator';
+          created_at: string;
+          email: string | null;
+          display_name: string | null;
+          avatar: string | null;
+        }>(
+          `SELECT m.user_id,
+                  m.role,
+                  m.created_at,
+                  u.email,
+                  u.display_name,
+                  COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+             FROM starship_members m
+             JOIN users u ON u.id = m.user_id
+              LEFT JOIN LATERAL (
+                SELECT (profile_data->>'avatar') as oauth_avatar
+                  FROM oauth_accounts
+                 WHERE user_id = u.id
+                 ORDER BY updated_at DESC
+                 LIMIT 1
+              ) oa ON true
+            WHERE m.starship_id = $1
+            ORDER BY m.created_at ASC
+            LIMIT $2
+            OFFSET $3`,
+          [starshipId, memberLimit, memberOffset]
+        )
+      : [];
+
     const members = [
-      owner,
+      ...(offset === 0 ? [owner] : []),
       ...memberRows.map((m) => ({
         userId: String(m.user_id),
         role: m.role,
@@ -165,7 +265,15 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
         }))
       : [];
 
-    sendSuccess(res, { members, invites }, 200);
+    sendSuccess(res, { members, invites }, 200, {
+      pagination: {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: offset > 0,
+      },
+    });
   } catch (error) {
     handleError(error, res, 'listing starship members');
   }

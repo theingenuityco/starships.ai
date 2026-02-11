@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useAuth } from '@/hooks/useAuth'
@@ -77,12 +78,16 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
 
   const [form, setForm] = useState<{
     name: string
+    websiteUrl: string
+    description: string
   } | null>(null)
 
   useEffect(() => {
     if (!starship) return
     setForm({
       name: starship.name,
+      websiteUrl: (starship.websiteUrl ?? '').toString(),
+      description: (starship.description ?? '').toString(),
     })
   }, [starship])
 
@@ -102,6 +107,14 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     // Slug is auto-generated on the server (and may get a unique suffix if taken),
     // so we intentionally do NOT set `next.slug` here. We only show an "expected base slug" in the UI.
 
+    const nextDescription = form.description.trim()
+    const currentDescription = (starship.description ?? '').trim()
+    if (nextDescription !== currentDescription) next.description = nextDescription
+
+    const nextWebsiteUrl = form.websiteUrl.trim()
+    const currentWebsiteUrl = (starship.websiteUrl ?? '').trim()
+    if (nextWebsiteUrl !== currentWebsiteUrl) next.websiteUrl = nextWebsiteUrl
+
     return Object.keys(next).length ? next : null
   }, [starship, form])
 
@@ -113,6 +126,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     if (!starship) return
     setForm({
       name: starship.name,
+      websiteUrl: (starship.websiteUrl ?? '').toString(),
+      description: (starship.description ?? '').toString(),
     })
   }
 
@@ -290,15 +305,13 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
             </Alert>
           )}
 
-          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
-
           <Card className={PROFILE_SECTION_CARD_CLASS}>
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <Icon name="id-card" className="h-4 w-4 text-primary" />
                 Starship details
               </CardTitle>
-              <CardDescription className="text-sm">Update your starship name.</CardDescription>
+              <CardDescription className="text-sm">Update your starship name, website, and description.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-5">
               <div className="space-y-4">
@@ -323,9 +336,44 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     </>
                   ) : null}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="starship-website">Website</Label>
+                  <div className="relative">
+                    <Input
+                      id="starship-website"
+                      value={form?.websiteUrl ?? (starship.websiteUrl ?? '')}
+                      onChange={e => setForm(prev => (prev ? { ...prev, websiteUrl: e.target.value } : prev))}
+                      disabled={!canEdit || isSaving}
+                      placeholder="https://example.com"
+                      className="pr-9"
+                      inputMode="url"
+                    />
+                    <Icon name="globe" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Must start with http:// or https://. Leave blank to clear.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-end justify-between gap-4">
+                    <Label htmlFor="starship-description">Description</Label>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{(form?.description ?? starship.description ?? '').length}/2000</span>
+                  </div>
+                  <Textarea
+                    id="starship-description"
+                    value={form?.description ?? starship.description}
+                    onChange={e => setForm(prev => (prev ? { ...prev, description: e.target.value } : prev))}
+                    disabled={!canEdit || isSaving}
+                    placeholder="What is this starship for?"
+                    maxLength={2000}
+                    className="min-h-[120px] resize-y"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
         </div>
       </form>
     </>

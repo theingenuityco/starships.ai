@@ -531,6 +531,17 @@ export default function MembersPage() {
   const invitesCount = invites.length
   const agentsCount = agents.length
   const totalCount = humansCount + agentsCount
+  const onlineHumansCount = useMemo(() => {
+    let n = 0
+    for (const m of humans) {
+      const userId = typeof (m as any)?.userId === 'string' ? String((m as any).userId).trim() : ''
+      if (!userId) continue
+      if (presence.isUserOnline(userId)) n += 1
+    }
+    return n
+  }, [humans, presence])
+  // Agents are rendered as "Online" throughout this page, so include them in the header online count.
+  const onlineCount = onlineHumansCount + agentsCount
 
   const canLoadMoreHumans = Boolean(humansQuery.hasNextPage)
   const canLoadMoreAgents = Boolean(agentsQuery.hasNextPage)
@@ -583,9 +594,22 @@ export default function MembersPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
-                  <span className="font-medium leading-none">{totalCount ? `${totalCount} total` : isLoading ? 'Loading…' : 'No members yet'}</span>
-                  {humansCount ? <span aria-label={`${humansCount} human members`}>{humansCount} humans</span> : null}
-                  {agentsCount ? <span aria-label={`${agentsCount} agents`}>{agentsCount} agents</span> : null}
+                  <span className="font-medium leading-none text-muted-foreground">{totalCount ? `${totalCount} total` : isLoading ? 'Loading…' : 'No members yet'}</span>
+                  {!isLoading && totalCount ? (
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <span
+                        className="inline-flex items-center gap-1.5 font-medium leading-none text-emerald-600 dark:text-emerald-400"
+                        aria-label={`${onlineCount} online`}
+                        title={`${onlineCount} online`}
+                      >
+                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
+                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
+                        </span>
+                        {onlineCount} online
+                      </span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
 

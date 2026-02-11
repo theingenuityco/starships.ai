@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -530,18 +531,6 @@ export default function MembersPage() {
   const humansCount = humans.length
   const invitesCount = invites.length
   const agentsCount = agents.length
-  const totalCount = humansCount + agentsCount
-  const onlineHumansCount = useMemo(() => {
-    let n = 0
-    for (const m of humans) {
-      const userId = typeof (m as any)?.userId === 'string' ? String((m as any).userId).trim() : ''
-      if (!userId) continue
-      if (presence.isUserOnline(userId)) n += 1
-    }
-    return n
-  }, [humans, presence])
-  // Agents are rendered as "Online" throughout this page, so include them in the header online count.
-  const onlineCount = onlineHumansCount + agentsCount
 
   const canLoadMoreHumans = Boolean(humansQuery.hasNextPage)
   const canLoadMoreAgents = Boolean(agentsQuery.hasNextPage)
@@ -552,6 +541,9 @@ export default function MembersPage() {
 
   const isFilterValue = (value: string): value is Filter => value === 'all' || value === 'humans' || value === 'agents'
   const openInviteFlow = () => setInviteOpen(true)
+
+  const humansTabCount = humansCount + invitesCount
+  const allTabCount = humansTabCount + agentsCount
 
   const renderMemberCardSkeleton = (key: string) => {
     return (
@@ -594,22 +586,9 @@ export default function MembersPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">{totalCount ? `${totalCount} total` : isLoading ? 'Loading…' : 'No members yet'}</span>
-                  {!isLoading && totalCount ? (
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span
-                        className="inline-flex items-center gap-1.5 font-medium leading-none text-emerald-600 dark:text-emerald-400"
-                        aria-label={`${onlineCount} online`}
-                        title={`${onlineCount} online`}
-                      >
-                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
-                        </span>
-                        {onlineCount} online
-                      </span>
-                    </span>
-                  ) : null}
+                  <span className="font-medium leading-none text-muted-foreground">
+                    Invite collaborators, manage roles, and deploy agents to your starship.
+                  </span>
                 </div>
               </div>
 
@@ -630,9 +609,45 @@ export default function MembersPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
                   <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="humans">Humans</TabsTrigger>
-                    <TabsTrigger value="agents">Agents</TabsTrigger>
+                    <TabsTrigger value="all">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>All</span>
+                        {!isLoading ? (
+                          <Badge
+                            variant={filter === 'all' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {allTabCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="humans">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Humans</span>
+                        {!isLoading ? (
+                          <Badge
+                            variant={filter === 'humans' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {humansTabCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="agents">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Agents</span>
+                        {!isLoading ? (
+                          <Badge
+                            variant={filter === 'agents' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {agentsCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
                   </TabsList>
                 </div>
                 <div className="w-full sm:w-64">

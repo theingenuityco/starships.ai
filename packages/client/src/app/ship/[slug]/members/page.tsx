@@ -262,10 +262,13 @@ export default function MembersPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 self-center">
           {chatHref ? (
             <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
-              <Link href={chatHref}>Chat</Link>
+              <Link href={chatHref} className="inline-flex items-center gap-1.5">
+                <Icon name="message-square" className="h-4 w-4" />
+                Chat
+              </Link>
             </Button>
           ) : null}
 
@@ -416,10 +419,13 @@ export default function MembersPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 self-center">
           {chatHref ? (
             <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
-              <Link href={chatHref}>Chat</Link>
+              <Link href={chatHref} className="inline-flex items-center gap-1.5">
+                <Icon name="message-square" className="h-4 w-4" />
+                Chat
+              </Link>
             </Button>
           ) : null}
 

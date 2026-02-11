@@ -9,7 +9,7 @@ import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
@@ -112,6 +112,7 @@ export function Navigation(props: NavigationProps) {
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const railStarships = useMemo(() => orderStarshipsOwnedFirst(userStarships ?? [], user?.id), [userStarships, user?.id])
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -368,7 +369,7 @@ export function Navigation(props: NavigationProps) {
         onClick={handleSidebarBackgroundClick}
       >
         {/* Discord-style starship rail */}
-        {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
+        {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
         <div
           className="flex flex-col pb-3 transition-all duration-300 ease-in-out"

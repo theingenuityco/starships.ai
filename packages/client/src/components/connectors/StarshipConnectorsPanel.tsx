@@ -558,19 +558,7 @@ export function StarshipConnectorsPanel({
         disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
       >
         <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
-        {isManaged
-          ? 'Managed by platform'
-          : isOauthConnectable
-            ? (connectButtonLabel ?? `Connect ${label}`)
-            : isApiKeyConnectable
-              ? isConnected
-                ? 'Update API key'
-                : 'Connect with API key'
-              : isBasicConnectable
-                ? isConnected
-                  ? 'Update credentials'
-                  : 'Connect with Basic auth'
-                : 'Not connectable'}
+        {isManaged ? 'Managed by platform' : (connectButtonLabel ?? 'Connect')}
       </Button>
     )
 
@@ -578,13 +566,15 @@ export function StarshipConnectorsPanel({
       <Button
         size="sm"
         variant="ghost"
-        className="h-8 min-w-[110px] shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        className="h-8 min-w-[130px] shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive justify-center"
         onClick={() => openDisconnectConfirm(provider)}
         disabled={disconnectMutation.isPending}
       >
         Disconnect
       </Button>
     ) : null
+
+    const cta = isConnected ? disconnectButton ?? connectButton : connectButton
 
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -631,8 +621,7 @@ export function StarshipConnectorsPanel({
         </div>
 
         <div className="flex items-center gap-1 self-center">
-          {!shouldHideConnectButton ? connectButton : null}
-          {disconnectButton}
+          {!shouldHideConnectButton ? cta : null}
         </div>
       </div>
     )

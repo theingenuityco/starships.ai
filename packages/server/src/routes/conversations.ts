@@ -595,7 +595,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
       const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
-      const turn: ConversationStreamSnapshot['turn'] =
+      let turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
           ? {
               turnId: latestTurn.id,
@@ -632,10 +632,21 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             type Buffer = { content: string; reasoning: string; firstAt?: string; lastAt?: string };
             const buffers = new Map<string, Buffer>();
+            let activeTurnAgent: { agentId: string; agentName?: string } | null = null;
 
             for (const item of recent) {
               const evt = item.evt;
               if (!evt || typeof evt.type !== 'string') continue;
+
+              // Capture canonical agent identity for the active turn (used for snapshot.turn + stream placeholder identity).
+              if (!activeTurnAgent && evt.type === 'turn.started') {
+                const d = (evt as Extract<ConversationStreamEvent, { type: 'turn.started' }>).data as any;
+                if (d && d.turnId === activeTurnId) {
+                  const agentId = typeof d.agentId === 'string' ? String(d.agentId).trim() : '';
+                  const agentName = typeof d.agentName === 'string' ? String(d.agentName).trim() : '';
+                  if (agentId) activeTurnAgent = { agentId, ...(agentName ? { agentName } : {}) };
+                }
+              }
 
               if (evt.type === 'assistant.delta' || evt.type === 'assistant.reasoning_delta') {
                 const data =
@@ -643,6 +654,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                     ? (evt as Extract<ConversationStreamEvent, { type: 'assistant.delta' }>).data
                     : (evt as Extract<ConversationStreamEvent, { type: 'assistant.reasoning_delta' }>).data;
                 if (!data || data.turnId !== activeTurnId) continue;
+                // Fallback identity source (should match turn.started); helps if the stream is missing turn.started for any reason.
+                if (!activeTurnAgent) {
+                  const agentId = typeof (data as any)?.agentId === 'string' ? String((data as any).agentId).trim() : '';
+                  const agentName = typeof (data as any)?.agentName === 'string' ? String((data as any).agentName).trim() : '';
+                  if (agentId) activeTurnAgent = { agentId, ...(agentName ? { agentName } : {}) };
+                }
                 const messageId = typeof data.messageId === 'string' ? data.messageId : '';
                 const delta = typeof data.delta === 'string' ? data.delta : '';
                 const at = typeof data.at === 'string' ? data.at : undefined;
@@ -655,6 +672,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                 else cur.reasoning += delta;
                 buffers.set(messageId, cur);
               }
+            }
+
+            if (activeTurnAgent && turn && turn.turnId === activeTurnId) {
+              turn = { ...turn, agentId: activeTurnAgent.agentId, ...(activeTurnAgent.agentName ? { agentName: activeTurnAgent.agentName } : {}) };
             }
 
             // Pick the messageId with the most accumulated data.
@@ -687,6 +708,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                   createdAt: buf.firstAt || at,
                   updatedAt: at,
                   turnId: activeTurnId,
+                  ...(activeTurnAgent?.agentId ? { agentId: activeTurnAgent.agentId } : {}),
+                  ...(activeTurnAgent?.agentName ? { agentName: activeTurnAgent.agentName } : {}),
                 };
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }

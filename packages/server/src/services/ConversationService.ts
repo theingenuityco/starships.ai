@@ -418,6 +418,7 @@ export class ConversationService {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
+      const agent = this.currentAgentForConversation.get(conversationId);
       const event: ConversationStreamEvent =
         kind === 'content'
           ? {
@@ -426,6 +427,8 @@ export class ConversationService {
                 conversationId,
                 turnId,
                 messageId,
+                ...(agent?.id ? { agentId: agent.id } : {}),
+                ...(agent?.name ? { agentName: agent.name } : {}),
                 delta: payload,
                 at: new Date().toISOString(),
               },
@@ -436,6 +439,8 @@ export class ConversationService {
                 conversationId,
                 turnId,
                 messageId,
+                ...(agent?.id ? { agentId: agent.id } : {}),
+                ...(agent?.name ? { agentName: agent.name } : {}),
                 delta: payload,
                 at: new Date().toISOString(),
               },
@@ -2190,9 +2195,20 @@ export class ConversationService {
     if (!noAgentToRun) {
       try {
         const at = new Date().toISOString();
+        const initialAgent = Array.isArray(agentQueue) && agentQueue.length > 0 ? agentQueue[0] : null;
+        // Seed canonical agent identity for the "typing/loading" window (before any deltas).
+        if (initialAgent && typeof initialAgent.id === 'string' && typeof initialAgent.name === 'string') {
+          this.currentAgentForConversation.set(data.conversationId, { id: initialAgent.id, name: initialAgent.name });
+        }
         await this.streamBus.publish(data.conversationId, {
           type: 'turn.started',
-          data: { conversationId: data.conversationId, turnId: turn.id, at },
+          data: {
+            conversationId: data.conversationId,
+            turnId: turn.id,
+            ...(initialAgent && typeof initialAgent.id === 'string' ? { agentId: initialAgent.id } : {}),
+            ...(initialAgent && typeof initialAgent.name === 'string' ? { agentName: initialAgent.name } : {}),
+            at,
+          },
         });
         await this.streamBus.publish(data.conversationId, {
           type: 'turn.status',
@@ -2715,7 +2731,26 @@ export class ConversationService {
         // (Harmless if the client ignores it.)
         if (latestTurnId) {
           try {
-            await this.streamBus.publish(conversationId, { type: 'turn.started', data: { conversationId, turnId, at } });
+            // Seed canonical agent identity for the resumed turn (so UI identity is stable before deltas).
+            try {
+              const aid = typeof agentModel?.id === 'string' ? String(agentModel.id) : '';
+              const an = typeof agentModel?.name === 'string' ? String(agentModel.name) : '';
+              if (aid && an) {
+                this.currentAgentForConversation.set(conversationId, { id: aid, name: an });
+              }
+            } catch {
+              /* ignore */
+            }
+            await this.streamBus.publish(conversationId, {
+              type: 'turn.started',
+              data: {
+                conversationId,
+                turnId,
+                ...(typeof agentModel?.id === 'string' ? { agentId: String(agentModel.id) } : {}),
+                ...(typeof agentModel?.name === 'string' ? { agentName: String(agentModel.name) } : {}),
+                at,
+              },
+            });
           } catch {
             // best-effort
           }

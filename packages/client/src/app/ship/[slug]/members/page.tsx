@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
@@ -13,15 +14,15 @@ import { HoverProfilePopover } from '@/components/conversation/HoverProfilePopov
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from '@/components/conversation/ProfileHoverCardContent'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
-import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
-import { useRemoveStarshipMember } from '@/hooks/useStarshipMembers'
-import { useRevokeStarshipInvite } from '@/hooks/useStarshipMembers'
+import { STARSHIP_MEMBERS_QUERY_KEYS, useInfiniteStarshipMembers, useRemoveStarshipMember, useRevokeStarshipInvite } from '@/hooks/useStarshipMembers'
+import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useDeleteAgent, useDeleteAgentWithUnusedTools, useUnpublishAgent } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuth } from '@/hooks/useAuth'
 import type { AgentModel } from '@starships/protocol'
+import { useQueryClient } from '@tanstack/react-query'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { cn } from '@/lib/utils'
@@ -100,12 +101,18 @@ export default function MembersPage() {
   const { slug: slugParam } = useParams<{ slug: string }>()
   const slug = typeof slugParam === 'string' ? slugParam : ''
   const { user, isInstanceAdmin } = useAuth()
+  const queryClient = useQueryClient()
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ?? null
+  const starshipIdStr = starshipId ? String(starshipId) : null
 
   const [filter, setFilter] = useState<Filter>('all')
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
+
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -113,6 +120,11 @@ export default function MembersPage() {
     }, 250)
     return () => window.clearTimeout(handle)
   }, [searchText])
+
+  useEffect(() => {
+    if (!inviteOpen) return
+    setLastInviteUrl(null)
+  }, [inviteOpen])
 
   const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50, search: debouncedSearch })
   const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC', search: debouncedSearch })
@@ -147,11 +159,10 @@ export default function MembersPage() {
     return agents
   }, [agents, filter])
 
-  const starshipIdStr = starshipId ? String(starshipId) : null
-
   const presence = useStarshipPresence(starshipIdStr ?? '', Boolean(starshipIdStr))
   const removeMember = useRemoveStarshipMember(starshipIdStr ?? '')
   const revokeInvite = useRevokeStarshipInvite(starshipIdStr ?? '')
+  const createInvite = useCreateStarshipInvite(starshipIdStr ?? '')
   const deleteAgent = useDeleteAgent()
   const deleteAgentWithUnusedTools = useDeleteAgentWithUnusedTools()
   const unpublishAgent = useUnpublishAgent()
@@ -528,6 +539,7 @@ export default function MembersPage() {
   const canInviteUsers = Boolean(starship?.id && (isInstanceAdmin === true || (user?.id && starship?.ownerId && String(starship.ownerId) === String(user.id))))
 
   const isFilterValue = (value: string): value is Filter => value === 'all' || value === 'humans' || value === 'agents'
+  const openInviteFlow = () => setInviteOpen(true)
 
   const renderMemberCardSkeleton = (key: string) => {
     return (
@@ -624,11 +636,9 @@ export default function MembersPage() {
                       <Skeleton className="h-4 w-8" />
                     </div>
                     {slug && canInviteUsers ? (
-                      <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                        <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
-                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
-                          Invite user
-                        </Link>
+                      <Button type="button" size="sm" variant="ghost" className="h-8 text-primary hover:text-primary" onClick={openInviteFlow}>
+                        <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
+                        Invite user
                       </Button>
                     ) : null}
                   </div>
@@ -670,11 +680,9 @@ export default function MembersPage() {
                       <span className="text-sm text-muted-foreground tabular-nums">{humansCount + invitesCount}</span>
                     </div>
                     {slug && canInviteUsers ? (
-                      <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                        <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
-                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
-                          Invite user
-                        </Link>
+                      <Button type="button" size="sm" variant="ghost" className="h-8 text-primary hover:text-primary" onClick={openInviteFlow}>
+                        <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-1.5" />
+                        Invite user
                       </Button>
                     ) : null}
                   </div>
@@ -720,6 +728,86 @@ export default function MembersPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={open => {
+          setInviteOpen(open)
+          if (!open) setLastInviteUrl(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Invite collaborator</DialogTitle>
+            <DialogDescription>Send an invite link to a teammate.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email</Label>
+              <Input
+                id="invite-email"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                placeholder="teammate@example.com"
+                disabled={createInvite.isPending}
+              />
+            </div>
+            {lastInviteUrl ? (
+              <div className="max-w-full overflow-hidden rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <Icon name="check-circle" className="h-4 w-4 text-emerald-700 dark:text-emerald-400 mt-0.5" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
+                      We have sent them an invite. You can also use this invite link:
+                    </p>
+                    <div className="min-w-0 flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <code className="block min-w-0 flex-1 break-all rounded-md border border-border/60 bg-card/60 px-2 py-1 text-[12px]">
+                        {lastInviteUrl}
+                      </code>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-8"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(lastInviteUrl)
+                          } catch {
+                            // ignore
+                          }
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="ghost" onClick={() => setInviteOpen(false)} disabled={createInvite.isPending}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              disabled={!canInviteUsers || !starshipIdStr || !inviteEmail.trim() || createInvite.isPending}
+              onClick={async () => {
+                if (!starshipIdStr) return
+                const email = inviteEmail.trim()
+                if (!email) return
+                const res = await createInvite.mutateAsync({ email })
+                setLastInviteUrl(res.inviteUrl || null)
+                queryClient.invalidateQueries({ queryKey: STARSHIP_MEMBERS_QUERY_KEYS.byStarship(starshipIdStr) })
+              }}
+            >
+              {createInvite.isPending ? 'Sending…' : 'Send invite'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={confirmAction !== null}

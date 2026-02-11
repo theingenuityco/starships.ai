@@ -20,8 +20,12 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
   const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents)
   const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools)
 
-  const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
-  const toolTemplates = (toolData ?? initialToolTemplates ?? []) as ToolTemplateModel[]
+  // IMPORTANT (hydration stability):
+  // If the page shipped server-provided initial templates, keep using them on hydration.
+  // Otherwise a pre-existing client-side cache can override the list (and drop fields like `avatarUrl`),
+  // causing avatars to "disappear" after hydration.
+  const agentTemplates = (useServerInitialAgents ? initialAgentTemplates : agentData ?? []) as AgentTemplateModel[]
+  const toolTemplates = (useServerInitialTools ? initialToolTemplates : toolData ?? []) as ToolTemplateModel[]
   const agentLoading = agentLoadingRaw && !useServerInitialAgents
   const toolLoading = toolLoadingRaw && !useServerInitialTools
 

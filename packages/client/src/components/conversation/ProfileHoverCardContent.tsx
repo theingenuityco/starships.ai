@@ -61,11 +61,11 @@ export function UserProfileHoverCardContent({
       <div className="relative h-9 w-9">
         <Avatar className="h-9 w-9 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
           {explicitAvatarUrl ? (
-            <AvatarImage src={explicitAvatarUrl} alt={title || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+            <AvatarImage src={explicitAvatarUrl} alt={title || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
           ) : avatarSeed ? (
             <AgentAvatar seed={avatarSeed} size={36} rounded />
           ) : resolvedAvatarUrl ? (
-            <AvatarImage src={resolvedAvatarUrl} alt={title || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+            <AvatarImage src={resolvedAvatarUrl} alt={title || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
           ) : null}
           <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
             {fallbackVariant === 'user-icon' ? (

@@ -593,7 +593,7 @@ export default function MembersPage() {
                   <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Members</h3>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                   <span className="font-medium leading-none text-muted-foreground">{totalCount ? `${totalCount} total` : isLoading ? 'Loading…' : 'No members yet'}</span>
                   {!isLoading && totalCount ? (
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">

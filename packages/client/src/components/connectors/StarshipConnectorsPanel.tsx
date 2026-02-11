@@ -18,7 +18,7 @@ import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const CONNECTOR_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -643,7 +643,6 @@ export function StarshipConnectorsPanel({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0 flex items-baseline gap-3">
               <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
-              <span className="text-sm text-muted-foreground tabular-nums">{sectionCount}</span>
             </div>
           </div>
           {isSearching ? (

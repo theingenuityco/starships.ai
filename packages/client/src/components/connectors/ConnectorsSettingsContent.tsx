@@ -2,24 +2,64 @@
 
 import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PageLayout } from '@/components/layout/PageLayout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { AgentDeploymentModal } from '@/components/connectors/AgentDeploymentModal'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useAgent } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { cn } from '@/lib/utils'
 
 interface ConnectorsSettingsContentProps {
   slug: string
 }
+
+type ConnectorView = 'all' | 'connected' | 'unconnected'
 
 export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentProps) {
   const { user, isInstanceAdmin, isLoading: authLoading } = useAuth()
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
   const searchParams = useSearchParams()
   const router = useRouter()
+  const [connectorStats, setConnectorStats] = useState<{ total: number; connected: number } | null>(null)
+  const handleStatsChange = useCallback((stats: { total: number; connected: number }) => {
+    setConnectorStats(prev => (prev && prev.total === stats.total && prev.connected === stats.connected ? prev : stats))
+  }, [])
+
+  const viewFromUrl = useMemo<ConnectorView>(() => {
+    const raw = (searchParams?.get('view') || '').trim()
+    if (raw === 'connected' || raw === 'unconnected' || raw === 'all') return raw
+    return 'all'
+  }, [searchParams])
+
+  const qFromUrl = useMemo(() => (searchParams?.get('q') || '').trim(), [searchParams])
+  const [searchValue, setSearchValue] = useState(qFromUrl)
+  const [debouncedQuery, setDebouncedQuery] = useState(qFromUrl)
+
+  useEffect(() => {
+    setSearchValue(qFromUrl)
+    setDebouncedQuery(qFromUrl)
+  }, [qFromUrl])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchValue.trim()), 250)
+    return () => clearTimeout(t)
+  }, [searchValue])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const q = debouncedQuery.trim()
+    if (q) params.set('q', q)
+    else params.delete('q')
+    const next = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
+    router.replace(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery])
   
   // Get agent info from URL params
   const agentId = searchParams?.get('agentId') || ''
@@ -66,66 +106,136 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
     }
   }
 
-  if (starshipLoading) {
-    return (
-      <PageLayout>
-        <div className="flex flex-col h-screen items-center justify-center">
-          <div className="text-center space-y-4 opacity-100">
-            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-              <Icon name="plug" className="w-8 h-8 text-primary animate-pulse" />
-            </div>
-            <p className="text-muted-foreground">Loading connectors...</p>
-          </div>
-        </div>
-      </PageLayout>
-    )
-  }
-
   // If we already know this user can't manage connectors, don't render the page (avoid UI flash).
   if (!authLoading && !starshipLoading && user?.id && starship?.id) {
     const canManage = Boolean(isInstanceAdmin === true || String(starship.ownerId) === String(user.id))
     if (!canManage) return null
   }
 
-  if (!starship) {
-    return (
-      <PageLayout>
-        <div className="flex flex-col h-screen items-center justify-center">
-          <div className="w-full max-w-6xl mx-auto px-6">
+  const totalCount = typeof connectorStats?.total === 'number' ? connectorStats.total : null
+  const connectedCount = typeof connectorStats?.connected === 'number' ? connectorStats.connected : null
+  const unconnectedCount = typeof totalCount === 'number' && typeof connectedCount === 'number' ? Math.max(0, totalCount - connectedCount) : null
+
+  return (
+    <div className="relative flex flex-col h-full min-w-0">
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="w-full">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+                <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                    <Icon name="plug" weight="bold" className="h-5 w-5" />
+                  </span>
+                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Connectors</h3>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                  <span className="font-medium leading-none text-muted-foreground">
+                    Connect services and apps to give your starship access to the tools and data it needs.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+        <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
+          <div className="pt-4 pb-8">
+            <Tabs
+              value={viewFromUrl}
+              onValueChange={value => {
+                if (typeof window === 'undefined') return
+                const nextView = (value === 'connected' || value === 'unconnected' || value === 'all' ? value : 'all') as ConnectorView
+                const params = new URLSearchParams(window.location.search)
+                if (nextView === 'all') params.delete('view')
+                else params.set('view', nextView)
+                const next = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
+                router.replace(next)
+              }}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex justify-start">
+                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                    <TabsTrigger value="all">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>All</span>
+                        {typeof totalCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'all' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {totalCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="connected">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Connected</span>
+                        {typeof connectedCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'connected' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {connectedCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="unconnected">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>Unconnected</span>
+                        {typeof unconnectedCount === 'number' ? (
+                          <Badge
+                            variant={viewFromUrl === 'unconnected' ? 'default' : 'secondary'}
+                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                          >
+                            {unconnectedCount}
+                          </Badge>
+                        ) : null}
+                      </span>
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                <div className="w-full sm:w-64">
+                  <div className="relative">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                    <Input
+                      value={searchValue}
+                      onChange={e => setSearchValue(e.target.value)}
+                      placeholder="Search connectors"
+                      className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
+                      aria-label="Search connectors"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Tabs>
+          </div>
+
+          {starshipLoading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : !starship ? (
             <Alert>
               <Icon name="info" className="h-4 w-4" />
               <AlertDescription>Starship not found. Please check the URL and try again.</AlertDescription>
             </Alert>
-          </div>
-        </div>
-      </PageLayout>
-    )
-  }
-
-  return (
-    <PageLayout>
-      <div className="bg-background">
-        <div className="flex flex-col items-center px-6 py-8">
-          <div className="w-full max-w-6xl mx-auto space-y-8">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Icon name="plug" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Connectors</h1>
-              </div>
-              <p className="text-muted-foreground">
-                Securely connect <strong>{starship.name}</strong> to your external accounts and data sources.
-              </p>
-            </div>
-
-            {starship.id && (
-              <div className="mt-4">
-                <StarshipConnectorsPanel starshipId={starship.id} />
-              </div>
-            )}
-          </div>
+          ) : starship.id ? (
+            <StarshipConnectorsPanel
+              starshipId={starship.id}
+              maxColumns={2}
+              onStatsChange={handleStatsChange}
+              statusFilter={viewFromUrl}
+              catalogQuery={debouncedQuery}
+              layout="list"
+            />
+          ) : null}
         </div>
       </div>
-      
+
       {/* Agent Deployment Modal */}
       {agentId && agentSlug && agentName && agentRole && (
         <AgentDeploymentModal
@@ -139,6 +249,6 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
           agent={agent}
         />
       )}
-    </PageLayout>
+    </div>
   )
 }

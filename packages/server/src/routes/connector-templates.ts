@@ -60,7 +60,7 @@ const AuthObjectSchema = z.object({ type: AuthTypeSchema }).passthrough();
 const UpdateConnectorTemplateSchema = z
   .object({
     name: TemplateTextSchema.max(255).optional(),
-    description: TemplateTextSchema.max(1024).optional(),
+    description: TemplateTextSchema.max(120).optional(),
     isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
@@ -90,7 +90,7 @@ const CreateConnectorTemplateSchema = z.object({
   slug: z.string().trim().min(1).max(255).optional(),
   provider: z.string().trim().min(1).max(255),
   name: TemplateTextSchema.max(255),
-  description: TemplateTextSchema.max(1024),
+  description: TemplateTextSchema.max(120),
   isEnabled: z.boolean().optional(),
   version: z.string().trim().min(1).max(20).optional(),
   category: z.string().trim().min(1).max(100).optional(),
@@ -261,7 +261,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           slug: z.string().trim().min(1).optional(),
           provider: z.string().trim().min(1),
           name: z.string().trim().min(1),
-          description: z.string().trim().min(1),
+          description: z.string().trim().min(1).max(120),
           isEnabled: z.boolean().optional(),
           version: z.string().trim().min(1).optional(),
           category: z.string().trim().min(1).optional(),

@@ -68,6 +68,30 @@ export function pickPrimaryStarshipForUser(
 }
 
 /**
+ * Order starships so user-owned starships appear first (stable order).
+ * If the user owns none (or userId is missing), returns the list as-is.
+ */
+export function orderStarshipsOwnedFirst(
+  starships: StarshipModel[] | undefined | null,
+  userId: string | undefined | null
+): StarshipModel[] {
+  const list = Array.isArray(starships) ? starships : []
+  const uid = typeof userId === 'string' ? userId : ''
+  if (!uid || list.length === 0) return list
+
+  const owned: StarshipModel[] = []
+  const others: StarshipModel[] = []
+
+  for (const s of list) {
+    if (s?.ownerId === uid) owned.push(s)
+    else others.push(s)
+  }
+
+  if (owned.length === 0) return list
+  return [...owned, ...others]
+}
+
+/**
  * Get starship by ID
  */
 export function useStarship(starshipId: string, enabled: boolean = true) {

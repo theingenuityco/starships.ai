@@ -6,17 +6,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
-import { useMemo, useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const CONNECTOR_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -25,9 +27,20 @@ interface StarshipConnectorsPanelProps {
    */
   onlyProviders?: string[]
   /**
-   * Hide the search bar (useful for embedded onboarding experiences).
+   * Back-compat: older callsites (onboarding) may pass this.
+   * Search is now rendered by the parent page for connectors settings.
    */
   hideSearch?: boolean
+  /** Optional server-side search query (catalog endpoint supports `q`). */
+  catalogQuery?: string
+  /** Filter which connectors to show. */
+  statusFilter?: 'all' | 'connected' | 'unconnected'
+  /**
+   * Rendering style.
+   * - grid: existing card grid (useful in onboarding/modals)
+   * - list: members-like rows (used on connectors page)
+   */
+  layout?: 'grid' | 'list'
   /**
    * Hide disconnect UI (useful for onboarding).
    */
@@ -51,6 +64,12 @@ interface StarshipConnectorsPanelProps {
    * (e.g. bg-card/10, border-border/40) for visual consistency.
    */
   matchAgentCardStyle?: boolean
+  /**
+   * Optional callback to surface connector counts to a parent header/subtitle.
+   * `total` counts the visible catalog (after onlyProviders filter), and `connected`
+   * counts how many of those are currently connected.
+   */
+  onStatsChange?: (stats: { total: number; connected: number }) => void
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -70,24 +89,28 @@ function getConnectorLogoSrc(provider: string): string {
 export function StarshipConnectorsPanel({
   starshipId,
   onlyProviders,
-  hideSearch = false,
+  hideSearch,
+  catalogQuery,
+  statusFilter = 'all',
+  layout = 'grid',
   hideDisconnect = false,
   maxColumns = 3,
   hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
   matchAgentCardStyle = false,
+  onStatsChange,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { data: catalog = [] } = useConnectorCatalog()
+  const q = typeof catalogQuery === 'string' ? catalogQuery.trim() : ''
+  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q })
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
   const apiKeyMutation = useConnectApiKeyConnector(starshipId)
   const basicMutation = useConnectBasicAuthConnector(starshipId)
 
-  const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
   const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
@@ -290,13 +313,6 @@ export function StarshipConnectorsPanel({
   //   setGithubDialogOpen(false)
   // }
 
-  const normalizedQuery = searchQuery.trim().toLowerCase()
-
-  const matchesQuery = useMemo(
-    () => (entry: { name: string; description: string }) => !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
-    [normalizedQuery]
-  )
-
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
     const base = catalog.filter(item => item.provider !== 'starships')
@@ -307,12 +323,103 @@ export function StarshipConnectorsPanel({
     return base
   }, [catalog, onlyProviders])
 
+  const connectedProviderSet = useMemo(() => {
+    return new Set((connectors ?? []).filter(c => (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
+  }, [connectors])
+
+  const connectedCount = useMemo(() => {
+    const providerSet = new Set(visibleCatalog.map(c => String(c.provider)))
+    const connectedProviders = new Set(
+      (connectors ?? [])
+        .filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected')
+        .map(c => String((c as any)?.provider))
+    )
+    return connectedProviders.size
+  }, [connectors, visibleCatalog])
+
+  const filteredCatalog = useMemo(() => {
+    if (statusFilter === 'connected') return visibleCatalog.filter(c => connectedProviderSet.has(String(c.provider)))
+    if (statusFilter === 'unconnected') return visibleCatalog.filter(c => !connectedProviderSet.has(String(c.provider)))
+    return visibleCatalog
+  }, [connectedProviderSet, statusFilter, visibleCatalog])
+
+  const lastStatsRef = useRef<{ total: number; connected: number } | null>(null)
+  useEffect(() => {
+    if (!onStatsChange) return
+    const next = { total: visibleCatalog.length, connected: connectedCount }
+    const prev = lastStatsRef.current
+    if (prev && prev.total === next.total && prev.connected === next.connected) return
+    lastStatsRef.current = next
+    onStatsChange(next)
+  }, [connectedCount, onStatsChange, visibleCatalog.length])
+
   const getProviderLabel = (provider: string | null | undefined) => {
     if (!provider) return ''
     return visibleCatalog.find((c: { provider: string }) => c.provider === provider)?.name ?? provider
   }
 
-  if (isLoading) {
+  const isSearching = Boolean(q) && isCatalogFetching
+  const isInitialCatalogLoading = !q && isCatalogFetching && catalog.length === 0
+  const isPanelLoading = isLoading || isInitialCatalogLoading
+
+  const sectionTitle = statusFilter === 'connected' ? 'Connected' : statusFilter === 'unconnected' ? 'Unconnected' : 'All connectors'
+  const sectionCount = filteredCatalog.length
+
+  const renderConnectorRowSkeleton = (key: string) => {
+    return (
+      <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className={cn('min-w-0 flex-1')}>
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                <Skeleton className="h-[22px] w-[22px] rounded-md" />
+              </span>
+              {/* Presence dot placeholder (match `PresenceIndicator` placement + connectors row offsets). */}
+              <span className="absolute bottom-0 right-0 translate-x-[22%] translate-y-[6%] z-50 pointer-events-none">
+                <Skeleton className="h-2 w-2 rounded-full ring-2 ring-background outline outline-1 outline-border" />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-40 max-w-[70%]" />
+                <Skeleton className="h-4 w-14 rounded-md" />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Skeleton className="h-3 w-64 max-w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 self-center">
+          <Skeleton className="h-8 min-w-[130px] rounded-2xl" />
+        </div>
+      </div>
+    )
+  }
+
+  const renderCenteredState = (message: string) => {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
+      </div>
+    )
+  }
+
+  if (isPanelLoading && layout === 'list') {
+    return (
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-baseline gap-3">
+            <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
+            <Skeleton className="h-4 w-8" />
+          </div>
+        </div>
+        <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderConnectorRowSkeleton(`connector-skel-${i}`))}</div>
+      </div>
+    )
+  }
+
+  if (isPanelLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-muted-foreground text-sm">Loading connectors...</p>
@@ -320,15 +427,9 @@ export function StarshipConnectorsPanel({
     )
   }
 
-  const hasAnyVisibleConnector = visibleCatalog.some(item => {
-    return matchesQuery({ name: item.name, description: item.description })
-  })
-
   const renderConnectorCard = (provider: string) => {
     const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
-    if (!catalogItem || !matchesQuery({ name: catalogItem.name, description: catalogItem.description })) {
-      return null
-    }
+    if (!catalogItem) return null
 
     const state = getConnectorState(provider)
     const isConnected = state?.status === 'connected'
@@ -436,27 +537,135 @@ export function StarshipConnectorsPanel({
 
   const gridClassName = maxColumns === 1 ? 'grid gap-6 grid-cols-1' : maxColumns === 2 ? 'grid gap-6 grid-cols-1 md:grid-cols-2' : 'grid gap-6 md:grid-cols-2 lg:grid-cols-3'
 
-  return (
-    <div className="space-y-6">
-      {/* Search - match Environment page styling */}
-      {!hideSearch ? (
-        <div className="mb-8 sticky top-6 z-30">
-          <div className="relative max-w-md mb-6 mx-auto">
-            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search connectors..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent text-sm"
-            />
+  const listRow = (provider: string) => {
+    const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
+    if (!catalogItem) return null
+
+    const state = getConnectorState(provider)
+    const isConnected = state?.status === 'connected'
+
+    const label = catalogItem.name
+    const logoSrc = getConnectorLogoSrc(provider)
+    const authType = catalogItem.auth?.type
+    const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
+    const isOauthConnectable = authType === 'oauth2'
+    const isApiKeyConnectable = authType === 'api_key'
+    const isBasicConnectable = authType === 'basic'
+    const isManaged = authType === 'platform_jwt'
+    const showLogo = !!provider && !hiddenLogos[provider]
+
+    const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
+
+    const connectButton = (
+      <Button
+        size="sm"
+        variant="ghost"
+        className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-8 group min-w-[130px] justify-center shrink-0')}
+        onClick={() => {
+          if (isManaged) return
+          if (isOauthConnectable) return void handleConnect(provider)
+          if (isApiKeyConnectable) return openApiKeyDialog(provider)
+          if (isBasicConnectable) return openBasicDialog(provider)
+        }}
+        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
+      >
+        <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
+        {isManaged ? 'Managed by platform' : (connectButtonLabel ?? 'Connect')}
+      </Button>
+    )
+
+    const disconnectButton = canDisconnect ? (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-8 min-w-[130px] shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive justify-center"
+        onClick={() => openDisconnectConfirm(provider)}
+        disabled={disconnectMutation.isPending}
+      >
+        Disconnect
+      </Button>
+    ) : null
+
+    const cta = isConnected ? disconnectButton ?? connectButton : connectButton
+
+    return (
+      <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className={cn('min-w-0 flex-1')} aria-label={label}>
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                {showLogo ? (
+                  <Image src={logoSrc} alt={`${label} logo`} width={22} height={22} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
+                ) : (
+                  <Icon name="plug" className="h-4 w-4 text-muted-foreground" />
+                )}
+              </span>
+              <PresenceIndicator
+                kind={isConnected ? 'online' : 'offline'}
+                active={true}
+                size="sm"
+                placement="outset"
+                // Match Members page placement for 40px avatar.
+                className="translate-x-[22%] translate-y-[6%]"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className={cn('text-sm font-medium truncate text-foreground')}>{label}</span>
+                <span
+                  className={cn(
+                    'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
+                    isConnected
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                      : 'border-border/50 bg-muted/20 text-muted-foreground'
+                  )}
+                  aria-label={isConnected ? 'Connected' : 'Not connected'}
+                  title={isConnected ? 'Connected' : 'Not connected'}
+                >
+                  {isConnected ? 'Connected' : 'Not connected'}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className="truncate">{catalogItem.description}</span>
+              </div>
+            </div>
           </div>
         </div>
-      ) : null}
 
-      {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
+        <div className="flex items-center gap-1 self-center">
+          {!shouldHideConnectButton ? cta : null}
+        </div>
+      </div>
+    )
+  }
 
-      <div className={gridClassName}>{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+  return (
+    <div className="space-y-6">
+      {layout === 'list' ? (
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex items-baseline gap-3">
+              <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
+            </div>
+          </div>
+          {isSearching ? (
+            renderCenteredState(`Searching “${q}”…`)
+          ) : filteredCatalog.length === 0 ? (
+            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
+          ) : (
+            <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {isSearching ? (
+            renderCenteredState(`Searching “${q}”…`)
+          ) : filteredCatalog.length === 0 ? (
+            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
+          ) : null}
+          <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+        </div>
+      )}
 
       {!hideDisconnect ? (
         <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>

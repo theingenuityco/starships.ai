@@ -43,12 +43,21 @@ function formatTimestamp(ts?: string): string {
 export interface SearchResultsSidebarProps {
   query: string
   results: SearchResult[]
+  isSearching?: boolean
   onSelectResult: (messageId: string, matchIndex: number) => void
   onClose: () => void
   className?: string
 }
 
-export function SearchResultsSidebar({ query, results, onSelectResult, onClose, className }: SearchResultsSidebarProps) {
+function renderCenteredState(message: string): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-center py-10">
+      <p className="text-sm text-muted-foreground text-center">{message}</p>
+    </div>
+  )
+}
+
+export function SearchResultsSidebar({ query, results, isSearching = false, onSelectResult, onClose, className }: SearchResultsSidebarProps) {
   return (
     <div className={cn('flex flex-col h-full min-h-0 w-[360px] min-w-[360px] max-w-[360px] border-l border-border bg-background flex-shrink-0', className)} role="region" aria-label="Search results">
       <div className="flex-shrink-0 border-b border-border px-3 py-2 flex flex-col gap-2">
@@ -59,13 +68,15 @@ export function SearchResultsSidebar({ query, results, onSelectResult, onClose, 
         </div>
         <div className="flex items-center justify-between mt-4 mb-1.5 px-0">
           <span className="text-xs font-medium text-foreground">
-            {results.length} {results.length === 1 ? 'Result' : 'Results'}
+            {isSearching ? 'Searching…' : `${results.length} ${results.length === 1 ? 'Result' : 'Results'}`}
           </span>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
-        {results.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">No matches for &quot;{query}&quot;</div>
+        {isSearching ? (
+          renderCenteredState(`Searching “${query}”…`)
+        ) : results.length === 0 ? (
+          renderCenteredState(`No messages match “${query}”.`)
         ) : (
           <ul className="p-2 space-y-2" role="list">
             {results.map(r => (

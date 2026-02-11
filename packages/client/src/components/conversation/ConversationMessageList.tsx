@@ -1364,20 +1364,7 @@ export function ConversationMessageList({
     if (streamingIdentityLoggedRef.current === key) return
     streamingIdentityLoggedRef.current = key
 
-    // #region agent log: streaming message identity merge
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'ConversationMessageList.tsx:streamingIdentityEffect',
-        message: 'Streaming assistant identity (base vs final)',
-        data: JSON.parse(key),
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // #endregion
+    // (agent debug log removed)
   }, [activeRenderedStreamingAssistantId, activeTurnId, agentById, gapLoaderPresentation, renderMessages, resolveAssistantPresentation])
 
   // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.

@@ -80,7 +80,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         >
           {isImageUrl(userAvatar) ? (
             <Avatar className={`${avatarSizeClass} rounded-full ring-1 ring-border/40`}>
-              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
             </Avatar>
           ) : (
             <div className={`${avatarSizeClass} rounded-full flex items-center justify-center bg-muted/40`}>
@@ -107,7 +107,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
         {isImageUrl(userAvatar) ? (
           <div className="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-primary/10 group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
             <Avatar className="w-full h-full rounded-none">
-              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="w-full h-full object-cover" />
+              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </Avatar>
           </div>
         ) : (

@@ -255,7 +255,7 @@ export function MessageReactions({
                     >
                       <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
                         <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                          {avatar ? <AvatarImage src={avatar} alt={label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                          {avatar ? <AvatarImage src={avatar} alt={label} referrerPolicy="no-referrer" className="rounded-full object-cover" /> : null}
                           <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(label)}</AvatarFallback>
                         </Avatar>
                       </div>

@@ -1532,7 +1532,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
                     {kind === 'user' ? (
                       <>
-                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover rounded-full" /> : null}
+                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
                         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
                       </>
                     ) : (

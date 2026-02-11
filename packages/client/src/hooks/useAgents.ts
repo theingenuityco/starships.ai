@@ -53,7 +53,8 @@ export const AGENT_QUERY_KEYS = {
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
-  byStarshipPaged: (starshipId: string, limit: number, order?: 'ASC' | 'DESC') => [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'paged', { limit, order: order ?? null }] as const,
+  byStarshipPaged: (starshipId: string, limit: number, order?: 'ASC' | 'DESC', search?: string | null) =>
+    [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'paged', { limit, order: order ?? null, search: search ?? null }] as const,
   byStarshipSlug: (starshipId: string, slug: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'slug', slug] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
@@ -120,11 +121,12 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true, o
 
 export type StarshipAgentsPage = { agents: AgentModel[]; pagination: PaginationMeta | null }
 
-export function useInfiniteStarshipAgents(starshipId: string, enabled: boolean = true, options?: { limit?: number; order?: 'ASC' | 'DESC' }) {
+export function useInfiniteStarshipAgents(starshipId: string, enabled: boolean = true, options?: { limit?: number; order?: 'ASC' | 'DESC'; search?: string }) {
   const limit = options?.limit ?? 50
   const order = options?.order
+  const search = typeof options?.search === 'string' && options.search.trim().length > 0 ? options.search.trim() : null
   return useInfiniteQuery({
-    queryKey: AGENT_QUERY_KEYS.byStarshipPaged(starshipId, limit, order),
+    queryKey: AGENT_QUERY_KEYS.byStarshipPaged(starshipId, limit, order, search),
     enabled: !!starshipId && enabled,
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<StarshipAgentsPage> => {
@@ -134,6 +136,7 @@ export function useInfiniteStarshipAgents(starshipId: string, enabled: boolean =
           page,
           limit,
           ...(order ? { order } : {}),
+          ...(search ? { search } : {}),
         },
       })
       return { agents: response.data.data, pagination: response.data.meta?.pagination ?? null }

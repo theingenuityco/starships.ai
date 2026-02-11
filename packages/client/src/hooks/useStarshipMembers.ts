@@ -33,7 +33,8 @@ export type StarshipMembersAndInvitesResponse = {
 export const STARSHIP_MEMBERS_QUERY_KEYS = {
   all: ['starships', 'members'] as const,
   byStarship: (starshipId: string) => [...STARSHIP_MEMBERS_QUERY_KEYS.all, starshipId] as const,
-  byStarshipPaged: (starshipId: string, limit: number) => [...STARSHIP_MEMBERS_QUERY_KEYS.all, starshipId, 'paged', { limit }] as const,
+  byStarshipPaged: (starshipId: string, limit: number, search?: string | null) =>
+    [...STARSHIP_MEMBERS_QUERY_KEYS.all, starshipId, 'paged', { limit, search: search ?? null }] as const,
 }
 
 export function useStarshipMembersAndInvites(starshipId: string, enabled: boolean) {
@@ -50,16 +51,17 @@ export function useStarshipMembersAndInvites(starshipId: string, enabled: boolea
 
 export type StarshipMembersAndInvitesPage = StarshipMembersAndInvitesResponse & { pagination: PaginationMeta | null }
 
-export function useInfiniteStarshipMembers(starshipId: string, enabled: boolean, options?: { limit?: number }) {
+export function useInfiniteStarshipMembers(starshipId: string, enabled: boolean, options?: { limit?: number; search?: string }) {
   const limit = options?.limit ?? 50
+  const search = typeof options?.search === 'string' && options.search.trim().length > 0 ? options.search.trim() : null
   return useInfiniteQuery({
-    queryKey: STARSHIP_MEMBERS_QUERY_KEYS.byStarshipPaged(starshipId, limit),
+    queryKey: STARSHIP_MEMBERS_QUERY_KEYS.byStarshipPaged(starshipId, limit, search),
     enabled: Boolean(enabled && starshipId),
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<StarshipMembersAndInvitesPage> => {
       const page = typeof pageParam === 'number' ? pageParam : Number(pageParam)
       const res: FetchResponse<ApiResponse<StarshipMembersAndInvitesResponse>> = await api.get(`/api/v1/starships/${starshipId}/members`, {
-        params: { page, limit },
+        params: { page, limit, ...(search ? { search } : {}) },
       })
       return {
         ...res.data.data,

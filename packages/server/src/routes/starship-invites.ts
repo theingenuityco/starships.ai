@@ -8,7 +8,7 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { StarshipInviteTokenRepository, StarshipMemberRepository, getConnection } from '@starships/models';
 import type { CreateStarshipInviteRequest } from '@starships/protocol';
-import { IdSchema, PaginationSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -22,6 +22,15 @@ type InviteRow = {
   role: 'admin' | 'collaborator';
   created_at: string;
   expires_at: string;
+};
+
+type MemberRow = {
+  user_id: string;
+  role: 'admin' | 'collaborator';
+  created_at: string;
+  email: string | null;
+  display_name: string | null;
+  avatar: string | null;
 };
 
 function requireUserId(req: Request, res: Response): string | null {
@@ -61,6 +70,18 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     if (!params) return;
     const starshipId = params.id;
 
+    const searchQuery = validateData(
+      z.object({
+        search: z.string().trim().max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }).optional(),
+      }),
+      req.query,
+      res,
+      'search query'
+    );
+    if (!searchQuery) return;
+    const search = typeof searchQuery.search === 'string' && searchQuery.search.trim().length > 0 ? searchQuery.search.trim() : null;
+    const searchLower = search ? search.toLowerCase() : null;
+
     const wantsPagination = Object.prototype.hasOwnProperty.call(req.query ?? {}, 'page') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'limit') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'offset');
     const paginationQuery = wantsPagination ? validateData(PaginationSchema, req.query, res, 'pagination query') : null;
     if (wantsPagination && !paginationQuery) return;
@@ -85,13 +106,21 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     const connection = getConnection();
     const inviteRowsPromise: Promise<InviteRow[]> = canViewInvites
       ? connection.query<InviteRow>(
-          `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
-             FROM starship_invite_tokens
-            WHERE starship_id = $1
-              AND NOT consumed
-              AND expires_at > NOW()
-            ORDER BY created_at DESC`,
-          [starshipId]
+          search
+            ? `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+                 FROM starship_invite_tokens
+                WHERE starship_id = $1
+                  AND NOT consumed
+                  AND expires_at > NOW()
+                  AND invited_email ILIKE $2
+                ORDER BY created_at DESC`
+            : `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+                 FROM starship_invite_tokens
+                WHERE starship_id = $1
+                  AND NOT consumed
+                  AND expires_at > NOW()
+                ORDER BY created_at DESC`,
+          search ? [starshipId, `%${search}%`] : [starshipId]
           ) as unknown as Promise<InviteRow[]>
       : Promise.resolve([] as InviteRow[]);
 
@@ -117,36 +146,61 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
 
     if (!wantsPagination) {
       const [memberRows, inviteRows, ownerRow] = await Promise.all([
-        connection.query<{
-          user_id: string;
-          role: 'admin' | 'collaborator';
-          created_at: string;
-          email: string | null;
-          display_name: string | null;
-          avatar: string | null;
-        }>(
-          `SELECT m.user_id,
-                  m.role,
-                  m.created_at,
-                  u.email,
-                  u.display_name,
-                  COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
-             FROM starship_members m
-             JOIN users u ON u.id = m.user_id
-              LEFT JOIN LATERAL (
-                SELECT (profile_data->>'avatar') as oauth_avatar
-                  FROM oauth_accounts
-                 WHERE user_id = u.id
-                 ORDER BY updated_at DESC
-                 LIMIT 1
-              ) oa ON true
-            WHERE m.starship_id = $1
-            ORDER BY m.created_at ASC`,
-          [starshipId]
-        ),
+        (() : Promise<MemberRow[]> => {
+          if (!search) {
+            return connection.query<MemberRow>(
+              `SELECT m.user_id,
+                      m.role,
+                      m.created_at,
+                      u.email,
+                      u.display_name,
+                      COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+                 FROM starship_members m
+                 JOIN users u ON u.id = m.user_id
+                  LEFT JOIN LATERAL (
+                    SELECT (profile_data->>'avatar') as oauth_avatar
+                      FROM oauth_accounts
+                     WHERE user_id = u.id
+                     ORDER BY updated_at DESC
+                     LIMIT 1
+                  ) oa ON true
+                WHERE m.starship_id = $1
+                ORDER BY m.created_at ASC`,
+              [starshipId]
+            ) as unknown as Promise<MemberRow[]>;
+          }
+          const clause = canViewEmails
+            ? `(COALESCE(u.display_name, '') ILIKE $2 OR COALESCE(u.email, '') ILIKE $2)`
+            : `COALESCE(u.display_name, '') ILIKE $2`;
+          return connection.query<MemberRow>(
+            `SELECT m.user_id,
+                    m.role,
+                    m.created_at,
+                    u.email,
+                    u.display_name,
+                    COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+               FROM starship_members m
+               JOIN users u ON u.id = m.user_id
+                LEFT JOIN LATERAL (
+                  SELECT (profile_data->>'avatar') as oauth_avatar
+                    FROM oauth_accounts
+                   WHERE user_id = u.id
+                   ORDER BY updated_at DESC
+                   LIMIT 1
+                ) oa ON true
+              WHERE m.starship_id = $1
+                AND ${clause}
+              ORDER BY m.created_at ASC`,
+            [starshipId, `%${search}%`]
+          ) as unknown as Promise<MemberRow[]>;
+        })(),
         inviteRowsPromise,
         ownerRowPromise,
       ]);
+
+      const ownerDisplay = typeof ownerRow?.display_name === 'string' ? ownerRow.display_name : '';
+      const ownerEmail = canViewEmails && typeof ownerRow?.email === 'string' ? ownerRow.email : '';
+      const ownerMatches = !searchLower ? true : ownerDisplay.toLowerCase().includes(searchLower) || ownerEmail.toLowerCase().includes(searchLower);
 
       const owner = {
         userId: starship.ownerId,
@@ -158,7 +212,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       };
 
       const members = [
-        owner,
+        ...(ownerMatches ? [owner] : []),
         ...memberRows.map((m) => ({
           userId: String(m.user_id),
           role: m.role,
@@ -184,19 +238,39 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     }
 
     // Paginated behavior (opt-in via query params): used by Members page to avoid huge payloads.
-    const totalRow = await connection.queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text as count
-         FROM starship_members
-        WHERE starship_id = $1`,
-      [starshipId]
-    );
-    const total = 1 + Number(totalRow?.count ?? 0);
-
-    const [inviteRows, ownerRow] = await Promise.all([
+    const [inviteRows, ownerRow, memberCountRow] = await Promise.all([
       // Only include invites on the first page (best-effort); Members UI doesn't need them.
       offset === 0 ? inviteRowsPromise : Promise.resolve([] as InviteRow[]),
       ownerRowPromise,
+      (() => {
+        if (!search) {
+          return connection.queryOne<{ count: string }>(
+            `SELECT COUNT(*)::text as count
+               FROM starship_members
+              WHERE starship_id = $1`,
+            [starshipId]
+          );
+        }
+        const clause = canViewEmails
+          ? `(COALESCE(u.display_name, '') ILIKE $2 OR COALESCE(u.email, '') ILIKE $2)`
+          : `COALESCE(u.display_name, '') ILIKE $2`;
+        return connection.queryOne<{ count: string }>(
+          `SELECT COUNT(*)::text as count
+             FROM starship_members m
+             JOIN users u ON u.id = m.user_id
+            WHERE m.starship_id = $1
+              AND ${clause}`,
+          [starshipId, `%${search}%`]
+        );
+      })(),
     ]);
+
+    const ownerDisplay = typeof ownerRow?.display_name === 'string' ? ownerRow.display_name : '';
+    const ownerEmail = canViewEmails && typeof ownerRow?.email === 'string' ? ownerRow.email : '';
+    const ownerMatches = !searchLower ? true : ownerDisplay.toLowerCase().includes(searchLower) || ownerEmail.toLowerCase().includes(searchLower);
+
+    const memberTotal = Number(memberCountRow?.count ?? 0);
+    const total = (ownerMatches ? 1 : 0) + memberTotal;
 
     const owner = {
       userId: starship.ownerId,
@@ -207,44 +281,67 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       avatar: ownerRow?.avatar ?? null,
     };
 
-    const remaining = Math.max(0, limit - (offset === 0 ? 1 : 0));
-    const memberLimit = offset === 0 ? remaining : limit;
-    const memberOffset = offset === 0 ? 0 : Math.max(0, offset - 1);
+    const ownerSlotOnThisPage = offset === 0 && ownerMatches;
+    const memberLimit = ownerSlotOnThisPage ? Math.max(0, limit - 1) : limit;
+    const memberOffset = ownerMatches ? Math.max(0, offset - 1) : offset;
 
     const memberRows = memberLimit > 0
-      ? await connection.query<{
-          user_id: string;
-          role: 'admin' | 'collaborator';
-          created_at: string;
-          email: string | null;
-          display_name: string | null;
-          avatar: string | null;
-        }>(
-          `SELECT m.user_id,
-                  m.role,
-                  m.created_at,
-                  u.email,
-                  u.display_name,
-                  COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
-             FROM starship_members m
-             JOIN users u ON u.id = m.user_id
-              LEFT JOIN LATERAL (
-                SELECT (profile_data->>'avatar') as oauth_avatar
-                  FROM oauth_accounts
-                 WHERE user_id = u.id
-                 ORDER BY updated_at DESC
-                 LIMIT 1
-              ) oa ON true
-            WHERE m.starship_id = $1
-            ORDER BY m.created_at ASC
-            LIMIT $2
-            OFFSET $3`,
-          [starshipId, memberLimit, memberOffset]
-        )
+      ? await ((() : Promise<MemberRow[]> => {
+          if (!search) {
+            return connection.query<MemberRow>(
+              `SELECT m.user_id,
+                      m.role,
+                      m.created_at,
+                      u.email,
+                      u.display_name,
+                      COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+                 FROM starship_members m
+                 JOIN users u ON u.id = m.user_id
+                  LEFT JOIN LATERAL (
+                    SELECT (profile_data->>'avatar') as oauth_avatar
+                      FROM oauth_accounts
+                     WHERE user_id = u.id
+                     ORDER BY updated_at DESC
+                     LIMIT 1
+                  ) oa ON true
+                WHERE m.starship_id = $1
+                ORDER BY m.created_at ASC
+                LIMIT $2
+                OFFSET $3`,
+              [starshipId, memberLimit, memberOffset]
+            ) as unknown as Promise<MemberRow[]>;
+          }
+          const clause = canViewEmails
+            ? `(COALESCE(u.display_name, '') ILIKE $4 OR COALESCE(u.email, '') ILIKE $4)`
+            : `COALESCE(u.display_name, '') ILIKE $4`;
+          return connection.query<MemberRow>(
+            `SELECT m.user_id,
+                    m.role,
+                    m.created_at,
+                    u.email,
+                    u.display_name,
+                    COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+               FROM starship_members m
+               JOIN users u ON u.id = m.user_id
+                LEFT JOIN LATERAL (
+                  SELECT (profile_data->>'avatar') as oauth_avatar
+                    FROM oauth_accounts
+                   WHERE user_id = u.id
+                   ORDER BY updated_at DESC
+                   LIMIT 1
+                ) oa ON true
+              WHERE m.starship_id = $1
+                AND ${clause}
+              ORDER BY m.created_at ASC
+              LIMIT $2
+              OFFSET $3`,
+            [starshipId, memberLimit, memberOffset, `%${search}%`]
+          ) as unknown as Promise<MemberRow[]>;
+        })())
       : [];
 
     const members = [
-      ...(offset === 0 ? [owner] : []),
+      ...(ownerSlotOnThisPage ? [owner] : []),
       ...memberRows.map((m) => ({
         userId: String(m.user_id),
         role: m.role,

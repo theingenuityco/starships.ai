@@ -3,11 +3,13 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipMembers } from '@/hooks/useStarshipMembers'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import type { AgentModel } from '@starships/protocol'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { isImageUrl } from '@/lib/isImageUrl'
@@ -93,6 +95,8 @@ export default function MembersPage() {
 
   const starshipIdStr = starshipId ? String(starshipId) : null
 
+  const presence = useStarshipPresence(starshipIdStr ?? '', Boolean(starshipIdStr))
+
   const visibleAgentAvatarAttachmentIds = useMemo(() => {
     if (!starshipIdStr) return []
     if (filter === 'humans') return []
@@ -119,31 +123,43 @@ export default function MembersPage() {
   const renderHumanRow = (m: StarshipMemberListItem) => {
     const label = getUserLabel(m)
     const userId = typeof m.userId === 'string' ? m.userId.trim() : ''
+    const isOnline = presence.isUserOnline(userId)
     const href = slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : slug ? `/ship/${encodeURIComponent(slug)}` : '/'
     const avatarUrlRaw = typeof m.avatar === 'string' ? m.avatar.trim() : ''
     const avatarUrl = isImageUrl(avatarUrlRaw) ? avatarUrlRaw : null
+    const presenceText = isOnline ? 'Online' : 'Offline'
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
           <div className="flex items-start gap-3">
-            <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
-              <AgentAvatar
-                seed={label.primary}
-                imageUrl={avatarUrl}
-                fill
-                instanceId={userId ? `member-u-${userId}` : `member-u-${label.primary}`}
-                rounded
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                <AgentAvatar
+                  seed={label.primary}
+                  imageUrl={avatarUrl}
+                  fill
+                  instanceId={userId ? `member-u-${userId}` : `member-u-${label.primary}`}
+                  rounded
+                />
+              </span>
+              <PresenceIndicator
+                kind={isOnline ? 'online' : 'offline'}
+                active={true}
+                size="md"
+                placement="outset"
+                // Slightly more down/right for 40px avatar.
+                className="translate-x-[22%] translate-y-[6%]"
               />
-            </span>
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium truncate text-foreground')}>{label.primary}</span>
               </div>
-              {label.secondary ? (
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span className="truncate">{label.secondary}</span>
-                </div>
-              ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className={cn('truncate', isOnline ? 'text-emerald-600 dark:text-emerald-400' : undefined)}>{presenceText}</span>
+                {label.secondary ? <span aria-hidden="true">·</span> : null}
+                {label.secondary ? <span className="truncate">{label.secondary}</span> : null}
+              </div>
             </div>
           </div>
         </Link>
@@ -164,20 +180,25 @@ export default function MembersPage() {
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <Link href={href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={label.primary}>
           <div className="flex items-start gap-3">
-            <span className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
-              <AgentAvatar
-                seed={label.primary}
-                imageUrl={avatarUrl}
-                fill
-                instanceId={a.id ? `member-a-${a.id}` : `member-a-${label.primary}`}
-                rounded
-              />
-            </span>
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                <AgentAvatar
+                  seed={label.primary}
+                  imageUrl={avatarUrl}
+                  fill
+                  instanceId={a.id ? `member-a-${a.id}` : `member-a-${label.primary}`}
+                  rounded
+                />
+              </span>
+              <PresenceIndicator kind="online" active={true} size="md" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium truncate text-foreground')}>{label.primary}</span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className="truncate text-emerald-600 dark:text-emerald-400">Online</span>
+                <span aria-hidden="true">·</span>
                 {categoryMeta ? (
                   <span className={cn('inline-flex items-center gap-1', categoryMeta.className)} aria-label={`Category: ${categoryMeta.label}`} title={`Category: ${categoryMeta.label}`}>
                     <span>{categoryMeta.label}</span>

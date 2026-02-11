@@ -14,7 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
-import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -51,6 +51,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { user, isAuthenticated } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
+  const railStarships = orderStarshipsOwnedFirst(starships ?? [], user?.id)
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
@@ -218,7 +219,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="flex-shrink-0 relative z-50">
             <aside className="relative h-full">
               <StarshipRail
-                starships={starships ?? []}
+                starships={railStarships}
                 activeSlug={null}
                 onSelect={s => {
                   setSelectedStarship(s.id)

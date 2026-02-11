@@ -268,11 +268,19 @@ export default function MembersPage() {
                 if (isFilterValue(value)) setFilter(value)
               }}
             >
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="humans">Humans</TabsTrigger>
-                <TabsTrigger value="agents">Agents</TabsTrigger>
-              </TabsList>
+              <div className="flex justify-start">
+                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
+                  <TabsTrigger value="all" className="rounded-xl px-3 py-1">
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger value="humans" className="rounded-xl px-3 py-1">
+                    Humans
+                  </TabsTrigger>
+                  <TabsTrigger value="agents" className="rounded-xl px-3 py-1">
+                    Agents
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </Tabs>
           </div>
 

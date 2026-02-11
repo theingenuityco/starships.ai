@@ -196,6 +196,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
               onStatsChange={handleStatsChange}
               statusFilter={viewFromUrl}
               catalogQuery={debouncedQuery}
+              layout="list"
             />
           ) : null}
         </div>

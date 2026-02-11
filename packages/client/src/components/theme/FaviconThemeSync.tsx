@@ -38,11 +38,13 @@ function getFaviconSvg(isDark: boolean, ts: number, badgeLabel: string | null) {
           // but clamp to the maximum size that still fits inside the bounds.
           const SCALE = 3
           const baseR = 5.1
-          const maxR = 9.25
+          const maxR = 8.5
           const r = Math.min(baseR * SCALE, maxR)
-          // Anchor to the bottom-right corner while keeping the full circle inside bounds.
-          const cx = 24 - r
-          const cy = 24 - r
+          // Anchor to the bottom-right like the (accurate) dark-mode placement:
+          // slightly nudge past the edge so it reads "corner-attached".
+          const nudge = Math.min(1.75, r * 0.18)
+          const cx = 24 - r + nudge
+          const cy = 24 - r + nudge
 
           // Scale font, then clamp so it stays readable within the badge.
           const rawFontSize = (len === 1 ? 8.75 : len === 2 ? 7.75 : 6.5) * SCALE
@@ -53,7 +55,9 @@ function getFaviconSvg(isDark: boolean, ts: number, badgeLabel: string | null) {
           // Use y=center + dy="0.35em" for more stable visual centering.
           const y = cy
           const strokeWidth = Math.min(4.5, 1.5 * (r / baseR))
-          const badgeStroke = tile
+          // Avoid theme-dependent "cutout" strokes which can make light mode look mis-positioned.
+          // Use a subtle consistent outline instead.
+          const badgeStroke = '#00000033'
           return (
             `<g>` +
             `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ef4444" stroke="${badgeStroke}" stroke-width="${strokeWidth}"/>` +

@@ -278,14 +278,15 @@ export default function MembersPage() {
             <div className="space-y-10">
               {filteredHumans.length > 0 ? (
                 <div>
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-semibold leading-tight text-muted-foreground">Humans</h3>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
+                      <span className="text-sm text-muted-foreground tabular-nums">{humansCount}</span>
                     </div>
                     {slug && canInviteUsers ? (
                       <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                         <Link href={`/ship/${encodeURIComponent(slug)}/settings/my-starship`}>
-                          <Icon name="user-plus" className="h-4 w-4 mr-2" />
+                          <Icon name="user-plus" iconOverride={{ type: 'phosphor', component: 'UserPlus' }} className="h-4 w-4 mr-2" />
                           Invite user
                         </Link>
                       </Button>
@@ -304,14 +305,15 @@ export default function MembersPage() {
 
               {filteredAgents.length > 0 ? (
                 <div>
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="text-base font-semibold leading-tight text-muted-foreground">Agents</h3>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
+                      <span className="text-sm text-muted-foreground tabular-nums">{agentsCount}</span>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                       <Link href="/marketplace">
-                        <Icon name="sparkles" className="h-4 w-4 mr-2" />
-                        Deploy agent
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-2" />
+                        Explore agents
                       </Link>
                     </Button>
                   </div>

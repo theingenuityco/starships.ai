@@ -126,16 +126,37 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none">
-                    {typeof connectorStats?.total === 'number' ? (
-                      <>
-                        <span className="text-foreground tabular-nums">{connectorStats.total}</span> connectors ·{' '}
-                        <span className="text-foreground tabular-nums">{connectorStats.connected}</span> connected
-                      </>
-                    ) : (
-                      <>—</>
-                    )}
-                  </span>
+                  {typeof connectorStats?.total === 'number' ? (
+                    <>
+                      <span className="font-medium leading-none text-muted-foreground tabular-nums">
+                        {connectorStats.total ? `${connectorStats.total} total` : 'No connectors yet'}
+                      </span>
+                      {connectorStats.total ? (
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <span
+                            className="inline-flex items-center gap-1.5 font-medium leading-none text-emerald-600 dark:text-emerald-400 tabular-nums"
+                            aria-label={`${connectorStats.connected} connected`}
+                            title={`${connectorStats.connected} connected`}
+                          >
+                            <span aria-hidden="true" className="relative inline-flex h-3 w-3">
+                              {/* Reuse presence indicator visuals for consistency */}
+                              <span className="absolute inset-0">
+                                <span className="inline-block rounded-full ring-2 ring-background outline outline-1 outline-border bg-emerald-500 dark:bg-emerald-400" style={{ width: 6, height: 6 }} />
+                              </span>
+                            </span>
+                            {connectorStats.connected} connected
+                          </span>
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <span className="font-medium leading-none text-muted-foreground tabular-nums">
+                            {Math.max(0, connectorStats.total - connectorStats.connected)} unconnected
+                          </span>
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="font-medium leading-none text-muted-foreground">Loading…</span>
+                  )}
                 </div>
               </div>
             </div>

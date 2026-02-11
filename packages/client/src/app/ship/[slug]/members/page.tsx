@@ -527,15 +527,38 @@ export default function MembersPage() {
     )
   }
 
-  const isLoading = Boolean(humansQuery.isLoading || agentsQuery.isLoading)
-  const humansCount = humans.length
-  const invitesCount = invites.length
-  const agentsCount = agents.length
+  const q = debouncedSearch
 
+  // Match connectors page behavior:
+  // - show skeletons for initial load (empty search)
+  // - show a centered "Searching…" message while search is running
+  // - show a centered "No matches…" message when search completes with empty results
   const canLoadMoreHumans = Boolean(humansQuery.hasNextPage)
   const canLoadMoreAgents = Boolean(agentsQuery.hasNextPage)
   const isLoadingMoreHumans = Boolean(humansQuery.isFetchingNextPage)
   const isLoadingMoreAgents = Boolean(agentsQuery.isFetchingNextPage)
+
+  const isInitialLoading = !q && Boolean(humansQuery.isLoading || agentsQuery.isLoading)
+  const isSearching = Boolean(
+    q &&
+      // New query keys for search can report isLoading=true; treat that as "searching" not "initial loading".
+      (humansQuery.isLoading ||
+        agentsQuery.isLoading ||
+        (humansQuery.isFetching && !isLoadingMoreHumans) ||
+        (agentsQuery.isFetching && !isLoadingMoreAgents))
+  )
+
+  const humansCount = humans.length
+  const invitesCount = invites.length
+  const agentsCount = agents.length
+
+  const renderCenteredState = (message: string) => {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
+      </div>
+    )
+  }
 
   const onlineHumansCount = useMemo(() => {
     let n = 0
@@ -624,7 +647,7 @@ export default function MembersPage() {
                     <TabsTrigger value="all">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
-                        {!isLoading ? (
+                        {!isInitialLoading ? (
                           <Badge
                             variant={filter === 'all' ? 'default' : 'secondary'}
                             className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
@@ -637,7 +660,7 @@ export default function MembersPage() {
                     <TabsTrigger value="humans">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Humans</span>
-                        {!isLoading ? (
+                        {!isInitialLoading ? (
                           <Badge
                             variant={filter === 'humans' ? 'default' : 'secondary'}
                             className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
@@ -650,7 +673,7 @@ export default function MembersPage() {
                     <TabsTrigger value="agents">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
-                        {!isLoading ? (
+                        {!isInitialLoading ? (
                           <Badge
                             variant={filter === 'agents' ? 'default' : 'secondary'}
                             className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
@@ -678,7 +701,7 @@ export default function MembersPage() {
             </Tabs>
           </div>
 
-          {isLoading ? (
+          {isInitialLoading ? (
             <div className="space-y-10">
               {filter !== 'agents' ? (
                 <div>
@@ -720,8 +743,10 @@ export default function MembersPage() {
                 </div>
               ) : null}
             </div>
+          ) : isSearching ? (
+            renderCenteredState(`Searching “${q}”…`)
           ) : filteredHumans.length === 0 && filteredInvites.length === 0 && filteredAgents.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No members found.</div>
+            renderCenteredState(q ? `No members match “${q}”.` : 'No members found.')
           ) : (
             <div className="space-y-10">
               {filteredHumans.length > 0 || filteredInvites.length > 0 ? (

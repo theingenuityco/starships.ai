@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24">
-  <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="#0b1220" stroke="#1f2937" stroke-width="1" />
+  <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="5" fill="#000000" />
 
   <g
     fill="none"
     stroke="#ffffff"
-    stroke-width="1"
+    stroke-width="1.25"
     stroke-linecap="round"
     stroke-linejoin="round"
     shape-rendering="geometricPrecision"

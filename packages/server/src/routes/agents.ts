@@ -215,6 +215,7 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
       PaginationSchema.extend({
         // Match other endpoints' convention (e.g. ledger): ASC | DESC
         order: z.enum(['ASC', 'DESC']).optional(),
+        search: z.string().trim().max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }).optional(),
       }),
       req.query,
       res,
@@ -229,7 +230,8 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
       req.user!.id,
       queryValidation.page,
       queryValidation.limit,
-      queryValidation.order
+      queryValidation.order,
+      typeof queryValidation.search === 'string' && queryValidation.search.trim().length > 0 ? queryValidation.search.trim() : undefined
     );
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });

@@ -447,7 +447,8 @@ export class AgentService {
     userId: string,
     page: number = 1,
     limit: number = 50,
-    order: 'ASC' | 'DESC' = 'DESC'
+    order: 'ASC' | 'DESC' = 'DESC',
+    search?: string
   ): Promise<{
     agents: AgentModel[];
     total: number;
@@ -465,8 +466,22 @@ export class AgentService {
     // Get all agents for the starship
     const allAgents = await this.getAgentsByStarship(starshipId);
 
+    const searchTerm = typeof search === 'string' && search.trim().length > 0 ? search.trim().toLowerCase() : null;
+
+    const filteredAgents = searchTerm
+      ? allAgents.filter((a) => {
+          const name = typeof a?.name === 'string' ? a.name : '';
+          const role = typeof a?.role === 'string' ? a.role : '';
+          const desc = typeof a?.description === 'string' ? a.description : '';
+          const slug = typeof a?.slug === 'string' ? a.slug : '';
+          const category = typeof a?.category === 'string' ? a.category : '';
+          const hay = `${name} ${role} ${desc} ${slug} ${category}`.toLowerCase();
+          return hay.includes(searchTerm);
+        })
+      : allAgents;
+
     // Sort agents by createdAt, then by name for stability
-    const sortedAgents = [...allAgents].sort((a, b) => {
+    const sortedAgents = [...filteredAgents].sort((a, b) => {
       const aTs = a?.createdAt ? new Date(a.createdAt as string).getTime() : 0;
       const bTs = b?.createdAt ? new Date(b.createdAt as string).getTime() : 0;
       if (aTs !== bTs) {

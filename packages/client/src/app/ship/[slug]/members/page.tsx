@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
@@ -19,7 +20,7 @@ import { isImageUrl } from '@/lib/isImageUrl'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 type Filter = 'all' | 'humans' | 'agents'
 
@@ -75,9 +76,18 @@ export default function MembersPage() {
   const starshipId = starship?.id ?? null
 
   const [filter, setFilter] = useState<Filter>('all')
+  const [searchText, setSearchText] = useState<string>('')
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('')
 
-  const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50 })
-  const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC' })
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(searchText.trim())
+    }, 250)
+    return () => window.clearTimeout(handle)
+  }, [searchText])
+
+  const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50, search: debouncedSearch })
+  const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC', search: debouncedSearch })
 
   const humans = useMemo(() => {
     const pages: StarshipMembersAndInvitesPage[] = humansQuery.data?.pages ?? []
@@ -340,12 +350,26 @@ export default function MembersPage() {
                 if (isFilterValue(value)) setFilter(value)
               }}
             >
-              <div className="flex justify-start">
-                <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="humans">Humans</TabsTrigger>
-                  <TabsTrigger value="agents">Agents</TabsTrigger>
-                </TabsList>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex justify-start">
+                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="humans">Humans</TabsTrigger>
+                    <TabsTrigger value="agents">Agents</TabsTrigger>
+                  </TabsList>
+                </div>
+                <div className="w-full sm:w-64">
+                  <div className="relative">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                    <Input
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      placeholder="Search members"
+                      className="pl-9 h-10"
+                      aria-label="Search members"
+                    />
+                  </div>
+                </div>
               </div>
             </Tabs>
           </div>

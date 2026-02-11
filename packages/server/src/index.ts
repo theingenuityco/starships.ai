@@ -12,7 +12,6 @@ import { getEnvConfig } from '@starships/env';
 import {
   createConnection,
   migrationRunner,
-  seedToolTemplates,
   seedUpdateDeployedInstances,
 } from '@starships/models';
 import cookieParser from 'cookie-parser';
@@ -171,10 +170,6 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
-
-    // Ensure current built-in tool templates exist/are up-to-date.
-    // (Idempotent; best-effort and should not block startup on failure.)
-    await seedToolTemplates();
 
     // Version flow: sync deployed instances to latest DB templates.
     // (Intentionally idempotent and should not block startup on failure.)

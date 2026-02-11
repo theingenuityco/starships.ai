@@ -183,7 +183,7 @@ export async function copyObjectInS3(options: { sourceKey: string; destKey: stri
   }
 
   // CopySource must be URL-encoded as /{bucket}/{key}
-  const copySource = `/${encodeURIComponent(bucket)}/${encodeS3KeyForUrl(sourceKey)}`;
+  const copySource = `${encodeURIComponent(bucket)}/${encodeS3KeyForUrl(sourceKey)}`;
   const command = new CopyObjectCommand({
     Bucket: bucket,
     Key: destKey,

@@ -652,31 +652,12 @@ export function ConversationMessageList({
   const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
   const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
 
-  // IMPORTANT:
-  // For user↔agent DMs, the streaming placeholder message (`stream-${turnId}`) often arrives without
-  // an `agentId`/`agentName` initially. If we fall back to `conversationAgents[0]`, we can render the
-  // *wrong* agent label during streaming (e.g. "Aria") and then "snap back" once the final persisted
-  // message includes the correct agent metadata. Prefer the DM list's resolved agent instead.
-  const dmAgentFallback = useMemo<ConversationAgent | null>(() => {
-    const dm: any = (dmItem as any)?.dm
-    if (dm?.dmType !== 'user_agent') return null
-
-    const dmAgent: any = (dmItem as any)?.agent ?? null
-    const dmAgentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
-    const fromConversationList = dmAgentId && Array.isArray(conversationAgents) ? ((conversationAgents.find(a => String((a as any)?.id || '').trim() === dmAgentId) as any) ?? null) : null
-
-    return (dmAgent as any) || (fromConversationList as any) || null
-  }, [conversationAgents, dmItem])
-
-  const isUserAgentDm = (dmItem as any)?.dm?.dmType === 'user_agent'
-  // For user↔agent DMs, never fall back to some other agent (e.g. Aria) if we can't resolve the DM agent.
-  // Prefer rendering a generic "Assistant" over showing the wrong name during streaming.
-  const fallbackAgent = isUserAgentDm ? dmAgentFallback : conversationAgents[0]
+  // Canonical identity should come from message.agentId / stream turn actor, not UI-side guessing.
+  // When identity is missing, prefer a generic label over rendering the wrong agent.
   const fallbackAgentDisplayName = useMemo(() => {
     if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
-    if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
-    return undefined
-  }, [agentNameOverride, fallbackAgent])
+    return 'Assistant'
+  }, [agentNameOverride])
 
   const agentById = useMemo(() => {
     const m = new Map<string, ConversationAgent>()
@@ -702,10 +683,8 @@ export function ConversationMessageList({
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
-    const fallbackId = typeof (fallbackAgent as any)?.avatarAttachmentId === 'string' ? String((fallbackAgent as any).avatarAttachmentId).trim() : ''
-    if (fallbackId) ids.push(fallbackId)
     return Array.from(new Set(ids))
-  }, [conversationAgents, fallbackAgent])
+  }, [conversationAgents])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
   const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 
@@ -714,17 +693,18 @@ export function ConversationMessageList({
       if (!msg || msg.role !== 'assistant') return null
       const agentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
       const fromList = agentId ? agentById.get(agentId) : undefined
-      const agent = fromList ?? fallbackAgent
+      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+      const agent = fromList ?? null
 
       // `message.agentName` often comes from the backend as *name-only* (no role).
       // Always append role when we can resolve it from the agent list.
-      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
       const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
       const nameFallback =
         nameFromMsg ||
-        (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') ||
-        (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') ||
-        (agentId ? `Agent ${agentId.slice(0, 6)}` : '')
+        (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
+        (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
+        (agentId ? `Agent ${agentId.slice(0, 6)}` : '') ||
+        fallbackAgentDisplayName
 
       const displayName = (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
 
@@ -764,7 +744,7 @@ export function ConversationMessageList({
         updatedAt,
       }
     },
-    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
+    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, fallbackAgentDisplayName]
   )
 
   const resolveAgentPresentationFromAgent = useCallback(
@@ -1295,81 +1275,26 @@ export function ConversationMessageList({
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
 
+  const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
+  const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const gapLoaderPresentation = useMemo(() => {
     if (!activeTurnId) return null
 
-    // 1) Best: `turn.usage` tells us the actual agent for this turn (when available).
-    const usage = activeTurnId && turnUsageByTurnId && typeof turnUsageByTurnId === 'object' ? (turnUsageByTurnId as any)[activeTurnId] : null
-    const usageAgentId = typeof usage?.agentId === 'string' ? String(usage.agentId).trim() : ''
-    const usageAgentName = typeof usage?.agentName === 'string' ? String(usage.agentName).trim() : ''
-    if (usageAgentId) {
-      const agent = agentById.get(usageAgentId) ?? null
+    // Strict identity: only render agent identity from the canonical turn actor (server-provided).
+    if (turnAgentId) {
+      const agent = agentById.get(turnAgentId) ?? null
       const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'turn.usage.agentId' as const, mentionAgentId: '' }
-    }
-    if (usageAgentName) {
-      return { displayName: usageAgentName, slug: undefined, avatarUrl: undefined, strategy: 'turn.usage.agentName' as const, mentionAgentId: '' }
+      if (p) return { ...p, strategy: 'turn.started.agentId' as const }
+      const label = turnAgentName || `Agent ${turnAgentId.slice(0, 6)}`
+      return { displayName: label, slug: undefined, avatarUrl: undefined, strategy: 'turn.started.agentId-unresolved' as const }
     }
 
-    // 2) Next-best: parse the last user message for an agent mention (<@a:AGENT_ID> or legacy @slug)
-    const lastUser = [...renderMessages].reverse().find(m => (m as any)?.role === 'user') as ExtendedMessage | undefined
-    const lastUserContent = typeof (lastUser as any)?.content === 'string' ? String((lastUser as any).content) : ''
-    const tokenMatch = lastUserContent.match(/^\s*<@a:([^>\s]+)>/)
-    const legacyText = lastUserContent.replace(/<@[^>\n]+>/g, ' ')
-    const legacyMentionMatch = legacyText.match(/^\s*@([A-Za-z0-9._-]{1,100})/i)
-    const mentionAgentId = tokenMatch ? String(tokenMatch[1] || '').trim() : ''
-    const mentionHandle = legacyMentionMatch ? String(legacyMentionMatch[1] || '').trim() : ''
-    if (mentionAgentId) {
-      const agent = agentById.get(mentionAgentId) ?? null
-      const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'lastUser.<@a:id>' as const, mentionAgentId }
-    }
-    if (mentionHandle) {
-      const lower = mentionHandle.toLowerCase()
-      const agent =
-        conversationAgents.find(a => {
-          const slug = typeof (a as any)?.slug === 'string' ? String((a as any).slug).toLowerCase() : ''
-          const name = typeof (a as any)?.name === 'string' ? String((a as any).name).toLowerCase() : ''
-          return (slug && slug === lower) || (name && name === lower)
-        }) ?? null
-      const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'lastUser.@handle' as const, mentionAgentId: '' }
+    if (turnAgentName) {
+      return { displayName: turnAgentName, slug: undefined, avatarUrl: undefined, strategy: 'turn.started.agentName' as const }
     }
 
-    // 3) Fallback: previous logic (last assistant / fallback agent)
-    const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
-    const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
-    return {
-      displayName: (p.displayName || fallbackAgentDisplayName || 'Assistant').trim() || 'Assistant',
-      slug: p.slug,
-      avatarUrl: p.avatarUrl,
-      strategy: 'fallback' as const,
-      mentionAgentId: '',
-    }
-  }, [activeTurnId, agentById, conversationAgents, fallbackAgentDisplayName, renderMessages, resolveAgentPresentationFromAgent, resolveAssistantPresentation, turnUsageByTurnId])
-
-  const gapLoaderLoggedKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!shouldShowGapLoader) {
-      gapLoaderLoggedKeyRef.current = null
-      return
-    }
-    const key = `${String(conversationId ?? 'none')}|${String(activeTurnId ?? 'none')}|${String(activeTurnStatus ?? 'none')}`
-    if (gapLoaderLoggedKeyRef.current === key) return
-    gapLoaderLoggedKeyRef.current = key
-  }, [
-    activeTurnId,
-    activeTurnStatus,
-    conversationId,
-    fallbackAgentDisplayName,
-    isAssistantStreaming,
-    isAwaitingAssistant,
-    isAwaitingToolResults,
-    renderMessages,
-    resolveAssistantPresentation,
-    shouldShowGapLoader,
-    turnUsageByTurnId,
-  ])
+    return { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined, strategy: 'unknown' as const }
+  }, [activeTurnId, agentById, fallbackAgentDisplayName, resolveAgentPresentationFromAgent, turnAgentId, turnAgentName])
 
   const activeThreadParentMessageId = useMemo(() => {
     const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
@@ -1394,6 +1319,66 @@ export function ConversationMessageList({
     }
     return lastId
   }, [renderMessages])
+
+  const streamingIdentityLoggedRef = useRef<string>('')
+  useEffect(() => {
+    if (!activeRenderedStreamingAssistantId) return
+    const m = renderMessages.find(x => String((x as any)?.id ?? '') === String(activeRenderedStreamingAssistantId)) as ExtendedMessage | undefined
+    if (!m) return
+    if (m.role !== 'assistant') return
+
+    const msgId = typeof (m as any)?.id === 'string' ? String((m as any).id) : String((m as any)?.id ?? '')
+    const msgTurnId = typeof (m as any)?.turnId === 'string' ? String((m as any).turnId) : ''
+    const msgAgentId = typeof (m as any)?.agentId === 'string' ? String((m as any).agentId).trim() : ''
+    const msgAgentName = typeof (m as any)?.agentName === 'string' ? String((m as any).agentName).trim() : ''
+    const fromListFound = Boolean(msgAgentId && agentById.has(msgAgentId))
+
+    const base = resolveAssistantPresentation(m)
+    const streamish = Boolean((m as any)?.streaming === true && typeof (m as any)?.id === 'string' && String((m as any).id).startsWith('stream-'))
+    const shouldOverrideFromGap = Boolean(streamish && activeTurnId && msgTurnId && msgTurnId === activeTurnId && gapLoaderPresentation)
+    const final = shouldOverrideFromGap
+      ? {
+          ...(base || ({} as any)),
+          displayName: (gapLoaderPresentation as any)?.displayName,
+          slug: (gapLoaderPresentation as any)?.slug,
+          avatarUrl: (gapLoaderPresentation as any)?.avatarUrl,
+        }
+      : base
+
+    const key = JSON.stringify({
+      msgId,
+      msgTurnId,
+      msgAgentId,
+      msgAgentName,
+      fromListFound,
+      activeTurnId: String(activeTurnId ?? ''),
+      shouldOverrideFromGap,
+      gapStrategy: (gapLoaderPresentation as any)?.strategy,
+      base: base
+        ? { displayName: (base as any).displayName, role: (base as any).role, avatarUrl: (base as any).avatarUrl, modelId: (base as any).modelId }
+        : null,
+      final: final
+        ? { displayName: (final as any).displayName, role: (final as any).role, avatarUrl: (final as any).avatarUrl, modelId: (final as any).modelId }
+        : null,
+    })
+    if (streamingIdentityLoggedRef.current === key) return
+    streamingIdentityLoggedRef.current = key
+
+    // #region agent log: streaming message identity merge
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'ConversationMessageList.tsx:streamingIdentityEffect',
+        message: 'Streaming assistant identity (base vs final)',
+        data: JSON.parse(key),
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+  }, [activeRenderedStreamingAssistantId, activeTurnId, agentById, gapLoaderPresentation, renderMessages, resolveAssistantPresentation])
 
   // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
   const lastRenderedMessage: ExtendedMessage | null = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as ExtendedMessage) : null

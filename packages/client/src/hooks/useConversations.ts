@@ -1158,7 +1158,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     spec: Record<string, unknown>
   }
 
-  type TurnState = { turnId: string | null; status: StreamTurnStatus | null; awaitRequested?: AwaitRequested | null }
+  type TurnState = {
+    turnId: string | null
+    status: StreamTurnStatus | null
+    agentId?: string | null
+    agentName?: string | null
+    awaitRequested?: AwaitRequested | null
+  }
   type TurnUsage = {
     turnId: string
     at: string
@@ -1602,6 +1608,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const messageId = chunk.data.messageId
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
+      const agentId = typeof (chunk as any)?.data?.agentId === 'string' ? String((chunk as any).data.agentId).trim() : ''
+      const agentName = typeof (chunk as any)?.data?.agentName === 'string' ? String((chunk as any).data.agentName).trim() : ''
 
       // If there are duplicates (should be prevented, but can occur during edge-case merges),
       // always apply deltas to the LAST occurrence so streaming continues at the tail.
@@ -1626,6 +1634,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           createdAt: now,
           updatedAt: now,
           ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
+          ...(agentId ? { agentId } : null),
+          ...(agentName ? { agentName } : null),
           streaming: true,
         }
         return [...messages, shell]
@@ -1637,6 +1647,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
       cur.updatedAt = now
       cur.streaming = true
+      // Canonical identity stamping (no UI heuristics):
+      // once we learn the agent for this streaming placeholder, persist it on the message record.
+      if (agentId) (cur as any).agentId = agentId
+      if (agentName) (cur as any).agentName = agentName
 
       // If this message came from a snapshot and this is the first delta, REPLACE content instead of appending
       // to avoid stale content from snapshot. Clear the flag after first delta.
@@ -1770,26 +1784,58 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   function reduceTurn(acc: TurnState, chunk: StreamedChunk): TurnState {
     if (chunk.type === 'snapshot') {
-      if (chunk.data.turn) return { turnId: chunk.data.turn.turnId, status: chunk.data.turn.status }
+      if (chunk.data.turn)
+        return {
+          ...acc,
+          turnId: chunk.data.turn.turnId,
+          status: chunk.data.turn.status,
+          agentId: typeof (chunk.data.turn as any)?.agentId === 'string' ? String((chunk.data.turn as any).agentId) : acc.agentId ?? null,
+          agentName: typeof (chunk.data.turn as any)?.agentName === 'string' ? String((chunk.data.turn as any).agentName) : acc.agentName ?? null,
+        }
       return acc
     }
     if (chunk.type === 'turn.started') {
-      return { turnId: chunk.data.turnId, status: 'active' }
+      return {
+        ...acc,
+        turnId: chunk.data.turnId,
+        status: 'active',
+        agentId: typeof (chunk.data as any)?.agentId === 'string' ? String((chunk.data as any).agentId) : acc.agentId ?? null,
+        agentName: typeof (chunk.data as any)?.agentName === 'string' ? String((chunk.data as any).agentName) : acc.agentName ?? null,
+      }
     }
     if (chunk.type === 'turn.status') {
       const data = chunk.data
       const status = data?.status
       if (!status) return acc
-      return { turnId: data?.turnId ?? acc.turnId, status }
+      return { ...acc, turnId: data?.turnId ?? acc.turnId, status }
     }
     if (chunk.type === 'await_requested') {
-      const d: any = chunk.data as any
-      const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString()
-      const nodeRef = typeof d?.nodeRef === 'string' ? String(d.nodeRef) : ''
-      const kind = typeof d?.kind === 'string' ? String(d.kind) : ''
-      const spec = d?.spec && typeof d.spec === 'object' && !Array.isArray(d.spec) ? (d.spec as Record<string, unknown>) : null
+      const d = chunk.data as unknown
+      const rec = d && typeof d === 'object' ? (d as Record<string, unknown>) : null
+      const at = typeof rec?.at === 'string' ? String(rec.at) : new Date().toISOString()
+      const nodeRef = typeof rec?.nodeRef === 'string' ? String(rec.nodeRef) : ''
+      const kind = typeof rec?.kind === 'string' ? String(rec.kind) : ''
+      const specRaw = rec?.spec
+      const spec = specRaw && typeof specRaw === 'object' && !Array.isArray(specRaw) ? (specRaw as Record<string, unknown>) : null
       if (!nodeRef || kind !== 'connector_event' || !spec) return acc
       return { ...acc, awaitRequested: { at, nodeRef, kind: 'connector_event', spec } }
+    }
+    if (chunk.type === 'assistant.delta' || chunk.type === 'assistant.reasoning_delta') {
+      // If the server did not (or could not) emit turn.started with agent identity, learn it from the first delta.
+      const d = (chunk as { data?: unknown }).data
+      const rec = d && typeof d === 'object' ? (d as Record<string, unknown>) : null
+      const tid = typeof rec?.turnId === 'string' ? String(rec.turnId) : ''
+      if (!tid) return acc
+      if (acc.turnId && String(acc.turnId) !== tid) return acc
+      const agentId = typeof rec?.agentId === 'string' ? String(rec.agentId) : ''
+      const agentName = typeof rec?.agentName === 'string' ? String(rec.agentName) : ''
+      if (!agentId && !agentName) return acc
+      return {
+        ...acc,
+        turnId: acc.turnId ?? tid,
+        agentId: agentId || (acc.agentId ?? null),
+        agentName: agentName || (acc.agentName ?? null),
+      }
     }
     // Back-compat for local pre-seed
     if (chunk.type === 'turn_started' && chunk.payload?.local === true) {
@@ -1857,7 +1903,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastReducedChunkCountRef.current = 0
   }, [conversationId])
 
-  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null, awaitRequested: null }), [chunksRevisionKey])
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null, agentId: null, agentName: null, awaitRequested: null }), [chunksRevisionKey])
 
   function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
     if (chunk.type === 'snapshot') {
@@ -2264,6 +2310,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     turnId: turnState.turnId,
     turnStatus: turnState.status,
+    turnAgentId: turnState.agentId ?? null,
+    turnAgentName: turnState.agentName ?? null,
     awaitRequested: turnState.awaitRequested ?? null,
     turnUsageByTurnId,
     lastUIAction,

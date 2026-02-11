@@ -1,6 +1,10 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
+import { useAuth } from '@/hooks/useAuth'
+import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useSyncExternalStore, useCallback, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
 
@@ -8,7 +12,14 @@ function svgToDataUrl(svg: string) {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
-function getFaviconSvg(isDark: boolean, ts: number) {
+function getBadgeLabel(unreadTotal: number): string | null {
+  const n = Number(unreadTotal ?? 0)
+  if (!Number.isFinite(n) || n <= 0) return null
+  if (n > 99) return '99+'
+  return String(Math.floor(n))
+}
+
+function getFaviconSvg(isDark: boolean, ts: number, badgeLabel: string | null) {
   // Match app theme background:
   // - light: hsl(38 30% 97.5%) ≈ #fbf9f7
   // - dark:  hsl(0 0% 0%)     = #000000
@@ -16,6 +27,41 @@ function getFaviconSvg(isDark: boolean, ts: number) {
   const stroke = isDark ? '#ffffff' : '#111827'
   const opacity = isDark ? '1' : '0.75'
   const strokeWidth = '1.25'
+
+  const badge =
+    badgeLabel && badgeLabel.trim().length > 0
+      ? (() => {
+          const label = badgeLabel.trim()
+          const len = label.length
+          // User request: make the badge+number ~3x larger.
+          // In a 24x24 favicon viewBox, truly 3x would clip, so we scale aggressively
+          // but clamp to the maximum size that still fits inside the bounds.
+          const SCALE = 3
+          const baseR = 5.1
+          const maxR = 9.25
+          const r = Math.min(baseR * SCALE, maxR)
+          // Anchor to the bottom-right corner while keeping the full circle inside bounds.
+          const cx = 24 - r
+          const cy = 24 - r
+
+          // Scale font, then clamp so it stays readable within the badge.
+          const rawFontSize = (len === 1 ? 8.75 : len === 2 ? 7.75 : 6.5) * SCALE
+          const maxFontSize = len === 1 ? r * 1.55 : len === 2 ? r * 1.25 : r * 1.05
+          const fontSize = Math.min(rawFontSize, maxFontSize)
+
+          // SVG text vertical centering is inconsistent across engines for tiny fonts.
+          // Use y=center + dy="0.35em" for more stable visual centering.
+          const y = cy
+          const strokeWidth = Math.min(4.5, 1.5 * (r / baseR))
+          const badgeStroke = tile
+          return (
+            `<g>` +
+            `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ef4444" stroke="${badgeStroke}" stroke-width="${strokeWidth}"/>` +
+            `<text x="${cx}" y="${y}" dy="0.35em" text-anchor="middle" fill="#ffffff" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-weight="500" font-size="${fontSize}">${label}</text>` +
+            `</g>`
+          )
+        })()
+      : ''
 
   // Keep this SVG tiny: no whitespace beyond what's needed.
   return (
@@ -31,6 +77,7 @@ function getFaviconSvg(isDark: boolean, ts: number) {
     `<line x1="9" y1="18" x2="7.6" y2="19.4"/>` +
     `</g></svg>`
   )
+    .replace(`</svg>`, `${badge}</svg>`)
 }
 
 function applyAppFavicon(nextHref: string): {
@@ -83,20 +130,125 @@ export function FaviconThemeSync() {
   const { resolvedTheme } = useTheme()
   const pathname = usePathname()
   const currentHrefRef = useRef<string | null>(null)
+  const queryClient = useQueryClient()
+  const { isAuthenticated, user } = useAuth()
+  const [selectedStarshipId, setSelectedStarshipId] = useState<string | null>(null)
+
+  // Keep selectedStarshipId in sync with localStorage + route changes.
+  useEffect(() => {
+    const readSelected = (): string | null => {
+      try {
+        if (typeof window === 'undefined') return null
+        return window.localStorage.getItem('selectedStarshipId')
+      } catch {
+        return null
+      }
+    }
+    const apply = () => setSelectedStarshipId(readSelected())
+    apply()
+    // Cross-tab updates
+    try {
+      window.addEventListener('storage', apply)
+      return () => window.removeEventListener('storage', apply)
+    } catch {
+      return
+    }
+  }, [pathname])
+
+  const pathStarshipSlug = useMemo(() => {
+    const p = typeof pathname === 'string' ? pathname : ''
+    if (!p.startsWith('/ship/')) return null
+    const parts = p.split('/')
+    const slug = parts[2] ? String(parts[2]).trim() : ''
+    return slug || null
+  }, [pathname])
+
+  const { data: starshipFromPath } = useStarshipBySlug(pathStarshipSlug || '', Boolean(isAuthenticated && pathStarshipSlug))
+  const { data: userStarships } = useUserStarships(user?.id || '', Boolean(isAuthenticated && user?.id))
+  const primaryStarship = useMemo(
+    () => pickPrimaryStarshipForUser(userStarships ?? [], user?.id, selectedStarshipId),
+    [userStarships, user?.id, selectedStarshipId]
+  )
+
+  const starshipId = useMemo(() => {
+    const byPath = starshipFromPath?.id ? String(starshipFromPath.id) : null
+    return byPath || selectedStarshipId || (primaryStarship?.id ? String(primaryStarship.id) : null)
+  }, [primaryStarship?.id, selectedStarshipId, starshipFromPath?.id])
+
+  // Prefer live unread counts if an SSE notifications stream is already mounted (e.g. ConversationList).
+  const streamKey = useMemo(() => (starshipId ? NOTIFICATION_QUERY_KEYS.stream(starshipId) : null), [starshipId])
+  const streamChunks = useSyncExternalStore(
+    useCallback(
+      (onStoreChange: () => void) => {
+        if (!streamKey) return () => {}
+        const sameKey = (a: unknown, b: unknown): boolean => {
+          if (!Array.isArray(a) || !Array.isArray(b)) return false
+          if (a.length !== b.length) return false
+          for (let i = 0; i < a.length; i++) if ((a as any)[i] !== (b as any)[i]) return false
+          return true
+        }
+        const cache = queryClient.getQueryCache()
+        const unsub = cache.subscribe(event => {
+          try {
+            const qk = (event as any)?.query?.queryKey
+            if (!sameKey(qk, streamKey)) return
+            onStoreChange()
+          } catch {
+            /* ignore */
+          }
+        })
+        return () => {
+          try {
+            unsub()
+          } catch {
+            /* ignore */
+          }
+        }
+      },
+      [queryClient, streamKey]
+    ),
+    useCallback(() => {
+      if (!streamKey) return null
+      try {
+        const data = queryClient.getQueryData(streamKey)
+        return Array.isArray(data) ? (data as any[]) : null
+      } catch {
+        return null
+      }
+    }, [queryClient, streamKey]),
+    () => null
+  )
+
+  const { data: notifList } = useNotificationsList(starshipId, Boolean(isAuthenticated && starshipId))
+  const unreadTotal = useMemo(() => {
+    const chunks = Array.isArray(streamChunks) ? (streamChunks as any[]) : []
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'notification.state' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+      if (c?.type === 'snapshot' && c?.data?.unread) {
+        const n = Number(c.data.unread.totalUnread ?? 0)
+        return Number.isFinite(n) ? n : 0
+      }
+    }
+    const fallback = Number((notifList as any)?.unread?.totalUnread ?? 0)
+    return Number.isFinite(fallback) ? fallback : 0
+  }, [streamChunks, notifList])
 
   useEffect(() => {
-    const runId = 'post-fix'
-
     const isDark =
       resolvedTheme === 'dark' || (resolvedTheme == null && document.documentElement.classList.contains('dark'))
 
     // Use data URL to avoid Chrome favicon caching/order issues on reload.
     const ts = Date.now()
-    const nextHref = svgToDataUrl(getFaviconSvg(isDark, ts))
+    const badgeLabel = getBadgeLabel(unreadTotal)
+    const nextHref = svgToDataUrl(getFaviconSvg(isDark, ts, badgeLabel))
 
     currentHrefRef.current = nextHref
     applyAppFavicon(nextHref)
-  }, [resolvedTheme, pathname])
+  }, [resolvedTheme, pathname, unreadTotal])
 
   useEffect(() => {
     const observer = new MutationObserver(() => {

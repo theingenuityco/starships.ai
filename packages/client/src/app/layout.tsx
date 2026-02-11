@@ -189,9 +189,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.className} app-gradient-bg`} suppressHydrationWarning>
         <SentryWrapper />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <FaviconThemeSync />
           <QueryProvider>
             <AuthProvider>
+              <FaviconThemeSync />
               <AuthUserHtmlClassSync />
               <UserbackWrapper>
                 <TooltipProvider>

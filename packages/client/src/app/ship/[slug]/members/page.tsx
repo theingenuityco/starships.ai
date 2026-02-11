@@ -198,6 +198,7 @@ export default function MembersPage() {
         statusLabel={presenceText}
       />
     )
+    const chatHref = !isAuthedUser && slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : null
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
@@ -244,6 +245,12 @@ export default function MembersPage() {
             </div>
           </div>
         </div>
+
+        {chatHref ? (
+          <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
+            <Link href={chatHref}>Chat</Link>
+          </Button>
+        ) : null}
       </div>
     )
   }
@@ -305,6 +312,9 @@ export default function MembersPage() {
         updatedAt={typeof a.updatedAt === 'string' ? a.updatedAt : undefined}
       />
     )
+    const detailsHref = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : null
+    const dmPeerKey = agentSlug || (typeof a.id === 'string' && a.id.trim().length > 0 ? `a:${a.id.trim()}` : '')
+    const chatHref = slug && dmPeerKey ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(dmPeerKey)}` : null
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
@@ -325,12 +335,13 @@ export default function MembersPage() {
               <div className="flex items-center gap-2">
                 <HoverProfilePopover
                   trigger={
-                    <button
-                      type="button"
-                      className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}
-                    >
-                      {label.primary}
-                    </button>
+                    detailsHref ? (
+                      <Link href={detailsHref} className={cn('block max-w-full truncate text-sm font-medium text-foreground hover:underline underline-offset-2')}>
+                        {label.primary}
+                      </Link>
+                    ) : (
+                      <span className={cn('block max-w-full truncate text-sm font-medium text-foreground')}>{label.primary}</span>
+                    )
                   }
                   content={agentHoverCard}
                   side="right"
@@ -352,6 +363,12 @@ export default function MembersPage() {
             </div>
           </div>
         </div>
+
+        {chatHref ? (
+          <Button asChild size="sm" variant="ghost" className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground">
+            <Link href={chatHref}>Chat</Link>
+          </Button>
+        ) : null}
       </div>
     )
   }

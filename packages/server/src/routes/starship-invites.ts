@@ -74,7 +74,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       z.object({
         search: z.string().trim().max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }).optional(),
       }),
-      req.query,
+      (req.query ?? {}) as unknown,
       res,
       'search query'
     );
@@ -83,7 +83,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     const searchLower = search ? search.toLowerCase() : null;
 
     const wantsPagination = Object.prototype.hasOwnProperty.call(req.query ?? {}, 'page') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'limit') || Object.prototype.hasOwnProperty.call(req.query ?? {}, 'offset');
-    const paginationQuery = wantsPagination ? validateData(PaginationSchema, req.query, res, 'pagination query') : null;
+    const paginationQuery = wantsPagination ? validateData(PaginationSchema, (req.query ?? {}) as unknown, res, 'pagination query') : null;
     if (wantsPagination && !paginationQuery) return;
     const page = paginationQuery?.page ?? 1;
     const limit = paginationQuery?.limit ?? 50;
@@ -104,25 +104,28 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     const canViewEmails = canViewInvites;
 
     const connection = getConnection();
-    const inviteRowsPromise: Promise<InviteRow[]> = canViewInvites
-      ? connection.query<InviteRow>(
-          search
-            ? `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
-                 FROM starship_invite_tokens
-                WHERE starship_id = $1
-                  AND NOT consumed
-                  AND expires_at > NOW()
-                  AND invited_email ILIKE $2
-                ORDER BY created_at DESC`
-            : `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
-                 FROM starship_invite_tokens
-                WHERE starship_id = $1
-                  AND NOT consumed
-                  AND expires_at > NOW()
-                ORDER BY created_at DESC`,
-          search ? [starshipId, `%${search}%`] : [starshipId]
-          ) as unknown as Promise<InviteRow[]>
-      : Promise.resolve([] as InviteRow[]);
+    const fetchInviteRows = (): Promise<InviteRow[]> => {
+      if (!canViewInvites) return Promise.resolve([] as InviteRow[]);
+      // Defer executing the query until awaited so that unit tests that mock `query()`
+      // with `.mockResolvedValueOnce(...)` can rely on the members-query happening first.
+      return connection.query<InviteRow>(
+        search
+          ? `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+               FROM starship_invite_tokens
+              WHERE starship_id = $1
+                AND NOT consumed
+                AND expires_at > NOW()
+                AND invited_email ILIKE $2
+              ORDER BY created_at DESC`
+          : `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+               FROM starship_invite_tokens
+              WHERE starship_id = $1
+                AND NOT consumed
+                AND expires_at > NOW()
+              ORDER BY created_at DESC`,
+        search ? [starshipId, `%${search}%`] : [starshipId]
+      ) as unknown as Promise<InviteRow[]>;
+    };
 
     const ownerRowPromise = connection.queryOne<{
       email: string | null;
@@ -194,7 +197,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
             [starshipId, `%${search}%`]
           ) as unknown as Promise<MemberRow[]>;
         })(),
-        inviteRowsPromise,
+        fetchInviteRows(),
         ownerRowPromise,
       ]);
 
@@ -240,7 +243,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     // Paginated behavior (opt-in via query params): used by Members page to avoid huge payloads.
     const [inviteRows, ownerRow, memberCountRow] = await Promise.all([
       // Only include invites on the first page (best-effort); Members UI doesn't need them.
-      offset === 0 ? inviteRowsPromise : Promise.resolve([] as InviteRow[]),
+      offset === 0 ? fetchInviteRows() : Promise.resolve([] as InviteRow[]),
       ownerRowPromise,
       (() => {
         if (!search) {

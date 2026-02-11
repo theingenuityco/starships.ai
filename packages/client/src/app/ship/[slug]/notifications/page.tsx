@@ -213,11 +213,6 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button size="sm" variant="secondary" className="h-8" onClick={() => markRead()} disabled={isLoading || !(unread?.totalUnread > 0)}>
-                  Mark all read
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -225,10 +220,10 @@ export default function NotificationsPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pb-6">
+          <div className="pb-8">
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
               <div className="flex justify-start">
-                <TabsList className="w-full sm:w-auto flex-wrap justify-start gap-1">
+                <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="mentions">Mentions</TabsTrigger>
                   <TabsTrigger value="dms">Direct messages</TabsTrigger>
@@ -243,17 +238,38 @@ export default function NotificationsPage() {
           ) : unreadItems.length === 0 && readItems.length === 0 ? (
             <div className="text-sm text-muted-foreground">No notifications yet.</div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-10">
               {unreadItems.length > 0 ? (
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unread</div>
+                  <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Unread</h3>
+                      <span className="text-sm text-muted-foreground tabular-nums">{unreadItems.length}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-primary hover:text-primary"
+                      onClick={() => markRead()}
+                      disabled={isLoading || unreadItems.length === 0}
+                      aria-label="Mark all unread notifications read"
+                    >
+                      <Icon name="check-circle" className="h-4 w-4 mr-1.5" />
+                      Mark all read
+                    </Button>
+                  </div>
                   <div className="space-y-2">{unreadItems.map(renderRow)}</div>
                 </div>
               ) : null}
 
               {readItems.length > 0 ? (
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Read</div>
+                  <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-3">
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Read</h3>
+                      <span className="text-sm text-muted-foreground tabular-nums">{readItems.length}</span>
+                    </div>
+                  </div>
                   <div className="space-y-2">{readItems.map(renderRow)}</div>
                 </div>
               ) : null}

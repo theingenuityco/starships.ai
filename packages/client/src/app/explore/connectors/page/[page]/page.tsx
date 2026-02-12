@@ -38,7 +38,7 @@ export default async function ExploreConnectorsPagedPage(props: PageProps) {
   if (!p) notFound()
   if (p === 1) redirect('/explore/connectors')
 
-  const PAGE_SIZE = 24
+  const PAGE_SIZE = 18
   const [connectorsPage, agentsCountPage, toolsCountPage] = await Promise.all([
     fetchPublicConnectorCatalogPage({ page: p, limit: PAGE_SIZE, revalidateSeconds: revalidate }),
     fetchPublicAgentTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate }),

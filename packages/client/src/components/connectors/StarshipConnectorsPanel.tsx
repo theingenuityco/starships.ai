@@ -1,7 +1,15 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectApiKeyConnector, useConnectBasicAuthConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
+import {
+  useConnectApiKeyConnector,
+  useConnectBasicAuthConnector,
+  useConnectorCatalog,
+  useDisconnectConnector,
+  useInfiniteConnectorCatalog,
+  useStarshipConnectors,
+  useStartOAuthConnector,
+} from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -34,6 +42,15 @@ interface StarshipConnectorsPanelProps {
   hideSearch?: boolean
   /** Optional server-side search query (catalog endpoint supports `q`). */
   catalogQuery?: string
+  /**
+   * When true, fetch the connector catalog via server pagination (page/limit).
+   * Useful when the catalog is large and we don't want to load everything at once.
+   */
+  paginateCatalog?: boolean
+  /** Page size for paginated catalog mode. */
+  catalogPageSize?: number
+  /** Optional callback to surface server catalog total (pagination.total). */
+  onCatalogTotalChange?: (total: number | null) => void
   /** Filter which connectors to show. */
   statusFilter?: 'all' | 'connected' | 'unconnected'
   /**
@@ -109,6 +126,9 @@ export function StarshipConnectorsPanel({
   onlyProviders,
   hideSearch,
   catalogQuery,
+  paginateCatalog = false,
+  catalogPageSize = 24,
+  onCatalogTotalChange,
   statusFilter = 'all',
   layout = 'grid',
   hideDisconnect = false,
@@ -125,7 +145,26 @@ export function StarshipConnectorsPanel({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const q = typeof catalogQuery === 'string' ? catalogQuery.trim() : ''
-  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q })
+  const pagedCatalog = useInfiniteConnectorCatalog({ q, limit: catalogPageSize, enabled: paginateCatalog })
+  const flatPagedCatalog = useMemo(() => {
+    const pages = pagedCatalog.data?.pages ?? []
+    return pages.flatMap(p => (Array.isArray(p?.connectors) ? p.connectors : []))
+  }, [pagedCatalog.data])
+  const pagedTotal = useMemo(() => {
+    const pages = pagedCatalog.data?.pages ?? []
+    for (let i = pages.length - 1; i >= 0; i--) {
+      const t = (pages[i] as any)?.pagination?.total
+      const n = typeof t === 'number' ? t : Number(t)
+      if (Number.isFinite(n)) return n
+    }
+    return null
+  }, [pagedCatalog.data])
+
+  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q, enabled: !paginateCatalog })
+  const catalogItems = paginateCatalog ? flatPagedCatalog : catalog
+  const isCatalogFetchingUnified = paginateCatalog ? pagedCatalog.isFetching : isCatalogFetching
+  const canLoadMoreCatalog = paginateCatalog ? Boolean(pagedCatalog.hasNextPage) : false
+  const isLoadingMoreCatalog = paginateCatalog ? Boolean(pagedCatalog.isFetchingNextPage) : false
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
@@ -336,13 +375,13 @@ export function StarshipConnectorsPanel({
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
-    const base = catalog.filter(item => item.provider !== 'starships')
+    const base = (catalogItems || []).filter(item => item.provider !== 'starships')
     if (Array.isArray(onlyProviders) && onlyProviders.length > 0) {
       const allow = new Set(onlyProviders.map(p => String(p)))
       return base.filter(item => allow.has(String(item.provider)))
     }
     return base
-  }, [catalog, onlyProviders])
+  }, [catalogItems, onlyProviders])
 
   const connectedProviderSet = useMemo(() => {
     return new Set((connectors ?? []).filter(c => (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
@@ -379,12 +418,18 @@ export function StarshipConnectorsPanel({
     return visibleCatalog.find((c: { provider: string }) => c.provider === provider)?.name ?? provider
   }
 
-  const isSearching = Boolean(q) && isCatalogFetching
-  const isInitialCatalogLoading = !q && isCatalogFetching && catalog.length === 0
+  const isSearching = Boolean(q) && isCatalogFetchingUnified
+  const isInitialCatalogLoading = !q && isCatalogFetchingUnified && catalogItems.length === 0
   const isPanelLoading = isLoading || isInitialCatalogLoading
 
-  const sectionTitle = statusFilter === 'connected' ? 'Connected' : statusFilter === 'unconnected' ? 'Unconnected' : 'All connectors'
-  const sectionCount = filteredCatalog.length
+  const lastCatalogTotalRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!onCatalogTotalChange) return
+    const next = paginateCatalog ? pagedTotal : visibleCatalog.length
+    if (lastCatalogTotalRef.current === next) return
+    lastCatalogTotalRef.current = next
+    onCatalogTotalChange(next)
+  }, [onCatalogTotalChange, paginateCatalog, pagedTotal, visibleCatalog.length])
 
   const renderConnectorRowSkeleton = (key: string) => {
     return (
@@ -429,12 +474,6 @@ export function StarshipConnectorsPanel({
   if (isPanelLoading && layout === 'list') {
     return (
       <div>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-baseline gap-3">
-            <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
-            <Skeleton className="h-4 w-8" />
-          </div>
-        </div>
         <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderConnectorRowSkeleton(`connector-skel-${i}`))}</div>
       </div>
     )
@@ -810,11 +849,6 @@ export function StarshipConnectorsPanel({
     <div className="space-y-6">
       {layout === 'list' ? (
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex items-baseline gap-3">
-              <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
-            </div>
-          </div>
           {isSearching ? (
             renderCenteredState(`Searching “${q}”…`)
           ) : filteredCatalog.length === 0 ? (
@@ -822,6 +856,20 @@ export function StarshipConnectorsPanel({
           ) : (
             <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
           )}
+          {paginateCatalog && canLoadMoreCatalog ? (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void pagedCatalog.fetchNextPage()
+                }}
+                disabled={isLoadingMoreCatalog}
+                className="h-8"
+              >
+                {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
@@ -831,6 +879,20 @@ export function StarshipConnectorsPanel({
             renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
           ) : null}
           <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+          {paginateCatalog && canLoadMoreCatalog ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void pagedCatalog.fetchNextPage()
+                }}
+                disabled={isLoadingMoreCatalog}
+                className="h-8"
+              >
+                {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 

@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -60,6 +61,12 @@ interface StarshipConnectorsPanelProps {
   /** Override connect button label (e.g. "Connect" instead of "Connect Gmail"). */
   connectButtonLabel?: string
   /**
+   * Controls the visual style of connector cards in grid layout.
+   * - panel: existing connectors/settings card design
+   * - explore: match the public Explore connector listing card design
+   */
+  cardVariant?: 'panel' | 'explore'
+  /**
    * Use the same card background/border as onboarding step 3 agent cards
    * (e.g. bg-card/10, border-border/40) for visual consistency.
    */
@@ -98,6 +105,7 @@ export function StarshipConnectorsPanel({
   hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
+  cardVariant = 'panel',
   matchAgentCardStyle = false,
   onStatsChange,
 }: StarshipConnectorsPanelProps) {
@@ -445,6 +453,98 @@ export function StarshipConnectorsPanel({
     const showLogo = !!provider && !hiddenLogos[provider]
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
+
+    if (cardVariant === 'explore') {
+      const exploreConnectButton = (
+        <Button
+          variant={isConnected ? 'ghost' : 'ghost'}
+          size="sm"
+          disabled={
+            oauthMutation.isPending ||
+            apiKeyMutation.isPending ||
+            basicMutation.isPending ||
+            isManaged ||
+            (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) ||
+            isConnected
+          }
+          onClick={() => {
+            if (isConnected) return
+            if (isManaged) return
+            if (isOauthConnectable) return void handleConnect(provider)
+            if (isApiKeyConnectable) return openApiKeyDialog(provider)
+            if (isBasicConnectable) return openBasicDialog(provider)
+          }}
+          className={cn(
+            'h-7 px-2 shrink-0 text-xs',
+            isConnected
+              ? 'text-emerald-700 dark:text-emerald-300 opacity-100'
+              : 'text-primary hover:text-primary disabled:text-muted-foreground'
+          )}
+        >
+          {isConnected ? (
+            <>
+              <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
+              Connected
+            </>
+          ) : isManaged ? (
+            'Managed by platform'
+          ) : (
+            (connectButtonLabel ?? 'Connect')
+          )}
+        </Button>
+      )
+
+      const exploreDisconnectButton = canDisconnect ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openDisconnectConfirm(provider)}
+          disabled={disconnectMutation.isPending}
+          className="h-7 px-2 shrink-0 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
+          Disconnect
+        </Button>
+      ) : null
+
+      return (
+        <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+          <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
+            <div className="flex">
+              {/* Left logo strip (edge-to-edge), matching Explore listing */}
+              <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {provider ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                      <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">
+                      <Icon name="plug" className="h-4.5 w-4.5" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right content */}
+              <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+                <div className="min-w-0">
+                  <div className="text-base font-semibold leading-tight truncate">{label}</div>
+                </div>
+
+                {!hideCardDescription && catalogItem.description ? (
+                  <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+                ) : null}
+
+                <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                  {exploreDisconnectButton}
+                  {!shouldHideConnectButton ? exploreConnectButton : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )
+    }
 
     const connectButton = (
       <Button

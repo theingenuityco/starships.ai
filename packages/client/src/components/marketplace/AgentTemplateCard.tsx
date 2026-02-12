@@ -241,13 +241,13 @@ export function AgentTemplateCard({
                           const showLogo = !hiddenLogos[provider]
                           const logoSrc = getConnectorLogoSrc(provider)
                           return (
-                            <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
+                            <div key={provider} className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white border border-border/40" title={name}>
                               {showLogo ? (
                                 <Image
                                   src={logoSrc}
                                   alt=""
-                                  width={14}
-                                  height={14}
+                                  width={12}
+                                  height={12}
                                   className="object-contain"
                                   onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                                 />

@@ -351,7 +351,7 @@ export default function MarketplacePageClient(props: {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {agentsMatchingSearch.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
                             <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                              <AgentTemplateCard template={template} density="compact" onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                              <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={false} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                             </motion.div>
                           ))}
                         </div>
@@ -413,7 +413,7 @@ export default function MarketplacePageClient(props: {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
                       <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                        <AgentTemplateCard template={template} density="compact" onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                        <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={false} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                       </motion.div>
                     ))}
                   </div>

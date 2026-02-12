@@ -244,7 +244,7 @@ export default function MarketplacePageClient(props: {
                     className={
                       // Match ConversationMessageInput "minimal/compact" composer styling:
                       // bg + border + shadow + focus border. Keep rounded edges on all breakpoints.
-                      'relative transition-all overflow-visible bg-card shadow-sm border border-border/80 rounded-2xl focus-within:border-primary/70'
+                      'relative transition-all overflow-visible bg-card shadow-sm border border-border/80 rounded-full focus-within:border-primary/70'
                     }
                   >
                     <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">

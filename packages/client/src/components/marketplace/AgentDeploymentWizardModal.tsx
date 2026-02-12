@@ -409,18 +409,11 @@ export function AgentDeploymentWizardModal({
               ) : null}
 
               {step === 2 ? (
-                <div className="mt-5 space-y-6">
-                  <div className="flex items-center gap-2">
-                    <Icon name="wrench" className="h-4 w-4 text-primary" />
-                    <div className="text-sm font-semibold">Suggested tools</div>
-                    <Badge variant="outline" className="text-xs">
-                      {assignedToolSlugs.length}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">(permissions can be changed later)</span>
-                  </div>
+                <div className="mt-8 space-y-2">
+                  <div className="text-sm font-semibold">Suggested tools</div>
 
                   {assignedToolSlugs.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                       {assignedToolSlugs.map(slug => {
                         const info = toolTemplateBySlug.get(slug)
                         const title = info?.name?.trim() || slug
@@ -430,9 +423,6 @@ export function AgentDeploymentWizardModal({
                           <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3 min-w-0">
-                                <div className="mt-1.5 flex-shrink-0">
-                                  <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
-                                </div>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2 min-w-0">
                                     <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
@@ -451,6 +441,7 @@ export function AgentDeploymentWizardModal({
                                       </TooltipContent>
                                     </Tooltip>
                                   </div>
+                                  {desc ? <div className="mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-1">{desc}</div> : null}
                                 </div>
                               </div>
 
@@ -504,6 +495,8 @@ export function AgentDeploymentWizardModal({
                       <p className="mt-1 text-sm text-muted-foreground">This agent doesn’t require any tools to be deployed.</p>
                     </div>
                   )}
+
+                  <div className="pt-1 text-xs text-muted-foreground italic">Note: Permissions can be changed later.</div>
                 </div>
               ) : null}
 

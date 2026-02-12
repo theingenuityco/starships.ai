@@ -607,12 +607,14 @@ export function AgentDeploymentWizardModal({
               <div className="flex items-center gap-2">
                 {step > 1 ? (
                   <Button type="button" variant="ghost" onClick={handleBack} disabled={isProcessing}>
-                    ← Back
+                    <Icon name="caret-left" className="h-4 w-4 mr-1" />
+                    Back
                   </Button>
                 ) : null}
                 {step < 4 ? (
                   <Button type="button" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
-                    Next →
+                    Next
+                    <Icon name="caret-right" className="h-4 w-4 ml-1" />
                   </Button>
                 ) : (
                   <Button type="button" onClick={handleDeploy} disabled={isProcessing || !selectedStarship} className="min-w-[140px]">

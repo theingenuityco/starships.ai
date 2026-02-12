@@ -68,7 +68,7 @@ export function PublicHeader(): React.JSX.Element {
             className={`${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
             aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
           >
-            Marketplace
+            Explore
           </Link>
           <Link
             href="/login"
@@ -117,7 +117,7 @@ export function PublicHeader(): React.JSX.Element {
                 }}
                 className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
-                Marketplace
+                Explore
               </Link>
               <Link
                 href="/login"

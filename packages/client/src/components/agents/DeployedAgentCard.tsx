@@ -127,7 +127,7 @@ export function DeployedAgentCard({
   const statusMeta = useMemo(() => {
     if (isTemplateAgent) {
       return {
-        label: 'From Marketplace',
+        label: 'From Explore',
         iconName: 'store',
       }
     }

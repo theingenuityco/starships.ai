@@ -95,12 +95,12 @@ export function useRevalidateMarketplaceMarketingCaches() {
       return response.data.data
     },
     onSuccess: () => {
-      toast.success('Revalidated marketplace cache')
+      toast.success('Revalidated Explore cache')
     },
     onError: (error: unknown) => {
       const err = error as { response?: { data?: { error?: string } }; message?: string }
-      const message = err?.response?.data?.error || err?.message || 'Failed to revalidate marketplace cache'
-      toast.error('Failed to revalidate marketplace cache', { description: message })
+      const message = err?.response?.data?.error || err?.message || 'Failed to revalidate Explore cache'
+      toast.error('Failed to revalidate Explore cache', { description: message })
     },
   })
 }

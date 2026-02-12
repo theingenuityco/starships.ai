@@ -74,10 +74,10 @@ function getAgentLabel(a: AgentWithAvatar): { primary: string; secondary?: strin
 
 function getAgentMarketplaceStatus(a: AgentWithAvatar): { label: string; className: string } {
   const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
-  if (fromMarketplace) return { label: 'Deployed from Marketplace', className: 'text-muted-foreground' }
+  if (fromMarketplace) return { label: 'Deployed from Explore', className: 'text-muted-foreground' }
 
   const status = a.publicationStatus
-  if (status === 'published') return { label: 'Published to Marketplace', className: 'text-muted-foreground' }
+  if (status === 'published') return { label: 'Published to Explore', className: 'text-muted-foreground' }
   if (status === 'pending_approval') return { label: 'Publish pending', className: 'text-muted-foreground' }
   if (status === 'rejected') return { label: 'Publish rejected', className: 'text-destructive' }
   return { label: 'Private', className: 'text-muted-foreground' }
@@ -934,7 +934,7 @@ export default function MembersPage() {
                   : confirmAction?.kind === 'deleteAgent'
                     ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
                     : confirmAction?.kind === 'unpublishAgent'
-                      ? 'This will remove the agent from the Marketplace (it will stay deployed in your starship).'
+                      ? 'This will remove the agent from Explore (it will stay deployed in your starship).'
                       : ''}
             </DialogDescription>
           </DialogHeader>

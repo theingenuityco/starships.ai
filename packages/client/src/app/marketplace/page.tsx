@@ -8,7 +8,7 @@ export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
 
 export const metadata: Metadata = {
-  title: 'Marketplace | Starships.ai',
+  title: 'Explore | Starships.ai',
   description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
   alternates: {
     canonical: 'https://starships.ai/marketplace',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Marketplace | Starships.ai',
+    title: 'Explore | Starships.ai',
     description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
     url: 'https://starships.ai/marketplace',
     locale: 'en_US',
@@ -34,13 +34,13 @@ export const metadata: Metadata = {
         url: '/static-assets/og.jpg',
         width: 1200,
         height: 630,
-        alt: 'Starships.ai Marketplace',
+        alt: 'Starships.ai Explore',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Marketplace | Starships.ai',
+    title: 'Explore | Starships.ai',
     description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
     images: ['/static-assets/og.jpg'],
   },

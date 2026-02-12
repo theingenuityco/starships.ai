@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
@@ -291,10 +292,10 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
               {/* Breadcrumb */}
               <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
-                <a href="/explore" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
+                <Link href="/explore" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
                   <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
                   <span>Explore</span>
-                </a>
+                </Link>
                 <span className="opacity-60">/</span>
                 <span className="text-foreground/80 truncate max-w-[40ch]">{template.name}</span>
               </div>

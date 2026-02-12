@@ -32,6 +32,8 @@ interface AgentTemplateCardProps {
    * - compact: tighter layout for Explore list pages
    */
   density?: 'default' | 'compact'
+  /** Show/hide the category badge. Defaults to true. */
+  showCategory?: boolean
   /**
    * Optional override: deploy/compare against a specific starship instead of the user's primary starship.
    * Useful for inline widgets embedded in a specific starship context (e.g. onboarding).
@@ -44,7 +46,15 @@ interface AgentTemplateCardProps {
   showDeployCta?: boolean
 }
 
-export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId, density = 'default' }: AgentTemplateCardProps) {
+export function AgentTemplateCard({
+  template,
+  onDeploy,
+  onClick,
+  showDeployCta = true,
+  targetStarshipId,
+  density = 'default',
+  showCategory = true,
+}: AgentTemplateCardProps) {
   const compact = density === 'compact'
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
@@ -223,33 +233,37 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
             <div className="min-w-0 flex-1 flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-base font-semibold leading-tight truncate">{displayName || 'Unnamed agent'}</div>
-                  {displayRole ? <div className="mt-0.5 text-xs text-muted-foreground truncate">{displayRole}</div> : null}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="min-w-0 flex-1 text-base font-semibold leading-tight truncate">{displayRole || displayName || 'Unnamed agent'}</div>
+                    {requiredConnectors.length > 0 ? (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {requiredConnectors.slice(0, 4).map(({ provider, name }) => {
+                          const showLogo = !hiddenLogos[provider]
+                          const logoSrc = getConnectorLogoSrc(provider)
+                          return (
+                            <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
+                              {showLogo ? (
+                                <Image
+                                  src={logoSrc}
+                                  alt=""
+                                  width={14}
+                                  height={14}
+                                  className="object-contain"
+                                  onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                                />
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                        {requiredConnectors.length > 4 ? (
+                          <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectors.length - 4}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {displayRole ? <div className="mt-0.5 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}
 
-                  {requiredConnectors.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                      {requiredConnectors.map(({ provider, name }) => {
-                        const showLogo = !hiddenLogos[provider]
-                        const logoSrc = getConnectorLogoSrc(provider)
-                        return (
-                          <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
-                            {showLogo ? (
-                              <Image
-                                src={logoSrc}
-                                alt=""
-                                width={14}
-                                height={14}
-                                className="object-contain"
-                                onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                              />
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : null}
-
-                  {template.category ? (
+                  {showCategory && template.category ? (
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="capitalize border-border/60 bg-background/30 text-[11px] px-2 py-0.5">
                         {template.category}
@@ -342,7 +356,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
               </div>
 
               <div className="mt-3 flex items-center gap-2 flex-wrap">
-                {template.category ? (
+                {showCategory && template.category ? (
                   <Badge variant="outline" className="capitalize border-border/60 bg-background/40">
                     {template.category}
                   </Badge>

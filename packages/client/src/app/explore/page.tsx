@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicExplorePopular, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -41,12 +41,16 @@ export default async function ExplorePage(props: PageProps) {
     fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
   ])
 
+  const popular = await fetchPublicExplorePopular({ revalidateSeconds: revalidate, windowDays: 30, limitAgents: 6, limitTools: 6 })
+
   return (
     <MarketplacePageClient
       activeTab="all"
       initialAgentTemplates={agentTemplates}
       initialToolTemplates={toolTemplates}
       initialConnectorCatalog={connectorCatalog}
+      initialPopularAgents={popular.agents}
+      initialPopularTools={popular.tools}
     />
   )
 }

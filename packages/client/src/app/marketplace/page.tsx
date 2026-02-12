@@ -20,7 +20,9 @@ export default async function MarketplaceRedirectPage(props: PageProps) {
   const searchParams = (await props.searchParams) ?? {}
   const tabRaw = searchParams?.tab
   const tab = typeof tabRaw === 'string' ? tabRaw : Array.isArray(tabRaw) ? tabRaw[0] : ''
-  const t = String(tab || '').trim().toLowerCase()
+  const t = String(tab || '')
+    .trim()
+    .toLowerCase()
   const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : t === 'connectors' ? '/explore/connectors' : '/explore'
   redirect(`${dest}${toQueryString(searchParams)}`)
 }

@@ -15,6 +15,7 @@ import { MarketplaceShareLinkCard } from '@/app/marketplace/agents/MarketplaceSh
 import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import { CapabilitiesLegendTooltip } from '@/app/marketplace/agents/[slug]/CapabilitiesLegendTooltip'
+import FinalCTA from '@/app/components/FinalCTA'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -489,6 +490,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
         </div>
       </main>
 
+      <FinalCTA />
       <div
         suppressHydrationWarning
         className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent"

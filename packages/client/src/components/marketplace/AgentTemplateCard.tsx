@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCreateAgentFromTemplate, useRequiredConnectors } from '@/hooks/useTemplates'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
+import { useStarshipsForDeploySelection, useStarship } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import { AgentDeploymentWizardModal } from './AgentDeploymentWizardModal'
@@ -60,10 +60,7 @@ function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = tr
     if (!explicitStarship) return null
     return { id: explicitStarship.id, slug: explicitStarship.slug ?? '', name: explicitStarship.name ?? '' }
   }, [explicitStarship])
-  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', {
-    enabled: !!userId,
-    explicitStarship: targetStarshipId ? explicitDeployOption : undefined,
-  })
+  const { deployStarships, primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
   const starship = targetStarshipId ? (explicitStarship ?? { id: targetStarshipId, slug: '', name: '' }) : primaryStarship
 
   // Get deployed agents to check if this template is already deployed
@@ -393,7 +390,7 @@ function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = tr
         starshipName={(starship as { name?: string })?.name || 'Unknown Starship'}
         starshipId={starship?.id}
         starshipSlug={(starship as { slug?: string })?.slug}
-        ownedStarships={ownedStarships}
+        ownedStarships={deployStarships}
       />
     </>
   )

@@ -11,7 +11,7 @@ import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
+import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -33,7 +33,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
-  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
+  const { deployStarships, primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -193,7 +193,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
-        ownedStarships={ownedStarships}
+        ownedStarships={deployStarships}
       />
     </Dialog>
   )

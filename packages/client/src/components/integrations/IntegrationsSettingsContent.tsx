@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { useInfiniteConnectorCatalog } from '@/hooks/useConnectors'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
@@ -241,15 +242,73 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const isSearchActive = debouncedQuery.trim().length > 0
 
+  // Fetch connector catalog total for the Connectors tab badge (and counts),
+  // even when the connectors panel isn't mounted (e.g. hard reload on Agents tab).
+  const connectorCatalogTotalQuery = useInfiniteConnectorCatalog({
+    q: debouncedQuery,
+    limit: 1,
+    enabled: canManageConnectors,
+  })
+  const connectorCatalogTotal = useMemo<number | null>(() => {
+    const pages = connectorCatalogTotalQuery.data?.pages ?? []
+    for (let i = pages.length - 1; i >= 0; i--) {
+      const t = (pages[i] as any)?.pagination?.total
+      const n = typeof t === 'number' ? t : Number(t)
+      if (Number.isFinite(n)) return n
+    }
+    return null
+  }, [connectorCatalogTotalQuery.data])
+
+  const agentsTotalForBadges = useMemo<number | null>(() => {
+    if (typeof agentsPagination?.total === 'number') return agentsPagination.total
+    if (!agentsQuery.isLoading) return agents.length
+    return null
+  }, [agents.length, agentsPagination?.total, agentsQuery.isLoading])
+
+  const automationsTotalForBadges = useMemo<number | null>(() => {
+    if (typeof toolsPagination?.total === 'number') return toolsPagination.total
+    if (!toolsQuery.isLoading) return tools.length
+    return null
+  }, [tools.length, toolsPagination?.total, toolsQuery.isLoading])
+
+  const connectorsTotalForBadges = useMemo<number | null>(() => {
+    if (!canManageConnectors) return 0
+    if (typeof connectorCatalogTotal === 'number') return connectorCatalogTotal
+    if (typeof catalogTotal === 'number') return catalogTotal
+    if (typeof totalConnectors === 'number') return totalConnectors
+    return null
+  }, [canManageConnectors, catalogTotal, connectorCatalogTotal, totalConnectors])
+
+  const allTabTotalForBadges = useMemo<number | null>(() => {
+    if (typeof agentsTotalForBadges !== 'number') return null
+    if (typeof automationsTotalForBadges !== 'number') return null
+    if (!canManageConnectors) return agentsTotalForBadges + automationsTotalForBadges
+    if (typeof connectorsTotalForBadges !== 'number') return null
+    return agentsTotalForBadges + automationsTotalForBadges + connectorsTotalForBadges
+  }, [agentsTotalForBadges, automationsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
+
   // IMPORTANT: During search on the All tab, we hide empty sections.
   // For connectors, the "emptiness" signal (catalog total) is emitted by `StarshipConnectorsPanel`.
   // If we hide the section based on a stale 0 from a previous query, the panel never mounts,
   // so it can never fetch and update totals => deadlock.
-  // Reset totals on query changes so "unknown" stays visible until the latest fetch resolves.
+  // Reset totals on All-tab query changes so "unknown" stays visible until the latest fetch resolves.
+  // Do NOT reset merely when switching tabs (would make the connector count badge flash/disappear).
+  const lastAllTabQueryRef = useRef<string>(debouncedQuery)
+  const lastIsAllTabRef = useRef<boolean>(isAllTab)
   useEffect(() => {
+    const prevQuery = lastAllTabQueryRef.current
+    const prevIsAllTab = lastIsAllTabRef.current
+    lastAllTabQueryRef.current = debouncedQuery
+    lastIsAllTabRef.current = isAllTab
+
+    if (!isAllTab) return
+    const isEnteringAllTab = prevIsAllTab !== isAllTab && isAllTab === true
+    const queryChanged = debouncedQuery !== prevQuery
+    if (isEnteringAllTab && !queryChanged) return
+
     setCatalogTotal(null)
     setConnectorStats(null)
-  }, [debouncedQuery, tabFromUrl])
+  }, [debouncedQuery, isAllTab])
 
   const baseShowAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
   const baseShowAutomations = tabFromUrl === 'all' || tabFromUrl === 'automations'
@@ -273,9 +332,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (!baseShowConnectors) return false
     if (!isAllTab || !isSearchActive) return true
     // Prefer server total when available; otherwise keep visible until the panel reports a total.
+    if (typeof connectorCatalogTotal === 'number') return connectorCatalogTotal > 0
     if (typeof catalogTotal === 'number') return catalogTotal > 0
     return true
-  }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive])
+  }, [baseShowConnectors, catalogTotal, connectorCatalogTotal, isAllTab, isSearchActive])
 
   const q = debouncedQuery.trim()
   const isInitialAgentsLoading = !q && Boolean(agentsQuery.isLoading)
@@ -545,6 +605,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <TabsTrigger value="all">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
+                        {typeof allTabTotalForBadges === 'number' ? (
+                          <Badge variant={tabFromUrl === 'all' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
+                            {allTabTotalForBadges}
+                          </Badge>
+                        ) : null}
                       </span>
                     </TabsTrigger>
                     <TabsTrigger value="agents">
@@ -571,7 +636,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       <TabsTrigger value="connectors">
                         <span className="inline-flex items-center gap-1.5">
                           <span>Connectors</span>
-                          {typeof catalogTotal === 'number' ? (
+                          {typeof connectorCatalogTotal === 'number' ? (
+                            <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
+                              {connectorCatalogTotal}
+                            </Badge>
+                          ) : typeof catalogTotal === 'number' ? (
                             <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                               {catalogTotal}
                             </Badge>
@@ -675,7 +744,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Connectors</h3>
-                      {typeof catalogTotal === 'number' ? (
+                      {typeof connectorCatalogTotal === 'number' ? (
+                        <span className="text-xs text-muted-foreground tabular-nums">({connectorCatalogTotal})</span>
+                      ) : typeof catalogTotal === 'number' ? (
                         <span className="text-xs text-muted-foreground tabular-nums">({catalogTotal})</span>
                       ) : typeof totalConnectors === 'number' ? (
                         <span className="text-xs text-muted-foreground tabular-nums">({totalConnectors})</span>

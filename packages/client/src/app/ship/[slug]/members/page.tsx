@@ -111,16 +111,15 @@ export default function MembersPage() {
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
 
+  const SEARCH_DEBOUNCE_MS = 400
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    const handle = window.setTimeout(() => {
-      setDebouncedSearch(searchText.trim())
-    }, 250)
+    const handle = window.setTimeout(() => setDebouncedSearch(searchText.trim()), SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(handle)
-  }, [searchText])
+  }, [SEARCH_DEBOUNCE_MS, searchText])
 
   useEffect(() => {
     if (!inviteOpen) return

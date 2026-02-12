@@ -102,12 +102,13 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
         {compact ? (
           <div className="flex">
             {/* Left fixed strip (edge-to-edge): connector logos or flow icon */}
-            <div className="relative w-20 shrink-0 overflow-hidden bg-muted/30">
-              <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.10),transparent_55%)]">
+            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 flex items-center justify-center">
                 {requiredConnectorProviders.length > 0 ? (
                   <div className="flex flex-col items-center gap-1.5">
-                    <div className="grid grid-cols-2 gap-1">
-                      {requiredConnectorProviders.slice(0, 4).map(provider => {
+                    {(() => {
+                      const providers = requiredConnectorProviders.slice(0, 4)
+                      const renderLogo = (provider: string) => {
                         const showLogo = !hiddenLogos[provider]
                         const logoSrc = getConnectorLogoSrc(provider)
                         return (
@@ -124,8 +125,17 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                             ) : null}
                           </div>
                         )
-                      })}
-                    </div>
+                      }
+
+                      if (providers.length === 1) {
+                        return <div className="flex items-center justify-center">{renderLogo(providers[0])}</div>
+                      }
+                      if (providers.length === 2) {
+                        return <div className="flex items-center justify-center gap-1">{providers.map(renderLogo)}</div>
+                      }
+                      // 3–4: use a 2x2 grid
+                      return <div className="grid grid-cols-2 gap-1 place-items-center">{providers.map(renderLogo)}</div>
+                    })()}
                     {requiredConnectorProviders.length > 4 ? (
                       <div className="text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div>
                     ) : null}

@@ -398,11 +398,7 @@ export function StarshipConnectorsPanel({
 
   const connectedCount = useMemo(() => {
     const providerSet = new Set(visibleCatalog.map(c => String(c.provider)))
-    const connectedProviders = new Set(
-      (connectors ?? [])
-        .filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected')
-        .map(c => String((c as any)?.provider))
-    )
+    const connectedProviders = new Set((connectors ?? []).filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
     return connectedProviders.size
   }, [connectors, visibleCatalog])
 
@@ -541,14 +537,7 @@ export function StarshipConnectorsPanel({
         <Button
           variant={isConnected ? 'ghost' : 'ghost'}
           size="sm"
-          disabled={
-            oauthMutation.isPending ||
-            apiKeyMutation.isPending ||
-            basicMutation.isPending ||
-            isManaged ||
-            (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) ||
-            isConnected
-          }
+          disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
           onClick={() => {
             if (isConnected) return
             if (isManaged) return
@@ -556,12 +545,7 @@ export function StarshipConnectorsPanel({
             if (isApiKeyConnectable) return openApiKeyDialog(provider)
             if (isBasicConnectable) return openBasicDialog(provider)
           }}
-          className={cn(
-            'h-7 px-2 shrink-0 text-xs',
-            isConnected
-              ? 'text-emerald-700 dark:text-emerald-300 opacity-100'
-              : 'text-primary hover:text-primary disabled:text-muted-foreground'
-          )}
+          className={cn('h-7 px-2 shrink-0 text-xs', isConnected ? 'text-emerald-700 dark:text-emerald-300 opacity-100' : 'text-primary hover:text-primary disabled:text-muted-foreground')}
         >
           {isConnected ? (
             <>
@@ -613,9 +597,7 @@ export function StarshipConnectorsPanel({
                 </div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? (
-                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
-              ) : null}
+              {!hideCardDescription && catalogItem.description ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
             </div>
           </div>
         )
@@ -655,9 +637,7 @@ export function StarshipConnectorsPanel({
                 <div className="text-base font-semibold leading-tight truncate">{label}</div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? (
-                <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
-              ) : null}
+              {!hideCardDescription && catalogItem.description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
 
               <div className="mt-auto pt-3 flex items-center justify-end gap-2">
                 {exploreDisconnectButton}
@@ -697,7 +677,7 @@ export function StarshipConnectorsPanel({
           ? 'Managed by platform'
           : isOauthConnectable
             ? isConnected
-              ? connectButtonLabel ?? `Connect ${label}`
+              ? (connectButtonLabel ?? `Connect ${label}`)
               : (connectButtonLabel ?? `Connect ${label}`)
             : isApiKeyConnectable
               ? isConnected
@@ -821,7 +801,7 @@ export function StarshipConnectorsPanel({
       </Button>
     ) : null
 
-    const cta = isConnected ? disconnectButton ?? connectButton : connectButton
+    const cta = isConnected ? (disconnectButton ?? connectButton) : connectButton
 
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -850,9 +830,7 @@ export function StarshipConnectorsPanel({
                 <span
                   className={cn(
                     'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                    isConnected
-                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                      : 'border-border/50 bg-muted/20 text-muted-foreground'
+                    isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-border/50 bg-muted/20 text-muted-foreground'
                   )}
                   aria-label={isConnected ? 'Connected' : 'Not connected'}
                   title={isConnected ? 'Connected' : 'Not connected'}
@@ -867,9 +845,7 @@ export function StarshipConnectorsPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 self-center">
-          {!shouldHideConnectButton ? cta : null}
-        </div>
+        <div className="flex items-center gap-1 self-center">{!shouldHideConnectButton ? cta : null}</div>
       </div>
     )
   }
@@ -903,11 +879,7 @@ export function StarshipConnectorsPanel({
         </div>
       ) : (
         <div className="space-y-4">
-          {isSearching ? (
-            renderCenteredState(`Searching “${q}”…`)
-          ) : filteredCatalog.length === 0 ? (
-            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
-          ) : null}
+          {isSearching ? renderCenteredState(`Searching “${q}”…`) : filteredCatalog.length === 0 ? renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.') : null}
           <div className={gridClassName}>{renderedCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
           {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
             <div className="flex justify-center pt-2">

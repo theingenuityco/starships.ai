@@ -101,16 +101,18 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
       <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
         {compact ? (
           <div className="flex">
-            {/* Compact content (logos inline after name) */}
-            <div className="min-w-0 flex-1 flex flex-col p-4">
-              <div className="min-w-0">
-                <div className="flex items-start justify-between gap-3 min-w-0">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-base font-semibold leading-tight truncate">{displayName}</div>
-                    {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
-                  </div>
-                </div>
+            {/* Left fixed strip (edge-to-edge): tools/capabilities icon */}
+            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Icon name="magic-wand" className="h-8 w-8 text-muted-foreground" title="Tools" />
+              </div>
+            </div>
 
+            {/* Right content */}
+            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-tight truncate">{displayName}</div>
+                {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
               </div>
 
               {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
@@ -130,8 +132,8 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                                 <Image
                                   src={logoSrc}
                                   alt=""
-                                  width={12}
-                                  height={12}
+                                  width={14}
+                                  height={14}
                                   className="object-contain"
                                   onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                                 />
@@ -143,11 +145,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                           <div className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div>
                         ) : null}
                       </>
-                    ) : (
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Flow">
-                        <Icon name="workflow" className="h-3.5 w-3.5" />
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {showInstallCta ? (

@@ -255,8 +255,8 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                                 <Image
                                   src={logoSrc}
                                   alt=""
-                                  width={12}
-                                  height={12}
+                                  width={14}
+                                  height={14}
                                   className="object-contain"
                                   onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                                 />

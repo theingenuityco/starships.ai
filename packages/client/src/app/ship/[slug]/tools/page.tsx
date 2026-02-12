@@ -146,7 +146,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
           <div className="w-full max-w-6xl mx-auto space-y-8">
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <Icon name="wrench" className="h-6 w-6 text-primary" />
+                <Icon name="magic-wand" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Tools</h1>
               </div>
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
@@ -176,7 +176,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
               ) : starshipTools.length === 0 ? (
                 <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
                   <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Icon name="wrench" className="w-8 h-8 text-muted-foreground" />
+                    <Icon name="magic-wand" className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-base text-muted-foreground mb-3">No tools installed</p>
                   <p className="text-sm text-muted-foreground">Install tools from Explore to get started.</p>

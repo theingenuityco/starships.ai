@@ -1,28 +1,7 @@
-import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 
-import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
-
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
-export const revalidate = 3600 // 1 hour
-
-export default async function ExploreAllPage() {
-  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
-    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
-  ])
-
-  return (
-    <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-      <MarketplacePageClient
-        activeTab="all"
-        initialAgentTemplates={agentTemplates}
-        initialToolTemplates={toolTemplates}
-        initialConnectorCatalog={connectorCatalog}
-      />
-    </Suspense>
-  )
+export default async function ExploreAllRedirectPage() {
+  // Back-compat: keep old route working.
+  redirect('/explore')
 }
 

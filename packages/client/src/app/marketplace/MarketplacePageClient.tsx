@@ -24,7 +24,7 @@ function isMarketplaceTab(value: string): value is MarketplaceTab {
 }
 
 const TAB_TO_ROUTE: Record<MarketplaceTab, string> = {
-  all: '/explore/all',
+  all: '/explore',
   agents: '/explore/agents',
   tools: '/explore/tools',
   connectors: '/explore/connectors',

@@ -20,7 +20,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
 import { PublicFooter } from '@/app/components/PublicFooter'
-import FinalCTA from '@/app/components/FinalCTA'
+import ExploreCTA from '@/app/components/ExploreCTA'
 
 const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
 type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
@@ -662,7 +662,7 @@ export default function MarketplacePageClient(props: {
           </div>
         </main>
 
-        <FinalCTA />
+        <ExploreCTA kind={tab === 'all' ? 'anything' : tab === 'agents' ? 'agent' : tab === 'connectors' ? 'connector' : 'automation'} />
         <div
           suppressHydrationWarning
           className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent"

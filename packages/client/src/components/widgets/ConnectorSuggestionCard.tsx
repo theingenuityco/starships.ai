@@ -42,6 +42,7 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         hideDisconnect={hideDisconnect}
         maxColumns={2}
         hideCardDescription={compactCard}
+        cardVariant="explore"
         connectButtonLabel={connectButtonLabel}
       />
     </div>

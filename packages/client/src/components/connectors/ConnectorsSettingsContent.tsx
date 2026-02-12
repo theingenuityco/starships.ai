@@ -19,6 +19,7 @@ interface ConnectorsSettingsContentProps {
 }
 
 type ConnectorView = 'all' | 'connected' | 'unconnected'
+const SEARCH_DEBOUNCE_MS = 400
 
 export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentProps) {
   const { user, isInstanceAdmin, isLoading: authLoading } = useAuth()
@@ -46,7 +47,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
   }, [qFromUrl])
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(searchValue.trim()), 250)
+    const t = setTimeout(() => setDebouncedQuery(searchValue.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(t)
   }, [searchValue])
 

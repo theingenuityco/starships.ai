@@ -95,9 +95,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
 
   return (
     <>
-      <div className="marketplace-public-chrome">
-        <PublicHeader />
-      </div>
+      <PublicHeader />
 
       <main className="marketplace-main pb-12 sm:pb-16">
         <div className="relative">

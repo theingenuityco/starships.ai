@@ -246,9 +246,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
 
   return (
     <>
-      <div className="marketplace-public-chrome">
-        <PublicHeader />
-      </div>
+      <PublicHeader />
 
       <main className="marketplace-agent-main">
         {/* Decorative hero background */}

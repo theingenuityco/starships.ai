@@ -23,7 +23,8 @@ export function ToolTemplatePreviewCard({ template, className }: { template: Too
           className={cn(
             'h-[72px] w-[72px] rounded-xl ring-1 ring-border/40 shadow-md',
             'flex items-center justify-center',
-            'bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]'
+            // Keep the tile neutral (no gradient / accent tint).
+            'bg-background/40'
           )}
           aria-hidden
         >

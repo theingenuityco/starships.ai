@@ -411,7 +411,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 2 ? (
                 <div className="mt-8 space-y-2">
-                  <div className="text-sm font-semibold">Suggested tools</div>
+                  <div className="text-sm font-semibold">Suggested tools ({assignedToolSlugs.length})</div>
 
                   {assignedToolSlugs.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -494,16 +494,8 @@ export function AgentDeploymentWizardModal({
               ) : null}
 
               {step === 3 ? (
-                <div className="mt-5 space-y-6">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold">Connect apps</div>
-                      {selectedStarship ? <div className="mt-1 text-xs text-muted-foreground truncate">Deploying to {selectedStarship.name || selectedStarship.slug || selectedStarship.id}</div> : null}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {requiredConnectors.length}
-                    </Badge>
-                  </div>
+                <div className="mt-8 space-y-3">
+                  <div className="text-sm font-semibold">Connect apps ({requiredConnectors.length})</div>
 
                   {requiredConnectors.length > 0 ? (
                     selectedStarship?.id ? (

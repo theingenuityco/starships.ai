@@ -6,9 +6,15 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { track } from '@/lib/analytics'
 
-export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolean }) {
+export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolean; topDividerVariant?: 'theme' | 'landingDark' }) {
   const fromPath = props.fromPath ?? '/'
   const showTopDivider = props.showTopDivider ?? true
+  const topDividerVariant = props.topDividerVariant ?? 'theme'
+
+  const topDividerClassName =
+    topDividerVariant === 'landingDark'
+      ? 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent'
+      : 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent'
 
   return (
     <footer className="py-16 relative">
@@ -16,7 +22,7 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
       {showTopDivider ? (
         <div
           suppressHydrationWarning
-          className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent"
+          className={topDividerClassName}
         />
       ) : null}
       <div className="w-full relative px-4 sm:px-8">

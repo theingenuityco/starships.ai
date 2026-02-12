@@ -1,24 +1,7 @@
-import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
-
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
-export const revalidate = 3600 // 1 hour
+import { redirect } from 'next/navigation'
 
 export default async function ExploreToolsPage() {
-  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
-    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
-  ])
-
-  return (
-    <MarketplacePageClient
-      activeTab="tools"
-      initialAgentTemplates={agentTemplates}
-      initialToolTemplates={toolTemplates}
-      initialConnectorCatalog={connectorCatalog}
-    />
-  )
+  // Back-compat: keep old route working, but send users to the new UI path.
+  redirect('/explore/automations')
 }
 

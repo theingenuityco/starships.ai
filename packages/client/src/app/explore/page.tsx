@@ -31,7 +31,7 @@ export default async function ExplorePage(props: PageProps) {
 
   // Back-compat: old links used `?tab=...`. Prefer redirecting to the new route segments.
   if (t === 'agents' || t === 'tools' || t === 'connectors') {
-    const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : '/explore/connectors'
+    const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/automations' : '/explore/connectors'
     redirect(`${dest}${toQueryString(searchParams)}`)
   }
 

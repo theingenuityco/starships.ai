@@ -31,7 +31,7 @@ function isMarketplaceTab(value: string): value is MarketplaceTab {
 const TAB_TO_ROUTE: Record<MarketplaceTab, string> = {
   all: '/explore',
   agents: '/explore/agents',
-  tools: '/explore/tools',
+  tools: '/explore/automations',
   connectors: '/explore/connectors',
 }
 
@@ -196,8 +196,8 @@ export default function MarketplacePageClient(props: {
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
   const hero = useMemo(() => {
-    const t = tab === 'all' ? 'Explore' : tab === 'agents' ? 'Explore agents' : tab === 'tools' ? 'Explore tools' : 'Explore connectors'
-    const subtitle = 'Search and install agents, tools, and connectors.'
+    const t = tab === 'all' ? 'Explore' : tab === 'agents' ? 'Explore agents' : tab === 'tools' ? 'Explore automations' : 'Explore connectors'
+    const subtitle = 'Search and install agents, automations, and connectors.'
     return { title: t, subtitle }
   }, [tab])
 
@@ -326,7 +326,7 @@ export default function MarketplacePageClient(props: {
                   <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
                     <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
                       {MARKETPLACE_TABS.map(t => {
-                        const label = t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'
+                        const label = t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Automations' : 'Connectors'
                         const isActive = tab === t
                         const isLoading = t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading
                         return (
@@ -396,7 +396,7 @@ export default function MarketplacePageClient(props: {
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular tools</h2>
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular automations</h2>
                               <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
                                 {toolsVisible.length}
                               </Badge>
@@ -406,7 +406,7 @@ export default function MarketplacePageClient(props: {
                               className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
                               onClick={() => router.push(TAB_TO_ROUTE.tools)}
                             >
-                              <span>Explore all tools</span>
+                              <span>Explore all automations</span>
                               <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
@@ -469,7 +469,7 @@ export default function MarketplacePageClient(props: {
                     <section>
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div className="min-w-0 flex items-center gap-3">
-                          <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
+                          <h2 className="text-lg font-semibold leading-tight text-foreground">Automations</h2>
                           <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
                             {activeCount}
                           </Badge>
@@ -507,14 +507,14 @@ export default function MarketplacePageClient(props: {
                       ? tab === 'agents'
                         ? `No agents match “${q}”.`
                         : tab === 'tools'
-                          ? `No tools match “${q}”.`
+                          ? `No automations match “${q}”.`
                           : tab === 'connectors'
                             ? `No connectors match “${q}”.`
                             : `No results match “${q}”.`
                       : tab === 'agents'
                         ? 'No agents found.'
                         : tab === 'tools'
-                          ? 'No tools found.'
+                          ? 'No automations found.'
                           : tab === 'connectors'
                             ? 'No connectors found.'
                             : 'No results found.'

@@ -23,6 +23,7 @@ export default async function MarketplaceRedirectPage(props: PageProps) {
   const t = String(tab || '')
     .trim()
     .toLowerCase()
-  const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : t === 'connectors' ? '/explore/connectors' : '/explore'
+  const dest =
+    t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/automations' : t === 'connectors' ? '/explore/connectors' : '/explore'
   redirect(`${dest}${toQueryString(searchParams)}`)
 }

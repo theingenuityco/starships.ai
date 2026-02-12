@@ -95,10 +95,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
       const sourceSlug = String((t as any)?.sourceTemplateSlug || '').trim()
       const publishedId = String((t as any)?.publishedTemplateId || '').trim()
       const publishedSlug = String((t as any)?.publishedTemplateSlug || '').trim()
-      return (
-        (tplId && (sourceId === tplId || publishedId === tplId)) ||
-        (tplSlug && (sourceSlug === tplSlug || publishedSlug === tplSlug))
-      )
+      return (tplId && (sourceId === tplId || publishedId === tplId)) || (tplSlug && (sourceSlug === tplSlug || publishedSlug === tplSlug))
     })
   }, [installedTools, isAuthenticated, starship?.id, template])
 
@@ -124,11 +121,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
   }
 
   const starshipSlugOrId = useMemo(() => {
-    const candidates = [
-      (explicitStarship as any)?.slug,
-      (starship as any)?.slug,
-      (starship as any)?.id,
-    ] as unknown[]
+    const candidates = [(explicitStarship as any)?.slug, (starship as any)?.slug, (starship as any)?.id] as unknown[]
     for (const c of candidates) {
       if (typeof c !== 'string') continue
       const raw = c.trim()
@@ -193,21 +186,12 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                           return (
                             <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
                               {showLogo ? (
-                                <Image
-                                  src={logoSrc}
-                                  alt=""
-                                  width={14}
-                                  height={14}
-                                  className="object-contain"
-                                  onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                                />
+                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                               ) : null}
                             </div>
                           )
                         })}
-                        {requiredConnectorProviders.length > 4 ? (
-                          <div className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div>
-                        ) : null}
+                        {requiredConnectorProviders.length > 4 ? <div className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div> : null}
                       </>
                     ) : null}
                   </div>
@@ -244,22 +228,11 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                     const logoSrc = getConnectorLogoSrc(provider)
                     return (
                       <div key={provider} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
-                        {showLogo ? (
-                          <Image
-                            src={logoSrc}
-                            alt=""
-                            width={20}
-                            height={20}
-                            className="object-contain"
-                            onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                          />
-                        ) : null}
+                        {showLogo ? <Image src={logoSrc} alt="" width={20} height={20} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
                       </div>
                     )
                   })}
-                  {requiredConnectorProviders.length > 10 ? (
-                    <span className="ml-1 text-xs text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 10}</span>
-                  ) : null}
+                  {requiredConnectorProviders.length > 10 ? <span className="ml-1 text-xs text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 10}</span> : null}
                 </>
               ) : (
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
@@ -323,4 +296,3 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
     </>
   )
 }
-

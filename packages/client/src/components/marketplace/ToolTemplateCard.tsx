@@ -8,8 +8,11 @@ import { DeploymentConfirmationModal } from '@/components/marketplace/Deployment
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
+import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import type { ToolTemplateModel } from '@starships/protocol'
+import api from '@/lib/api'
+import type { ApiResponse, ToolModel, ToolTemplateModel } from '@starships/protocol'
+import type { FetchResponse } from '@/lib/types'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
@@ -69,11 +72,43 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
     return Array.from(new Set(normalized))
   }, [template])
 
+  const { data: installedTools = [] } = useQuery({
+    queryKey: ['starship-tools', starship?.id || ''] as const,
+    queryFn: async (): Promise<ToolModel[]> => {
+      if (!starship?.id) return []
+      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starship.id}/tools`)
+      return response.data.data || []
+    },
+    enabled: !!(isAuthenticated && starship?.id),
+    staleTime: 30 * 1000,
+  })
+
+  const isInstalled = useMemo(() => {
+    if (!isAuthenticated) return false
+    if (!starship?.id) return false
+    const tplId = String((template as any)?.id || '').trim()
+    const tplSlug = String((template as any)?.slug || '').trim()
+    if (!tplId && !tplSlug) return false
+
+    return installedTools.some(t => {
+      const sourceId = String((t as any)?.sourceTemplateId || '').trim()
+      const sourceSlug = String((t as any)?.sourceTemplateSlug || '').trim()
+      const publishedId = String((t as any)?.publishedTemplateId || '').trim()
+      const publishedSlug = String((t as any)?.publishedTemplateSlug || '').trim()
+      return (
+        (tplId && (sourceId === tplId || publishedId === tplId)) ||
+        (tplSlug && (sourceSlug === tplSlug || publishedSlug === tplSlug))
+      )
+    })
+  }, [installedTools, isAuthenticated, starship?.id, template])
+
   const leftIcon = useMemo(() => {
     return pickToolLeftIcon(displayName)
   }, [displayName])
 
   const deployDisabled = isInstalling || (isAuthenticated && !starship) || !slug
+  const installDisabled = deployDisabled || isInstalled
+  const installLabel = isInstalled ? 'Installed' : isInstalling ? 'Installing…' : 'Install'
 
   const requestInstall = () => {
     track({ type: 'marketplace_tool_install_clicked', templateSlug: slug, templateName: displayName, authenticated: !!isAuthenticated })
@@ -184,12 +219,13 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                       onClick={e => {
                         e.preventDefault()
                         e.stopPropagation()
+                        if (installDisabled) return
                         requestInstall()
                       }}
-                      disabled={deployDisabled}
+                      disabled={installDisabled}
                       className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
                     >
-                      {isInstalling ? 'Installing…' : 'Install'}
+                      {installLabel}
                     </Button>
                   ) : (
                     <div />

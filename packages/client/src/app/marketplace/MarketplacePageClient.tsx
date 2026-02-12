@@ -75,7 +75,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
       templateName: template.name,
       category: template.category,
     })
-    router.push(`/marketplace/agents/${encodeURIComponent(template.slug)}`)
+    router.push(`/explore/agents/${encodeURIComponent(template.slug)}`)
   }
 
   // Back-compat: old links used `?agent=<id|slug>` to open a modal.
@@ -88,9 +88,9 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
     const found = agentTemplates.find(t => t.slug === agentFromUrl) ?? agentTemplates.find(t => t.id === agentFromUrl) ?? null
     if (!found) return
 
-    // Preserve other query params (e.g. category) by leaving `/marketplace` alone in history
+    // Preserve other query params (e.g. category) by leaving the listing URL alone in history
     // and pushing the canonical details route.
-    router.replace(`/marketplace/agents/${encodeURIComponent(found.slug)}`)
+    router.replace(`/explore/agents/${encodeURIComponent(found.slug)}`)
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
   return (

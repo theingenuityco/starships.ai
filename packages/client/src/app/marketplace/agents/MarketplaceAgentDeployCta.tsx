@@ -104,7 +104,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
 
       // Marketplace UX: after deploy, take the user to the agent's chat.
       // Refetch agents for this starship so the DM page finds the new agent when it mounts (avoids bounce to lobby).
-      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+      if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
         if (agentId) {
           await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)

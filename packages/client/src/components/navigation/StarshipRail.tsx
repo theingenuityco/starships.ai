@@ -97,7 +97,7 @@ export function StarshipRail({
   const pathname = usePathname()
   const router = useRouter()
 
-  const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
+  const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
   return (
     <div
@@ -120,7 +120,7 @@ export function StarshipRail({
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => router.push('/marketplace')}
+              onClick={() => router.push('/explore')}
               className={[
                 'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
                 'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',

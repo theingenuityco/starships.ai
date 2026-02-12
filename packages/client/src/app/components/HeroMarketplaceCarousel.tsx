@@ -113,7 +113,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
       category: template.category,
       source: 'landing_hero_carousel',
     })
-    router.push(`/marketplace/agents/${encodeURIComponent(template.slug)}`)
+    router.push(`/explore/agents/${encodeURIComponent(template.slug)}`)
   }
 
   return (

@@ -84,8 +84,10 @@ export default function MarketplacePageClient(props: {
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 
-  const shouldUseServerSearch = debouncedSearch.trim().length > 0
+  const q = debouncedSearch.trim()
+  const shouldUseServerSearch = q.length > 0
   const serverSearch = useExploreSearch({ q: debouncedSearch, type: tab, limit: 24, enabled: shouldUseServerSearch })
+  const isSearching = shouldUseServerSearch && (serverSearch.isFetching || serverSearch.isLoading)
 
   const agentsMatchingSearch = useMemo(() => {
     if (!shouldUseServerSearch) return agentTemplates
@@ -123,9 +125,10 @@ export default function MarketplacePageClient(props: {
   ])
 
   const activeCount = countsByTab[tab]
-  const isAllLoading = shouldUseServerSearch ? serverSearch.isLoading : agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
+  // Initial list loading (no query). Search loading is handled separately (Members-style).
+  const isAllLoading = agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
   const activeLoading = shouldUseServerSearch
-    ? serverSearch.isLoading
+    ? false
     : tab === 'all'
       ? isAllLoading
       : tab === 'agents'
@@ -133,6 +136,14 @@ export default function MarketplacePageClient(props: {
         : tab === 'tools'
           ? toolTemplatesLoading
           : connectorsLoading
+
+  const renderCenteredState = (message: string) => {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
+      </div>
+    )
+  }
 
   // Handle template deployment/installation
   const handleAgentDeploy = (_template: AgentTemplateModel) => {
@@ -311,7 +322,9 @@ export default function MarketplacePageClient(props: {
 
             {/* Results */}
             <div className="mt-8">
-              {activeLoading ? (
+              {isSearching ? (
+                renderCenteredState(`Searching “${q}”…`)
+              ) : activeLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="h-56 rounded-lg border border-border/60 bg-card animate-pulse" />
@@ -418,15 +431,23 @@ export default function MarketplacePageClient(props: {
                   </div>
                 )
               ) : (
-                <div className="rounded-lg border border-border/60 bg-card shadow-sm p-10 text-center">
-                  <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted/40 flex items-center justify-center">
-                    <Icon name="head-circuit" className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-semibold">
-                    {tab === 'agents' ? 'No agents found' : tab === 'tools' ? 'No tools found' : tab === 'connectors' ? 'No connectors found' : 'No results found'}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search.</p>
-                </div>
+                renderCenteredState(
+                  shouldUseServerSearch
+                    ? tab === 'agents'
+                      ? `No agents match “${q}”.`
+                      : tab === 'tools'
+                        ? `No tools match “${q}”.`
+                        : tab === 'connectors'
+                          ? `No connectors match “${q}”.`
+                          : `No results match “${q}”.`
+                    : tab === 'agents'
+                      ? 'No agents found.'
+                      : tab === 'tools'
+                        ? 'No tools found.'
+                        : tab === 'connectors'
+                          ? 'No connectors found.'
+                          : 'No results found.'
+                )
               )}
             </div>
             </div>

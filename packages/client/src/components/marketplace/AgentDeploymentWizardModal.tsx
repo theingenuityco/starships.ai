@@ -392,9 +392,6 @@ export function AgentDeploymentWizardModal({
                                         </div>
                                         {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : null}
                                       </div>
-                                      {disabled && access.deployDisabledReason ? (
-                                        <div className="mt-1 text-[11px] text-muted-foreground truncate">{access.deployDisabledReason}</div>
-                                      ) : null}
                                     </button>
                                   )
                                 })}

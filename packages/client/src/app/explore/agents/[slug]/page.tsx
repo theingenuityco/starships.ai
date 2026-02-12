@@ -386,7 +386,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                                       ? `${agentSubjectLabel(template.name)} will ask before using`
                                       : `${agentSubjectLabel(template.name)} can’t use`}
                                 </h2>
-                                {group.key === 'deny' ? <span className={SECTION_SUBTITLE_CLASS}>(can be changed after deploy)</span> : null}
+                                {group.key === 'deny' ? <span className={SECTION_SUBTITLE_CLASS}>(can be changed after install)</span> : null}
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

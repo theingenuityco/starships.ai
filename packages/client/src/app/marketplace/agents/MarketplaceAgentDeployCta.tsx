@@ -43,7 +43,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   const [isDeploying, setIsDeploying] = useState(false)
   const createAgentMutation = useCreateAgentFromTemplate()
 
-  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  const deployLabel = isAlreadyDeployed ? 'Installed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Installing…' : 'Install'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
 

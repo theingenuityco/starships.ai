@@ -570,26 +570,14 @@ export function AgentDeploymentWizardModal({
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Automations & permissions</div>
                           </div>
                           {assignedToolSlugs.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground tabular-nums">{assignedToolSlugs.length} automations</span>
-                              <span className="text-xs text-muted-foreground" aria-hidden>
-                                |
-                              </span>
-                              <span className="text-xs tabular-nums text-emerald-700 dark:text-emerald-300">
-                                {permissionCounts.allow} Always
-                              </span>
-                              <span className="text-xs text-muted-foreground" aria-hidden>
-                                |
-                              </span>
-                              <span className="text-xs tabular-nums text-amber-700 dark:text-amber-300">
-                                {permissionCounts.ask} Ask First
-                              </span>
-                              <span className="text-xs text-muted-foreground" aria-hidden>
-                                |
-                              </span>
-                              <span className="text-xs tabular-nums text-red-700 dark:text-red-300">
-                                {permissionCounts.deny} Never
-                              </span>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{assignedToolSlugs.length} automations</span>
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{permissionCounts.allow} Always</span>
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span className="font-medium leading-none tabular-nums text-amber-700 dark:text-amber-300">{permissionCounts.ask} Ask First</span>
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span className="font-medium leading-none tabular-nums text-red-700 dark:text-red-300">{permissionCounts.deny} Never</span>
                             </div>
                           ) : (
                             <div className="mt-1 text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">No automations</div>

@@ -9,7 +9,7 @@ import { createPaginationMeta, handleError, sendError, sendSuccess } from '../ut
 import { AgentTemplateRepository } from '@starships/models';
 import { buildPublicS3ObjectUrl, generatePresignedUrlInline } from '@/utils/s3-helper';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import type { AuthUser } from '@starships/protocol';
+import type { AgentTemplateModel, AuthUser } from '@starships/protocol';
 import { AgentTemplateMarketingService } from '@/services/AgentTemplateMarketingService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 import {
@@ -21,6 +21,11 @@ import {
 } from '@/services/AgentTemplateMarketingJobs';
 
 const router: Router = Router();
+
+type ConnectionLike = {
+  queryOne: <T>(sql: string, params?: unknown[]) => Promise<T | null | undefined>;
+  query: <T>(sql: string, params?: unknown[]) => Promise<T[]>;
+};
 
 function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<string, unknown> {
   // Never expose raw S3 pointers even to creators (serve via direct public URL).
@@ -89,25 +94,111 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     const searchQuery = (queryValidation.search || queryValidation.query || '').trim();
     const category = queryValidation.category;
 
-    // Use search if query provided, otherwise get all templates
-    const baseTemplates = searchQuery
-      ? await templateService.searchTemplates(searchQuery)
-      : category
-        ? await templateService.getTemplatesByCategory(category)
-        : await templateService.getAllTemplates();
-
-    // If both search + category are provided, filter search results client-side.
-    // (We keep the service signature stable; repository can still do DB-level filtering later.)
-    const allTemplates = searchQuery && category ? baseTemplates.filter((t) => t?.category === category) : baseTemplates;
-
-    // Apply pagination
-    const startIndex = (page - 1) * limit;
-    const paginatedTemplates = allTemplates.slice(startIndex, startIndex + limit);
-
-    const paginationMeta = createPaginationMeta(page, limit, allTemplates.length);
-
     const requesterUserId = req.user?.id;
     const repo = new AgentTemplateRepository();
+    const connection = (((repo as any).getConnection?.() ?? null) as unknown as ConnectionLike | null) ?? null;
+    const windowDays = 30; // popularity window for listing (avoid `usage_count`)
+
+    async function resolveAgentsTemplateColumn(): Promise<'source_template_id' | 'template_id'> {
+      if (!connection?.queryOne) return 'template_id';
+      const row = await connection.queryOne<{ has_source: boolean; has_template: boolean }>(
+        `
+          SELECT
+            EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'source_template_id') AS has_source,
+            EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'template_id') AS has_template
+        `
+      );
+      if (row?.has_source) return 'source_template_id';
+      return 'template_id';
+    }
+
+    // Popularity-sorted listing (no search).
+    // For search queries, keep relevance sorting from repository search.
+    let paginatedTemplates: AgentTemplateModel[] = [];
+    let paginationMeta = createPaginationMeta(page, limit, 0);
+
+    if (searchQuery) {
+      const base = await templateService.searchTemplates(searchQuery);
+      const filtered = category ? base.filter((t) => t?.category === category) : base;
+      const startIndex = (page - 1) * limit;
+      paginatedTemplates = filtered.slice(startIndex, startIndex + limit);
+      paginationMeta = createPaginationMeta(page, limit, filtered.length);
+    } else {
+      if (!connection?.queryOne || !connection?.query) {
+        // Fallback: no DB connection method exposed. Keep deterministic ordering (newest first).
+        const base = category ? await templateService.getTemplatesByCategory(category) : await templateService.getAllTemplates();
+        const startIndex = (page - 1) * limit;
+        paginatedTemplates = base.slice(startIndex, startIndex + limit);
+        paginationMeta = createPaginationMeta(page, limit, base.length);
+      } else {
+        const templateCol = await resolveAgentsTemplateColumn();
+        const offset = (page - 1) * limit;
+
+        const whereSql = category ? `WHERE at.category = $2` : '';
+        const whereCountSql = category ? `WHERE at.category = $1` : '';
+        const countParams: unknown[] = category ? [category] : [];
+        const countRow = await connection.queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM agent_templates at ${whereCountSql}`, countParams);
+
+        // For count query, we didn't include windowDays; rebuild params for the main query.
+        const listParams: unknown[] = category ? [windowDays, category, limit, offset] : [windowDays, limit, offset];
+        const pLimit = `$${category ? 3 : 2}`;
+        const pOffset = `$${category ? 4 : 3}`;
+
+        const rows = await connection.query<{ id: string }>(
+          `
+            WITH agent_msgs AS (
+              SELECT DISTINCT
+                a.${templateCol} AS template_id,
+                m.conversation_id AS conversation_id
+              FROM messages m
+              JOIN agents a ON a.id = m.agent_id
+              WHERE m.role = 'assistant'
+                AND m.agent_id IS NOT NULL
+                AND a.${templateCol} IS NOT NULL
+                AND m.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+            ),
+            agent_usage AS (
+              SELECT
+                template_id,
+                COUNT(*)::int AS conversation_refs,
+                COUNT(DISTINCT conversation_id)::int AS conversation_count
+              FROM agent_msgs
+              GROUP BY template_id
+            ),
+            agent_tokens AS (
+              SELECT
+                am.template_id AS template_id,
+                COALESCE(SUM(u.total_tokens), 0)::bigint AS token_count
+              FROM agent_msgs am
+              JOIN usage u ON u.conversation_id = am.conversation_id
+              WHERE u.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+              GROUP BY am.template_id
+            )
+            SELECT at.id
+            FROM agent_templates at
+            LEFT JOIN agent_usage au ON au.template_id = at.id
+            LEFT JOIN agent_tokens tok ON tok.template_id = at.id
+            ${whereSql}
+            ORDER BY
+              COALESCE(au.conversation_count, 0) DESC,
+              COALESCE(tok.token_count, 0) DESC,
+              COALESCE(au.conversation_refs, 0) DESC,
+              at.created_at DESC
+            LIMIT ${pLimit}
+            OFFSET ${pOffset}
+          `,
+          listParams
+        );
+
+        const ids = (rows || [])
+          .map((r: { id?: unknown }) => (typeof r?.id === 'string' ? String(r.id).trim() : ''))
+          .filter((x: string) => x.length > 0);
+
+        const fetched = await Promise.all(ids.map((id: string) => templateService.getTemplateById(id)));
+        paginatedTemplates = fetched.filter((t): t is AgentTemplateModel => !!t);
+        paginationMeta = createPaginationMeta(page, limit, countRow?.n ?? 0);
+      }
+    }
 
     const templateIds = paginatedTemplates
       .map((t): string | undefined => {

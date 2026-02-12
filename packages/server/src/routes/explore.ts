@@ -37,24 +37,6 @@ function toConnectorCatalogItem(tpl: Record<string, unknown>): ConnectorCatalogI
   }
 }
 
-async function resolveAgentsTemplateColumn(connection: ConnectionLike): Promise<'source_template_id' | 'template_id'> {
-  // We renamed `agents.template_id -> agents.source_template_id` in older DBs, but local/dev
-  // setups may have either column depending on migration history.
-  //
-  // IMPORTANT: We cannot reference both columns in SQL (Postgres errors if a column doesn't exist),
-  // so we detect the available column first.
-  const row = await connection.queryOne<{ has_source: boolean; has_template: boolean }>(
-    `
-      SELECT
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'source_template_id') AS has_source,
-        EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'template_id') AS has_template
-    `
-  )
-
-  if (row?.has_source) return 'source_template_id'
-  return 'template_id'
-}
-
 // GET /explore/search (public)
 // Unified search endpoint for Explore (agents + tools + connectors), backed by DB queries.
 router.get('/explore/search', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {

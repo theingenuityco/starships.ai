@@ -16,12 +16,17 @@ import type {
   AuthUser,
   CreateToolRequest,
   CreateToolTemplateRequest,
+  ToolTemplateModel,
   ToolModel,
   UpdateToolRequest,
   WalletModel,
 } from '@starships/protocol';
 
 const router: Router = Router();
+
+type ConnectionLike = {
+  query: (sql: string, params?: unknown[]) => Promise<Array<Record<string, unknown>>>;
+};
 
 // Zod schemas for validation
 
@@ -195,11 +200,109 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
     if (!queryValidation) return;
 
     const toolTemplateRepository = new ToolTemplateRepository();
-    const templates = await toolTemplateRepository.search({
-      category: queryValidation.category,
-      query: queryValidation.query,
-      requiresApiKey: queryValidation.requiresApiKey,
-    });
+    const connection = ((toolTemplateRepository as any).getConnection?.() ?? null) as ConnectionLike | null;
+    const windowDays = 30; // popularity window for listing (avoid `usage_count`)
+
+    const page = queryValidation.page ?? 1;
+    const limit = queryValidation.limit ?? 50;
+    const offset = (page - 1) * limit;
+
+    const q = String(queryValidation.query || '').trim();
+
+    let templates: ToolTemplateModel[] = [];
+
+    if (q) {
+      // Search mode: keep deterministic created_at ordering from repository search.
+      templates = await toolTemplateRepository.search({
+        category: queryValidation.category,
+        query: q,
+        requiresApiKey: queryValidation.requiresApiKey,
+      });
+    } else if (!connection?.query) {
+      templates = await toolTemplateRepository.search({
+        category: queryValidation.category,
+        query: undefined,
+        requiresApiKey: queryValidation.requiresApiKey,
+      });
+    } else {
+      const where: string[] = [];
+      const params: unknown[] = [windowDays];
+      let i = 2;
+
+      if (queryValidation.category) {
+        where.push(`tt.category = $${i}`);
+        params.push(queryValidation.category);
+        i++;
+      }
+      if (queryValidation.requiresApiKey !== undefined) {
+        where.push(`tt.requires_api_key = $${i}`);
+        params.push(queryValidation.requiresApiKey);
+        i++;
+      }
+
+      params.push(limit);
+      const pLimit = `$${i++}`;
+      params.push(offset);
+      const pOffset = `$${i++}`;
+
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      const rows = await connection.query(
+        `
+          WITH tool_calls AS (
+            SELECT
+              (tc -> 'function' ->> 'name') AS tool_slug,
+              m.conversation_id AS conversation_id
+            FROM messages m
+            JOIN LATERAL jsonb_array_elements(m.tool_calls) tc ON TRUE
+            WHERE m.role = 'assistant'
+              AND m.tool_calls IS NOT NULL
+              AND jsonb_typeof(m.tool_calls) = 'array'
+              AND m.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+          ),
+          tool_usage AS (
+            SELECT
+              tool_slug,
+              COUNT(*)::int AS call_count,
+              COUNT(DISTINCT conversation_id)::int AS conversation_count
+            FROM tool_calls
+            WHERE tool_slug IS NOT NULL AND tool_slug <> ''
+            GROUP BY tool_slug
+          ),
+          tool_tokens AS (
+            SELECT
+              tc.tool_slug AS tool_slug,
+              COALESCE(SUM(u.total_tokens), 0)::bigint AS token_count
+            FROM (SELECT DISTINCT tool_slug, conversation_id FROM tool_calls WHERE tool_slug IS NOT NULL AND tool_slug <> '') tc
+            JOIN usage u ON u.conversation_id = tc.conversation_id
+            WHERE u.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+            GROUP BY tc.tool_slug
+          )
+          SELECT tt.*
+          FROM tool_templates tt
+          LEFT JOIN tool_usage tu ON tu.tool_slug = tt.slug
+          LEFT JOIN tool_tokens tok ON tok.tool_slug = tt.slug
+          ${whereSql}
+          ORDER BY
+            COALESCE(tu.conversation_count, 0) DESC,
+            COALESCE(tok.token_count, 0) DESC,
+            COALESCE(tu.call_count, 0) DESC,
+            tt.created_at DESC
+          LIMIT ${pLimit}
+          OFFSET ${pOffset}
+        `,
+        params
+      );
+
+      // Reuse repository entity mapping to keep API shape consistent.
+      // `search()` already maps DB->model for us; mimic by using `fromDatabaseArray` is internal to repo,
+      // so instead call findById for the ordered ids (bounded by limit).
+      const ids = (rows || [])
+        .map((r: Record<string, unknown>) => (typeof r?.id === 'string' ? String(r.id).trim() : ''))
+        .filter((x: string) => x.length > 0);
+      const fetched = await Promise.all(ids.map((id: string) => toolTemplateRepository.findById(id)));
+      templates = fetched.filter((t): t is ToolTemplateModel => !!t);
+    }
 
     // Public template routes should not expose executable blueprints
     const sanitized = templates.map((t) => {

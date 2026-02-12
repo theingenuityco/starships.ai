@@ -754,12 +754,7 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
-                      <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums">
-                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
-                        </span>
-                        {onlineHumansCount} online
-                      </Badge>
+                      <span className="text-xs text-muted-foreground tabular-nums">({filteredHumans.length + filteredInvites.length})</span>
                     </div>
                     {slug && canInviteUsers ? (
                       <Button type="button" size="sm" variant="ghost" className="h-8 text-primary hover:text-primary" onClick={openInviteFlow}>
@@ -787,12 +782,7 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
-                      <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums">
-                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
-                        </span>
-                        {onlineAgentsCount} online
-                      </Badge>
+                      <span className="text-xs text-muted-foreground tabular-nums">({filteredAgents.length})</span>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                       <Link href="/explore">

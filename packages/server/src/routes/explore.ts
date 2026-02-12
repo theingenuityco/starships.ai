@@ -11,6 +11,11 @@ import type { AgentTemplateModel, ConnectorCatalogItem, ConnectorProvider, ToolT
 
 const router: Router = Router()
 
+type ConnectionLike = {
+  queryOne: <T>(sql: string, params?: unknown[]) => Promise<T | null | undefined>
+  query: <T>(sql: string, params?: unknown[]) => Promise<T[]>
+}
+
 const ExploreSearchQuerySchema = z
   .object({
     q: z.string().optional(),
@@ -22,7 +27,7 @@ const ExploreSearchQuerySchema = z
 function toConnectorCatalogItem(tpl: Record<string, unknown>): ConnectorCatalogItem {
   const provider = String(tpl.provider || '').trim() as ConnectorProvider
   const name = String(tpl.name || '').trim() || provider
-  const description = typeof tpl.description === 'string' ? tpl.description : undefined
+  const description = typeof tpl.description === 'string' ? tpl.description : ''
   const authType = ((tpl.authJson as unknown as { type?: string })?.type || (tpl.authType as string) || 'none') as ConnectorCatalogItem['auth']['type']
   return {
     provider,
@@ -59,7 +64,7 @@ router.get('/explore/search', optionalJwtAuth, async (req: Request, res: Respons
             // NOTE:
             // We intentionally query connector_templates directly here (DB-backed search).
             // Avoid relying on a repository method that might not be present at runtime in all dev setups.
-            const connection = (connectorRepo as any).getConnection?.()
+            const connection = ((connectorRepo as any).getConnection?.() ?? null) as ConnectionLike | null
             if (!connection) {
               const all = await connectorRepo.list()
               const lowered = q.toLowerCase()

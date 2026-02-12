@@ -100,39 +100,46 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
     <>
       <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
         {compact ? (
-          <div className="min-h-[116px] p-4">
-            <div className="min-w-0 flex flex-col">
-              <div className="flex items-center gap-1 mb-2">
+          <div className="flex">
+            {/* Left fixed strip (edge-to-edge): connector logos or flow icon */}
+            <div className="relative w-20 shrink-0 overflow-hidden bg-muted/30">
+              <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.10),transparent_55%)]">
                 {requiredConnectorProviders.length > 0 ? (
-                  <>
-                    {requiredConnectorProviders.slice(0, 8).map(provider => {
-                      const showLogo = !hiddenLogos[provider]
-                      const logoSrc = getConnectorLogoSrc(provider)
-                      return (
-                        <div key={provider} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
-                          {showLogo ? (
-                            <Image
-                              src={logoSrc}
-                              alt=""
-                              width={20}
-                              height={20}
-                              className="object-contain"
-                              onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                            />
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                    {requiredConnectorProviders.length > 8 ? (
-                      <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 8}</span>
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="grid grid-cols-2 gap-1">
+                      {requiredConnectorProviders.slice(0, 4).map(provider => {
+                        const showLogo = !hiddenLogos[provider]
+                        const logoSrc = getConnectorLogoSrc(provider)
+                        return (
+                          <div key={provider} className="flex h-7 w-7 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
+                            {showLogo ? (
+                              <Image
+                                src={logoSrc}
+                                alt=""
+                                width={18}
+                                height={18}
+                                className="object-contain"
+                                onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                              />
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {requiredConnectorProviders.length > 4 ? (
+                      <div className="text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div>
                     ) : null}
-                  </>
+                  </div>
                 ) : (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
-                    <Icon name="workflow" className="h-5 w-5" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
+                    <Icon name="workflow" className="h-4.5 w-4.5" />
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Right content */}
+            <div className="min-w-0 flex-1 flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-base font-semibold leading-tight truncate">{displayName}</div>

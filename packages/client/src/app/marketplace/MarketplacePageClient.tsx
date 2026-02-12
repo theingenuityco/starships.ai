@@ -42,8 +42,6 @@ export default function MarketplacePageClient(props: {
   initialAgentTemplates?: AgentTemplateModel[]
   initialToolTemplates?: ToolTemplateModel[]
   initialConnectorCatalog?: ConnectorCatalogItem[]
-  initialPopularAgents?: AgentTemplateModel[]
-  initialPopularTools?: ToolTemplateModel[]
   activeTab?: MarketplaceTab
 }) {
   const searchParams = useSearchParams()
@@ -70,8 +68,6 @@ export default function MarketplacePageClient(props: {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const initialToolTemplates = props.initialToolTemplates ?? []
   const initialConnectorCatalog = props.initialConnectorCatalog ?? []
-  const initialPopularAgents = props.initialPopularAgents ?? []
-  const initialPopularTools = props.initialPopularTools ?? []
 
   const useServerInitialAgents = initialAgentTemplates.length > 0
   const useServerInitialTools = initialToolTemplates.length > 0
@@ -137,8 +133,6 @@ export default function MarketplacePageClient(props: {
   // Initial list loading (no query). Search loading is handled separately (Members-style).
   const isAllLoading = agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
   const activeLoading = shouldUseServerSearch ? false : tab === 'all' ? isAllLoading : tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
-
-  const showPopular = tab === 'all' && !shouldUseServerSearch && (initialPopularAgents.length > 0 || initialPopularTools.length > 0)
 
   const renderCenteredState = (message: string) => {
     return (
@@ -348,85 +342,6 @@ export default function MarketplacePageClient(props: {
                 ) : activeCount > 0 ? (
                   tab === 'all' ? (
                     <div className="space-y-10">
-                      {showPopular ? (
-                        <section>
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-baseline gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular</h2>
-                            </div>
-                          </div>
-
-                          <div className="space-y-10">
-                            {initialPopularAgents.length > 0 ? (
-                              <div>
-                                <div className="mb-4 flex items-center justify-between gap-3">
-                                  <div className="min-w-0 flex items-baseline gap-3">
-                                    <h3 className="text-base font-semibold leading-tight text-foreground">Popular agents</h3>
-                                    <span className="text-sm text-muted-foreground tabular-nums">({initialPopularAgents.length})</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="text-sm text-primary hover:underline underline-offset-2"
-                                    onClick={() => router.push(TAB_TO_ROUTE.agents)}
-                                  >
-                                    View all
-                                  </button>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                  {initialPopularAgents.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
-                                    <motion.div
-                                      key={template.id}
-                                      initial={{ opacity: 0, y: 14 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: idx * 0.04 }}
-                                    >
-                                      <AgentTemplateCard
-                                        template={template}
-                                        density="compact"
-                                        showCategory={false}
-                                        showDeployCta={true}
-                                        onDeploy={handleAgentDeploy}
-                                        onClick={handleAgentClick}
-                                      />
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {initialPopularTools.length > 0 ? (
-                              <div>
-                                <div className="mb-4 flex items-center justify-between gap-3">
-                                  <div className="min-w-0 flex items-baseline gap-3">
-                                    <h3 className="text-base font-semibold leading-tight text-foreground">Popular tools</h3>
-                                    <span className="text-sm text-muted-foreground tabular-nums">({initialPopularTools.length})</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    className="text-sm text-primary hover:underline underline-offset-2"
-                                    onClick={() => router.push(TAB_TO_ROUTE.tools)}
-                                  >
-                                    View all
-                                  </button>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                  {initialPopularTools.slice(0, 6).map((template: ToolTemplateModel, idx: number) => (
-                                    <motion.div
-                                      key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
-                                      initial={{ opacity: 0, y: 14 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: idx * 0.04 }}
-                                    >
-                                      <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
-                                    </motion.div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        </section>
-                      ) : null}
-
                       {agentsMatchingSearch.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
@@ -439,7 +354,7 @@ export default function MarketplacePageClient(props: {
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {agentsMatchingSearch.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
+                            {agentsMatchingSearch.slice(0, 9).map((template: AgentTemplateModel, idx: number) => (
                               <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                                 <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                               </motion.div>
@@ -460,7 +375,7 @@ export default function MarketplacePageClient(props: {
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {toolsMatchingSearch.slice(0, 6).map((template: ToolTemplateModel, idx: number) => (
+                            {toolsMatchingSearch.slice(0, 9).map((template: ToolTemplateModel, idx: number) => (
                               <motion.div
                                 key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
                                 initial={{ opacity: 0, y: 14 }}
@@ -485,7 +400,7 @@ export default function MarketplacePageClient(props: {
                               View all
                             </button>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsMatchingSearch.slice(0, 6).map(renderConnectorCard)}</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsMatchingSearch.slice(0, 9).map(renderConnectorCard)}</div>
                         </section>
                       ) : null}
                     </div>

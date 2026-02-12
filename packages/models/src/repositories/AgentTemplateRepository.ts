@@ -911,7 +911,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY usage_count DESC',
+          'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY created_at DESC',
           [category]
         );
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
@@ -1024,7 +1024,7 @@ export class AgentTemplateRepository extends BaseRepository {
             ) AS relevance
            FROM agent_templates
            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-           ORDER BY relevance DESC, usage_count DESC, created_at DESC`;
+           ORDER BY relevance DESC, created_at DESC`;
 
         const result = await connection.query<Record<string, unknown>>(sql, params);
 

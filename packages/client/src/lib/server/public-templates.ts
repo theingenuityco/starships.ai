@@ -50,12 +50,6 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-type ExplorePopularResponse = {
-  windowDays: number
-  agents: AgentTemplateModel[]
-  tools: ToolTemplateModel[]
-}
-
 export async function fetchPublicAgentTemplates(args?: {
   category?: string
   search?: string
@@ -110,44 +104,6 @@ export async function fetchPublicToolTemplates(args?: {
       error: e instanceof Error ? e.message : String(e),
     })
     return []
-  }
-}
-
-export async function fetchPublicExplorePopular(args?: {
-  windowDays?: number
-  limitAgents?: number
-  limitTools?: number
-  revalidateSeconds?: number
-}): Promise<ExplorePopularResponse> {
-  try {
-    const base = getPublicBaseUrl()
-    const u = new URL('/api/v1/explore/popular', base)
-    if (args?.windowDays) u.searchParams.set('windowDays', String(args.windowDays))
-    if (args?.limitAgents) u.searchParams.set('limitAgents', String(args.limitAgents))
-    if (args?.limitTools) u.searchParams.set('limitTools', String(args.limitTools))
-
-    const json = await fetchJson<ApiResponse<ExplorePopularResponse>>(u.toString(), {
-      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-explore-popular'] },
-      headers: { Accept: 'application/json' },
-    })
-
-    const data = (json.data as ExplorePopularResponse | undefined) ?? { windowDays: args?.windowDays ?? 30, agents: [], tools: [] }
-    // Ensure any avatar URLs embedded in the HTML are reachable from the public origin.
-    return {
-      ...data,
-      agents: Array.isArray(data.agents)
-        ? data.agents.map(t => ({
-            ...t,
-            avatarUrl: absolutizePublicUrl((t as any)?.avatarUrl, base),
-          }))
-        : [],
-      tools: Array.isArray(data.tools) ? data.tools : [],
-    }
-  } catch (e) {
-    console.warn('[public-templates] fetchPublicExplorePopular failed', {
-      error: e instanceof Error ? e.message : String(e),
-    })
-    return { windowDays: args?.windowDays ?? 30, agents: [], tools: [] }
   }
 }
 

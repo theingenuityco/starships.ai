@@ -156,7 +156,7 @@ export class ToolTemplateRepository extends BaseRepository {
           query += ' WHERE ' + whereConditions.join(' AND ');
         }
 
-        query += ' ORDER BY usage_count DESC, created_at DESC';
+        query += ' ORDER BY created_at DESC';
 
         const result = await connection.query<Record<string, unknown>>(query, queryParams);
         return fromDatabaseArray(ToolTemplateEntity, result);

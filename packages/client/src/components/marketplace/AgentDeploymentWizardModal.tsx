@@ -17,6 +17,7 @@ import { AgentTemplatePreviewCard } from '@/components/marketplace/AgentTemplate
 import { cn } from '@/lib/utils'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
 import type { DeployStarshipOptionWithAccess } from '@/hooks/useStarships'
+import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
 
 type WizardStep = 1 | 2 | 3 | 4
 
@@ -419,29 +420,17 @@ export function AgentDeploymentWizardModal({
                         const title = info?.name?.trim() || slug
                         const desc = info?.description?.trim() || ''
                         const current = toolPermissions[slug] ?? 'ask'
+                        const leftIcon = pickToolLeftIcon(title)
                         return (
-                          <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
+                          <div key={slug} className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
                             <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3 min-w-0">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
-                                    <Tooltip delayDuration={250}>
-                                      <TooltipTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex-shrink-0"
-                                          aria-label={`Tool info: ${title}`}
-                                        >
-                                          <Icon name="info" iconOverride={{ type: 'phosphor', component: 'Info' }} className="h-4 w-4" />
-                                        </button>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="top" align="start" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]">
-                                        <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </div>
-                                  {desc ? <div className="mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-1">{desc}</div> : null}
+                              <div className="flex items-start gap-3 min-w-0 flex-1">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-border/40 flex-shrink-0">
+                                  <Icon name={leftIcon.name} className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="min-w-0 flex-1 pt-0.5">
+                                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
+                                  {desc ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{desc}</div> : null}
                                 </div>
                               </div>
 

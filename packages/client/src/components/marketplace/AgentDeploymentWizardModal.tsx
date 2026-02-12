@@ -294,7 +294,8 @@ export function AgentDeploymentWizardModal({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               {/* Agent details (compact preview, matches marketplace card layout). */}
-              <AgentTemplatePreviewCard template={template} className="mb-6" />
+              <div className="text-sm font-semibold">Agent details</div>
+              <AgentTemplatePreviewCard template={template} className="mt-3 mb-6" />
 
               {step === 1 ? (
                 <div className="mt-8 space-y-3">

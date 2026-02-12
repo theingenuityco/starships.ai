@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import type { Metadata } from 'next'
 
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -48,11 +48,15 @@ export const metadata: Metadata = {
 }
 
 export default async function ExplorePage() {
-  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
+  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
+    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
+    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
+    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
+  ])
   return (
     <>
       <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-        <MarketplacePageClient initialAgentTemplates={agentTemplates} />
+        <MarketplacePageClient initialAgentTemplates={agentTemplates} initialToolTemplates={toolTemplates} initialConnectorCatalog={connectorCatalog} />
       </Suspense>
     </>
   )

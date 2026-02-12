@@ -423,53 +423,57 @@ export function AgentDeploymentWizardModal({
                         const leftIcon = pickToolLeftIcon(title)
                         return (
                           <div key={slug} className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3 min-w-0 flex-1">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <Icon name={leftIcon.name} className="h-4 w-4 text-foreground shrink-0" />
-                                    <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
-                                  </div>
-                                  {desc ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{desc}</div> : null}
+                            <div className="flex flex-col gap-1">
+                              {/* Row 1: icon + name + permission selector */}
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Icon name={leftIcon.name} className="h-4 w-4 text-foreground shrink-0" />
+                                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
                                 </div>
+
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
+                                      <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
+                                        <Badge
+                                          variant="outline"
+                                          className={cn('whitespace-nowrap border text-[9px] px-1 py-0.5', permissionBadgeClassName(current))}
+                                        >
+                                          <span className="inline-flex items-center gap-1">
+                                            <Icon name={permissionIconName(current)} className="h-2.5 w-2.5" />
+                                            <span>{permissionLabel(current)}</span>
+                                            <Icon name="chevron-down" className="h-2.5 w-2.5 opacity-70" />
+                                          </span>
+                                        </Badge>
+                                      </button>
+                                    </span>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-64">
+                                    {(['allow', 'ask', 'deny'] as const).map(p => (
+                                      <DropdownMenuItem
+                                        key={p}
+                                        className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
+                                        onClick={() => {
+                                          if (isProcessing) return
+                                          setToolPermissions(prev => ({ ...prev, [slug]: p }))
+                                        }}
+                                      >
+                                        <div className="flex flex-col gap-0.5">
+                                          <div className="flex items-center gap-2">
+                                            <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
+                                            <span className="text-sm font-medium">{permissionLabel(p)}</span>
+                                            <span className="ml-auto" />
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
+                                        </div>
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
 
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
-                                    <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
-                                      <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
-                                        <span className="inline-flex items-center gap-1.5">
-                                          <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
-                                          <span>{permissionLabel(current)}</span>
-                                          <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
-                                        </span>
-                                      </Badge>
-                                    </button>
-                                  </span>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-72">
-                                  {(['allow', 'ask', 'deny'] as const).map(p => (
-                                    <DropdownMenuItem
-                                      key={p}
-                                      className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
-                                      onClick={() => {
-                                        if (isProcessing) return
-                                        setToolPermissions(prev => ({ ...prev, [slug]: p }))
-                                      }}
-                                    >
-                                      <div className="flex flex-col gap-0.5">
-                                        <div className="flex items-center gap-2">
-                                          <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
-                                          <span className="text-sm font-medium">{permissionLabel(p)}</span>
-                                          <span className="ml-auto" />
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
-                                      </div>
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {/* Row 2: full-width description */}
+                              {desc ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{desc}</div> : null}
                             </div>
                           </div>
                         )

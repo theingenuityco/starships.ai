@@ -1,11 +1,11 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import type { AgentTemplateModel, AgentToolPermission, DeployStarshipOption, ToolTemplateModel } from '@starships/protocol'
 
 import Icon from '@/components/primitives/Icon'
-import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { ConnectorSuggestionCard } from '@/components/widgets/ConnectorSuggestionCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,10 @@ import { cn } from '@/lib/utils'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
 
 type WizardStep = 1 | 2 | 3
+
+// Lazy import to avoid circular dependency:
+// `AgentTemplateCard` opens the wizard (imports this file), and the wizard wants to render the card.
+const AgentTemplateCard = dynamic(() => import('@/components/marketplace/AgentTemplateCard').then(m => m.AgentTemplateCard), { ssr: false })
 
 interface AgentDeploymentWizardModalProps {
   isOpen: boolean
@@ -174,44 +178,9 @@ export function AgentDeploymentWizardModal({
             </DialogHeader>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              {/* Template summary (consistent across steps) */}
-              <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
-                <div className="flex items-start gap-4 min-w-0">
-                  <MarketplaceAvatar
-                    imageUrl={template.avatarUrl || null}
-                    label={template.name}
-                    seed={template.name || template.slug || 'AI'}
-                    sizeClassName="h-16 w-16"
-                    shapeClassName="rounded-2xl"
-                    ringClassName="ring-1 ring-border/40"
-                    shadowClassName="shadow-sm"
-                    showTintWhenMissing={false}
-                    showInsetRing={false}
-                    fallbackTextClassName="text-sm font-semibold text-muted-foreground"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-base leading-tight truncate">{template.name}</h4>
-                    {template.role ? <p className="mt-0.5 text-sm text-muted-foreground truncate">{template.role}</p> : null}
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      {template.category ? (
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {template.category}
-                        </Badge>
-                      ) : null}
-                      {template.version ? (
-                        <Badge variant="outline" className="text-xs font-mono">
-                          v{template.version}
-                        </Badge>
-                      ) : null}
-                      {template.model ? (
-                        <Badge variant="outline" className="text-xs font-mono">
-                          {template.model}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-                {template.description ? <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{template.description}</p> : null}
+              {/* Agent preview card (reuse marketplace card without CTA). */}
+              <div className="pointer-events-none">
+                <AgentTemplateCard template={template} showDeployCta={false} showCategory={false} density="compact" />
               </div>
 
               {step === 1 ? (

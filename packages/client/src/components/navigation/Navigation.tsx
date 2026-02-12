@@ -307,7 +307,7 @@ export function Navigation(props: NavigationProps) {
             {
               href: `/ship/${starshipSlug}/installed`,
               label: 'Installed',
-              icon: 'link',
+              icon: 'download',
               isActive: isInstalledRoute,
             },
           ]

@@ -581,7 +581,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="link" weight="bold" className="h-5 w-5" />
+                    <Icon name="download" weight="bold" className="h-5 w-5" />
                   </span>
                   <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Installed</h3>
                 </div>

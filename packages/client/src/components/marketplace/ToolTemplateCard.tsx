@@ -132,7 +132,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
             <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={leftIcon.title}>
-                  <Icon name={leftIcon.name} className="h-5 w-5 text-muted-foreground" />
+                  <Icon name={leftIcon.name} className="h-6 w-6 text-muted-foreground" />
                 </div>
               </div>
             </div>

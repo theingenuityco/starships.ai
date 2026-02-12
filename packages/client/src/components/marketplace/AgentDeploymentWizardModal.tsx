@@ -212,7 +212,7 @@ export function AgentDeploymentWizardModal({
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               {/* Agent preview card (reuse marketplace card without CTA). */}
               <div className="pointer-events-none">
-                <AgentTemplateCard template={template} showDeployCta={false} showCategory={false} density="compact" />
+                <AgentTemplateCard template={template} showDeployCta={false} showCategory={false} density="compact" compactAvatarStyle="tile" />
               </div>
 
               {step === 1 ? (

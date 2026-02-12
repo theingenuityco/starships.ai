@@ -83,6 +83,11 @@ interface StarshipConnectorsPanelProps {
    * counts how many of those are currently connected.
    */
   onStatsChange?: (stats: { total: number; connected: number }) => void
+  /**
+   * When false, disables entrance animations for cards (no motion wrappers).
+   * Useful for wizard/modals where staggered animations feel distracting.
+   */
+  animateCards?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -115,6 +120,7 @@ export function StarshipConnectorsPanel({
   cardVariant = 'panel',
   matchAgentCardStyle = false,
   onStatsChange,
+  animateCards = true,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -515,77 +521,93 @@ export function StarshipConnectorsPanel({
       ) : null
 
       if (compact) {
-        return (
-          <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
-            <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {provider && showLogo ? (
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                        <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
-                      </div>
-                    ) : (
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
-                        <Icon name="plug" className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-
-                    <div className="text-sm font-semibold leading-tight text-foreground truncate">{label}</div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {exploreDisconnectButton}
-                    {!shouldHideConnectButton ? exploreConnectButton : null}
-                  </div>
-                </div>
-
-                {!hideCardDescription && catalogItem.description ? (
-                  <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
-                ) : null}
-              </div>
-            </div>
-          </motion.div>
-        )
-      }
-
-      return (
-        <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
-          <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
-            <div className="flex">
-              {/* Left logo strip (edge-to-edge), matching Explore listing */}
-              <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  {provider ? (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                      <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+        const CardShell = (
+          <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  {provider && showLogo ? (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                      <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
                     </div>
                   ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">
-                      <Icon name="plug" className="h-4.5 w-4.5" />
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
+                      <Icon name="plug" className="h-3.5 w-3.5" />
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Right content */}
-              <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
-                <div className="min-w-0">
-                  <div className="text-base font-semibold leading-tight truncate">{label}</div>
+                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{label}</div>
                 </div>
 
-                {!hideCardDescription && catalogItem.description ? (
-                  <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
-                ) : null}
-
-                <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   {exploreDisconnectButton}
                   {!shouldHideConnectButton ? exploreConnectButton : null}
                 </div>
               </div>
+
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
             </div>
           </div>
+        )
+
+        return animateCards ? (
+          <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+            {CardShell}
+          </motion.div>
+        ) : (
+          <div key={provider} className="h-full">
+            {CardShell}
+          </div>
+        )
+      }
+
+      const DefaultExploreShell = (
+        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
+          <div className="flex">
+            {/* Left logo strip (edge-to-edge), matching Explore listing */}
+            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 flex items-center justify-center">
+                {provider ? (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                    <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                  </div>
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">
+                    <Icon name="plug" className="h-4.5 w-4.5" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right content */}
+            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-tight truncate">{label}</div>
+              </div>
+
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
+
+              <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                {exploreDisconnectButton}
+                {!shouldHideConnectButton ? exploreConnectButton : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+      return animateCards ? (
+        <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+          {DefaultExploreShell}
         </motion.div>
+      ) : (
+        <div key={provider} className="h-full">
+          {DefaultExploreShell}
+        </div>
       )
     }
 

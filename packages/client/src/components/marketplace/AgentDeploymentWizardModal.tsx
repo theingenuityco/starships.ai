@@ -515,6 +515,7 @@ export function AgentDeploymentWizardModal({
                         hideDisconnect={false}
                         compactCard
                         connectButtonLabel="Connect"
+                        animateCards={false}
                       />
                     ) : (
                       <div className="rounded-xl border border-border/60 bg-card/50 p-4">

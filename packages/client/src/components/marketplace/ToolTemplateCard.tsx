@@ -9,7 +9,7 @@ import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import api from '@/lib/api'
 import type { ApiResponse, ToolModel, ToolTemplateModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
@@ -40,7 +40,9 @@ function pickToolLeftIcon(name: string): { name: string; title: string } {
   return { name: 'magic-wand', title: 'Tools' }
 }
 
-export function ToolTemplateCard(props: { template: ToolTemplateModel; density?: 'default' | 'compact'; showCategory?: boolean; showInstallCta?: boolean }) {
+type ToolTemplateCardProps = { template: ToolTemplateModel; density?: 'default' | 'compact'; showCategory?: boolean; showInstallCta?: boolean }
+
+function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
   const template = props.template
   const density = props.density ?? 'default'
   const compact = density === 'compact'
@@ -102,6 +104,22 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
   const leftIcon = useMemo(() => {
     return pickToolLeftIcon(displayName)
   }, [displayName])
+
+  const connectorLogoItems = useMemo(() => {
+    // Precompute logo src so we don't call `getConnectorLogoSrc` on every render.
+    return requiredConnectorProviders.map(provider => ({
+      provider,
+      logoSrc: getConnectorLogoSrc(provider),
+    }))
+  }, [requiredConnectorProviders])
+
+  const hideLogo = useCallback((provider: string) => {
+    if (!provider) return
+    setHiddenLogos(prev => {
+      if (prev[provider]) return prev
+      return { ...prev, [provider]: true }
+    })
+  }, [])
 
   const deployDisabled = isInstalling || (isAuthenticated && !starship) || !slug
   const installDisabled = deployDisabled || isInstalled
@@ -180,13 +198,12 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                   <div className="flex items-center gap-1 min-w-0">
                     {requiredConnectorProviders.length > 0 ? (
                       <>
-                        {requiredConnectorProviders.slice(0, 4).map(provider => {
+                        {connectorLogoItems.slice(0, 4).map(({ provider, logoSrc }) => {
                           const showLogo = !hiddenLogos[provider]
-                          const logoSrc = getConnectorLogoSrc(provider)
                           return (
                             <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
                               {showLogo ? (
-                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
+                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} />
                               ) : null}
                             </div>
                           )
@@ -223,12 +240,11 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
             <div className="flex items-center gap-1 mb-3">
               {requiredConnectorProviders.length > 0 ? (
                 <>
-                  {requiredConnectorProviders.slice(0, 10).map(provider => {
+                  {connectorLogoItems.slice(0, 10).map(({ provider, logoSrc }) => {
                     const showLogo = !hiddenLogos[provider]
-                    const logoSrc = getConnectorLogoSrc(provider)
                     return (
                       <div key={provider} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
-                        {showLogo ? <Image src={logoSrc} alt="" width={20} height={20} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
+                        {showLogo ? <Image src={logoSrc} alt="" width={20} height={20} className="object-contain" onError={() => hideLogo(provider)} /> : null}
                       </div>
                     )
                   })}
@@ -296,3 +312,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
     </>
   )
 }
+
+// Prevent expensive icon/logo rerenders when the parent list rerenders
+// (e.g. typing in search input, tab count updates, etc.)
+export const ToolTemplateCard = memo(ToolTemplateCardImpl)

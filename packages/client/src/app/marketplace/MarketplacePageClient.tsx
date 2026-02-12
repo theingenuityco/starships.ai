@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog } from '@/hooks/useConnectors'
@@ -112,27 +113,28 @@ export default function MarketplacePageClient(props: {
   }, [connectorCatalog, serverSearch.data?.connectors, shouldUseServerSearch])
 
   const agentsVisible = useMemo(() => {
-    return shouldUseServerSearch ? agentsMatchingSearch : agentsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
-  }, [agentsMatchingSearch, shouldUseServerSearch])
+    if (shouldUseServerSearch) return agentsMatchingSearch
+    // Only cap results on the "All" tab sections.
+    return tab === 'all' ? agentsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : agentsMatchingSearch
+  }, [agentsMatchingSearch, shouldUseServerSearch, tab])
 
   const toolsVisible = useMemo(() => {
-    return shouldUseServerSearch ? toolsMatchingSearch : toolsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
-  }, [toolsMatchingSearch, shouldUseServerSearch])
+    if (shouldUseServerSearch) return toolsMatchingSearch
+    // Only cap results on the "All" tab sections.
+    return tab === 'all' ? toolsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : toolsMatchingSearch
+  }, [toolsMatchingSearch, shouldUseServerSearch, tab])
 
   const connectorsVisible = useMemo(() => {
-    return shouldUseServerSearch ? connectorsMatchingSearch : connectorsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
-  }, [connectorsMatchingSearch, shouldUseServerSearch])
+    if (shouldUseServerSearch) return connectorsMatchingSearch
+    // Only cap results on the "All" tab sections.
+    return tab === 'all' ? connectorsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : connectorsMatchingSearch
+  }, [connectorsMatchingSearch, shouldUseServerSearch, tab])
 
   const countsByTab = useMemo(() => {
-    const agents = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
-      : Math.min(agentsMatchingSearch.length, MAX_LISTING_RESULTS)
-    const tools = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
-      : Math.min(toolsMatchingSearch.length, MAX_LISTING_RESULTS)
-    const connectors = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
-      : Math.min(connectorsMatchingSearch.length, MAX_LISTING_RESULTS)
+    // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
+    const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : agentsMatchingSearch.length
+    const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : toolsMatchingSearch.length
+    const connectors = shouldUseServerSearch ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length) : connectorsMatchingSearch.length
     return {
       all: agents + tools + connectors,
       agents,
@@ -365,12 +367,19 @@ export default function MarketplacePageClient(props: {
                       {agentsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-baseline gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({agentsVisible.length})</span>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {agentsVisible.length}
+                              </Badge>
                             </div>
-                            <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
-                              View all
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
+                              onClick={() => router.push(TAB_TO_ROUTE.agents)}
+                            >
+                              <span>Explore all agents</span>
+                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -386,12 +395,19 @@ export default function MarketplacePageClient(props: {
                       {toolsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-baseline gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({toolsVisible.length})</span>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {toolsVisible.length}
+                              </Badge>
                             </div>
-                            <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.tools)}>
-                              View all
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
+                              onClick={() => router.push(TAB_TO_ROUTE.tools)}
+                            >
+                              <span>Explore all tools</span>
+                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -412,12 +428,19 @@ export default function MarketplacePageClient(props: {
                       {connectorsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-baseline gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({connectorsVisible.length})</span>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {connectorsVisible.length}
+                              </Badge>
                             </div>
-                            <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.connectors)}>
-                              View all
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
+                              onClick={() => router.push(TAB_TO_ROUTE.connectors)}
+                            >
+                              <span>Explore all connectors</span>
+                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>

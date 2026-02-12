@@ -1,4 +1,8 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+
+import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
+import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -16,12 +20,37 @@ function toQueryString(params: Record<string, string | string[] | undefined> | n
   return qs ? `?${qs}` : ''
 }
 
-export default async function ExploreRedirectPage(props: PageProps) {
+// Public marketing page: cacheable at the edge with ISR.
+export const dynamic = 'force-static'
+export const revalidate = 3600 // 1 hour
+
+export default async function ExplorePage(props: PageProps) {
   const searchParams = (await props.searchParams) ?? {}
   const tabRaw = searchParams?.tab
   const tab = typeof tabRaw === 'string' ? tabRaw : Array.isArray(tabRaw) ? tabRaw[0] : ''
   const t = String(tab || '').trim().toLowerCase()
-  const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : t === 'connectors' ? '/explore/connectors' : '/explore/all'
-  redirect(`${dest}${toQueryString(searchParams)}`)
+
+  // Back-compat: old links used `?tab=...`. Prefer redirecting to the new route segments.
+  if (t === 'agents' || t === 'tools' || t === 'connectors') {
+    const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : '/explore/connectors'
+    redirect(`${dest}${toQueryString(searchParams)}`)
+  }
+
+  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
+    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
+    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
+    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
+  ])
+
+  return (
+    <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
+      <MarketplacePageClient
+        activeTab="all"
+        initialAgentTemplates={agentTemplates}
+        initialToolTemplates={toolTemplates}
+        initialConnectorCatalog={connectorCatalog}
+      />
+    </Suspense>
+  )
 }
 

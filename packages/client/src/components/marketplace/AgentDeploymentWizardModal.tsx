@@ -216,7 +216,7 @@ export function AgentDeploymentWizardModal({
               </div>
 
               {step === 1 ? (
-                <div className="mt-5 space-y-3">
+                <div className="mt-8 space-y-3">
                   <div className="text-sm font-semibold">Choose a starship</div>
 
                   {listForSelection.length === 0 ? (

@@ -56,7 +56,7 @@ function StarshipMonogram({ starship, disabled }: { starship: { name?: string; s
   return (
     <div
       className={cn(
-        'h-6 w-6 shrink-0 rounded-md border flex items-center justify-center text-[10px] font-semibold tabular-nums',
+        'h-8 w-8 shrink-0 rounded-lg border flex items-center justify-center text-[11px] font-semibold tabular-nums',
         disabled ? 'border-border/60 bg-muted/20 text-muted-foreground' : 'border-primary/25 bg-primary/10 text-primary'
       )}
       aria-hidden
@@ -211,13 +211,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 1 ? (
                 <div className="mt-5 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Icon name="rocket" className="h-4 w-4 text-primary" />
-                    <div className="text-sm font-semibold">Choose a starship</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    You can deploy agents only to starships you own. Starships where you&apos;re a member are shown but disabled.
-                  </div>
+                  <div className="text-sm font-semibold">Choose a starship</div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
@@ -247,27 +241,30 @@ export function AgentDeploymentWizardModal({
                               disabled && 'hover:bg-card/40'
                             )}
                           >
-                            <div className="flex items-start justify-between gap-3 h-full">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start gap-2 min-w-0">
-                                  <StarshipMonogram starship={s} disabled={disabled} />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
-                                    <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
-                                    {/* Reserve space for disabled warning so cards stay uniform height. */}
-                                    <div className="mt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
-                                      {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                            <div className="flex flex-col h-full">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start gap-2 min-w-0">
+                                    <StarshipMonogram starship={s} disabled={disabled} />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
+                                      <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
                                     </div>
                                   </div>
                                 </div>
+                                {disabled ? (
+                                  <Icon name="lock" className="h-5 w-5 text-muted-foreground shrink-0" />
+                                ) : selected ? (
+                                  <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" />
+                                ) : (
+                                  <div className="h-5 w-5 shrink-0" />
+                                )}
                               </div>
-                              {disabled ? (
-                                <Icon name="lock" className="h-5 w-5 text-muted-foreground shrink-0" />
-                              ) : selected ? (
-                                <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" />
-                              ) : (
-                                <div className="h-5 w-5 shrink-0" />
-                              )}
+
+                              {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
+                              <div className="mt-auto pt-3 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
+                                {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                              </div>
                             </div>
                           </button>
                         )
@@ -292,21 +289,25 @@ export function AgentDeploymentWizardModal({
                                   setSelectedStarship(s)
                                 }}
                                 disabled={isProcessing || disabled}
-                                className={cn(
-                                  'w-full flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm transition-colors',
-                                  selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30',
-                                  (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
-                                  disabled && 'hover:bg-background/30'
-                                )}
+                                className={cn('w-full rounded-lg border px-3 py-2 text-sm transition-colors text-left', selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30', (isProcessing || disabled) && 'opacity-60 cursor-not-allowed', disabled && 'hover:bg-background/30')}
                               >
-                                <span className="flex items-start gap-2 min-w-0 flex-1">
-                                  <StarshipMonogram starship={s} disabled={disabled} />
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
-                                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
-                                  </span>
-                                </span>
-                                {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
+                                <div className="flex flex-col min-h-[64px]">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <span className="flex items-start gap-2 min-w-0 flex-1">
+                                      <StarshipMonogram starship={s} disabled={disabled} />
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
+                                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
+                                      </span>
+                                    </span>
+                                    {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary shrink-0" /> : null}
+                                  </div>
+
+                                  {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
+                                  <div className="mt-auto pt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
+                                    {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                                  </div>
+                                </div>
                               </button>
                             )
                           })}

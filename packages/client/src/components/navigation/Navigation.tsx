@@ -176,18 +176,20 @@ export function Navigation(props: NavigationProps) {
     if (!starshipSlug) {
       return {
         isConnectorsRoute: false,
+        isIntegrationsRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
       }
     }
     return {
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
+      isIntegrationsRoute: pathname.startsWith(`/ship/${starshipSlug}/integrations`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isSchedulesRoute, isMembersRoute } = routeChecks
+  const { isConnectorsRoute, isIntegrationsRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -300,6 +302,16 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/integrations`,
+              label: 'Integrations',
+              icon: 'link',
+              isActive: isIntegrationsRoute,
+            },
+          ]
+        : []),
       ...(canManageConnectors && starshipSlug
         ? [
             {
@@ -331,7 +343,17 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isMembersRoute, isInstanceAdmin]
+    [
+      isAuthenticated,
+      starshipSlug,
+      canManageConnectors,
+      pathname,
+      isSchedulesRoute,
+      isConnectorsRoute,
+      isIntegrationsRoute,
+      isMembersRoute,
+      isInstanceAdmin,
+    ]
   )
 
   const handleSidebarBackgroundClick = useCallback(

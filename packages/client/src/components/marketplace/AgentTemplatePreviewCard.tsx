@@ -15,19 +15,19 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
 
   return (
     <div className={cn('relative overflow-hidden rounded-lg bg-transparent', className)}>
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3 pl-0.5">
         {/* Square avatar tile */}
         <MarketplaceAvatar
           imageUrl={avatarUrl || null}
           label={displayName || 'Agent'}
           seed={displayName || template.slug || 'AI'}
-          sizeClassName="h-24 w-24"
+          sizeClassName="h-[72px] w-[72px]"
           shapeClassName="rounded-xl"
           ringClassName="ring-1 ring-border/40"
-          shadowClassName="shadow-sm"
+          shadowClassName="shadow-md"
           showInsetRing={false}
           showTintWhenMissing={true}
-          fallbackTextClassName="text-base font-semibold text-muted-foreground"
+          fallbackTextClassName="text-sm font-semibold text-muted-foreground"
           tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
         />
 
@@ -38,12 +38,12 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
             {displayRole ? <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}
 
             {/* Role (big) */}
-            <div className={displayRole ? 'mt-0.5 text-base font-semibold leading-tight truncate' : 'text-base font-semibold leading-tight truncate'}>
+            <div className={displayRole ? 'mt-0.5 text-sm font-semibold leading-tight truncate' : 'text-sm font-semibold leading-tight truncate'}>
               {displayRole || displayName || 'Unnamed agent'}
             </div>
           </div>
 
-          {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+          {displayDescription ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
         </div>
       </div>
     </div>

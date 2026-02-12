@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog } from '@/hooks/useConnectors'
@@ -189,27 +190,57 @@ export default function MarketplacePageClient(props: {
     const logoSrc = provider ? getConnectorLogoSrc(provider) : null
     return (
       <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md p-5">
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 shrink-0 rounded-lg border border-border/40 bg-white flex items-center justify-center overflow-hidden">
-              {logoSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoSrc}
-                  alt=""
-                  className="h-6 w-6 object-contain"
-                  onError={e => {
-                    ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                  }}
-                />
-              ) : null}
+        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
+          <div className="flex">
+            {/* Left logo strip (edge-to-edge) */}
+            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 flex items-center justify-center">
+                {logoSrc ? (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || name}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoSrc}
+                      alt=""
+                      className="h-6 w-6 object-contain"
+                      onError={e => {
+                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
+                    <Icon name="workflow" className="h-4.5 w-4.5" />
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-lg font-semibold leading-tight truncate">{name}</div>
-              {provider ? <div className="mt-1 text-xs text-muted-foreground truncate">{provider}</div> : null}
+
+            {/* Right content */}
+            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-base font-semibold leading-tight truncate">{name}</div>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!provider}
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!provider) return
+                    router.push(`/connectors/${encodeURIComponent(provider)}/install`)
+                  }}
+                  className="h-8 px-3 shrink-0"
+                >
+                  <Icon name="plug" className="w-3.5 h-3.5 mr-2" />
+                  Connect
+                </Button>
+              </div>
+              {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
             </div>
           </div>
-          {description ? <div className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{description}</div> : null}
         </div>
       </motion.div>
     )
@@ -351,7 +382,7 @@ export default function MarketplacePageClient(props: {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {agentsMatchingSearch.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
                             <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                              <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={false} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                              <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                             </motion.div>
                           ))}
                         </div>
@@ -381,7 +412,7 @@ export default function MarketplacePageClient(props: {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: idx * 0.04 }}
                             >
-                              <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={false} />
+                              <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
                             </motion.div>
                           ))}
                         </div>
@@ -413,7 +444,7 @@ export default function MarketplacePageClient(props: {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
                       <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                        <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={false} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                        <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                       </motion.div>
                     ))}
                   </div>
@@ -421,7 +452,7 @@ export default function MarketplacePageClient(props: {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {toolsMatchingSearch.map((template: ToolTemplateModel, idx: number) => (
                       <motion.div key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                        <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={false} />
+                        <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
                       </motion.div>
                     ))}
                   </div>

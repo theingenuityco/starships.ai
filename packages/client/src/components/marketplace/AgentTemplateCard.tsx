@@ -294,26 +294,20 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
                 {/* CTA */}
                 {showDeployCta ? (
-                  isAlreadyDeployed ? (
-                    <div className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 border border-emerald-500/30 dark:border-emerald-500/30 shrink-0">
-                      <Icon name="check-circle" className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        requestDeploy()
-                      }}
-                      disabled={deployDisabled}
-                      className="h-8 bg-primary text-primary-foreground hover:bg-primary/90 px-3 shrink-0"
-                    >
-                      <Icon name={deployIconName} className="w-3.5 h-3.5 mr-2" />
-                      {deployLabel}
-                    </Button>
-                  )
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      requestDeploy()
+                    }}
+                    disabled={deployDisabled}
+                    className="h-8 px-3 shrink-0"
+                  >
+                    <Icon name={deployIconName} className="w-3.5 h-3.5 mr-2" />
+                    {deployLabel}
+                  </Button>
                 ) : null}
               </div>
 

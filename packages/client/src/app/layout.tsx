@@ -10,8 +10,11 @@ import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
 import { AuthUserHtmlClassSync } from '@/components/auth/AuthUserHtmlClassSync'
+import { FaviconThemeSync } from '@/components/theme/FaviconThemeSync'
+import { buildFaviconInitScriptSource } from '@/lib/faviconSvg'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import Script from 'next/script'
 import { Toaster as SonnerToaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -77,11 +80,6 @@ export const metadata: Metadata = {
     images: ['/static-assets/og.jpg'],
   },
   icons: {
-    icon: [
-      { url: '/favicons/favicon.ico', sizes: 'any' },
-      { url: '/favicons/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicons/icon.png', sizes: '96x96', type: 'image/png' },
-    ],
     apple: '/favicons/apple-icon.png',
   },
   appleWebApp: {
@@ -94,11 +92,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="app-favicon-init" strategy="beforeInteractive">
+          {buildFaviconInitScriptSource()}
+        </Script>
+      </head>
       <body className={`${inter.className} app-gradient-bg`} suppressHydrationWarning>
         <SentryWrapper />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <QueryProvider>
             <AuthProvider>
+              <FaviconThemeSync />
               <AuthUserHtmlClassSync />
               <UserbackWrapper>
                 <TooltipProvider>

@@ -18,6 +18,7 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ConversationRepository,
   ConversationMemberRepository,
   ConversationParticipantRepository,
   ConversationWidgetRepository,
@@ -48,6 +49,7 @@ import type {
   StandardErrorCode,
 } from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
+import crypto from 'crypto';
 
 const router: Router = Router();
 
@@ -593,7 +595,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
       const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
-      const turn: ConversationStreamSnapshot['turn'] =
+      let turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
           ? {
               turnId: latestTurn.id,
@@ -630,10 +632,21 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             type Buffer = { content: string; reasoning: string; firstAt?: string; lastAt?: string };
             const buffers = new Map<string, Buffer>();
+            let activeTurnAgent: { agentId: string; agentName?: string } | null = null;
 
             for (const item of recent) {
               const evt = item.evt;
               if (!evt || typeof evt.type !== 'string') continue;
+
+              // Capture canonical agent identity for the active turn (used for snapshot.turn + stream placeholder identity).
+              if (!activeTurnAgent && evt.type === 'turn.started') {
+                const d = (evt as Extract<ConversationStreamEvent, { type: 'turn.started' }>).data as any;
+                if (d && d.turnId === activeTurnId) {
+                  const agentId = typeof d.agentId === 'string' ? String(d.agentId).trim() : '';
+                  const agentName = typeof d.agentName === 'string' ? String(d.agentName).trim() : '';
+                  if (agentId) activeTurnAgent = { agentId, ...(agentName ? { agentName } : {}) };
+                }
+              }
 
               if (evt.type === 'assistant.delta' || evt.type === 'assistant.reasoning_delta') {
                 const data =
@@ -641,6 +654,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                     ? (evt as Extract<ConversationStreamEvent, { type: 'assistant.delta' }>).data
                     : (evt as Extract<ConversationStreamEvent, { type: 'assistant.reasoning_delta' }>).data;
                 if (!data || data.turnId !== activeTurnId) continue;
+                // Fallback identity source (should match turn.started); helps if the stream is missing turn.started for any reason.
+                if (!activeTurnAgent) {
+                  const agentId = typeof (data as any)?.agentId === 'string' ? String((data as any).agentId).trim() : '';
+                  const agentName = typeof (data as any)?.agentName === 'string' ? String((data as any).agentName).trim() : '';
+                  if (agentId) activeTurnAgent = { agentId, ...(agentName ? { agentName } : {}) };
+                }
                 const messageId = typeof data.messageId === 'string' ? data.messageId : '';
                 const delta = typeof data.delta === 'string' ? data.delta : '';
                 const at = typeof data.at === 'string' ? data.at : undefined;
@@ -653,6 +672,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                 else cur.reasoning += delta;
                 buffers.set(messageId, cur);
               }
+            }
+
+            if (activeTurnAgent && turn && turn.turnId === activeTurnId) {
+              turn = { ...turn, agentId: activeTurnAgent.agentId, ...(activeTurnAgent.agentName ? { agentName: activeTurnAgent.agentName } : {}) };
             }
 
             // Pick the messageId with the most accumulated data.
@@ -685,6 +708,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                   createdAt: buf.firstAt || at,
                   updatedAt: at,
                   turnId: activeTurnId,
+                  ...(activeTurnAgent?.agentId ? { agentId: activeTurnAgent.agentId } : {}),
+                  ...(activeTurnAgent?.agentName ? { agentName: activeTurnAgent.agentName } : {}),
                 };
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }
@@ -1846,6 +1871,41 @@ router.post(
         }
       }
 
+      // Conversation-level DB-backed turn guard.
+      //
+      // CRITICAL BILLING SAFEGUARD:
+      // Duplicate client requests (double-submit, retries) can arrive while a turn is starting.
+      // Previously we would bill credits before `ConversationService.addConversationMessage()` could
+      // reject the duplicate as a conflicting in-progress turn, causing multiple 10-credit debits
+      // for what users perceive as a single agent turn.
+      //
+      // This guard is DB-backed so it works across multiple server replicas.
+      // The acquired `turnGuardId` is passed to ConversationService so it can proceed even though
+      // `state.turnActive` is already true (it "owns" the guard).
+      const conversationRepo = new ConversationRepository();
+      let turnGuardId: string | undefined;
+      let turnGuardAcquired = false;
+      if (willTriggerAgent) {
+        turnGuardId = crypto.randomUUID();
+        try {
+          turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId);
+        } catch (e) {
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          handleError(e, res, 'acquiring conversation turn guard');
+          return;
+        }
+        if (!turnGuardAcquired) {
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          sendError(
+            res,
+            'RESOURCE_LOCKED',
+            'A turn is already in progress for this conversation. Please wait for the current response to complete before sending another message.',
+            409
+          );
+          return;
+        }
+      }
+
       // Persist the user message first (we need messageId for idempotent charging).
       // If this message will run an agent, debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
@@ -1899,8 +1959,14 @@ router.post(
               currentCredits: wallet?.balance ?? '0',
               requiredCredits: requiredCredits.toFixed(6),
             });
+            if (turnGuardAcquired) {
+              await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+            }
             if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
             return;
+          }
+          if (turnGuardAcquired) {
+            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
           }
           if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
           throw e;
@@ -1922,7 +1988,7 @@ router.post(
               ...(imageConfig && { imageConfig }),
             },
             { authContext: req.authContext },
-            { preCreatedUserMessage: userMessage, turnLeaseId }
+            { preCreatedUserMessage: userMessage, turnLeaseId, turnGuardId }
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
@@ -1979,7 +2045,7 @@ router.post(
             ...(imageConfig && { imageConfig }),
           },
           { authContext: req.authContext },
-          { preCreatedUserMessage: userMessage, turnLeaseId }
+          { preCreatedUserMessage: userMessage, turnLeaseId, turnGuardId }
         )
         .catch((error) => {
           // Background conversation processing failure; main request already acknowledged

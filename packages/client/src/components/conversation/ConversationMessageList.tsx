@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { TypingDots } from '@/components/ui/TypingDots'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -376,7 +377,7 @@ function LinkedConversationCard({
                       return (
                         <div key={p.key} className="h-7 w-7">
                           <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
                             <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                           </Avatar>
                         </div>
@@ -651,31 +652,12 @@ export function ConversationMessageList({
   const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
   const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
 
-  // IMPORTANT:
-  // For user↔agent DMs, the streaming placeholder message (`stream-${turnId}`) often arrives without
-  // an `agentId`/`agentName` initially. If we fall back to `conversationAgents[0]`, we can render the
-  // *wrong* agent label during streaming (e.g. "Aria") and then "snap back" once the final persisted
-  // message includes the correct agent metadata. Prefer the DM list's resolved agent instead.
-  const dmAgentFallback = useMemo<ConversationAgent | null>(() => {
-    const dm: any = (dmItem as any)?.dm
-    if (dm?.dmType !== 'user_agent') return null
-
-    const dmAgent: any = (dmItem as any)?.agent ?? null
-    const dmAgentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
-    const fromConversationList = dmAgentId && Array.isArray(conversationAgents) ? ((conversationAgents.find(a => String((a as any)?.id || '').trim() === dmAgentId) as any) ?? null) : null
-
-    return (dmAgent as any) || (fromConversationList as any) || null
-  }, [conversationAgents, dmItem])
-
-  const isUserAgentDm = (dmItem as any)?.dm?.dmType === 'user_agent'
-  // For user↔agent DMs, never fall back to some other agent (e.g. Aria) if we can't resolve the DM agent.
-  // Prefer rendering a generic "Assistant" over showing the wrong name during streaming.
-  const fallbackAgent = isUserAgentDm ? dmAgentFallback : conversationAgents[0]
+  // Canonical identity should come from message.agentId / stream turn actor, not UI-side guessing.
+  // When identity is missing, prefer a generic label over rendering the wrong agent.
   const fallbackAgentDisplayName = useMemo(() => {
     if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
-    if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
-    return undefined
-  }, [agentNameOverride, fallbackAgent])
+    return 'Assistant'
+  }, [agentNameOverride])
 
   const agentById = useMemo(() => {
     const m = new Map<string, ConversationAgent>()
@@ -701,10 +683,8 @@ export function ConversationMessageList({
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
-    const fallbackId = typeof (fallbackAgent as any)?.avatarAttachmentId === 'string' ? String((fallbackAgent as any).avatarAttachmentId).trim() : ''
-    if (fallbackId) ids.push(fallbackId)
     return Array.from(new Set(ids))
-  }, [conversationAgents, fallbackAgent])
+  }, [conversationAgents])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
   const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 
@@ -713,17 +693,18 @@ export function ConversationMessageList({
       if (!msg || msg.role !== 'assistant') return null
       const agentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
       const fromList = agentId ? agentById.get(agentId) : undefined
-      const agent = fromList ?? fallbackAgent
+      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+      const agent = fromList ?? null
 
       // `message.agentName` often comes from the backend as *name-only* (no role).
       // Always append role when we can resolve it from the agent list.
-      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
       const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
       const nameFallback =
         nameFromMsg ||
-        (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') ||
-        (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') ||
-        (agentId ? `Agent ${agentId.slice(0, 6)}` : '')
+        (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
+        (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
+        (agentId ? `Agent ${agentId.slice(0, 6)}` : '') ||
+        fallbackAgentDisplayName
 
       const displayName = (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
 
@@ -763,7 +744,7 @@ export function ConversationMessageList({
         updatedAt,
       }
     },
-    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
+    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, fallbackAgentDisplayName]
   )
 
   const resolveAgentPresentationFromAgent = useCallback(
@@ -1294,81 +1275,26 @@ export function ConversationMessageList({
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
 
+  const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
+  const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const gapLoaderPresentation = useMemo(() => {
     if (!activeTurnId) return null
 
-    // 1) Best: `turn.usage` tells us the actual agent for this turn (when available).
-    const usage = activeTurnId && turnUsageByTurnId && typeof turnUsageByTurnId === 'object' ? (turnUsageByTurnId as any)[activeTurnId] : null
-    const usageAgentId = typeof usage?.agentId === 'string' ? String(usage.agentId).trim() : ''
-    const usageAgentName = typeof usage?.agentName === 'string' ? String(usage.agentName).trim() : ''
-    if (usageAgentId) {
-      const agent = agentById.get(usageAgentId) ?? null
+    // Strict identity: only render agent identity from the canonical turn actor (server-provided).
+    if (turnAgentId) {
+      const agent = agentById.get(turnAgentId) ?? null
       const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'turn.usage.agentId' as const, mentionAgentId: '' }
-    }
-    if (usageAgentName) {
-      return { displayName: usageAgentName, slug: undefined, avatarUrl: undefined, strategy: 'turn.usage.agentName' as const, mentionAgentId: '' }
+      if (p) return { ...p, strategy: 'turn.started.agentId' as const }
+      const label = turnAgentName || `Agent ${turnAgentId.slice(0, 6)}`
+      return { displayName: label, slug: undefined, avatarUrl: undefined, strategy: 'turn.started.agentId-unresolved' as const }
     }
 
-    // 2) Next-best: parse the last user message for an agent mention (<@a:AGENT_ID> or legacy @slug)
-    const lastUser = [...renderMessages].reverse().find(m => (m as any)?.role === 'user') as ExtendedMessage | undefined
-    const lastUserContent = typeof (lastUser as any)?.content === 'string' ? String((lastUser as any).content) : ''
-    const tokenMatch = lastUserContent.match(/^\s*<@a:([^>\s]+)>/)
-    const legacyText = lastUserContent.replace(/<@[^>\n]+>/g, ' ')
-    const legacyMentionMatch = legacyText.match(/^\s*@([A-Za-z0-9._-]{1,100})/i)
-    const mentionAgentId = tokenMatch ? String(tokenMatch[1] || '').trim() : ''
-    const mentionHandle = legacyMentionMatch ? String(legacyMentionMatch[1] || '').trim() : ''
-    if (mentionAgentId) {
-      const agent = agentById.get(mentionAgentId) ?? null
-      const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'lastUser.<@a:id>' as const, mentionAgentId }
-    }
-    if (mentionHandle) {
-      const lower = mentionHandle.toLowerCase()
-      const agent =
-        conversationAgents.find(a => {
-          const slug = typeof (a as any)?.slug === 'string' ? String((a as any).slug).toLowerCase() : ''
-          const name = typeof (a as any)?.name === 'string' ? String((a as any).name).toLowerCase() : ''
-          return (slug && slug === lower) || (name && name === lower)
-        }) ?? null
-      const p = resolveAgentPresentationFromAgent(agent)
-      if (p) return { ...p, strategy: 'lastUser.@handle' as const, mentionAgentId: '' }
+    if (turnAgentName) {
+      return { displayName: turnAgentName, slug: undefined, avatarUrl: undefined, strategy: 'turn.started.agentName' as const }
     }
 
-    // 3) Fallback: previous logic (last assistant / fallback agent)
-    const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
-    const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
-    return {
-      displayName: (p.displayName || fallbackAgentDisplayName || 'Assistant').trim() || 'Assistant',
-      slug: p.slug,
-      avatarUrl: p.avatarUrl,
-      strategy: 'fallback' as const,
-      mentionAgentId: '',
-    }
-  }, [activeTurnId, agentById, conversationAgents, fallbackAgentDisplayName, renderMessages, resolveAgentPresentationFromAgent, resolveAssistantPresentation, turnUsageByTurnId])
-
-  const gapLoaderLoggedKeyRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!shouldShowGapLoader) {
-      gapLoaderLoggedKeyRef.current = null
-      return
-    }
-    const key = `${String(conversationId ?? 'none')}|${String(activeTurnId ?? 'none')}|${String(activeTurnStatus ?? 'none')}`
-    if (gapLoaderLoggedKeyRef.current === key) return
-    gapLoaderLoggedKeyRef.current = key
-  }, [
-    activeTurnId,
-    activeTurnStatus,
-    conversationId,
-    fallbackAgentDisplayName,
-    isAssistantStreaming,
-    isAwaitingAssistant,
-    isAwaitingToolResults,
-    renderMessages,
-    resolveAssistantPresentation,
-    shouldShowGapLoader,
-    turnUsageByTurnId,
-  ])
+    return { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined, strategy: 'unknown' as const }
+  }, [activeTurnId, agentById, fallbackAgentDisplayName, resolveAgentPresentationFromAgent, turnAgentId, turnAgentName])
 
   const activeThreadParentMessageId = useMemo(() => {
     const tid = typeof activeThreadConversationId === 'string' ? activeThreadConversationId.trim() : ''
@@ -1393,6 +1319,53 @@ export function ConversationMessageList({
     }
     return lastId
   }, [renderMessages])
+
+  const streamingIdentityLoggedRef = useRef<string>('')
+  useEffect(() => {
+    if (!activeRenderedStreamingAssistantId) return
+    const m = renderMessages.find(x => String((x as any)?.id ?? '') === String(activeRenderedStreamingAssistantId)) as ExtendedMessage | undefined
+    if (!m) return
+    if (m.role !== 'assistant') return
+
+    const msgId = typeof (m as any)?.id === 'string' ? String((m as any).id) : String((m as any)?.id ?? '')
+    const msgTurnId = typeof (m as any)?.turnId === 'string' ? String((m as any).turnId) : ''
+    const msgAgentId = typeof (m as any)?.agentId === 'string' ? String((m as any).agentId).trim() : ''
+    const msgAgentName = typeof (m as any)?.agentName === 'string' ? String((m as any).agentName).trim() : ''
+    const fromListFound = Boolean(msgAgentId && agentById.has(msgAgentId))
+
+    const base = resolveAssistantPresentation(m)
+    const streamish = Boolean((m as any)?.streaming === true && typeof (m as any)?.id === 'string' && String((m as any).id).startsWith('stream-'))
+    const shouldOverrideFromGap = Boolean(streamish && activeTurnId && msgTurnId && msgTurnId === activeTurnId && gapLoaderPresentation)
+    const final = shouldOverrideFromGap
+      ? {
+          ...(base || ({} as any)),
+          displayName: (gapLoaderPresentation as any)?.displayName,
+          slug: (gapLoaderPresentation as any)?.slug,
+          avatarUrl: (gapLoaderPresentation as any)?.avatarUrl,
+        }
+      : base
+
+    const key = JSON.stringify({
+      msgId,
+      msgTurnId,
+      msgAgentId,
+      msgAgentName,
+      fromListFound,
+      activeTurnId: String(activeTurnId ?? ''),
+      shouldOverrideFromGap,
+      gapStrategy: (gapLoaderPresentation as any)?.strategy,
+      base: base
+        ? { displayName: (base as any).displayName, role: (base as any).role, avatarUrl: (base as any).avatarUrl, modelId: (base as any).modelId }
+        : null,
+      final: final
+        ? { displayName: (final as any).displayName, role: (final as any).role, avatarUrl: (final as any).avatarUrl, modelId: (final as any).modelId }
+        : null,
+    })
+    if (streamingIdentityLoggedRef.current === key) return
+    streamingIdentityLoggedRef.current = key
+
+    // (agent debug log removed)
+  }, [activeRenderedStreamingAssistantId, activeTurnId, agentById, gapLoaderPresentation, renderMessages, resolveAssistantPresentation])
 
   // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
   const lastRenderedMessage: ExtendedMessage | null = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as ExtendedMessage) : null
@@ -1456,6 +1429,7 @@ export function ConversationMessageList({
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
   const lastAutoScrollThreadIdRef = useRef<string | null>(null)
+  const threadOpenAutoScrollTimeoutRef = useRef<number | null>(null)
   useLayoutEffect(() => {
     // When the thread pane opens, the main pane shrinks which can reflow text and
     // push the clicked "thread card" message out of view. Best-effort: scroll the
@@ -1476,38 +1450,62 @@ export function ConversationMessageList({
     const el = cardEl ?? messageRefs.current[messageId]
     if (!el) return
 
-    // Defer to next frame so layout reflow from pane resize is applied.
-    requestAnimationFrame(() => {
-      const c = scrollContainerRef.current
-      const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
-      if (!c || !node) return
+    const runScroll = (behavior: ScrollBehavior) => {
+      // Defer to next frame so layout reflow from pane resize is applied.
+      requestAnimationFrame(() => {
+        const c = scrollContainerRef.current
+        const node = (c ? (c.querySelector(`[data-thread-linked-conversation-id="${CSS.escape(tid)}"]`) as HTMLElement | null) : null) ?? messageRefs.current[messageId]
+        if (!c || !node) return
 
-      const cRect = c.getBoundingClientRect()
-      const r = node.getBoundingClientRect()
-      const pad = 16
-      const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
-      // On thread-open we prefer centering the thread card even if it's already visible,
-      // to avoid it drifting out of view after the pane shrink/reflow.
-      if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
-        // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
-        // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
-        try {
-          const currentTop = c.scrollTop
-          const deltaTop = r.top - cRect.top
-          const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
-          const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
-          const nextTop = Math.max(0, Math.min(maxTop, desired))
-          // Update the "stick to bottom" lock immediately so we don't auto-snap back down
-          // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
-          isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
-          c.scrollTo({ top: nextTop, behavior: 'smooth' })
-        } catch {
-          /* ignore */
+        const cRect = c.getBoundingClientRect()
+        const r = node.getBoundingClientRect()
+        const pad = 16
+        const fullyVisible = r.top >= cRect.top + pad && r.bottom <= cRect.bottom - pad
+        // On thread-open we prefer centering the thread card even if it's already visible,
+        // to avoid it drifting out of view after the pane shrink/reflow.
+        if (!fullyVisible || Boolean(enableChannelMessageThreads && activeThreadConversationId)) {
+          // Avoid `scrollIntoView()` here: it can scroll the *page* instead of the message list container,
+          // and some browsers clamp "center" in surprising ways. Compute a target scrollTop ourselves.
+          try {
+            const currentTop = c.scrollTop
+            const deltaTop = r.top - cRect.top
+            const desired = currentTop + deltaTop - (c.clientHeight / 2 - r.height / 2)
+            const maxTop = Math.max(0, c.scrollHeight - c.clientHeight)
+            const nextTop = Math.max(0, Math.min(maxTop, desired))
+            // Update the "stick to bottom" lock immediately so we don't auto-snap back down
+            // after we perform this targeted scroll (e.g. on hard reload with `?thread=` open).
+            isNearBottomRef.current = nextTop + c.clientHeight >= c.scrollHeight - SCROLL_THRESHOLD_PX
+            c.scrollTo({ top: nextTop, behavior })
+          } catch {
+            /* ignore */
+          }
         }
-      } else {
-      }
+      })
+    }
+
+    // Cancel any prior scheduled correction.
+    if (threadOpenAutoScrollTimeoutRef.current != null) {
+      window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+      threadOpenAutoScrollTimeoutRef.current = null
+    }
+
+    // 1) Immediate best-effort scroll after the first reflow.
+    runScroll('smooth')
+
+    // 2) Correction scroll after the thread pane width transition completes (layout keeps shifting during the 300ms animation).
+    // This prevents occasional mis-calculation when we measure mid-transition.
+    threadOpenAutoScrollTimeoutRef.current = window.setTimeout(() => {
+      threadOpenAutoScrollTimeoutRef.current = null
+      runScroll('auto')
       lastAutoScrollThreadIdRef.current = tid
-    })
+    }, 320)
+
+    return () => {
+      if (threadOpenAutoScrollTimeoutRef.current != null) {
+        window.clearTimeout(threadOpenAutoScrollTimeoutRef.current)
+        threadOpenAutoScrollTimeoutRef.current = null
+      }
+    }
   }, [activeThreadConversationId, activeThreadParentMessageId])
 
   // Optimized auto-scroll with debouncing (now supports streaming progress).
@@ -2360,7 +2358,7 @@ function MessageDateDivider({ label }: { label: string }) {
 function MessageTimestamp({ value, isEdited = false }: { value?: string | null; isEdited?: boolean }) {
   if (!value || typeof value !== 'string' || value.trim().length === 0) return null
   return (
-    <div className="inline-flex items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
+    <div className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] text-foreground/65 leading-none">
       <time dateTime={value} title={formatDate(value)}>
         <span className="tabular-nums leading-none text-foreground/70">{formatTime(value)}</span>
       </time>
@@ -2390,15 +2388,19 @@ function getDeletedMessageLabel(isAuthedUserMessage: boolean): string {
   return isAuthedUserMessage ? 'Message deleted by you.' : 'Message deleted by user.'
 }
 
-function MessageOwnerActions({
+function MessageMoreActions({
   messageId,
   disabled,
+  canEdit,
+  canDelete,
   isEditing,
   onStartEdit,
   onCancelEdit,
 }: {
   messageId: string
   disabled?: boolean
+  canEdit: boolean
+  canDelete: boolean
   isEditing: boolean
   onStartEdit: () => void
   onCancelEdit: () => void
@@ -2406,35 +2408,60 @@ function MessageOwnerActions({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const deleteMessage = useDeleteMessage()
 
-  const canDelete = !deleteMessage.isPending
+  const canConfirmDelete = !deleteMessage.isPending
 
   if (disabled) return null
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7"
-        onClick={() => (isEditing ? onCancelEdit() : onStartEdit())}
-        aria-label={isEditing ? 'Cancel edit' : 'Edit message'}
-        title={isEditing ? 'Cancel edit' : 'Edit message'}
-      >
-        <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-destructive hover:text-destructive"
-        onClick={() => setDeleteOpen(true)}
-        aria-label="Delete message"
-        title="Delete message"
-        disabled={isEditing}
-      >
-        <Icon name="trash" className="h-4 w-4" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="More options" title="More options">
+            <Icon name="dots-horizontal" className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[180px]">
+          <DropdownMenuItem
+            onSelect={async e => {
+              e.preventDefault()
+              try {
+                await navigator.clipboard.writeText(String(messageId))
+              } catch {
+                // ignore clipboard failures
+              }
+            }}
+          >
+            <Icon name="copy" className="h-4 w-4" />
+            Copy message ID
+          </DropdownMenuItem>
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+          {canEdit ? (
+            <DropdownMenuItem
+              onSelect={e => {
+                e.preventDefault()
+                isEditing ? onCancelEdit() : onStartEdit()
+              }}
+            >
+              <Icon name={isEditing ? 'x' : 'edit'} className="h-4 w-4" />
+              {isEditing ? 'Cancel edit' : 'Edit message'}
+            </DropdownMenuItem>
+          ) : null}
+          {canDelete ? (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              disabled={isEditing}
+              onSelect={e => {
+                e.preventDefault()
+                setDeleteOpen(true)
+              }}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+              Delete message
+            </DropdownMenuItem>
+          ) : null}
+          {!canEdit && !canDelete ? <DropdownMenuItem disabled>No other actions</DropdownMenuItem> : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={deleteOpen} onOpenChange={open => setDeleteOpen(open)}>
         <DialogContent className="sm:max-w-md">
@@ -2450,7 +2477,7 @@ function MessageOwnerActions({
               type="button"
               variant="destructive"
               onClick={async () => {
-                if (!canDelete) return
+                if (!canConfirmDelete) return
                 try {
                   await deleteMessage.mutateAsync(messageId)
                   setDeleteOpen(false)
@@ -2458,7 +2485,7 @@ function MessageOwnerActions({
                   // Error toast handled in hook
                 }
               }}
-              disabled={!canDelete}
+              disabled={!canConfirmDelete}
             >
               Delete
             </Button>
@@ -2715,17 +2742,20 @@ const MemoizedMessageBubble = memo(
       return <MessageReactionAction conversationId={cid} messageId={id} showQuick={true} />
     }, [cid, isDeletedMessage, message.id])
 
-    const ownerActionButtons = useMemo(() => {
+    const moreActionButton = useMemo(() => {
       const id = typeof message.id === 'string' ? message.id : ''
       if (!id) return null
-      if (!isUser) return null
-      if (!isAuthedUserMessage) return null
       if (isDeletedMessage) return null
-      if (id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')) return null
+      const isEphemeral = id.startsWith('temp-user-') || id.startsWith('stream-') || id.startsWith('ui-action:')
+      // Allow the menu even for ephemeral IDs (useful during streaming/sending), but disable edit/delete.
+      const canEdit = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
+      const canDeleteMsg = Boolean(isUser && isAuthedUserMessage && !isEphemeral)
       return (
-        <MessageOwnerActions
+        <MessageMoreActions
           messageId={id}
           isEditing={isEditing}
+          canEdit={canEdit}
+          canDelete={canDeleteMsg}
           onStartEdit={() => {
             setEditDraft(String(message.content ?? ''))
             setIsEditing(true)
@@ -2735,16 +2765,15 @@ const MemoizedMessageBubble = memo(
       )
     }, [isAuthedUserMessage, isDeletedMessage, isEditing, isUser, message.content, message.id])
 
-    const messageActionNodes = useMemo(() => {
-      if (!threadActionButton && !reactionActionButton && !ownerActionButtons) return null
+    const messageActionNodesBeforeCopy = useMemo(() => {
+      if (!threadActionButton && !reactionActionButton) return null
       return (
         <>
           {reactionActionButton}
           {threadActionButton}
-          {ownerActionButtons}
         </>
       )
-    }, [ownerActionButtons, reactionActionButton, threadActionButton])
+    }, [reactionActionButton, threadActionButton])
 
     if (isUser) {
       const isConsecutiveSameUser = Boolean(isConsecutiveUser)
@@ -2837,7 +2866,7 @@ const MemoizedMessageBubble = memo(
                           src={explicitUserAvatarUrl!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : userAvatarSeedOverride ? (
@@ -2847,7 +2876,7 @@ const MemoizedMessageBubble = memo(
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : null}
@@ -2870,7 +2899,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || (messageUserId ? `User ${messageUserId.slice(0, 6)}` : 'User')).trim()
-      const userProfileHref = isAuthedUserMessage && typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : null
+      const userProfileHref = isAuthedUserMessage ? '/account' : null
       const authorLabel = (() => {
         if (!isAuthedUserMessage) return userDisplayName
         const detail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
@@ -2944,7 +2973,7 @@ const MemoizedMessageBubble = memo(
                           src={explicitUserAvatarUrl!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : userAvatarSeedOverride ? (
@@ -2954,7 +2983,7 @@ const MemoizedMessageBubble = memo(
                           src={effectiveUserAvatar!}
                           alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                           referrerPolicy="no-referrer"
-                          crossOrigin="anonymous"
+                          // NOTE: Do not set `crossOrigin` for simple avatar display.
                           className="rounded-full object-cover"
                         />
                       ) : null}
@@ -2981,7 +3010,7 @@ const MemoizedMessageBubble = memo(
                         src={explicitUserAvatarUrl!}
                         alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                         referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
+                        // NOTE: Do not set `crossOrigin` for simple avatar display.
                         className="rounded-full object-cover"
                       />
                     ) : userAvatarSeedOverride ? (
@@ -2991,7 +3020,7 @@ const MemoizedMessageBubble = memo(
                         src={effectiveUserAvatar!}
                         alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
                         referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
+                        // NOTE: Do not set `crossOrigin` for simple avatar display.
                         className="rounded-full object-cover"
                       />
                     ) : null}
@@ -3009,16 +3038,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 flex items-center gap-2">
-                  <div className="text-sm font-bold font-mono text-foreground">
+                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                  <div className="min-w-0 text-sm font-bold font-mono text-foreground">
                     <HoverProfilePopover
                       trigger={
                         userProfileHref ? (
-                          <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                          <Link href={userProfileHref} className="block max-w-full truncate hover:underline underline-offset-2">
                             {authorLabel}
                           </Link>
                         ) : (
-                          <span>{authorLabel}</span>
+                          <span className="block max-w-full truncate">{authorLabel}</span>
                         )
                       }
                       content={userHoverCard}
@@ -3058,11 +3087,13 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={!isConsecutiveSameUser}
                   className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                   chunks={message.chunks}
                   reasoning={message.reasoning}
@@ -3192,11 +3223,13 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive && !isDeletedMessage}
-                  extraActions={messageActionNodes}
+                  extraActions={messageActionNodesBeforeCopy}
+                  extraActionsAfterCopy={moreActionButton}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
                   compact={true}
+                  hasAuthorLine={true}
                   className={cn('text-foreground', isDeletedMessage && 'italic text-muted-foreground')}
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
@@ -3290,16 +3323,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 flex items-center gap-2">
-                  <div className="text-sm font-bold text-foreground">
+                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                  <div className="min-w-0 text-sm font-bold text-foreground">
                     <HoverProfilePopover
                       trigger={
                         assistantProfileHref ? (
-                          <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                          <Link href={assistantProfileHref} className="block max-w-full truncate font-mono hover:underline underline-offset-2">
                             {assistantDisplayName}
                           </Link>
                         ) : (
-                          <span className="font-mono">{assistantDisplayName}</span>
+                          <span className="block max-w-full truncate font-mono">{assistantDisplayName}</span>
                         )
                       }
                       content={assistantHoverCard}
@@ -3314,11 +3347,13 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive && !isDeletedMessage}
-                extraActions={messageActionNodes}
+                extraActions={messageActionNodesBeforeCopy}
+                extraActionsAfterCopy={moreActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
                 compact={true}
+                hasAuthorLine={Boolean(showAssistantAvatar)}
                 className={cn('text-foreground/80', isDeletedMessage && 'italic text-muted-foreground')}
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -3528,13 +3563,6 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
-        // but with a left-weighted fade (transparent → solid border → transparent).
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }
@@ -3572,11 +3600,6 @@ function DirectMessageHero({
           </div>
         </div>
       </div>
-      <div
-        role="separator"
-        aria-hidden="true"
-        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
-      />
     </div>
   )
 }

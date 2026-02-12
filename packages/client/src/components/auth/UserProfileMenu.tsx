@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
-import { useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { isImageUrl } from '@/lib/isImageUrl'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
@@ -42,8 +42,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
     if (selectedStarshipId) {
       return userStarships.find(s => s.id === selectedStarshipId) ?? null
     }
-    return userStarships[0] ?? null
-  }, [userStarships, pathStarshipSlug, selectedStarshipId])
+    return pickPrimaryStarshipForUser(userStarships, user?.id, selectedStarshipId)
+  }, [userStarships, pathStarshipSlug, selectedStarshipId, user?.id])
 
   // Fallback: if we're on /ship/:slug/* but userStarships hasn't loaded yet, fetch the starship by slug to get its ID.
   const { data: starshipBySlug } = useStarshipBySlug(pathStarshipSlug || '', !!pathStarshipSlug && isAuthenticated && !starshipFromList?.id)
@@ -51,6 +51,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
   const activeStarshipId = starshipFromList?.id ?? starshipBySlug?.id ?? selectedStarshipId ?? null
   const activeStarshipSlug = starshipFromList?.slug ?? pathStarshipSlug ?? null
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
+
+  const isOwner = Boolean(isAuthenticated && user?.id && (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
 
@@ -60,9 +62,8 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
   }, [router, activeStarshipSlug])
 
   const handleAccountClick = useCallback(() => {
-    if (!activeStarshipSlug) return
-    router.push(`/ship/${activeStarshipSlug}/settings/my-profile`)
-  }, [router, activeStarshipSlug])
+    router.push('/account')
+  }, [router])
 
   const handleMyStarshipClick = useCallback(() => {
     if (!activeStarshipSlug) return
@@ -115,7 +116,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12 rounded-full ring-1 ring-border/40">
               {isImageUrl(userAvatar) ? (
-                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
               ) : null}
               <AvatarFallback className="rounded-full bg-muted/40">
                 <Icon name="user" className="h-5 w-5 text-muted-foreground" />
@@ -131,18 +132,20 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleAccountClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+        <DropdownMenuItem onClick={handleAccountClick} className={navMenuItemClassName}>
           <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
             <Icon name="user" className={navMenuItemIconClassName} />
           </div>
           My Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleMyStarshipClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
-          <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-            <Icon name="rocket" className={navMenuItemIconClassName} />
-          </div>
-          My Starship
-        </DropdownMenuItem>
+        {isOwner ? (
+          <DropdownMenuItem onClick={handleMyStarshipClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+            <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+              <Icon name="rocket" className={navMenuItemIconClassName} />
+            </div>
+            My Starship
+          </DropdownMenuItem>
+        ) : null}
         {canManageBilling ? (
           <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
             <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>

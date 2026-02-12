@@ -24,6 +24,74 @@ export const STARSHIP_QUERY_KEYS = {
 } as const
 
 /**
+ * Pick the "primary" starship for a user from an accessible list.
+ *
+ * Priority:
+ * 1) If the user owns any starships: prefer an owned starship
+ *    - Use selected starship only if it is also owned
+ *    - Otherwise use the first owned starship
+ * 2) If the user owns no starships: selected starship (if present)
+ * 3) Fallback: first starship in the list
+ */
+export function pickPrimaryStarshipForUser(
+  starships: StarshipModel[] | undefined | null,
+  userId: string | undefined | null,
+  selectedStarshipId?: string | null
+): StarshipModel | null {
+  const list = Array.isArray(starships) ? starships : []
+  if (!list.length) return null
+
+  const uid = typeof userId === 'string' ? userId : ''
+  const selectedId = typeof selectedStarshipId === 'string' && selectedStarshipId.trim() ? selectedStarshipId : null
+
+  const selected = selectedId ? (list.find(s => s.id === selectedId) ?? null) : null
+  const firstOwned = uid ? (list.find(s => s.ownerId === uid) ?? null) : null
+  const ownedCount = uid ? list.reduce((n, s) => (s.ownerId === uid ? n + 1 : n), 0) : 0
+
+  // If the user owns at least one starship, prefer an owned starship.
+  // Only honor selectedStarshipId when it is ALSO owned by the user.
+  let choice: StarshipModel | null = null
+
+  if (uid && ownedCount > 0) {
+    if (selected && selected.ownerId === uid) {
+      choice = selected
+    } else {
+      choice = firstOwned
+    }
+  } else if (selected) {
+    choice = selected
+  } else {
+    choice = list[0] ?? null
+  }
+
+  return choice
+}
+
+/**
+ * Order starships so user-owned starships appear first (stable order).
+ * If the user owns none (or userId is missing), returns the list as-is.
+ */
+export function orderStarshipsOwnedFirst(
+  starships: StarshipModel[] | undefined | null,
+  userId: string | undefined | null
+): StarshipModel[] {
+  const list = Array.isArray(starships) ? starships : []
+  const uid = typeof userId === 'string' ? userId : ''
+  if (!uid || list.length === 0) return list
+
+  const owned: StarshipModel[] = []
+  const others: StarshipModel[] = []
+
+  for (const s of list) {
+    if (s?.ownerId === uid) owned.push(s)
+    else others.push(s)
+  }
+
+  if (owned.length === 0) return list
+  return [...owned, ...others]
+}
+
+/**
  * Get starship by ID
  */
 export function useStarship(starshipId: string, enabled: boolean = true) {
@@ -152,7 +220,7 @@ export function useCreateStarship() {
 
 /**
  * Ensure the current user has at least one starship (creates default if none).
- * Used on /profile when user has no starships; invite-joiners never need this.
+ * Used when user has no starships; invite-joiners never need this.
  */
 export function useEnsureDefaultStarship() {
   const queryClient = useQueryClient()

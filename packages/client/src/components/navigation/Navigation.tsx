@@ -4,18 +4,17 @@ import Icon from '@/components/primitives/Icon'
 
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
-import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
 
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -32,19 +31,67 @@ export function Navigation(props: NavigationProps) {
   const { isMobile = false, isOpen = true, onClose } = props
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
-  const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
+  const { isAuthenticated, user, isInstanceAdmin } = useAuth()
+
+  // Keep these stable so effects/callbacks don't churn.
+  const getSelectedStarshipId = useCallback((): string | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      return localStorage.getItem('selectedStarshipId')
+    } catch {
+      return null
+    }
+  }, [])
+
+  const setSelectedStarship = useCallback((starshipId: string | null) => {
+    if (typeof window === 'undefined') return
+    try {
+      if (starshipId) localStorage.setItem('selectedStarshipId', starshipId)
+      else localStorage.removeItem('selectedStarshipId')
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
   const [isExpanded, setIsExpanded] = useState(true)
-  const [isHovered, setIsHovered] = useState(false)
   const [isCollapsing, setIsCollapsing] = useState(false)
+
+  // Keep logo stable during collapse animation.
+  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearCollapseTimeout = useCallback(() => {
+    if (!collapseTimeoutRef.current) return
+    try {
+      clearTimeout(collapseTimeoutRef.current)
+    } finally {
+      collapseTimeoutRef.current = null
+    }
+  }, [])
+
+  const collapseSidebar = useCallback(() => {
+    if (isMobile) return
+    setIsCollapsing(true)
+    setIsExpanded(false)
+    clearCollapseTimeout()
+    // Match the CSS transition duration (300ms)
+    collapseTimeoutRef.current = setTimeout(() => {
+      setIsCollapsing(false)
+    }, 300)
+  }, [clearCollapseTimeout, isMobile])
+
+  const expandSidebar = useCallback(() => {
+    if (isMobile) return
+    clearCollapseTimeout()
+    setIsCollapsing(false)
+    setIsExpanded(true)
+  }, [clearCollapseTimeout, isMobile])
 
   // Force expanded state on mobile
   useEffect(() => {
     if (isMobile) {
       setIsExpanded(true)
+      setIsCollapsing(false)
     }
   }, [isMobile])
 
@@ -52,30 +99,20 @@ export function Navigation(props: NavigationProps) {
   const isMarketplaceRoute = pathname === '/marketplace' || pathname.startsWith('/marketplace/')
   useEffect(() => {
     if (!isMobile && isMarketplaceRoute) {
-      setIsExpanded(false)
+      collapseSidebar()
     }
-  }, [isMobile, isMarketplaceRoute])
+  }, [collapseSidebar, isMobile, isMarketplaceRoute])
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
   const [navigationStarshipSlug, setNavigationStarshipSlug] = useState<string | null>(null)
-  // Ref for click outside detection
-  const sidebarRef = useRef<HTMLDivElement>(null)
 
-  // Ref for collapse timeout to keep logo stable during collapse animation
-  const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Cleanup collapse timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (collapseTimeoutRef.current) {
-        clearTimeout(collapseTimeoutRef.current)
-      }
-    }
-  }, [])
+  // Cleanup any collapse timeout on unmount
+  useEffect(() => clearCollapseTimeout, [clearCollapseTimeout])
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const railStarships = useMemo(() => orderStarshipsOwnedFirst(userStarships ?? [], user?.id), [userStarships, user?.id])
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -94,22 +131,9 @@ export function Navigation(props: NavigationProps) {
       // If we're on a starship route, use that starship
       setNavigationStarshipSlug(pathStarshipSlug)
     } else {
-      // If we're not on a starship route, try to get a default starship
       const selectedStarshipId = getSelectedStarshipId()
-      if (selectedStarshipId && userStarships) {
-        const selectedStarship = userStarships.find(ship => ship.id === selectedStarshipId)
-        if (selectedStarship) {
-          setNavigationStarshipSlug(selectedStarship.slug)
-          return
-        }
-      }
-
-      // Fall back to the first available starship
-      if (userStarships && userStarships.length > 0) {
-        setNavigationStarshipSlug(userStarships[0].slug)
-      } else {
-        setNavigationStarshipSlug(null)
-      }
+      const primary = pickPrimaryStarshipForUser(userStarships ?? [], user?.id, selectedStarshipId)
+      setNavigationStarshipSlug(primary?.slug ?? null)
     }
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
@@ -152,20 +176,18 @@ export function Navigation(props: NavigationProps) {
     if (!starshipSlug) {
       return {
         isConnectorsRoute: false,
-        isAgentsRoute: false,
-        isAgentBuilderRoute: false,
         isSchedulesRoute: false,
+        isMembersRoute: false,
       }
     }
     return {
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
-      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
-      isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
+      isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -240,22 +262,29 @@ export function Navigation(props: NavigationProps) {
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
-  // Handle logo click - memoized
+  // Handle logo/name click - memoized
   const handleLogoClick = useCallback(() => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
-    // Always go to landing screen
+    // Prefer routing into the active starship (ship root redirects to default channel).
+    if (activeStarshipSlug) {
+      router.push(`/ship/${activeStarshipSlug}`)
+      if (isMobile && onClose) onClose()
+      return
+    }
+    // Fallback to landing screen
     router.push('/')
-  }, [router])
+    if (isMobile && onClose) onClose()
+  }, [activeStarshipSlug, isMobile, onClose, router])
 
   // Header click: expand when collapsed, otherwise go to landing
   const handleHeaderClick = useCallback(() => {
     if (!isExpanded) {
-      setIsExpanded(true)
+      expandSidebar()
       return
     }
     handleLogoClick()
-  }, [isExpanded, handleLogoClick])
+  }, [isExpanded, expandSidebar, handleLogoClick])
 
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
@@ -264,10 +293,10 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug
         ? [
             {
-              href: `/ship/${starshipSlug}/agents`,
-              label: 'My Agents',
-              icon: 'bot',
-              isActive: isAgentsRoute || isAgentBuilderRoute,
+              href: `/ship/${starshipSlug}/members`,
+              label: 'Members',
+              icon: 'users',
+              isActive: isMembersRoute,
             },
           ]
         : []),
@@ -302,7 +331,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isMembersRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(
@@ -313,10 +342,14 @@ export function Navigation(props: NavigationProps) {
       if (target.closest('button, a, [role="button"], input, label')) {
         return
       }
-      setIsExpanded(true)
+      expandSidebar()
     },
-    [isExpanded]
+    [expandSidebar, isExpanded]
   )
+
+  const handleConversationSelect = useCallback(() => {
+    if (isMobile && onClose) onClose()
+  }, [isMobile, onClose])
 
   return (
     <>
@@ -327,19 +360,16 @@ export function Navigation(props: NavigationProps) {
 
       {/* Navigation sidebar */}
       <motion.div
-        ref={sidebarRef}
         data-navigation-sidebar
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className={`flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
+        className={`group/navigation flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
         style={{ willChange: isMobile ? 'transform' : 'width', cursor: !isMobile && !isExpanded ? 'e-resize' : 'auto' }}
-        onMouseEnter={() => !isMobile && setIsHovered(true)}
-        onMouseLeave={() => !isMobile && setIsHovered(false)}
         onClick={handleSidebarBackgroundClick}
       >
         {/* Discord-style starship rail */}
-        {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/profile')} /> : null}
+        {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
         <div
           className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
@@ -351,16 +381,21 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
-              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
-              onClick={isMobile ? undefined : handleHeaderClick}
-              title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
+              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
+              onClick={handleHeaderClick}
+              title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Match the nav icon column width so the logo aligns with item icons */}
-              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
-                {isExpanded || isCollapsing || !isHovered ? (
+              <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
+                <div
+                  className={[
+                    'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
+                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover/navigation:opacity-0' : 'opacity-100',
+                  ].join(' ')}
+                >
                   <StarshipsLogo
                     width={22}
                     height={22}
@@ -372,9 +407,25 @@ export function Navigation(props: NavigationProps) {
                     idleLoop={false}
                     playOnMountOnce={false}
                   />
-                ) : (
+                </div>
+                <div
+                  className={[
+                    'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
+                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover/navigation:opacity-100' : 'opacity-0',
+                  ].join(' ')}
+                  aria-hidden
+                >
                   <Icon name="sidebar" className="w-4 h-4" />
-                )}
+                </div>
+                {/* When collapsed, show unread badge on the logo area (hide bell button). */}
+                {!isExpanded && unreadTotal > 0 ? (
+                  <span
+                    // Match bell badge position (bell badge is anchored to a 16px icon centered in a 24px button)
+                    className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
+                    aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                    title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                  />
+                ) : null}
               </div>
               {isExpanded && (
                 <motion.span
@@ -382,8 +433,9 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="text-sm font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
+                  className="block flex-1 min-w-0 text-sm font-medium tracking-tight leading-snug truncate"
                   style={{ marginLeft: '0.375rem' }}
+                  title={starshipData?.name || 'Starships.ai'}
                 >
                   {starshipData?.name || 'Starships.ai'}
                 </motion.span>
@@ -391,29 +443,19 @@ export function Navigation(props: NavigationProps) {
             </div>
             {/* Right-side actions: notifications (icon only) + close/collapse */}
             <div className="flex items-center gap-0.5">
-              {isAuthenticated && starshipSlug && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/ship/${starshipSlug}/notifications`)}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                      aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
-                    >
-                      <span className="relative inline-flex">
-                        <Icon name="bell" className="h-5 w-5" />
-                        {unreadTotal > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500/90 px-1 text-[10px] font-semibold text-white">
-                            {unreadTotal > 99 ? '99+' : unreadTotal}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    {unreadTotal > 0 ? `${unreadTotal} unread` : 'Notifications'}
-                  </TooltipContent>
-                </Tooltip>
+              {isAuthenticated && starshipSlug && isExpanded && (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/ship/${starshipSlug}/notifications`)}
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
+                  title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
+                >
+                  <span className="relative inline-flex">
+                    <Icon name="bell" className="h-4 w-4" />
+                    {unreadTotal > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden />}
+                  </span>
+                </button>
               )}
               {isMobile && isExpanded && onClose ? (
               <button
@@ -430,21 +472,11 @@ export function Navigation(props: NavigationProps) {
                 <button
                   type="button"
                   onClick={() => {
-                    // Start collapsing: keep logo visible during animation
-                    setIsCollapsing(true)
-                    setIsExpanded(false)
-
-                    if (collapseTimeoutRef.current) {
-                      clearTimeout(collapseTimeoutRef.current)
-                    }
-
-                    // Match the CSS transition duration (300ms)
-                    collapseTimeoutRef.current = setTimeout(() => {
-                      setIsCollapsing(false)
-                    }, 300)
+                    collapseSidebar()
                   }}
                   className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                   aria-label="Collapse sidebar"
+                  title="Collapse sidebar"
                   style={{ cursor: 'w-resize' }}
                 >
                   <Icon name="sidebar" className="w-4 h-4" />
@@ -472,17 +504,15 @@ export function Navigation(props: NavigationProps) {
           </div>
 
           {/* Channels + Direct messages */}
-          {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
-            <div className="flex-1 min-h-0 flex flex-col px-2">
+          {isAuthenticated && starshipSlug && starshipData?.id && (
+            <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col px-2' : 'hidden'}>
               {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
               <div className="flex-1 min-h-0 overflow-hidden pb-2">
                 <ConversationList
                   starshipId={starshipData.id}
                   starshipSlug={activeStarshipSlug || undefined}
                   compact={true}
-                  onConversationSelect={() => {
-                    if (isMobile && onClose) onClose()
-                  }}
+                  onConversationSelect={handleConversationSelect}
                 />
               </div>
             </div>
@@ -532,7 +562,11 @@ export function Navigation(props: NavigationProps) {
                           <Icon name="coins" className="h-3.5 w-3.5" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="right">
+                      <TooltipContent
+                        side="right"
+                        className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
+                        sideOffset={10}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="font-medium">Credits</span>
                           <Icon name="coins" className="h-3.5 w-3.5" />
@@ -554,7 +588,13 @@ export function Navigation(props: NavigationProps) {
                         <UserProfileMenu />
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="right">Account</TooltipContent>
+                    <TooltipContent
+                      side="right"
+                      className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
+                      sideOffset={10}
+                    >
+                      Account
+                    </TooltipContent>
                   </Tooltip>
                 )}
               </div>

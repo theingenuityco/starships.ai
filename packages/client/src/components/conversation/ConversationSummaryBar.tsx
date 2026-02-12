@@ -527,7 +527,7 @@ export function ConversationSummaryBar({
                 ) : (
                   <div className="relative">
                     <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="rounded-full object-cover" /> : null}
                       <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                     </Avatar>
                   </div>
@@ -621,7 +621,7 @@ export function ConversationSummaryBar({
                   {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                 </div>
                 {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                   {isDraftHeader ? (
                     <>
                       {hasDraftParticipants ? (
@@ -661,7 +661,7 @@ export function ConversationSummaryBar({
                                   return (
                                     <div key={p.key} className="relative h-5 w-5">
                                       <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
                                         <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                                       </Avatar>
                                     </div>
@@ -814,7 +814,7 @@ export function ConversationSummaryBar({
               </div>
 
               {/* Agents + updated row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                 {effectiveParticipantItems.length > 0 ? (
                   <>
                     {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
@@ -854,7 +854,7 @@ export function ConversationSummaryBar({
                               return (
                                 <div key={p.key} className="relative h-5 w-5">
                                   <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
                                     <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                                   </Avatar>
                                 </div>

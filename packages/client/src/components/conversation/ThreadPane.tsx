@@ -236,8 +236,8 @@ export function ThreadPane(props: {
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}
-        <div ref={inputContainerRef} className="px-4 pb-4 pt-2">
-          <div className="w-full pointer-events-auto opacity-100 relative" data-message-input>
+        <div ref={inputContainerRef} className="px-0 sm:px-4 md:px-6 pt-1.5 pb-[env(safe-area-inset-bottom)] sm:pb-3">
+          <div className="w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative" data-message-input>
             <ConversationMessageInput
               selectedAgent={selectedAgent}
               starshipId={starshipId}

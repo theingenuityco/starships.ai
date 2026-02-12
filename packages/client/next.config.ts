@@ -1,4 +1,4 @@
-import {withSentryConfig} from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs'
 import type { NextConfig } from 'next'
 import { loadEnvConfig } from '@next/env'
 import path from 'path'
@@ -6,7 +6,8 @@ import path from 'path'
 // Load env from monorepo root for local dev
 // In production (Docker/K8s), env vars are injected directly into process.env
 const monorepoRoot = path.resolve(__dirname, '../..')
-loadEnvConfig(monorepoRoot)
+const isDev = process.env.NODE_ENV !== 'production'
+loadEnvConfig(monorepoRoot, isDev)
 
 const PUBLIC_HTML_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
 const PRIVATE_NO_STORE = 'private, no-store'
@@ -67,7 +68,7 @@ const nextConfig: NextConfig = {
       // Authenticated / app area (never cache)
       { source: '/ship/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       { source: '/admin/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
-      { source: '/profile', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/account', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       // Auth entry points (avoid caching login/register HTML)
       { source: '/login', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
       { source: '/forgot-password', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
@@ -100,9 +101,9 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "the-ingenuity-labs-inc",
+  org: 'the-ingenuity-labs-inc',
 
-  project: "starships-client",
+  project: 'starships-client',
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -127,4 +128,4 @@ export default withSentryConfig(nextConfig, {
   // https://docs.sentry.io/product/crons/
   // https://vercel.com/docs/cron-jobs
   // automaticVercelMonitors: true,
-});
+})

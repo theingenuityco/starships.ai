@@ -14,7 +14,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
-import { useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -51,7 +51,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { user, isAuthenticated } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
-  const primaryStarship = starships[0]
+  const railStarships = orderStarshipsOwnedFirst(starships ?? [], user?.id)
+  const selectedStarshipId = getSelectedStarshipId()
+  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
   const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
@@ -79,7 +81,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path === '/reset-password') return 'Reset Password | Starships.ai'
       if (path === '/terms') return 'Terms of Service | Starships.ai'
       if (path === '/privacy') return 'Privacy Policy | Starships.ai'
-      if (path === '/profile') return 'Profile | Starships.ai'
+      if (path === '/account') return 'My Profile | Starships.ai'
       if (path === '/onboarding') return 'Set up your starship | Starships.ai'
       if (path.startsWith('/connectors/') && path.endsWith('/install')) return 'Connectors | Starships.ai'
 
@@ -105,7 +107,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         if (section === 'settings') {
           const tab = parts[2]
           if (!tab) return 'Settings | Starships.ai'
-          if (tab === 'profile') return 'Settings: Profile | Starships.ai'
+          if (tab === 'my-starship') return 'Settings: My Starship | Starships.ai'
+          if (tab === 'upgrade') return 'Settings: Upgrade | Starships.ai'
           if (tab === 'usage') return 'Settings: Analytics | Starships.ai'
           if (tab === 'billing') return 'Settings: Billing | Starships.ai'
           return 'Settings | Starships.ai'
@@ -177,22 +180,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     )
   }
 
-  // Profile page (create workspace / redirect) - full page, no sidebar, so new users
-  // never see the app chrome (e.g. Direct messages) while "Redirecting..." is shown.
-  if (pathname === '/profile') {
-    return (
-      <JwtAuthGate>
-        <StarTheme>
-          <NotificationSoundBootstrap />
-          <EmailChangeToastHandler />
-          <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
-            <main className="relative min-h-full w-full">{children}</main>
-          </div>
-        </StarTheme>
-      </JwtAuthGate>
-    )
-  }
-
   // Wizard onboarding - full page, no sidebar (authenticated only via JwtAuthGate)
   if (pathname === '/onboarding') {
     return (
@@ -232,7 +219,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="flex-shrink-0 relative z-50">
             <aside className="relative h-full">
               <StarshipRail
-                starships={starships ?? []}
+                starships={railStarships}
                 activeSlug={null}
                 onSelect={s => {
                   setSelectedStarship(s.id)

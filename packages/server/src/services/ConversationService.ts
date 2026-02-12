@@ -434,6 +434,7 @@ export class ConversationService {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
+      const agent = this.currentAgentForConversation.get(conversationId);
       const event: ConversationStreamEvent =
         kind === 'content'
           ? {
@@ -442,6 +443,8 @@ export class ConversationService {
                 conversationId,
                 turnId,
                 messageId,
+                ...(agent?.id ? { agentId: agent.id } : {}),
+                ...(agent?.name ? { agentName: agent.name } : {}),
                 delta: payload,
                 at: new Date().toISOString(),
               },
@@ -452,6 +455,8 @@ export class ConversationService {
                 conversationId,
                 turnId,
                 messageId,
+                ...(agent?.id ? { agentId: agent.id } : {}),
+                ...(agent?.name ? { agentName: agent.name } : {}),
                 delta: payload,
                 at: new Date().toISOString(),
               },
@@ -859,8 +864,7 @@ export class ConversationService {
     const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return null;
 
-    const at =
-      this.coerceToIsoString(message.createdAt) ?? this.coerceToIsoString(message.updatedAt) ?? new Date().toISOString();
+    const at = this.coerceToIsoString(message.createdAt) ?? this.coerceToIsoString(message.updatedAt) ?? new Date().toISOString();
 
     const toCompactAt = (iso: string): string => {
       // 2026-02-04T01:44:08.592Z -> 20260204_014408Z
@@ -1961,7 +1965,7 @@ export class ConversationService {
     ctx?: {
       authContext?: { userId: string; agentId?: string; starshipId?: string };
     },
-    opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string }
+    opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string; turnGuardId?: string }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -1982,12 +1986,19 @@ export class ConversationService {
 
     // Now check conversation state (async, but we're already protected by activeCancellations)
     const conversationStateCheck = await this.getConversationById(data.conversationId).catch(() => null);
-    const turnActive =
-      conversationStateCheck?.state &&
-      typeof conversationStateCheck.state === 'object' &&
-      (conversationStateCheck.state as { turnActive?: boolean }).turnActive === true;
+    const stateObj =
+      conversationStateCheck?.state && typeof conversationStateCheck.state === 'object'
+        ? (conversationStateCheck.state as { turnActive?: boolean; turnGuardId?: unknown })
+        : null;
+    const turnActive = stateObj?.turnActive === true;
+    const stateGuardId = typeof stateObj?.turnGuardId === 'string' ? String(stateObj.turnGuardId).trim() : '';
+    const callerGuardId = typeof opts?.turnGuardId === 'string' ? String(opts.turnGuardId).trim() : '';
+    const sameGuard = Boolean(turnActive && callerGuardId && stateGuardId && stateGuardId === callerGuardId);
 
-    if (turnActive) {
+    // IMPORTANT: turnActive is DB-backed so it works across server replicas.
+    // We allow the call to proceed only if the caller presents the matching guard id (meaning this request
+    // is the one that set turnActive=true just before handing control to the turn runner).
+    if (turnActive && !sameGuard) {
       // Remove placeholder since we're blocking
       ConversationService.activeCancellations.delete(data.conversationId);
       throw new ConflictError(
@@ -2145,11 +2156,10 @@ export class ConversationService {
     const channelRepo = new ChannelRepository();
     const channel = await channelRepo.findByConversationId(contextConversationId).catch(() => null);
     const isChannel = Boolean(channel);
-    // Channel threads:
-    // - The *parent* conversation may be a channel, but the child thread should be allowed to have a default agent fallback
-    //   when it has exactly 1 linked agent.
-    // - Only the channel *root* conversation remains strictly mention-only.
-    const isChannelRoot = Boolean(isChannel && !isThread);
+    // Channel conversations (including threads under channels) are mention-only:
+    // - Only explicit @agent mentions should trigger execution (no default fallback agent).
+    // - This prevents surprising agent runs/charges from regular human chatter in channels/threads.
+    const isMentionOnlyChannel = Boolean(isChannel);
     const dmRepo = new DirectMessageRepository();
     const dm = await dmRepo.findByConversationId(contextConversationId).catch(() => null);
     const isUserUserDm = dm?.dmType === 'user_user';
@@ -2158,7 +2168,7 @@ export class ConversationService {
     const restrictAgentMentionsToDmPeer = Boolean(isUserAgentDm && dmAgentId);
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
-    let isMentionOnlyThread = Boolean(isThread && !isChannelRoot && conversationAgents.length >= 2);
+    let isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && conversationAgents.length >= 2);
 
     let agentQueue: AgentModel[] = [];
     let noAgentToRun = false;
@@ -2180,11 +2190,11 @@ export class ConversationService {
 
       // Explicit agent selection (client-provided agentId):
       // - Supported for normal conversations and threads (including threads under channels) where a default agent is allowed.
-      // - NOT used for channel root conversations or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
+      // - NOT used for channel conversations or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
       const explicitAgentIdRaw = typeof data.agentId === 'string' ? data.agentId.trim() : '';
       const explicitAgentId = restrictAgentMentionsToDmPeer ? dmAgentId : explicitAgentIdRaw;
       // IMPORTANT: explicitAgentId is lower priority than explicit mentions, and must not trigger when the message contains user mentions.
-      if (explicitAgentId && !isChannelRoot && !isMentionOnlyThread && !hasUserMentions && !hasAgentMentions) {
+      if (explicitAgentId && !isMentionOnlyChannel && !isMentionOnlyThread && !hasUserMentions && !hasAgentMentions) {
         const explicitAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === explicitAgentId);
         if (explicitAgent) {
           // Ensure the agent is linked so subsequent turns have a stable fallback.
@@ -2206,7 +2216,7 @@ export class ConversationService {
       }
 
       // Build initial target agents from @mentions in the incoming message.
-      // - For channel roots: mention-only; no fallback agent.
+      // - For channels: mention-only; no fallback agent.
       // - For normal conversations: fallback to the first linked agent.
       // - For threads with 2+ agents: mention-only; no fallback agent.
       if (agentQueue.length === 0) {
@@ -2227,8 +2237,8 @@ export class ConversationService {
           conversationAgents = await this.getConversationAgents(data.conversationId);
         }
 
-        isMentionOnlyThread = Boolean(isThread && !isChannelRoot && conversationAgents.length >= 2);
-        const initialTargets = isChannelRoot
+        isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && conversationAgents.length >= 2);
+        const initialTargets = isMentionOnlyChannel
           ? initialTargetsUnlinked
           : initialTargetsUnlinked.length > 0
             ? initialTargetsUnlinked
@@ -2241,19 +2251,19 @@ export class ConversationService {
         // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
         // This allows people to talk to each other in agent-backed threads without triggering an agent run.
         const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
-        const allowFallback = !isChannelRoot && !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
+        const allowFallback = !isMentionOnlyChannel && !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
         agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
         // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
         // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
         noAgentToRun =
-          ((isChannelRoot || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) ||
+          ((isMentionOnlyChannel || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) ||
           (blockFallbackDueToUserMentions && agentQueue.length === 0);
       }
     }
 
     // Preserve legacy behavior for non-thread, non-channel conversations that require a default agent:
     // if no agents are linked AND there are no explicit/mentioned targets, surface a 404.
-    if (!isChannelRoot && !isUserUserDm && !isThread && conversationAgents.length < 1 && agentQueue.length < 1) {
+    if (!isMentionOnlyChannel && !isUserUserDm && !isThread && conversationAgents.length < 1 && agentQueue.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
 
@@ -2261,9 +2271,20 @@ export class ConversationService {
     if (!noAgentToRun) {
       try {
         const at = new Date().toISOString();
+        const initialAgent = Array.isArray(agentQueue) && agentQueue.length > 0 ? agentQueue[0] : null;
+        // Seed canonical agent identity for the "typing/loading" window (before any deltas).
+        if (initialAgent && typeof initialAgent.id === 'string' && typeof initialAgent.name === 'string') {
+          this.currentAgentForConversation.set(data.conversationId, { id: initialAgent.id, name: initialAgent.name });
+        }
         await this.streamBus.publish(data.conversationId, {
           type: 'turn.started',
-          data: { conversationId: data.conversationId, turnId: turn.id, at },
+          data: {
+            conversationId: data.conversationId,
+            turnId: turn.id,
+            ...(initialAgent && typeof initialAgent.id === 'string' ? { agentId: initialAgent.id } : {}),
+            ...(initialAgent && typeof initialAgent.name === 'string' ? { agentName: initialAgent.name } : {}),
+            at,
+          },
         });
         await this.streamBus.publish(data.conversationId, {
           type: 'turn.status',
@@ -2647,12 +2668,12 @@ export class ConversationService {
       ]);
 
       const isChannel = Boolean(channel);
-      const isChannelRoot = Boolean(isChannel && !isThread);
+      const isMentionOnlyChannel = Boolean(isChannel);
       const isUserUserDm = (dm as { dmType?: unknown } | null)?.dmType === 'user_user';
       if (isUserUserDm) return false;
 
       const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0;
-      const isMentionOnlyThread = Boolean(isThread && !isChannelRoot && linkedAgentCount >= 2);
+      const isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && linkedAgentCount >= 2);
 
       // Mentions are resolved against the full starship agent list (not only currently-linked agents).
       const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
@@ -2660,7 +2681,7 @@ export class ConversationService {
       const hasUserMentionToken = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/i.test(content);
 
       // Mention-only contexts only trigger when at least one agent is mentioned.
-      if (isChannelRoot || isMentionOnlyThread) return hasMention;
+      if (isMentionOnlyChannel || isMentionOnlyThread) return hasMention;
 
       // If the message contains user mentions but no agent mentions, do not trigger any agent execution
       // (even if a default linked agent exists or a client provided agentId for convenience).
@@ -2786,7 +2807,26 @@ export class ConversationService {
         // (Harmless if the client ignores it.)
         if (latestTurnId) {
           try {
-            await this.streamBus.publish(conversationId, { type: 'turn.started', data: { conversationId, turnId, at } });
+            // Seed canonical agent identity for the resumed turn (so UI identity is stable before deltas).
+            try {
+              const aid = typeof agentModel?.id === 'string' ? String(agentModel.id) : '';
+              const an = typeof agentModel?.name === 'string' ? String(agentModel.name) : '';
+              if (aid && an) {
+                this.currentAgentForConversation.set(conversationId, { id: aid, name: an });
+              }
+            } catch {
+              /* ignore */
+            }
+            await this.streamBus.publish(conversationId, {
+              type: 'turn.started',
+              data: {
+                conversationId,
+                turnId,
+                ...(typeof agentModel?.id === 'string' ? { agentId: String(agentModel.id) } : {}),
+                ...(typeof agentModel?.name === 'string' ? { agentName: String(agentModel.name) } : {}),
+                at,
+              },
+            });
           } catch {
             // best-effort
           }

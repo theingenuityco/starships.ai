@@ -9,7 +9,7 @@ import { Suspense, useState } from 'react'
 import * as React from 'react'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { isValidRedirectUrl } from '@/lib/utils'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
@@ -24,11 +24,13 @@ function LoginContent() {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { getSelectedStarshipId } = useSelectedStarship()
   const tabParam = searchParams?.get('tab')
   const initialTab = tabParam === 'register' ? 'register' : 'login'
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab)
 
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
+  const selectedStarshipId = mounted ? getSelectedStarshipId() : null
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
@@ -82,12 +84,13 @@ function LoginContent() {
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
       } else if (starships && starships.length > 0) {
-        router.push(`/ship/${starships[0].slug}`)
+        const primary = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
+        router.push(`/ship/${(primary ?? starships[0]).slug}`)
       } else {
-        router.push('/profile')
+        router.push('/account')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout, user?.id, selectedStarshipId])
 
   // Show loading state while checking authentication or mounting
   if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {

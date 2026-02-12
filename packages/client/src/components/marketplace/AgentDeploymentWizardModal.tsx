@@ -133,7 +133,7 @@ function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
                 </div>
               </div>
 
-              <div className="mt-2 min-w-0 w-28 sm:w-36">
+              <div className="mt-2 min-w-0 w-36 sm:w-44">
                 <div className={cn('text-xs font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
                 <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{s.subtitle}</div>
               </div>

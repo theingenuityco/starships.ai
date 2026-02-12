@@ -56,7 +56,7 @@ function StarshipMonogram({ starship, disabled }: { starship: { name?: string; s
   return (
     <div
       className={cn(
-        'h-8 w-8 shrink-0 rounded-lg border flex items-center justify-center text-[11px] font-semibold tabular-nums',
+        'h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center text-[12px] font-semibold tabular-nums',
         disabled ? 'border-border/60 bg-muted/20 text-muted-foreground' : 'border-primary/25 bg-primary/10 text-primary'
       )}
       aria-hidden

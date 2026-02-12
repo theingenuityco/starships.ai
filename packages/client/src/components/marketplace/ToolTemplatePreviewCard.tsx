@@ -34,13 +34,13 @@ export function ToolTemplatePreviewCard({ template, className }: { template: Too
         {/* Content */}
         <div className="min-w-0 flex-1 flex flex-col pt-0.5">
           <div className="min-w-0">
-            {/* Category (small) */}
-            {displayCategory ? <div className="min-w-0 text-xs text-muted-foreground truncate">{displayCategory}</div> : null}
-
             {/* Name (big) */}
-            <div className={displayCategory ? 'mt-0.5 text-sm font-semibold leading-tight truncate' : 'text-sm font-semibold leading-tight truncate'}>
+            <div className={'text-sm font-semibold leading-tight truncate'}>
               {displayName || 'Unnamed tool'}
             </div>
+
+            {/* Category (small) */}
+            {displayCategory ? <div className="mt-0.5 min-w-0 text-xs text-muted-foreground truncate">{displayCategory}</div> : null}
           </div>
 
           {displayDescription ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}

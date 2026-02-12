@@ -417,24 +417,18 @@ export function ToolInstallationWizardModal({
                     <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Icon name="key" className="h-4 w-4 text-foreground shrink-0" />
-                          <div className="text-sm font-semibold leading-tight text-foreground truncate">API key</div>
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground leading-relaxed">{requiresApiKey ? 'Required (add after install)' : 'Not required'}</div>
-                      </div>
-                    </div>
-
-                    <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 min-w-0">
                           <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
                           <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                          {requiredConnectorProviders.length > 0
-                            ? `${connectedRequiredConnectorsCount}/${requiredConnectorProviders.length} connected`
-                            : 'None required'}
-                        </div>
+                        {requiredConnectorProviders.length > 0 ? (
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                            <span className="font-medium leading-none tabular-nums text-muted-foreground">{requiredConnectorProviders.length} required</span>
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-xs font-medium leading-none text-emerald-700 dark:text-emerald-300">No connectors required</div>
+                        )}
                       </div>
                     </div>
                   </div>

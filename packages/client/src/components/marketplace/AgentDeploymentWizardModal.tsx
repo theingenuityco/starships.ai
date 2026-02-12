@@ -90,9 +90,9 @@ function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
   return (
     <div className="relative pt-1">
       {/* Track line */}
-      <div className="absolute left-3 right-3 top-4 h-px bg-border/60" aria-hidden />
+      <div className="absolute left-[14px] right-[14px] top-[14px] h-px bg-border/60" aria-hidden />
       {/* Progress line */}
-      <div className="absolute left-3 right-3 top-4 h-px" aria-hidden>
+      <div className="absolute left-[14px] right-[14px] top-[14px] h-px" aria-hidden>
         <div className="h-full bg-primary/50 origin-left" style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressValue / 100))})` }} />
       </div>
 
@@ -100,8 +100,14 @@ function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
         {WIZARD_STEPS.map(s => {
           const isCompleted = currentStep > s.id
           const isActive = currentStep === s.id
+          const alignment =
+            s.id === 1
+              ? 'items-start text-left'
+              : s.id === TOTAL_STEPS
+                ? 'items-end text-right'
+                : 'items-center text-center'
           return (
-            <li key={s.id} className="min-w-0 flex flex-col items-center text-center" aria-current={isActive ? 'step' : undefined}>
+            <li key={s.id} className={cn('min-w-0 flex flex-col', alignment)} aria-current={isActive ? 'step' : undefined}>
               <div
                 className={cn(
                   'h-7 w-7 rounded-full border flex items-center justify-center bg-background shadow-sm',

@@ -140,15 +140,9 @@ export default function MarketplacePageClient(props: {
 
   const countsByTab = useMemo(() => {
     // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
-    const agents = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
-      : (initialTotals?.agents ?? agentsMatchingSearch.length)
-    const tools = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
-      : (initialTotals?.tools ?? toolsMatchingSearch.length)
-    const connectors = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
-      : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+    const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : (initialTotals?.agents ?? agentsMatchingSearch.length)
+    const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : (initialTotals?.tools ?? toolsMatchingSearch.length)
+    const connectors = shouldUseServerSearch ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length) : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
     return {
       all: agents + tools + connectors,
       agents,
@@ -185,33 +179,21 @@ export default function MarketplacePageClient(props: {
     return (
       <nav aria-label="Explore pagination" className="mt-8 flex items-center justify-center gap-3">
         {prevHref ? (
-          <Link
-            href={prevHref}
-            className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors"
-          >
+          <Link href={prevHref} className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors">
             Previous
           </Link>
         ) : (
-          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
-            Previous
-          </span>
+          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">Previous</span>
         )}
 
-        <span className="text-sm text-muted-foreground tabular-nums">
-          Page {pagination.page}
-        </span>
+        <span className="text-sm text-muted-foreground tabular-nums">Page {pagination.page}</span>
 
         {nextHref ? (
-          <Link
-            href={nextHref}
-            className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors"
-          >
+          <Link href={nextHref} className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors">
             Next
           </Link>
         ) : (
-          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
-            Next
-          </span>
+          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">Next</span>
         )}
       </nav>
     )
@@ -439,11 +421,7 @@ export default function MarketplacePageClient(props: {
                                 {agentsVisible.length}
                               </Badge>
                             </div>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
-                              onClick={() => router.push(TAB_TO_ROUTE.agents)}
-                            >
+                            <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
                               <span>Explore all agents</span>
                               <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
@@ -467,11 +445,7 @@ export default function MarketplacePageClient(props: {
                                 {toolsVisible.length}
                               </Badge>
                             </div>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
-                              onClick={() => router.push(TAB_TO_ROUTE.tools)}
-                            >
+                            <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.tools)}>
                               <span>Explore all automations</span>
                               <Icon name="chevron-right" className="h-4 w-4" />
                             </button>

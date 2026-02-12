@@ -56,6 +56,13 @@ function toolsStepTitle(agentName: string, count: number): string {
   return `${agentName} can use these ${n} automations`
 }
 
+function connectorsStepTitle(agentName: string, count: number): string {
+  const n = Number.isFinite(count) ? count : 0
+  if (n <= 0) return `${agentName} requires no apps to be connected`
+  if (n === 1) return `${agentName} requires this app to be connected`
+  return `${agentName} requires these ${n} apps to be connected`
+}
+
 function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
   const label = String(input?.name || input?.slug || input?.id || '').trim()
   if (!label) return 'S'
@@ -517,7 +524,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 3 ? (
                 <div className="mt-8 space-y-3">
-                  <div className="text-sm font-semibold">Connect apps ({requiredConnectors.length})</div>
+                  <div className="text-sm font-semibold">{connectorsStepTitle(agentDeployLabel, requiredConnectors.length)}</div>
 
                   {requiredConnectors.length > 0 ? (
                     selectedStarship?.id ? (
@@ -565,7 +572,7 @@ export function AgentDeploymentWizardModal({
                           <div className="mt-1 flex items-start gap-3 min-w-0">
                             <StarshipMonogram starship={selectedStarship} />
                             <div className="min-w-0">
-                              <div className="text-xs text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
+                              <div className="text-xs font-medium text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
                               <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
                             </div>
                           </div>
@@ -621,11 +628,15 @@ export function AgentDeploymentWizardModal({
                             <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
                           </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                            <span className="font-medium leading-none tabular-nums text-muted-foreground">{requiredConnectors.length} required</span>
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
-                          </div>
+                          {requiredConnectors.length > 0 ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{requiredConnectors.length} required</span>
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs font-medium leading-none text-emerald-700 dark:text-emerald-300">No connectors required</div>
+                          )}
                         </div>
                       </div>
                     </div>

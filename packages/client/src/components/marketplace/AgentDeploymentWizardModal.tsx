@@ -553,8 +553,15 @@ export function AgentDeploymentWizardModal({
                       </div>
                     )
                   ) : (
-                    // Show an empty connectors panel (do not show "no connectors" copy).
-                    <div className="rounded-xl border border-border/60 bg-card/10 p-3 min-h-[92px]" />
+                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
+                          <p className="text-sm font-semibold leading-tight">No connectors required</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">This agent can be deployed without connecting any apps.</p>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : null}

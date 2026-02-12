@@ -286,7 +286,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
       <div className="relative z-10">
         <PublicHeader />
 
-        <main className="marketplace-agent-main pt-20 sm:pt-28">
+        <main className="marketplace-agent-main pt-6 sm:pt-8">
           <div className="relative">
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
               {/* Breadcrumb */}
@@ -317,18 +317,26 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         {template.category ? (
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold leading-none capitalize ${categoryBadgeClass(template.category)}`}
+                          >
+                            {template.category}
+                          </span>
                         ) : null}
                         {template.version ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
+                            v{template.version}
+                          </span>
                         ) : null}
                         {typeof template.usageCount === 'number' ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
                             {template.usageCount.toLocaleString()} deployments
                           </span>
                         ) : null}
                         {template.model ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
+                            {template.model}
+                          </span>
                         ) : null}
                       </div>
                     </div>

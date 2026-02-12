@@ -4,14 +4,14 @@ import Image from 'next/image'
 import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { ToolInstallationWizardModal } from '@/components/marketplace/ToolInstallationWizardModal'
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useAuth } from '@/hooks/useAuth'
 import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
 import { useQuery } from '@tanstack/react-query'
 import { memo, useCallback, useMemo, useState } from 'react'
 import api from '@/lib/api'
-import type { ApiResponse, ToolModel, ToolTemplateModel } from '@starships/protocol'
+import type { ApiResponse, DeployStarshipOption, ToolModel, ToolTemplateModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -128,24 +128,6 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
     }
     return null
   }, [explicitStarship, starship])
-
-  const handleConfirmInstall = async () => {
-    if (!starship?.id || !slug) return
-    setIsInstalling(true)
-    try {
-      await createToolMutation.mutateAsync({
-        templateSlug: slug,
-        starshipId: String(starship.id),
-      })
-
-      // Marketplace UX: keep user moving forward after install.
-      if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
-        router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/tools`)
-      }
-    } finally {
-      setIsInstalling(false)
-    }
-  }
 
   return (
     <>
@@ -283,12 +265,40 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
         )}
       </div>
 
-      <DeploymentConfirmationModal
+      <ToolInstallationWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
-        onConfirm={handleConfirmInstall}
+        onConfirm={async (input?: { starship?: DeployStarshipOption }) => {
+          const targetStarship = input?.starship ?? starship
+          if (!targetStarship?.id || !slug) return
+          setIsInstalling(true)
+          try {
+            await createToolMutation.mutateAsync({
+              templateSlug: slug,
+              starshipId: String(targetStarship.id),
+            })
+
+            const targetShipSlugOrId = (() => {
+              const candidates = [targetStarship.slug, targetStarship.id] as unknown[]
+              for (const c of candidates) {
+                if (typeof c !== 'string') continue
+                const raw = c.trim()
+                if (!raw) continue
+                const lowered = raw.toLowerCase()
+                if (lowered === 'undefined' || lowered === 'null') continue
+                return raw
+              }
+              return null
+            })()
+
+            if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && targetShipSlugOrId) {
+              router.push(`/ship/${encodeURIComponent(targetShipSlugOrId)}/tools`)
+            }
+          } finally {
+            setIsInstalling(false)
+          }
+        }}
         isProcessing={isInstalling}
-        type="tool"
         template={template}
         starshipName={(starship as any)?.name || 'Unknown Starship'}
         starshipId={starship?.id}

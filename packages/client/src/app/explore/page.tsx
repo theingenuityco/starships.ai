@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { Suspense } from 'react'
 
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
 import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
@@ -43,14 +42,12 @@ export default async function ExplorePage(props: PageProps) {
   ])
 
   return (
-    <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-      <MarketplacePageClient
-        activeTab="all"
-        initialAgentTemplates={agentTemplates}
-        initialToolTemplates={toolTemplates}
-        initialConnectorCatalog={connectorCatalog}
-      />
-    </Suspense>
+    <MarketplacePageClient
+      activeTab="all"
+      initialAgentTemplates={agentTemplates}
+      initialToolTemplates={toolTemplates}
+      initialConnectorCatalog={connectorCatalog}
+    />
   )
 }
 

@@ -362,7 +362,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                             </div>
                             <div className={`${SECTION_SUBTITLE_CLASS} mt-1`}>Tools and connectors {possessiveLabel(template.name)} uses.</div>
                           </div>
-                          <Icon name="wrench" className="h-4 w-4 text-primary/80" />
+                          <Icon name="magic-wand" className="h-4 w-4 text-primary/80" />
                         </div>
 
                         <div className="mt-5 space-y-3">

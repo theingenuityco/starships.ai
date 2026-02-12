@@ -204,7 +204,8 @@ export function AgentDeploymentWizardModal({
     return (requiredConnectors ?? []).filter(c => {
       const provider = String((c as any)?.provider || '').trim()
       if (!provider) return false
-      return provider.toLowerCase() !== 'starship'
+      // Ignore the built-in Starships connector requirement.
+      return provider.toLowerCase() !== 'starships'
     })
   }, [requiredConnectors])
 
@@ -213,7 +214,7 @@ export function AgentDeploymentWizardModal({
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
       const provider = String((c as any)?.provider || '').trim().toLowerCase()
-      if (!provider || provider === 'starship') return false
+      if (!provider || provider === 'starships') return false
       const status = String((c as any)?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length
@@ -552,15 +553,8 @@ export function AgentDeploymentWizardModal({
                       </div>
                     )
                   ) : (
-                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
-                          <p className="text-sm font-semibold leading-tight">No connectors required</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed">This agent can be deployed without connecting any apps.</p>
-                      </div>
-                    </div>
+                    // Show an empty connectors panel (do not show "no connectors" copy).
+                    <div className="rounded-xl border border-border/60 bg-card/10 p-3 min-h-[92px]" />
                   )}
                 </div>
               ) : null}

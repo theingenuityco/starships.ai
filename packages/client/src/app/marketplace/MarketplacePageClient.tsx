@@ -661,7 +661,8 @@ export default function MarketplacePageClient(props: {
           </div>
         </main>
 
-        <PublicFooter fromPath={pathname ?? '/explore'} />
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" aria-hidden />
+        <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={false} />
       </div>
     </>
   )

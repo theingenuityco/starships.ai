@@ -489,7 +489,8 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
         </div>
       </main>
 
-      <PublicFooter fromPath={`/explore/agents/${encodeURIComponent(template.slug)}`} />
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent" aria-hidden />
+      <PublicFooter fromPath={`/explore/agents/${encodeURIComponent(template.slug)}`} showTopDivider={false} />
       {/* Instance-admin-only: generate marketing content */}
       <MarketplaceAgentMarketingFab templateId={template.id} marketingRenderingDisabled={marketplaceMarketingRenderingDisabled} />
     </>

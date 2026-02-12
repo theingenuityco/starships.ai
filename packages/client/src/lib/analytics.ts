@@ -5,6 +5,7 @@ export type AnalyticsEvent =
   | { type: 'use_case_toggled'; scenario: 'enrichment' | 'copilot' }
   | { type: 'discord_hero_clicked' }
   | { type: 'discord_cta_clicked' }
+  | { type: 'explore_request_cta_clicked'; destination: `mailto:${string}`; kind: 'agent' | 'connector' | 'automation' | 'anything' }
   | { type: 'public_header_logo_clicked'; fromPath: string }
   | { type: 'public_header_nav_clicked'; fromPath: string; destination: '/' | '/explore' | '/marketplace' | '/login'; variant: 'desktop' | 'mobile' }
   | { type: 'public_header_mobile_menu_toggled'; fromPath: string; isOpen: boolean }

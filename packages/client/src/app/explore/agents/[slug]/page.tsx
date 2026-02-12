@@ -315,30 +315,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
                       {template.role ? <div className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {template.category ? (
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold leading-none capitalize ${categoryBadgeClass(template.category)}`}
-                          >
-                            {template.category}
-                          </span>
-                        ) : null}
-                        {template.version ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
-                            v{template.version}
-                          </span>
-                        ) : null}
-                        {typeof template.usageCount === 'number' ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
-                            {template.usageCount.toLocaleString()} deployments
-                          </span>
-                        ) : null}
-                        {template.model ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
-                            {template.model}
-                          </span>
-                        ) : null}
-                      </div>
+                      {template.description ? <p className="mt-3 text-sm leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
                     </div>
                   </div>
 
@@ -349,8 +326,31 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                   </div>
                 </div>
 
-                {/* Description as separate section below */}
-                {template.description ? <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
+                {/* Badges below description (swapped order) */}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {template.category ? (
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold leading-none capitalize ${categoryBadgeClass(template.category)}`}
+                    >
+                      {template.category}
+                    </span>
+                  ) : null}
+                  {template.version ? (
+                    <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
+                      v{template.version}
+                    </span>
+                  ) : null}
+                  {typeof template.usageCount === 'number' ? (
+                    <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground">
+                      {template.usageCount.toLocaleString()} deployments
+                    </span>
+                  ) : null}
+                  {template.model ? (
+                    <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-2.5 py-0.5 text-[11px] font-semibold leading-none font-mono">
+                      {template.model}
+                    </span>
+                  ) : null}
+                </div>
               </section>
 
               {/* Main content grid */}

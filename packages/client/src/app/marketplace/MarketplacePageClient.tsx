@@ -21,6 +21,8 @@ import { track } from '@/lib/analytics'
 const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
 type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
 
+const MAX_LISTING_RESULTS = 9
+
 function isMarketplaceTab(value: string): value is MarketplaceTab {
   return (MARKETPLACE_TABS as readonly string[]).includes(value)
 }
@@ -109,10 +111,28 @@ export default function MarketplacePageClient(props: {
     return serverSearch.data?.connectors ?? []
   }, [connectorCatalog, serverSearch.data?.connectors, shouldUseServerSearch])
 
+  const agentsVisible = useMemo(() => {
+    return shouldUseServerSearch ? agentsMatchingSearch : agentsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
+  }, [agentsMatchingSearch, shouldUseServerSearch])
+
+  const toolsVisible = useMemo(() => {
+    return shouldUseServerSearch ? toolsMatchingSearch : toolsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
+  }, [toolsMatchingSearch, shouldUseServerSearch])
+
+  const connectorsVisible = useMemo(() => {
+    return shouldUseServerSearch ? connectorsMatchingSearch : connectorsMatchingSearch.slice(0, MAX_LISTING_RESULTS)
+  }, [connectorsMatchingSearch, shouldUseServerSearch])
+
   const countsByTab = useMemo(() => {
-    const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : agentsMatchingSearch.length
-    const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : toolsMatchingSearch.length
-    const connectors = shouldUseServerSearch ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length) : connectorsMatchingSearch.length
+    const agents = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
+      : Math.min(agentsMatchingSearch.length, MAX_LISTING_RESULTS)
+    const tools = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
+      : Math.min(toolsMatchingSearch.length, MAX_LISTING_RESULTS)
+    const connectors = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
+      : Math.min(connectorsMatchingSearch.length, MAX_LISTING_RESULTS)
     return {
       all: agents + tools + connectors,
       agents,
@@ -342,19 +362,19 @@ export default function MarketplacePageClient(props: {
                 ) : activeCount > 0 ? (
                   tab === 'all' ? (
                     <div className="space-y-10">
-                      {agentsMatchingSearch.length > 0 ? (
+                      {agentsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-baseline gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({agentsMatchingSearch.length})</span>
+                              <span className="text-sm text-muted-foreground tabular-nums">({agentsVisible.length})</span>
                             </div>
                             <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
                               View all
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {agentsMatchingSearch.slice(0, 9).map((template: AgentTemplateModel, idx: number) => (
+                            {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
                               <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                                 <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                               </motion.div>
@@ -363,19 +383,19 @@ export default function MarketplacePageClient(props: {
                         </section>
                       ) : null}
 
-                      {toolsMatchingSearch.length > 0 ? (
+                      {toolsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-baseline gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({toolsMatchingSearch.length})</span>
+                              <span className="text-sm text-muted-foreground tabular-nums">({toolsVisible.length})</span>
                             </div>
                             <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.tools)}>
                               View all
                             </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {toolsMatchingSearch.slice(0, 9).map((template: ToolTemplateModel, idx: number) => (
+                            {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
                               <motion.div
                                 key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
                                 initial={{ opacity: 0, y: 14 }}
@@ -389,24 +409,24 @@ export default function MarketplacePageClient(props: {
                         </section>
                       ) : null}
 
-                      {connectorsMatchingSearch.length > 0 ? (
+                      {connectorsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-baseline gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
-                              <span className="text-sm text-muted-foreground tabular-nums">({connectorsMatchingSearch.length})</span>
+                              <span className="text-sm text-muted-foreground tabular-nums">({connectorsVisible.length})</span>
                             </div>
                             <button type="button" className="text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.connectors)}>
                               View all
                             </button>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsMatchingSearch.slice(0, 9).map(renderConnectorCard)}</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
                         </section>
                       ) : null}
                     </div>
                   ) : tab === 'agents' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                      {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
+                      {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
                         <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                           <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                         </motion.div>
@@ -414,7 +434,7 @@ export default function MarketplacePageClient(props: {
                     </div>
                   ) : tab === 'tools' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                      {toolsMatchingSearch.map((template: ToolTemplateModel, idx: number) => (
+                      {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
                         <motion.div
                           key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
                           initial={{ opacity: 0, y: 14 }}
@@ -426,7 +446,7 @@ export default function MarketplacePageClient(props: {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsMatchingSearch.map(renderConnectorCard)}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
                   )
                 ) : (
                   renderCenteredState(

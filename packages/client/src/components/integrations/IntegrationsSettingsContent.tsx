@@ -47,7 +47,7 @@ function safeLower(s: unknown): string {
 const INTEGRATION_CTA_BUTTON_CLASS =
   'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
 const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
-const INTEGRATION_OUTLINE_BUTTON_CLASS = 'h-8 bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
+const INTEGRATION_OUTLINE_BUTTON_CLASS = 'h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
 
 export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsContentProps) {
   const router = useRouter()
@@ -306,7 +306,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && agentsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button variant="outline" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => agentsQuery.fetchNextPage()}
+              disabled={agentsQuery.isFetchingNextPage}
+              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
+            >
               {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
             </Button>
           </div>
@@ -388,7 +394,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && toolsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button variant="outline" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => toolsQuery.fetchNextPage()}
+              disabled={toolsQuery.isFetchingNextPage}
+              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
+            >
               {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more tools'}
             </Button>
           </div>
@@ -524,7 +536,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   {isAllTab ? (
                     <div className="flex justify-center pt-4">
                       {hasMoreAgentsThanPreview ? (
-                        <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                        <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
                           <Link href={buildIntegrationsTabHref('agents')}>Show all agents</Link>
                         </Button>
                       ) : null}
@@ -551,16 +563,16 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       ) : null}
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href={`/ship/${encodeURIComponent(slug)}/tools`}>
-                        <Icon name="magic-wand" className="h-4 w-4 mr-1.5" />
-                        Manage tools
+                      <Link href="/explore">
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
+                        Explore tools
                       </Link>
                     </Button>
                   </div>
                   {renderToolsList()}
                   {isAllTab ? (
                     <div className="flex justify-center pt-4">
-                      <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                      <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
                         <Link href={buildIntegrationsTabHref('tools')}>Show all tools</Link>
                       </Button>
                     </div>
@@ -603,9 +615,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       ) : null}
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href={`/ship/${encodeURIComponent(slug)}/connectors`}>
-                        <Icon name="plug" className="h-4 w-4 mr-1.5" />
-                        Manage connectors
+                      <Link href="/explore">
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
+                        Explore connectors
                       </Link>
                     </Button>
                   </div>
@@ -626,7 +638,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   />
                   {isAllTab ? (
                     <div className="flex justify-center pt-4">
-                      <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                      <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
                         <Link href={buildIntegrationsTabHref('connectors')}>Show all connectors</Link>
                       </Button>
                     </div>

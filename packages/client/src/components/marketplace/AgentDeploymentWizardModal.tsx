@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentTemplatePreviewCard } from '@/components/marketplace/AgentTemplatePreviewCard'
 import { cn } from '@/lib/utils'
@@ -65,6 +67,15 @@ function StarshipMonogram({ starship, disabled }: { starship: { name?: string; s
       aria-hidden
     >
       {initials}
+    </div>
+  )
+}
+
+function StarshipPickerIcon({ starship, disabled }: { starship: { name?: string; slug?: string; id?: string }; disabled?: boolean }) {
+  const initials = getStarshipInitials(starship)
+  return (
+    <div className={cn('flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border/40 flex-shrink-0', disabled && 'opacity-60')}>
+      <span className="text-sm font-semibold text-primary tabular-nums">{initials}</span>
     </div>
   )
 }
@@ -161,6 +172,8 @@ export function AgentDeploymentWizardModal({
 
   const [step, setStep] = useState<WizardStep>(1)
   const [selectedStarship, setSelectedStarship] = useState<DeployStarshipOption | null>(null)
+  const [starshipPickerOpen, setStarshipPickerOpen] = useState(false)
+  const [starshipPickerSearch, setStarshipPickerSearch] = useState('')
 
   // Only fetch tool/connectors when the modal is open and user reaches configuration step.
   const shouldFetchTools = isOpen && step >= 2
@@ -174,6 +187,10 @@ export function AgentDeploymentWizardModal({
     const firstEnabled = listForSelection.find(s => !(s as DeployStarshipOptionWithAccess)?.deployDisabled) ?? null
     setSelectedStarship(firstEnabled)
   }, [isOpen, listForSelection[0]?.id, listForSelection.length])
+
+  useEffect(() => {
+    if (!starshipPickerOpen) setStarshipPickerSearch('')
+  }, [starshipPickerOpen])
 
   const toolTemplateBySlug = useMemo(() => {
     const map = new Map<string, ToolTemplateModel>()
@@ -218,6 +235,16 @@ export function AgentDeploymentWizardModal({
     return false
   }, [step, selectedStarship])
 
+  const filteredStarships = useMemo(() => {
+    const q = (starshipPickerSearch || '').trim().toLowerCase()
+    if (!q) return listForSelection
+    return listForSelection.filter(s => {
+      const name = (s.name || '').toLowerCase()
+      const slugv = (s.slug || '').toLowerCase()
+      return name.includes(q) || slugv.includes(q)
+    })
+  }, [listForSelection, starshipPickerSearch])
+
   const handleNext = () => {
     if (isProcessing) return
     if (!canGoNext) return
@@ -241,8 +268,6 @@ export function AgentDeploymentWizardModal({
       // Keep wizard open if deploy fails.
     }
   }
-
-  const showGridSelection = listForSelection.length > 0 && listForSelection.length <= 6
 
   const permissionCounts = useMemo(() => {
     const counts = { allow: 0, ask: 0, deny: 0 }
@@ -278,131 +303,107 @@ export function AgentDeploymentWizardModal({
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
                       <p className="text-sm text-muted-foreground">No starships available for deployment.</p>
                     </div>
-                  ) : showGridSelection ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {listForSelection.map(s => {
-                        const access = s as DeployStarshipOptionWithAccess
-                        const disabled = Boolean(access.deployDisabled)
-                        const selected = selectedStarship?.id === s.id
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              if (disabled) return
-                              setSelectedStarship(s)
-                            }}
-                            disabled={isProcessing || disabled}
-                            aria-pressed={selected}
-                            className={cn(
-                              // Min height ensures consistent layout even when disabled warning is present.
-                              'text-left rounded-xl border p-3 transition-all bg-card/40 hover:bg-card/60 min-h-[96px]',
-                              selected ? 'border-primary/40 bg-primary/10' : 'border-border/60',
-                              (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
-                              disabled && 'hover:bg-card/40'
-                            )}
-                          >
-                            <div className="flex flex-col h-full">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-start gap-2.5 min-w-0">
-                                    <StarshipMonogram starship={s} disabled={disabled} />
-                                    <div className="min-w-0 flex-1">
-                                      <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
-                                      <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
-                                    </div>
-                                  </div>
-                                </div>
-                                <StarshipRightSlot>
-                                  {disabled ? (
-                                    <Icon name="lock" className="h-5 w-5 text-muted-foreground" />
-                                  ) : selected ? (
-                                    <Icon name="check-circle" className="h-5 w-5 text-primary" />
-                                  ) : (
-                                    <div className="h-5 w-5" />
-                                  )}
-                                </StarshipRightSlot>
-                              </div>
-
-                              {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
-                              <div className="mt-auto pt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
-                                {disabled ? (
-                                  <span className="inline-flex items-center gap-1.5">
-                                    <Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                    <span className="truncate">{access.deployDisabledReason || 'Deploy disabled'}</span>
-                                  </span>
-                                ) : (
-                                  ''
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
                   ) : (
-                    <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                      <p className="text-sm text-muted-foreground">Select the target starship below.</p>
-                      <div className="mt-3">
-                        {/* For large lists, we keep it simple: clickable list */}
-                        <div className="space-y-2">
-                          {listForSelection.map(s => {
-                            const access = s as DeployStarshipOptionWithAccess
-                            const disabled = Boolean(access.deployDisabled)
-                            const selected = selectedStarship?.id === s.id
-                            return (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => {
-                                  if (disabled) return
-                                  setSelectedStarship(s)
-                                }}
-                                disabled={isProcessing || disabled}
-                                className={cn(
-                                  'w-full rounded-lg border px-3 py-1.5 text-sm transition-colors text-left',
-                                  selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30',
-                                  (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
-                                  disabled && 'hover:bg-background/30'
-                                )}
-                              >
-                                <div className="flex flex-col min-h-[56px]">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <span className="flex items-start gap-2.5 min-w-0 flex-1">
-                                      <StarshipMonogram starship={s} disabled={disabled} />
-                                      <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
-                                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
-                                      </span>
-                                    </span>
-                                    <StarshipRightSlot>
-                                      {disabled ? (
-                                        <Icon name="lock" className="h-4 w-4 text-muted-foreground" />
-                                      ) : selected ? (
-                                        <Icon name="check" className="h-4 w-4 text-primary" />
-                                      ) : (
-                                        <div className="h-4 w-4" />
-                                      )}
-                                    </StarshipRightSlot>
-                                  </div>
+                    <div>
+                      <Popover open={starshipPickerOpen} onOpenChange={setStarshipPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            aria-label={selectedStarship ? `Selected starship: ${selectedStarship.name || selectedStarship.slug}. Change starship.` : 'Select a starship'}
+                            className={cn(
+                              // Match starship-level tool selector trigger styling (ToolDropdown)
+                              'flex min-h-14 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-4 py-3 text-sm text-left',
+                              'ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                              'hover:bg-background hover:text-foreground',
+                              isProcessing && 'opacity-60 cursor-not-allowed'
+                            )}
+                            disabled={isProcessing}
+                          >
+                            <span className="flex items-start gap-3 min-w-0">
+                              <StarshipPickerIcon starship={selectedStarship ?? { id: '', name: 'S' }} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate">
+                                  {selectedStarship?.name || selectedStarship?.slug || 'Select a starship…'}
+                                </span>
+                                {selectedStarship ? (
+                                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                    {selectedStarship.slug ? `/${selectedStarship.slug}` : selectedStarship.id}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                            <Icon name="chevron-down" className={cn('h-4 w-4 opacity-50 shrink-0', starshipPickerOpen && 'rotate-180')} />
+                          </Button>
+                        </PopoverTrigger>
 
-                                  {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
-                                  <div className="mt-auto pt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
-                                    {disabled ? (
-                                      <span className="inline-flex items-center gap-1.5">
-                                        <Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                        <span className="truncate">{access.deployDisabledReason || 'Deploy disabled'}</span>
-                                      </span>
-                                    ) : (
-                                      ''
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
+                        <PopoverContent
+                          align="start"
+                          side="bottom"
+                          sideOffset={8}
+                          aria-label="Starship options"
+                          className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6 w-[min(520px,calc(100vw-40px))]')}
+                        >
+                          <div className="border-b border-border/40 p-2">
+                            <div className="relative">
+                              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
+                              <Input
+                                value={starshipPickerSearch}
+                                onChange={e => setStarshipPickerSearch(e.target.value)}
+                                placeholder="Search starships…"
+                                className="h-9 pl-10"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
+                            {listForSelection.length === 0 ? (
+                              <div className="text-center py-4 text-sm text-muted-foreground">No starships available</div>
+                            ) : filteredStarships.length === 0 ? (
+                              <div className="text-center py-4 text-sm text-muted-foreground">No starships match your search</div>
+                            ) : (
+                              <>
+                                {filteredStarships.map(s => {
+                                  const access = s as DeployStarshipOptionWithAccess
+                                  const disabled = Boolean(access.deployDisabled)
+                                  const selected = selectedStarship?.id === s.id
+                                  return (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      disabled={disabled}
+                                      onClick={() => {
+                                        if (disabled) return
+                                        setSelectedStarship(s)
+                                        setStarshipPickerOpen(false)
+                                      }}
+                                      className={cn(
+                                        'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
+                                        selected ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm',
+                                        disabled && 'opacity-60 cursor-not-allowed hover:bg-transparent hover:shadow-none'
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        <StarshipPickerIcon starship={s} disabled={disabled} />
+                                        <div className="min-w-0 flex flex-col flex-1">
+                                          <div className="font-medium leading-5 text-foreground truncate">{s.name || s.slug || s.id}</div>
+                                          <div className="mt-0.5 text-xs leading-4 text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
+                                        </div>
+                                        {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : null}
+                                      </div>
+                                      {disabled && access.deployDisabledReason ? (
+                                        <div className="mt-1 text-[11px] text-muted-foreground truncate">{access.deployDisabledReason}</div>
+                                      ) : null}
+                                    </button>
+                                  )
+                                })}
+                              </>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
                     </div>
                   )}
                 </div>

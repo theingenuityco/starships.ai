@@ -186,20 +186,27 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
                 </div>
 
                 {showInstallCta ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (installDisabled) return
-                      requestInstall()
-                    }}
-                    disabled={installDisabled}
-                    className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
-                  >
-                    {installLabel}
-                  </Button>
+                  isInstalled ? (
+                    <Button variant="ghost" size="sm" disabled className="h-7 px-2 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
+                      <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
+                      Installed
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (installDisabled) return
+                        requestInstall()
+                      }}
+                      disabled={installDisabled}
+                      className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
+                    >
+                      {installLabel}
+                    </Button>
+                  )
                 ) : (
                   <div />
                 )}
@@ -249,19 +256,27 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
 
             {showInstallCta ? (
               <div className="mt-auto pt-4 flex items-center justify-end">
-                <Button
-                  size="sm"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    requestInstall()
-                  }}
-                  disabled={deployDisabled}
-                  className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Icon name={isInstalling ? 'loader-2' : 'sparkles'} className={isInstalling ? 'w-4 h-4 mr-2 animate-spin' : 'w-4 h-4 mr-2'} />
-                  {isInstalling ? 'Installing…' : 'Install'}
-                </Button>
+                {isInstalled ? (
+                  <Button variant="ghost" size="sm" disabled className="h-9 px-3 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
+                    <Icon name="check-circle" className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                    Installed
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (deployDisabled || isInstalled) return
+                      requestInstall()
+                    }}
+                    disabled={deployDisabled || isInstalled}
+                    className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Icon name={isInstalling ? 'loader-2' : 'sparkles'} className={isInstalling ? 'w-4 h-4 mr-2 animate-spin' : 'w-4 h-4 mr-2'} />
+                    {isInstalling ? 'Installing…' : 'Install'}
+                  </Button>
+                )}
               </div>
             ) : null}
           </div>

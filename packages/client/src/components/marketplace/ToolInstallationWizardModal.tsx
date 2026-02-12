@@ -149,7 +149,10 @@ export function ToolInstallationWizardModal({
   const requiredConnectorProviders = useMemo(() => {
     const raw = (template as any)?.requiredConnectorProviders
     const list = Array.isArray(raw) ? raw : []
-    const normalized = list.map(p => String(p ?? '').trim()).filter(Boolean)
+    const normalized = list
+      .map(p => String(p ?? '').trim())
+      .filter(Boolean)
+      .filter(p => p.toLowerCase() !== 'starship')
     return Array.from(new Set(normalized))
   }, [template])
 
@@ -167,10 +170,11 @@ export function ToolInstallationWizardModal({
   const { data: selectedStarshipConnectors = [] } = useStarshipConnectors(selectedStarshipId, Boolean(shouldFetchConnectors))
 
   const connectedRequiredConnectorsCount = useMemo(() => {
-    const requiredProviders = new Set(requiredConnectorProviders.map(p => String(p || '').trim()).filter(Boolean))
+    const requiredProviders = new Set(requiredConnectorProviders.map(p => String(p || '').trim().toLowerCase()).filter(Boolean))
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
-      const provider = String((c as any)?.provider || '').trim()
+      const provider = String((c as any)?.provider || '').trim().toLowerCase()
+      if (!provider || provider === 'starship') return false
       const status = String((c as any)?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length

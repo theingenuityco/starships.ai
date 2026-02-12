@@ -200,15 +200,24 @@ export function AgentDeploymentWizardModal({
   const selectedStarshipId = String((selectedStarship as any)?.id || '')
   const { data: selectedStarshipConnectors = [] } = useStarshipConnectors(selectedStarshipId, Boolean(shouldFetchConnectors && selectedStarshipId))
 
+  const visibleRequiredConnectors = useMemo(() => {
+    return (requiredConnectors ?? []).filter(c => {
+      const provider = String((c as any)?.provider || '').trim()
+      if (!provider) return false
+      return provider.toLowerCase() !== 'starship'
+    })
+  }, [requiredConnectors])
+
   const connectedRequiredConnectorsCount = useMemo(() => {
-    const requiredProviders = new Set((requiredConnectors ?? []).map(c => String((c as any)?.provider || '').trim()).filter(Boolean))
+    const requiredProviders = new Set(visibleRequiredConnectors.map(c => String((c as any)?.provider || '').trim().toLowerCase()).filter(Boolean))
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
-      const provider = String((c as any)?.provider || '').trim()
+      const provider = String((c as any)?.provider || '').trim().toLowerCase()
+      if (!provider || provider === 'starship') return false
       const status = String((c as any)?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length
-  }, [requiredConnectors, selectedStarshipConnectors])
+  }, [visibleRequiredConnectors, selectedStarshipConnectors])
 
   useEffect(() => {
     if (!isOpen) return
@@ -524,13 +533,13 @@ export function AgentDeploymentWizardModal({
 
               {step === 3 ? (
                 <div className="mt-8 space-y-4">
-                  <div className="text-sm font-semibold">{connectorsStepTitle(agentDeployLabel, requiredConnectors.length)}</div>
+                  <div className="text-sm font-semibold">{connectorsStepTitle(agentDeployLabel, visibleRequiredConnectors.length)}</div>
 
-                  {requiredConnectors.length > 0 ? (
+                  {visibleRequiredConnectors.length > 0 ? (
                     selectedStarship?.id ? (
                       <ConnectorSuggestionCard
                         starshipId={selectedStarship.id}
-                        providers={requiredConnectors.map(c => c.provider)}
+                        providers={visibleRequiredConnectors.map(c => c.provider)}
                         hideSearch={true}
                         hideDisconnect={false}
                         compactCard
@@ -630,9 +639,9 @@ export function AgentDeploymentWizardModal({
                             <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
                           </div>
-                          {requiredConnectors.length > 0 ? (
+                          {visibleRequiredConnectors.length > 0 ? (
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{requiredConnectors.length} required</span>
+                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{visibleRequiredConnectors.length} required</span>
                               <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                               <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
                             </div>

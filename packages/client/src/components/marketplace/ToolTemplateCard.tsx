@@ -112,13 +112,13 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                         const showLogo = !hiddenLogos[provider]
                         const logoSrc = getConnectorLogoSrc(provider)
                         return (
-                          <div key={provider} className="flex h-7 w-7 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
+                          <div key={provider} className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
                             {showLogo ? (
                               <Image
                                 src={logoSrc}
                                 alt=""
-                                width={18}
-                                height={18}
+                                width={24}
+                                height={24}
                                 className="object-contain"
                                 onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                               />
@@ -149,7 +149,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
             </div>
 
             {/* Right content */}
-            <div className="min-w-0 flex-1 flex flex-col p-4">
+            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-base font-semibold leading-tight truncate">{displayName}</div>

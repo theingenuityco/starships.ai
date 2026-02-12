@@ -15,7 +15,7 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
 
   return (
     <div className={cn('relative overflow-hidden rounded-lg bg-transparent', className)}>
-      <div className="flex items-start gap-3 pl-0.5">
+      <div className="flex items-start gap-3 pl-0.5 py-0.5">
         {/* Square avatar tile */}
         <MarketplaceAvatar
           imageUrl={avatarUrl || null}

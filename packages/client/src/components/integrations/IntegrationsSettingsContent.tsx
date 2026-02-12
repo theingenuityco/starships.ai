@@ -277,6 +277,12 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return true
   }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive])
 
+  const q = debouncedQuery.trim()
+  const isInitialAgentsLoading = !q && Boolean(agentsQuery.isLoading)
+  const isSearchingAgents = Boolean(q && (agentsQuery.isLoading || (agentsQuery.isFetching && !agentsQuery.isFetchingNextPage)))
+  const isInitialAutomationsLoading = !q && Boolean(toolsQuery.isLoading)
+  const isSearchingAutomations = Boolean(q && (toolsQuery.isLoading || (toolsQuery.isFetching && !toolsQuery.isFetchingNextPage)))
+
   const renderRowSkeleton = useCallback((key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -308,9 +314,23 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     )
   }, [])
 
+  const renderCenteredState = useCallback((message: string) => {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
+      </div>
+    )
+  }, [])
+
   const renderAgentsList = () => {
-    if (agentsQuery.isLoading) {
+    // Match Members page behavior:
+    // - show skeletons for initial load (empty search)
+    // - show a centered "Searching…" message while search is running
+    if (isInitialAgentsLoading) {
       return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`agent-skel-${i}`))}</div>
+    }
+    if (isSearchingAgents) {
+      return renderCenteredState(`Searching “${q}”…`)
     }
     if (!Array.isArray(visibleAgents) || visibleAgents.length === 0) {
       return (
@@ -402,8 +422,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }
 
   const renderAutomationsList = () => {
-    if (toolsQuery.isLoading) {
+    if (isInitialAutomationsLoading) {
       return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`automation-skel-${i}`))}</div>
+    }
+    if (isSearchingAutomations) {
+      return renderCenteredState(`Searching “${q}”…`)
     }
     if (!Array.isArray(visibleAutomations) || visibleAutomations.length === 0) {
       return (

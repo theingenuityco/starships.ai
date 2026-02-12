@@ -258,7 +258,7 @@ export function AgentDeploymentWizardModal({
       <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-4xl h-[85vh] overflow-hidden p-0">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="shrink-0 px-6 pt-6 pb-6 border-b border-border/50 space-y-6">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
               <DialogTitle>Deploy agent</DialogTitle>
 
               <div>
@@ -268,7 +268,7 @@ export function AgentDeploymentWizardModal({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               {/* Agent details (compact preview, matches marketplace card layout). */}
-              <AgentTemplatePreviewCard template={template} />
+              <AgentTemplatePreviewCard template={template} className="mb-6" />
 
               {step === 1 ? (
                 <div className="mt-8 space-y-3">
@@ -296,7 +296,7 @@ export function AgentDeploymentWizardModal({
                             aria-pressed={selected}
                             className={cn(
                               // Min height ensures consistent layout even when disabled warning is present.
-                              'text-left rounded-xl border p-4 transition-all bg-card/40 hover:bg-card/60 min-h-[108px]',
+                              'text-left rounded-xl border p-3 transition-all bg-card/40 hover:bg-card/60 min-h-[96px]',
                               selected ? 'border-primary/40 bg-primary/10' : 'border-border/60',
                               (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
                               disabled && 'hover:bg-card/40'
@@ -305,7 +305,7 @@ export function AgentDeploymentWizardModal({
                             <div className="flex flex-col h-full">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-start gap-3 min-w-0">
+                                  <div className="flex items-start gap-2.5 min-w-0">
                                     <StarshipMonogram starship={s} disabled={disabled} />
                                     <div className="min-w-0 flex-1">
                                       <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
@@ -325,7 +325,7 @@ export function AgentDeploymentWizardModal({
                               </div>
 
                               {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
-                              <div className="mt-auto pt-3 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
+                              <div className="mt-auto pt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
                                 {disabled ? (
                                   <span className="inline-flex items-center gap-1.5">
                                     <Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -359,11 +359,16 @@ export function AgentDeploymentWizardModal({
                                   setSelectedStarship(s)
                                 }}
                                 disabled={isProcessing || disabled}
-                                className={cn('w-full rounded-lg border px-3 py-2 text-sm transition-colors text-left', selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30', (isProcessing || disabled) && 'opacity-60 cursor-not-allowed', disabled && 'hover:bg-background/30')}
+                                className={cn(
+                                  'w-full rounded-lg border px-3 py-1.5 text-sm transition-colors text-left',
+                                  selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30',
+                                  (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
+                                  disabled && 'hover:bg-background/30'
+                                )}
                               >
-                                <div className="flex flex-col min-h-[64px]">
+                                <div className="flex flex-col min-h-[56px]">
                                   <div className="flex items-start justify-between gap-3">
-                                    <span className="flex items-start gap-3 min-w-0 flex-1">
+                                    <span className="flex items-start gap-2.5 min-w-0 flex-1">
                                       <StarshipMonogram starship={s} disabled={disabled} />
                                       <span className="min-w-0 flex-1">
                                         <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
@@ -591,7 +596,7 @@ export function AgentDeploymentWizardModal({
               ) : null}
             </div>
 
-            <DialogFooter className="shrink-0 px-6 py-4 border-t border-border/50 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
+            <DialogFooter className="shrink-0 px-6 py-4 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
               <div>
                 <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isProcessing}>
                   Cancel

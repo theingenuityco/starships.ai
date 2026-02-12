@@ -66,6 +66,12 @@ function StarshipMonogram({ starship, disabled }: { starship: { name?: string; s
   )
 }
 
+function StarshipRightSlot({ children }: { children: React.ReactNode }) {
+  // Fixed accessory width so the right side matches the left logo column visually.
+  // Monogram is 2rem (w-8) so we reserve w-8 on the right.
+  return <div className="w-8 shrink-0 flex items-start justify-center">{children}</div>
+}
+
 function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select starship'
   if (step === 2) return 'Configure'
@@ -244,7 +250,7 @@ export function AgentDeploymentWizardModal({
                             <div className="flex flex-col h-full">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-start gap-2 min-w-0">
+                                  <div className="flex items-start gap-3 min-w-0">
                                     <StarshipMonogram starship={s} disabled={disabled} />
                                     <div className="min-w-0 flex-1">
                                       <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
@@ -252,18 +258,27 @@ export function AgentDeploymentWizardModal({
                                     </div>
                                   </div>
                                 </div>
-                                {disabled ? (
-                                  <Icon name="lock" className="h-5 w-5 text-muted-foreground shrink-0" />
-                                ) : selected ? (
-                                  <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" />
-                                ) : (
-                                  <div className="h-5 w-5 shrink-0" />
-                                )}
+                                <StarshipRightSlot>
+                                  {disabled ? (
+                                    <Icon name="lock" className="h-5 w-5 text-muted-foreground" />
+                                  ) : selected ? (
+                                    <Icon name="check-circle" className="h-5 w-5 text-primary" />
+                                  ) : (
+                                    <div className="h-5 w-5" />
+                                  )}
+                                </StarshipRightSlot>
                               </div>
 
                               {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
                               <div className="mt-auto pt-3 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
-                                {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                                {disabled ? (
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    <span className="truncate">{access.deployDisabledReason || 'Deploy disabled'}</span>
+                                  </span>
+                                ) : (
+                                  ''
+                                )}
                               </div>
                             </div>
                           </button>
@@ -293,19 +308,34 @@ export function AgentDeploymentWizardModal({
                               >
                                 <div className="flex flex-col min-h-[64px]">
                                   <div className="flex items-start justify-between gap-3">
-                                    <span className="flex items-start gap-2 min-w-0 flex-1">
+                                    <span className="flex items-start gap-3 min-w-0 flex-1">
                                       <StarshipMonogram starship={s} disabled={disabled} />
                                       <span className="min-w-0 flex-1">
                                         <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
                                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
                                       </span>
                                     </span>
-                                    {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary shrink-0" /> : null}
+                                    <StarshipRightSlot>
+                                      {disabled ? (
+                                        <Icon name="lock" className="h-4 w-4 text-muted-foreground" />
+                                      ) : selected ? (
+                                        <Icon name="check" className="h-4 w-4 text-primary" />
+                                      ) : (
+                                        <div className="h-4 w-4" />
+                                      )}
+                                    </StarshipRightSlot>
                                   </div>
 
                                   {/* Disabled warning should be full-width (not part of the monogram/name/slug row). */}
                                   <div className="mt-auto pt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
-                                    {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                                    {disabled ? (
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <Icon name="alert-triangle" className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                        <span className="truncate">{access.deployDisabledReason || 'Deploy disabled'}</span>
+                                      </span>
+                                    ) : (
+                                      ''
+                                    )}
                                   </div>
                                 </div>
                               </button>
@@ -452,7 +482,7 @@ export function AgentDeploymentWizardModal({
                       <div className="min-w-0">
                         <div className="text-sm font-semibold">Target starship</div>
                         {selectedStarship ? (
-                          <div className="mt-1 flex items-start gap-2 min-w-0">
+                          <div className="mt-1 flex items-start gap-3 min-w-0">
                             <StarshipMonogram starship={selectedStarship} />
                             <div className="min-w-0">
                               <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>

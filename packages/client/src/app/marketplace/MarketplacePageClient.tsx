@@ -176,25 +176,121 @@ export default function MarketplacePageClient(props: {
     if (!hasPagination || !pagination) return null
     const prevHref = pagination.has_prev ? routeForPage(tab, pagination.page - 1) : null
     const nextHref = pagination.has_next ? routeForPage(tab, pagination.page + 1) : null
+    const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.limit))
+    const start = pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
+    const end = pagination.total > 0 ? Math.min(pagination.total, pagination.page * pagination.limit) : 0
+
+    const buildPageItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+      if (total <= 1) return [1]
+      if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+
+      const pages = new Set<number>()
+      pages.add(1)
+      pages.add(total)
+
+      // Expand the window near the edges to avoid awkward ellipses.
+      if (current <= 3) {
+        pages.add(2)
+        pages.add(3)
+        pages.add(4)
+      } else if (current >= total - 2) {
+        pages.add(total - 1)
+        pages.add(total - 2)
+        pages.add(total - 3)
+      } else {
+        pages.add(current - 1)
+        pages.add(current)
+        pages.add(current + 1)
+      }
+
+      const sorted = Array.from(pages)
+        .filter(p => p >= 1 && p <= total)
+        .sort((a, b) => a - b)
+
+      const items: Array<number | 'ellipsis'> = []
+      let prev = 0
+      for (const p of sorted) {
+        if (prev && p - prev > 1) items.push('ellipsis')
+        items.push(p)
+        prev = p
+      }
+      return items
+    }
+
+    const pageItems = buildPageItems(pagination.page, totalPages)
     return (
-      <nav aria-label="Explore pagination" className="mt-8 flex items-center justify-center gap-3">
-        {prevHref ? (
-          <Link href={prevHref} className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors">
-            Previous
-          </Link>
-        ) : (
-          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">Previous</span>
-        )}
+      <nav aria-label="Explore pagination" className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-muted-foreground tabular-nums">
+          {pagination.total > 0 ? (
+            <>
+              Showing {start}–{end} of {pagination.total}
+            </>
+          ) : (
+            <>No results</>
+          )}
+        </div>
 
-        <span className="text-sm text-muted-foreground tabular-nums">Page {pagination.page}</span>
+        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+          {prevHref ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={prevHref} aria-label="Previous page">
+                <Icon name="chevron-left" className="h-4 w-4" />
+                <span className="hidden sm:inline">Prev</span>
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled aria-label="Previous page">
+              <Icon name="chevron-left" className="h-4 w-4" />
+              <span className="hidden sm:inline">Prev</span>
+            </Button>
+          )}
 
-        {nextHref ? (
-          <Link href={nextHref} className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors">
-            Next
-          </Link>
-        ) : (
-          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">Next</span>
-        )}
+          {pageItems.map((item, idx) => {
+            if (item === 'ellipsis') {
+              return (
+                <span key={`ellipsis-${idx}`} className="px-2 text-sm text-muted-foreground select-none" aria-hidden>
+                  …
+                </span>
+              )
+            }
+
+            const p = item
+            const isCurrent = p === pagination.page
+            const href = routeForPage(tab, p)
+
+            if (isCurrent) {
+              return (
+                <Button key={p} asChild variant="secondary" size="sm">
+                  <span aria-current="page" className="tabular-nums">
+                    {p}
+                  </span>
+                </Button>
+              )
+            }
+
+            return (
+              <Button key={p} asChild variant="outline" size="sm">
+                <Link href={href} aria-label={`Go to page ${p}`} className="tabular-nums">
+                  {p}
+                </Link>
+              </Button>
+            )
+          })}
+
+          {nextHref ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={nextHref} aria-label="Next page">
+                <span className="hidden sm:inline">Next</span>
+                <Icon name="chevron-right" className="h-4 w-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled aria-label="Next page">
+              <span className="hidden sm:inline">Next</span>
+              <Icon name="chevron-right" className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </nav>
     )
   }

@@ -41,7 +41,8 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         hideSearch={hideSearch}
         hideDisconnect={hideDisconnect}
         maxColumns={2}
-        hideCardDescription={compactCard}
+        // Widget cards should match Explore listing, including description.
+        hideCardDescription={false}
         cardVariant="explore"
         connectButtonLabel={connectButtonLabel}
       />

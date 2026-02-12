@@ -13,6 +13,55 @@ export class ConnectorTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Search connector templates for Explore catalog (DB-backed).
+   * Filters to enabled templates by default.
+   */
+  async searchCatalog(args?: { q?: string; limit?: number }): Promise<Array<Record<string, unknown>>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const q = typeof args?.q === 'string' ? args.q.trim() : '';
+        const limit = typeof args?.limit === 'number' && Number.isFinite(args.limit) ? Math.max(1, Math.min(200, args.limit)) : 200;
+
+        const connection = this.getConnection();
+        const params: unknown[] = [];
+        let i = 1;
+        const where: string[] = [];
+
+        // Only enabled connectors should be discoverable in public Explore.
+        where.push('(is_enabled IS DISTINCT FROM FALSE)');
+
+        if (q) {
+          if (q.length > 200) throw new Error('Search query cannot exceed 200 characters');
+          params.push(`%${q}%`);
+          const p = `$${i++}`;
+          where.push(`(
+            provider ILIKE ${p}
+            OR name ILIKE ${p}
+            OR description ILIKE ${p}
+            OR category ILIKE ${p}
+          )`);
+        }
+
+        params.push(limit);
+        const pLimit = `$${i++}`;
+
+        const sql = `
+          SELECT *
+          FROM connector_templates
+          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+          ORDER BY usage_count DESC, provider ASC, created_at DESC
+          LIMIT ${pLimit}
+        `;
+
+        const rows = await connection.query<Record<string, unknown>>(sql, params);
+        return rows ?? [];
+      },
+      'searchCatalog',
+      'ConnectorTemplate'
+    );
+  }
+
+  /**
    * Read-only access to the legacy endpoints catalog stored on connector_templates.endpoints_json.
    *
    * IMPORTANT: This exists only for admin transparency/debugging. Runtime execution must use

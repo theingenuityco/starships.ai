@@ -44,6 +44,7 @@ const map: Record<string, ResolvedIcon> = {
   stars: { type: 'phosphor', component: 'Stars' },
   heart: { type: 'phosphor', component: 'Heart' },
   info: { type: 'phosphor', component: 'Info' },
+  eyeglasses: { type: 'phosphor', component: 'Eyeglasses' },
   calendar: { type: 'phosphor', component: 'Calendar' },
   clock: { type: 'phosphor', component: 'Clock' },
   percent: { type: 'phosphor', component: 'Percent' },

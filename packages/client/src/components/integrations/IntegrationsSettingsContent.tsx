@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -206,6 +207,14 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
                       <AgentAvatar seed={avatarSeed} imageUrl={avatarUrl} size={40} rounded instanceId={String(a.id)} />
                     </span>
+                    <PresenceIndicator
+                      kind="online"
+                      active={true}
+                      size="sm"
+                      placement="outset"
+                      // Match Members/Connectors placement for 40px avatar.
+                      className="translate-x-[22%] translate-y-[6%]"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -280,6 +289,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     >
                       <Icon name={toolLeftIcon.name} className="h-4 w-4 text-muted-foreground" />
                     </span>
+                    <PresenceIndicator kind="online" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

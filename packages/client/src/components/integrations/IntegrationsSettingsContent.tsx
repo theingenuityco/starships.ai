@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 
 import api from '@/lib/api'
 import type { ApiResponse, AgentModel, ToolModel } from '@starships/protocol'
@@ -436,20 +437,23 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
                       {Array.isArray(filteredAgents) ? (
-                        <span className="text-xs text-muted-foreground tabular-nums">{filteredAgents.length}</span>
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
+                        >
+                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
+                            <Icon name="bot" className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                          {filteredAgents.length} agents
+                        </Badge>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-xs font-medium text-muted-foreground hover:text-foreground transition-colors',
-                        tabFromUrl === 'agents' ? 'opacity-0 pointer-events-none' : ''
-                      )}
-                      onClick={() => setTab('agents')}
-                      aria-label="View agents only"
-                    >
-                      View
-                    </button>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                      <Link href="/explore">
+                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
+                        Explore agents
+                      </Link>
+                    </Button>
                   </div>
                   {renderAgentsList()}
                 </section>
@@ -460,19 +464,24 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Tools</h3>
-                      {Array.isArray(filteredTools) ? <span className="text-xs text-muted-foreground tabular-nums">{filteredTools.length}</span> : null}
+                      {Array.isArray(filteredTools) ? (
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
+                        >
+                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
+                            <Icon name="magic-wand" className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                          {filteredTools.length} tools
+                        </Badge>
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-xs font-medium text-muted-foreground hover:text-foreground transition-colors',
-                        tabFromUrl === 'tools' ? 'opacity-0 pointer-events-none' : ''
-                      )}
-                      onClick={() => setTab('tools')}
-                      aria-label="View tools only"
-                    >
-                      View
-                    </button>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                      <Link href={`/ship/${encodeURIComponent(slug)}/tools`}>
+                        <Icon name="magic-wand" className="h-4 w-4 mr-1.5" />
+                        Manage tools
+                      </Link>
+                    </Button>
                   </div>
                   {renderToolsList()}
                 </section>
@@ -490,18 +499,24 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Connectors</h3>
+                      {typeof totalConnectors === 'number' ? (
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
+                        >
+                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
+                            <Icon name="plug" className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                          {totalConnectors} connectors
+                        </Badge>
+                      ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className={cn(
-                        'text-xs font-medium text-muted-foreground hover:text-foreground transition-colors',
-                        tabFromUrl === 'connectors' ? 'opacity-0 pointer-events-none' : ''
-                      )}
-                      onClick={() => setTab('connectors')}
-                      aria-label="View connectors only"
-                    >
-                      View
-                    </button>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
+                      <Link href={`/ship/${encodeURIComponent(slug)}/connectors`}>
+                        <Icon name="plug" className="h-4 w-4 mr-1.5" />
+                        Manage connectors
+                      </Link>
+                    </Button>
                   </div>
 
                   <StarshipConnectorsPanel

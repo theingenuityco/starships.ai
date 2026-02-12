@@ -226,9 +226,34 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const totalConnectors = typeof connectorStats?.total === 'number' ? connectorStats.total : null
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
 
-  const showAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
-  const showAutomations = tabFromUrl === 'all' || tabFromUrl === 'automations'
-  const showConnectors = (tabFromUrl === 'all' || tabFromUrl === 'connectors') && canManageConnectors
+  const isSearchActive = debouncedQuery.trim().length > 0
+
+  const baseShowAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
+  const baseShowAutomations = tabFromUrl === 'all' || tabFromUrl === 'automations'
+  const baseShowConnectors = (tabFromUrl === 'all' || tabFromUrl === 'connectors') && canManageConnectors
+
+  // In the All tab, hide empty sections during search (q present).
+  // Keep sections visible while their initial query is loading to avoid UI "blink".
+  const showAgents = useMemo(() => {
+    if (!baseShowAgents) return false
+    if (!isAllTab || !isSearchActive) return true
+    return agentsQuery.isLoading || agents.length > 0
+  }, [agents.length, agentsQuery.isLoading, baseShowAgents, isAllTab, isSearchActive])
+
+  const showAutomations = useMemo(() => {
+    if (!baseShowAutomations) return false
+    if (!isAllTab || !isSearchActive) return true
+    return toolsQuery.isLoading || tools.length > 0
+  }, [baseShowAutomations, isAllTab, isSearchActive, tools.length, toolsQuery.isLoading])
+
+  const showConnectors = useMemo(() => {
+    if (!baseShowConnectors) return false
+    if (!isAllTab || !isSearchActive) return true
+    // Prefer server total when available; otherwise fall back to visible count while loading.
+    if (typeof catalogTotal === 'number') return catalogTotal > 0
+    if (typeof totalConnectors === 'number') return totalConnectors > 0
+    return true
+  }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive, totalConnectors])
 
   const renderAgentsList = () => {
     if (agentsQuery.isLoading) {

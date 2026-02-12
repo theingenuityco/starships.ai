@@ -8,7 +8,7 @@ import { AgentTemplateDetailsModalContent } from '@/components/marketplace/Agent
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
@@ -184,12 +184,11 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         </div>
       </DialogContent>
 
-      <DeploymentConfirmationModal
+      <AgentDeploymentWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
         onConfirm={handleConfirmDeploy}
         isProcessing={isDeploying}
-        type="agent"
         template={template}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}

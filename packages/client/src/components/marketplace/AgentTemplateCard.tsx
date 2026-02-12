@@ -11,7 +11,7 @@ import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy, useStarship } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
-import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
+import { AgentDeploymentWizardModal } from './AgentDeploymentWizardModal'
 
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
@@ -384,12 +384,11 @@ function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = tr
       </div>
 
       {/* Confirmation Modal */}
-      <DeploymentConfirmationModal
+      <AgentDeploymentWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
         onConfirm={handleConfirmDeploy}
         isProcessing={isDeploying}
-        type="agent"
         template={template}
         starshipName={(starship as { name?: string })?.name || 'Unknown Starship'}
         starshipId={starship?.id}

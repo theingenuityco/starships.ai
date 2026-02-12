@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { track } from '@/lib/analytics'
@@ -139,16 +139,15 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         </Button>
       )}
 
-      <DeploymentConfirmationModal
+      <AgentDeploymentWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
         onConfirm={handleConfirmDeploy}
         isProcessing={isDeploying}
-        type="agent"
         template={template}
-        starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
+        starshipName={primaryStarship?.name || 'Unknown Starship'}
         ownedStarships={ownedStarships}
       />
     </>

@@ -141,8 +141,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [sending, setSending] = useState(false)
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
     const isStarter = !conversationId
-    const { data: channelsData } = useStarshipChannels(starshipId, Boolean(starshipId && conversationId))
-    const isChannelConversation = useMemo(() => {
+    // Load channels so we can detect "channel context" for both channel roots AND channel threads.
+    // (Channel threads have conversationId != channelConversationId, so we must check parentConversationId.)
+    const { data: channelsData } = useStarshipChannels(
+      starshipId,
+      Boolean(starshipId && (conversationId || (typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)))
+    )
+
+    const isChannelRootConversation = useMemo(() => {
       const cid = typeof conversationId === 'string' ? conversationId : ''
       if (!cid) return false
       const channels = (channelsData as any)?.channels
@@ -150,8 +156,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return channels.some((c: any) => String(c?.conversationId || '') === cid)
     }, [channelsData, conversationId])
 
+    // Conversation state for web browsing toggle
+    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+
+    const isChannelContext = useMemo(() => {
+      const channels = (channelsData as any)?.channels
+      if (!Array.isArray(channels) || channels.length === 0) {
+        // Best-effort:
+        // - If we're creating a new child conversation and we don't yet have channel data,
+        //   assume it's a channel thread (thread drafts are only created from channels in the UI).
+        const draftParent = typeof newConversationParentConversationId === 'string' ? newConversationParentConversationId.trim() : ''
+        return Boolean(draftParent)
+      }
+
+      const inList = (id: string) => channels.some((c: any) => String(c?.conversationId || '') === id)
+
+      const cid = typeof conversationId === 'string' ? conversationId.trim() : ''
+      if (cid && inList(cid)) return true
+
+      const parentId = typeof conversation?.parentConversationId === 'string' ? conversation.parentConversationId.trim() : ''
+      if (parentId && inList(parentId)) return true
+
+      const draftParent = typeof newConversationParentConversationId === 'string' ? newConversationParentConversationId.trim() : ''
+      if (draftParent && inList(draftParent)) return true
+
+      return false
+    }, [channelsData, conversationId, conversation?.parentConversationId, newConversationParentConversationId])
+
     // DM context (used for mention restrictions)
-    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelConversation))
+    const { data: directMessagesData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId && !isChannelContext))
     type DmMentionAllowed = { kind: 'agent' | 'user' | null; id: string | null }
     const dmMentionAllowedRef = useRef<DmMentionAllowed>({ kind: null, id: null })
     useEffect(() => {
@@ -224,7 +257,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       // Existing DM: resolve from starship DM list (usually already cached by sidebar)
-      if (conversationId && !isChannelConversation) {
+      if (conversationId && !isChannelContext) {
         const cid = String(conversationId || '').trim()
         const list = (directMessagesData as any)?.directMessages
         const items = Array.isArray(list) ? (list as any[]) : []
@@ -249,7 +282,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelConversation, userId])
+    }, [conversationId, draftDirectMessageTarget, directMessagesData, isChannelContext, userId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -367,8 +400,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const hasHistoryFold = Boolean(ctxUsage?.hasMoreBefore)
     const contextActive = Boolean(conversationId)
 
-    // Conversation state for web browsing toggle
-    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
     const { data: conversationAgents = [] } = useConversationAgents(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
 
@@ -428,14 +459,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (resolvedDmTarget?.dmType === 'user_user') return false
 
       // Mention-only contexts: only charge when an agent is explicitly mentioned.
-      if (isChannelConversation || isMentionOnlyThread) return draftHasAgentMention
+      if (isChannelContext || isMentionOnlyThread) return draftHasAgentMention
 
       // Normal conversations: charge when there's either a mention or a linked fallback agent.
       // (Mirrors the server: hasMention || linkedAgentCount > 0)
       if (draftHasAgentMention) return true
       const linkedCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
       return linkedCount > 0
-    }, [conversationId, draftDirectMessageTarget, isChannelConversation, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
+    }, [conversationId, draftDirectMessageTarget, isChannelContext, isMentionOnlyThread, draftHasAgentMention, conversationAgents])
 
     // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
     const hasFunds = canManageBilling ? !requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE : true
@@ -699,7 +730,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Existing DM: resolve from starship DM list (usually already cached by sidebar)
-        if (conversationId && !isChannelConversation) {
+        if (conversationId && !isChannelContext) {
           const cid = String(conversationId || '').trim()
           const list = (directMessagesData as any)?.directMessages
           const items = Array.isArray(list) ? (list as any[]) : []
@@ -747,8 +778,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // user↔user DMs are human-only: never require or auto-pick an agent.
         effectiveAgent = null
       } else {
-        // Channels + mention-only threads: do not default; only run when an agent is explicitly mentioned.
-        if (isChannelConversation || isMentionOnlyThread) {
+        // Channel context + mention-only threads: do not default; only run when an agent is explicitly mentioned.
+        if (isChannelContext || isMentionOnlyThread) {
           effectiveAgent = null
         }
 
@@ -760,7 +791,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Threads (non-mention-only): if exactly 1 linked agent, allow it as a fallback.
-        if (!effectiveAgent && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+        // NOTE: channel threads are mention-only (no fallback agent).
+        if (!effectiveAgent && isThreadConversation && !isChannelContext && !isMentionOnlyThread && linkedAgentCount === 1) {
           const linked = Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []
           effectiveAgent = linked[0] ?? null
         }
@@ -798,7 +830,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       //
       // Without this, opening a thread via URL/refresh (or from a non-assistant message) can yield `selectedAgent === null`,
       // which incorrectly blocks sending with "Select an agent" even though the thread already has linked agents.
-      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isMentionOnlyThread && linkedAgentCount === 1) {
+      if (!effectiveAgent && !isUserUserDm && isThreadConversation && !isChannelContext && !isMentionOnlyThread && linkedAgentCount === 1) {
         const linked = Array.isArray(conversationAgents) ? conversationAgents : []
         if (linked.length > 0) {
           effectiveAgent = linked[0] ?? null
@@ -810,7 +842,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // allow the message to be persisted without triggering an agent.
       // (This covers "thread started from a user message" and other edge cases.)
       const isAttachmentOnlySend = Boolean(hasPendingAttachments && !messageToSend)
-      const shouldPersistOnly = Boolean(isThreadContext && !isChannelConversation && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
+      const shouldPersistOnly = Boolean(isThreadContext && !isChannelContext && !isUserUserDm && !effectiveAgent && (!isMentionOnlyThread || isAttachmentOnlySend))
 
       // Best-effort routing preview:
       // Only pre-seed a local "turn_started" (typing/loader) when we expect the server to actually run an agent.
@@ -830,7 +862,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
 
         // Mention-only contexts only run when at least one agent is mentioned.
-        if (isChannelConversation || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
+        if (isChannelContext || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
 
         // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
         if (hasUserMentionToken && !hasAgentMention) return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention }
@@ -841,7 +873,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const willTriggerAgentBestEffort = routingPreview.willTriggerAgentBestEffort
 
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation && !isUserUserDm && !shouldPersistOnly) {
+      if (!effectiveAgent && !isChannelContext && !isUserUserDm && !shouldPersistOnly) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -1163,7 +1195,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       isThreadContext,
       isMentionOnlyThread,
       selectedAgent,
-      isChannelConversation,
+      isChannelContext,
       userId,
       conversationId,
       createConversation,
@@ -1342,7 +1374,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const contextAgentForUI: AgentModel | null = useMemo(() => {
       // Channels are mention-driven; never imply a default agent in the UI.
-      if (isChannelConversation) return null
+      if (isChannelContext) return null
 
       // DMs: lock UI hints to the DM target agent when applicable.
       if (resolvedDmTarget?.dmType === 'user_agent') {
@@ -1360,14 +1392,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationAgents, isChannelConversation, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
+    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
 
     const getPlaceholder = () => {
       const label = agentLabelForUI(contextAgentForUI)
       if (isStreamingEffective) return label ? `${label} is responding...` : 'AI is responding...'
       if (sending) return label ? `${label} is thinking...` : 'Thinking...'
 
-      if (isChannelConversation) return 'Message this channel (mention agents with @)'
+      // Channel roots: "message the channel"
+      if (isChannelRootConversation) return 'Message this channel (mention agents with @)'
+      // Channel threads: mention-only behavior, but still allow human chatter without an agent trigger.
+      if (isChannelContext) return 'Reply (mention an agent with @)…'
       if (resolvedDmTarget?.dmType === 'user_agent') return label ? `Message ${label}…` : 'Write a message…'
       if (resolvedDmTarget?.dmType === 'user_user') return 'Write a message…'
       if (isMentionOnlyThread) return 'Reply (mention an agent with @)…'
@@ -1383,7 +1418,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const t = String(message || '').trim()
       return t.startsWith('<@a:') || t.startsWith('@')
     })()
-    const hasTargetAgent = isChannelConversation
+    const hasTargetAgent = isChannelContext
       ? true
       : resolvedDmTarget?.dmType === 'user_user'
         ? true
@@ -1397,6 +1432,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Preserve existing agent-target gating for text, but allow attachment-only sends without text.
     const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
     const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
+
+    // Mobile UX: Discord-like "focus mode" (secondary actions fade back once typing/focused).
+    const isMobileComposerEngaged = Boolean((isEditorFocused || hasActualContent) && !disabled && !isStreamingEffective)
 
     // TipTap editor with Mention extension to treat mentions as atomic units
 
@@ -1494,7 +1532,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
                     {kind === 'user' ? (
                       <>
-                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover rounded-full" /> : null}
+                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
                         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
                       </>
                     ) : (
@@ -1955,7 +1993,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
               )}
             </span>
-            <span className="font-medium text-base">@{display}</span>
+            <span className="font-medium text-sm">@{display}</span>
           </span>
         </NodeViewWrapper>
       )
@@ -2077,11 +2115,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            // Use a “normal” input font size for both starter + docked/minimal modes.
-            'text-base',
+            // Match the chat transcript's default message text size.
+            'text-sm leading-relaxed',
+            // Prevent leading mention pills (ring/shadow) from clipping on the left edge.
+            'pl-1 pr-0.5',
             // Minimal mode should still feel comfortable (not cramped).
-            minimal ? 'min-h-[36px] max-h-[140px]' : isStarter ? 'min-h-[96px] max-h-[300px]' : 'min-h-[64px] max-h-[220px]',
-            'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+            // NOTE: Do NOT set max-height here; the scroll container lives outside the ProseMirror node.
+            // If ProseMirror has a max-height, overflowing content can be clipped without increasing the
+            // parent's scrollHeight, making long inputs appear "non-scrollable".
+            minimal ? 'min-h-[36px]' : isStarter ? 'min-h-[96px]' : 'min-h-[64px]',
             // Minimal mode has a small min-height; center the baseline within that space.
             // This does not change font size or the overall component height.
             minimal && 'tiptap--minimal'
@@ -2384,7 +2426,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Input Container with Expandable Overlay */}
-        <div className={cn('relative transition-all overflow-visible bg-card border border-border/60 rounded-2xl shadow-sm', 'focus-within:border-primary/70', disabled && 'opacity-50')}>
+        <div
+          className={cn(
+            // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
+            // Desktop: keep the rounded composer card.
+            'relative transition-all overflow-visible bg-card shadow-sm',
+            // Mobile: full border but square corners so it reads as a native input bar.
+            'border border-border/80 sm:rounded-2xl rounded-none',
+            'focus-within:border-primary/70',
+            disabled && 'opacity-50'
+          )}
+        >
           {/* Expandable Message Overlay - Inside the input container */}
           {showExpandableOverlay && conversationId && (
             <ExpandableMessageOverlay
@@ -2398,7 +2450,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2.5' : 'px-3 py-2.5')}>
+          <div
+            className={cn(
+              'flex relative gap-2',
+              minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5'
+            )}
+          >
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2409,24 +2466,82 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               className="hidden"
             />
 
+            {/* Left-side Actions */}
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
+                className={cn(
+                  'flex items-center gap-1 transition-opacity duration-200',
+                  // Mobile: don't dim attachment/emoji while the editor is focused (they should still look tappable).
+                  isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                  'sm:opacity-100'
+                )}
+              >
+                {/* Attachment Button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled || fileUploading}
+                  className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                  aria-label="Attach file"
+                  title="Attach file (images, PDFs)"
+                >
+                  <Icon name="paperclip" className="h-5 w-5" />
+                </button>
+
+                {/* Emoji Picker */}
+                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={!canEditComposer}
+                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      aria-label="Insert emoji"
+                      title="Insert emoji"
+                    >
+                      <Icon name="smiley" className="h-5 w-5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverPrimitive.Portal>
+                    <PopoverPrimitive.Content
+                      asChild
+                      align="start"
+                      side="top"
+                      sideOffset={8}
+                      // NOTE: With `asChild`, these classes land on the picker element.
+                      // Do not include bg/border/shadow resets here or we'll override the theme styling.
+                      className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                    >
+                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    </PopoverPrimitive.Content>
+                  </PopoverPrimitive.Portal>
+                </Popover>
+              </div>
+            </div>
+
             {/* Optional left-side controls in expanded mode */}
-            {!minimal && children && <div className="mr-3 flex items-center gap-3">{children}</div>}
+            {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-52 relative z-10')}
+              className={cn('flex-1 min-w-0 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
               }}
             >
-              <div className="max-h-[300px] overflow-y-auto">
+              <div
+                className={cn(
+                  'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                  minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
+                )}
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
                 <EditorContent editor={tiptap} />
               </div>
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-52">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -2437,84 +2552,56 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
 
             {/* Right-side Action Buttons Container */}
-            <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
-              {/* Attachment Button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || fileUploading}
-                className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                aria-label="Attach file"
-                title="Attach file (images, PDFs)"
-              >
-                <Icon name="paperclip" className="h-5 w-5" />
-              </button>
-
-              {/* Emoji Picker */}
-              <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={!canEditComposer}
-                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                    aria-label="Insert emoji"
-                    title="Insert emoji"
-                  >
-                    <Icon name="smiley" className="h-5 w-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverPrimitive.Portal>
-                  <PopoverPrimitive.Content
-                    asChild
-                    align="end"
-                    side="top"
-                    sideOffset={8}
-                    // NOTE: With `asChild`, these classes land on the picker element.
-                    // Do not include bg/border/shadow resets here or we'll override the theme styling.
-                    className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
-                  >
-                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                  </PopoverPrimitive.Content>
-                </PopoverPrimitive.Portal>
-              </Popover>
-
-              {/* Web Browsing Toggle Button - Available from the start */}
-              <button
-                onClick={() => {
-                  if (conversationId) {
-                    // Update existing conversation
-                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
-                    updateConversationState.mutate({
-                      conversationId,
-                      state: {
-                        plugins: newPlugins,
-                      } as ConversationState,
-                    })
-                  } else {
-                    // Store preference for when conversation is created
-                    setPendingWebBrowsing(!pendingWebBrowsing)
-                  }
-                }}
-                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+              {/* Secondary actions (mobile: fade back while typing/focused) */}
+              <div
                 className={cn(
-                  'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
-                  hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                  'flex items-center gap-2 transition-opacity duration-200',
+                  isMobileComposerEngaged && 'opacity-30',
+                  'sm:opacity-100'
                 )}
-                aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
               >
-                {hasWebBrowsing ? (
-                  <>
-                    <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                      <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                      <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="text-xs font-medium whitespace-nowrap">Search</span>
-                  </>
-                ) : (
-                  <Icon name="globe" className="h-5 w-5" />
-                )}
-              </button>
+                {/* Web Browsing Toggle Button - Available from the start */}
+                <button
+                  onClick={() => {
+                    if (conversationId) {
+                      // Update existing conversation
+                      const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                      updateConversationState.mutate({
+                        conversationId,
+                        state: {
+                          plugins: newPlugins,
+                        } as ConversationState,
+                      })
+                    } else {
+                      // Store preference for when conversation is created
+                      setPendingWebBrowsing(!pendingWebBrowsing)
+                    }
+                  }}
+                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                  className={cn(
+                    'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                    hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    // Mobile: when engaged, hide the toggle to keep the composer feeling focused.
+                    isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                  )}
+                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                >
+                  {hasWebBrowsing ? (
+                    <>
+                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                    </>
+                  ) : (
+                    <Icon name="globe" className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
 
               {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (
@@ -2552,6 +2639,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               )}
             </div>
           </div>
+
+          {/* Disclaimer: only show when an agent is tagged in the draft */}
+          {draftHasAgentMention && (
+            <div
+              className={cn(
+                'border-t border-border/40 text-[11px] leading-snug text-muted-foreground',
+                minimal ? 'px-3 py-1' : 'px-3 py-1.5'
+              )}
+            >
+              Agents use AI and may make mistakes. Double-check important details before sending.
+            </div>
+          )}
         </div>
 
         {/* Cost hint (non-minimal) - moved below the composer */}
@@ -2597,13 +2696,22 @@ export function PlaceholderStyles() {
       /* Minimal mode placeholder: center it too (only applies when empty). */
       .tiptap.tiptap--minimal p.is-editor-empty:first-child {
         position: relative;
+        width: 100%;
+        overflow: hidden;
       }
       .tiptap.tiptap--minimal p.is-editor-empty:first-child::before {
         float: none;
         height: auto;
         position: absolute;
+        left: 0;
+        right: 0;
         top: 50%;
         transform: translateY(-50%);
+        display: block;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
     `}</style>
   )

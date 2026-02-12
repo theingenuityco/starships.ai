@@ -9,7 +9,11 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedUpdateDeployedInstances } from '@starships/models';
+import {
+  createConnection,
+  migrationRunner,
+  seedUpdateDeployedInstances,
+} from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';

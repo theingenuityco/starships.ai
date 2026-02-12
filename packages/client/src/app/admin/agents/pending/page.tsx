@@ -38,7 +38,7 @@ function RequestedByProfile({ name, starshipName, starshipSlug, avatar }: Reques
       <div className="w-7 h-7">
         {avatar && isImageUrl(avatar) ? (
           <Avatar className="w-7 h-7 rounded-lg">
-            <AvatarImage src={avatar} alt={name} referrerPolicy="no-referrer" crossOrigin="anonymous" />
+            <AvatarImage src={avatar} alt={name} referrerPolicy="no-referrer" />
             <AvatarFallback className="text-xs">{name.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         ) : (

@@ -8,7 +8,7 @@
 import { AttachmentRepository } from '@starships/models';
 import type { Attachment, AttachmentModel, AttachmentWithUrl } from '@starships/protocol';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '@starships/protocol';
-import { uploadToS3, generatePresignedUrl, deleteFromS3 } from '@/utils/s3-helper';
+import { uploadToS3, generatePresignedUrl, generatePresignedUrlInline, deleteFromS3 } from '@/utils/s3-helper';
 import sharp from 'sharp';
 
 export class AttachmentService {
@@ -330,7 +330,8 @@ export class AttachmentService {
       throw new Error('Unauthorized access to attachments');
     }
 
-    // Generate presigned URLs in parallel (15 minute expiry)
+    // Generate presigned *inline* URLs in parallel (15 minute expiry)
+    // Important: avatars/images are rendered in <img>, so we want `inline` disposition.
     return Promise.all(
       attachments.map(async (a: AttachmentModel) => ({
         id: a.id,
@@ -340,7 +341,7 @@ export class AttachmentService {
         imageWidth: a.imageWidth,
         imageHeight: a.imageHeight,
         createdAt: a.createdAt,
-        previewUrl: await generatePresignedUrl(a.s3Key, 900), // 15 minutes (900s)
+        previewUrl: await generatePresignedUrlInline(a.s3Key, 900), // 15 minutes (900s)
       }))
     );
   }

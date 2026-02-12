@@ -4,24 +4,20 @@ import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
-import { STARSHIP_MEMBERS_QUERY_KEYS, useRemoveStarshipMember, useRevokeStarshipInvite, useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
 import { StarshipToolsDefaultsSection } from '@/components/settings/StarshipToolsDefaultsSection'
 
 interface MyStarshipSettingsSectionProps {
@@ -61,16 +57,10 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const queryClient = useQueryClient()
   const { userId, userName, userAvatar, isInstanceAdmin } = useAuth()
   const updateStarship = useUpdateStarship()
-  const createInvite = useCreateStarshipInvite(starship?.id ?? '')
 
   const { data: deployedAgents, isLoading: isAgentsLoading } = useStarshipAgents(starship?.id ?? '', Boolean(starship?.id))
   const deployedAgentsCount = Array.isArray(deployedAgents) ? deployedAgents.length : 0
   const maxAgentsLabel = isAgentsLoading ? `…/${starship?.maxAgents ?? '—'}` : `${deployedAgentsCount}/${starship?.maxAgents ?? '—'}`
-
-  const canManageBilling = useMemo(() => {
-    if (!starship) return false
-    return Boolean(isInstanceAdmin || (userId && starship.ownerId === userId))
-  }, [starship, isInstanceAdmin, userId])
 
   const canEdit = useMemo(() => {
     if (!starship) return false
@@ -78,25 +68,20 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     return Boolean(isInstanceAdmin || userId)
   }, [starship, isInstanceAdmin, userId])
 
-  const canManageMembers = canManageBilling
-  const { data: membersAndInvites, isLoading: isMembersLoading } = useStarshipMembersAndInvites(starship?.id ?? '', Boolean(starship?.id && canManageMembers))
   const presence = useStarshipPresence(starship?.id ?? '', Boolean(starship?.id))
-  const removeMember = useRemoveStarshipMember(starship?.id ?? '')
-  const revokeInvite = useRevokeStarshipInvite(starship?.id ?? '')
-
-  const [confirmAction, setConfirmAction] = useState<{ kind: 'removeMember'; memberUserId: string; label: string } | { kind: 'revokeInvite'; email: string } | null>(null)
-
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
 
   const [form, setForm] = useState<{
     name: string
+    websiteUrl: string
+    description: string
   } | null>(null)
 
   useEffect(() => {
     if (!starship) return
     setForm({
       name: starship.name,
+      websiteUrl: (starship.websiteUrl ?? '').toString(),
+      description: (starship.description ?? '').toString(),
     })
   }, [starship])
 
@@ -116,6 +101,14 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     // Slug is auto-generated on the server (and may get a unique suffix if taken),
     // so we intentionally do NOT set `next.slug` here. We only show an "expected base slug" in the UI.
 
+    const nextDescription = form.description.trim()
+    const currentDescription = (starship.description ?? '').trim()
+    if (nextDescription !== currentDescription) next.description = nextDescription
+
+    const nextWebsiteUrl = form.websiteUrl.trim()
+    const currentWebsiteUrl = (starship.websiteUrl ?? '').trim()
+    if (nextWebsiteUrl !== currentWebsiteUrl) next.websiteUrl = nextWebsiteUrl
+
     return Object.keys(next).length ? next : null
   }, [starship, form])
 
@@ -127,6 +120,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     if (!starship) return
     setForm({
       name: starship.name,
+      websiteUrl: (starship.websiteUrl ?? '').toString(),
+      description: (starship.description ?? '').toString(),
     })
   }
 
@@ -206,12 +201,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
       </div>
 
       <form id={formId} onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start">
-        {starship.id && canManageBilling && (
-          <div className="xl:col-span-2">
-            <StarshipUpgradeSection starshipId={starship.id} />
-          </div>
-        )}
-
         {/* Left column: overview */}
         <div className="space-y-6">
           <Card className={PROFILE_SECTION_CARD_CLASS}>
@@ -304,15 +293,13 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
             </Alert>
           )}
 
-          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
-
           <Card className={PROFILE_SECTION_CARD_CLASS}>
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <Icon name="id-card" className="h-4 w-4 text-primary" />
                 Starship details
               </CardTitle>
-              <CardDescription className="text-sm">Update your starship name.</CardDescription>
+              <CardDescription className="text-sm">Update your starship name, website, and description.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-5">
               <div className="space-y-4">
@@ -337,252 +324,46 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     </>
                   ) : null}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="starship-website">Website</Label>
+                  <div className="relative">
+                    <Input
+                      id="starship-website"
+                      value={form?.websiteUrl ?? (starship.websiteUrl ?? '')}
+                      onChange={e => setForm(prev => (prev ? { ...prev, websiteUrl: e.target.value } : prev))}
+                      disabled={!canEdit || isSaving}
+                      placeholder="https://example.com"
+                      className="pr-9"
+                      inputMode="url"
+                    />
+                    <Icon name="globe" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Must start with http:// or https://. Leave blank to clear.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-end justify-between gap-4">
+                    <Label htmlFor="starship-description">Description</Label>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">{(form?.description ?? starship.description ?? '').length}/2000</span>
+                  </div>
+                  <Textarea
+                    id="starship-description"
+                    value={form?.description ?? starship.description}
+                    onChange={e => setForm(prev => (prev ? { ...prev, description: e.target.value } : prev))}
+                    disabled={!canEdit || isSaving}
+                    placeholder="What is this starship for?"
+                    maxLength={2000}
+                    className="min-h-[120px] resize-y"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {canManageMembers && (
-            <Card className={PROFILE_SECTION_CARD_CLASS}>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Icon name="mail" className="h-4 w-4 text-primary" />
-                  Invite collaborator
-                </CardTitle>
-                <CardDescription className="text-sm">Send an invite link to a teammate.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="invite-email">Email</Label>
-                  <Input id="invite-email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="teammate@example.com" disabled={createInvite.isPending} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    disabled={!inviteEmail.trim() || createInvite.isPending}
-                    onClick={async () => {
-                      if (!starship?.id) return
-                      const res = await createInvite.mutateAsync({ email: inviteEmail.trim() })
-                      setLastInviteUrl(res.inviteUrl || null)
-                      queryClient.invalidateQueries({ queryKey: STARSHIP_MEMBERS_QUERY_KEYS.byStarship(starship.id) })
-                    }}
-                  >
-                    {createInvite.isPending ? 'Sending…' : 'Send invite'}
-                  </Button>
-                  {lastInviteUrl ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(lastInviteUrl)
-                        } catch {
-                          // ignore
-                        }
-                      }}
-                    >
-                      Copy link
-                    </Button>
-                  ) : null}
-                </div>
-                {lastInviteUrl ? (
-                  <p className="text-xs text-muted-foreground break-all">
-                    Invite link: <span className="font-mono">{lastInviteUrl}</span>
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
-          )}
-
-          {canManageMembers && starship.id && (
-            <Card className={PROFILE_SECTION_CARD_CLASS}>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Icon name="users" className="h-4 w-4 text-primary" />
-                  Members
-                </CardTitle>
-                <CardDescription className="text-sm">All active members and pending invites.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-4">
-                {isMembersLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading members…</p>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Active</span>
-                        <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium tabular-nums border-border/60 bg-muted/20">
-                          {membersAndInvites?.members?.length ?? 0}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        {(membersAndInvites?.members ?? []).map(m => {
-                          const label = m.displayName || m.email || m.userId
-                          const initials = (label || '?').trim().slice(0, 2).toUpperCase()
-                          return (
-                            <div key={`member-${m.userId}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
-                              <div className="flex min-w-0 items-center gap-3">
-                                <div className="relative">
-                                  <Avatar className="h-7 w-7 rounded-full">
-                                    {typeof m.avatar === 'string' && m.avatar.trim() ? <AvatarImage src={m.avatar.trim()} alt={label} referrerPolicy="no-referrer" /> : null}
-                                    <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
-                                  </Avatar>
-                                  {m.userId ? <PresenceIndicator kind={presence.isUserOnline(m.userId) ? 'online' : 'offline'} active={true} size="sm" /> : null}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium truncate">{label}</div>
-                                  {m.email && m.displayName ? <div className="text-xs text-muted-foreground truncate">{m.email}</div> : null}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">{m.role}</span>
-                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                  Active
-                                </span>
-                                {m.role !== 'owner' ? (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-[11px]"
-                                    disabled={removeMember.isPending}
-                                    onClick={async () => {
-                                      if (!starship?.id) return
-                                      setConfirmAction({ kind: 'removeMember', memberUserId: m.userId, label })
-                                    }}
-                                  >
-                                    Remove
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </div>
-                          )
-                        })}
-                        {(membersAndInvites?.members ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No members found.</p> : null}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Invited</span>
-                        <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium tabular-nums border-border/60 bg-muted/20">
-                          {membersAndInvites?.invites?.length ?? 0}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        {(membersAndInvites?.invites ?? []).map(invite => (
-                          <div key={`invite-${invite.invitedEmail}-${invite.createdAt}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
-                                <Icon name="mail" className="h-4 w-4 text-primary" />
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-medium truncate">{invite.invitedEmail}</div>
-                                <div className="text-xs text-muted-foreground truncate">Expires {formatHumanDateTime(invite.expiresAt)}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">{invite.role}</span>
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                Invited
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-[11px]"
-                                disabled={revokeInvite.isPending}
-                                onClick={async () => {
-                                  if (!starship?.id) return
-                                  setConfirmAction({ kind: 'revokeInvite', email: invite.invitedEmail })
-                                }}
-                              >
-                                Revoke
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                        {(membersAndInvites?.invites ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No pending invites.</p> : null}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
         </div>
       </form>
-
-      <Dialog
-        open={confirmAction !== null}
-        onOpenChange={open => {
-          if (!open) setConfirmAction(null)
-        }}
-      >
-        <DialogContent className="sm:max-w-[520px]">
-          <DialogHeader>
-            <DialogTitle className={confirmAction?.kind === 'removeMember' ? 'text-destructive' : undefined}>{confirmAction?.kind === 'removeMember' ? 'Remove member' : 'Revoke invite'}</DialogTitle>
-            <DialogDescription>
-              {confirmAction?.kind === 'removeMember' ? 'This will remove the member’s access to this starship immediately.' : 'This will invalidate the invite link so it can no longer be used.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          {confirmAction?.kind === 'removeMember' ? (
-            <div className="space-y-3">
-              <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/10 text-sm">
-                <div className="flex items-start gap-2">
-                  <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="font-medium text-destructive">You’re about to remove:</p>
-                    <p className="text-destructive/80 break-words">{confirmAction.label}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : confirmAction?.kind === 'revokeInvite' ? (
-            <div className="space-y-3">
-              <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm">
-                <div className="flex items-start gap-2">
-                  <Icon name="alert-triangle" className="h-4 w-4 text-amber-600 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="font-medium text-amber-700 dark:text-amber-300">You’re about to revoke the invite for:</p>
-                    <p className="text-amber-700/80 dark:text-amber-200/80 break-words">{confirmAction.email}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={removeMember.isPending || revokeInvite.isPending}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant={confirmAction?.kind === 'removeMember' ? 'destructive' : 'default'}
-              disabled={removeMember.isPending || revokeInvite.isPending}
-              onClick={async () => {
-                if (!starship?.id) return
-                const action = confirmAction
-                if (!action) return
-
-                try {
-                  if (action.kind === 'removeMember') {
-                    await removeMember.mutateAsync(action.memberUserId)
-                  } else {
-                    await revokeInvite.mutateAsync(action.email)
-                  }
-                } finally {
-                  setConfirmAction(null)
-                }
-              }}
-            >
-              {confirmAction?.kind === 'removeMember' ? (removeMember.isPending ? 'Removing…' : 'Remove') : revokeInvite.isPending ? 'Revoking…' : 'Revoke'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

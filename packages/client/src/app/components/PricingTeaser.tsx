@@ -2,14 +2,15 @@
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 
 export default function PricingTeaser() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
+  const { getSelectedStarshipId } = useSelectedStarship()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
-  const primaryStarship = starships[0]
+  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
 
   const handleClick = () => {
     if (isAuthenticated && primaryStarship?.slug) {

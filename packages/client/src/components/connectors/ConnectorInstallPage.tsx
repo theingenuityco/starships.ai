@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useUserStarships } from '@/hooks/useStarships'
 import { useStartOAuthConnector } from '@/hooks/useConnectors'
 
 import { LoginForm } from '@/components/auth/LoginForm'
@@ -110,12 +110,13 @@ export function ConnectorInstallPage() {
   const [selectedStarshipId, setSelectedStarshipId] = useState<string>('')
   const selectedStarship = useMemo(() => starships?.find(s => s.id === selectedStarshipId), [starships, selectedStarshipId])
 
-  // Auto-select if there is exactly one starship.
+  // Default-select the user's own starship (or first accessible) to avoid picking the newest membership by accident.
   useEffect(() => {
-    if (starships && starships.length === 1) {
-      setSelectedStarshipId(starships[0].id)
-    }
-  }, [starships])
+    if (!starships?.length) return
+    if (selectedStarshipId) return
+    const primary = pickPrimaryStarshipForUser(starships, user?.id, null)
+    if (primary?.id) setSelectedStarshipId(primary.id)
+  }, [starships, user?.id, selectedStarshipId])
 
   const startOAuth = useStartOAuthConnector(selectedStarshipId || '')
   const [isStarting, setIsStarting] = useState(false)

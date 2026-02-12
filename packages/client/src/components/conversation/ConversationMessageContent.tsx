@@ -300,13 +300,20 @@ interface MessageContentProps {
   className?: string
   enableMarkdown?: boolean
   enableCopy?: boolean
-  /** Optional extra action buttons rendered next to copy/export (e.g. "Start thread"). */
+  /** Optional action buttons rendered in the floating actions pill (e.g. reactions, thread). */
   extraActions?: ReactNode
+  /** Optional action buttons rendered after the copy button (e.g. "More options"). */
+  extraActionsAfterCopy?: ReactNode
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
   /** When true, use tighter vertical padding for stacked consecutive messages. */
   compact?: boolean
+  /**
+   * Whether the author header line (name/timestamp) is shown immediately above this content.
+   * Used to prevent emoji-only messages (large, `leading-none`) from visually colliding with the header.
+   */
+  hasAuthorLine?: boolean
   // Optional reasoning content and chunks
   reasoning?: string
   reasoningChunks?: StreamChunk[]
@@ -512,10 +519,12 @@ export function ConversationMessageContent({
   enableMarkdown = true,
   enableCopy = true,
   extraActions,
+  extraActionsAfterCopy,
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
   compact = false,
+  hasAuthorLine = false,
   reasoning,
   reasoningChunks = [],
   agentName,
@@ -1106,6 +1115,7 @@ export function ConversationMessageContent({
 
   const emojiOnlyInfo = useMemo(() => getEmojiOnlyInfo(rawDisplayContent), [rawDisplayContent])
   const shouldRenderEmojiOnlyPlain = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0)
+  const emojiOnlyHeaderGapClass = shouldRenderEmojiOnlyPlain && hasAuthorLine ? 'mt-1' : ''
   const emojiOnlyTextClass = useMemo(() => {
     if (!shouldRenderEmojiOnlyPlain) return ''
     const n = emojiOnlyInfo.emojiCount
@@ -1126,7 +1136,7 @@ export function ConversationMessageContent({
           <div className="relative w-full group/content-chunk">
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
-            {(enableCopy || extraActions) && (
+            {(enableCopy || extraActions || extraActionsAfterCopy) && (
               <div className="pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   {extraActions}
@@ -1137,6 +1147,7 @@ export function ConversationMessageContent({
                       </Button>
                     </>
                   )}
+                  {extraActionsAfterCopy}
                 </div>
               </div>
             )}
@@ -1145,11 +1156,12 @@ export function ConversationMessageContent({
               ref={messageContainerRef}
               className={cn(
                 // Keep internal padding; remove outside row-gap in the list instead.
-                contentContainerClassName
+                contentContainerClassName,
+                emojiOnlyHeaderGapClass
               )}
             >
               {shouldRenderEmojiOnlyPlain ? (
-                <div className={cn('not-prose whitespace-pre-wrap break-words', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
+                <div className={cn('not-prose whitespace-pre-wrap break-words text-foreground', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
               ) : (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -1183,7 +1195,8 @@ export function ConversationMessageContent({
         <div
           className={cn(
             shouldLargePlain ? largePlainClass : contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed',
-            'whitespace-pre-wrap ph-mask-chat-message'
+            'whitespace-pre-wrap ph-mask-chat-message',
+            shouldLargePlain && hasAuthorLine && 'mt-1'
           )}
         >
           {shouldLargePlain ? emojiPlain.trimmed : renderTextWithEmojiSpans(String(displayContent ?? ''))}

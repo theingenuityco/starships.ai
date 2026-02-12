@@ -2,14 +2,14 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useCreateChannel, useDeleteChannel, useStarshipChannels, useStarshipDirectMessages, useUpdateChannel, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useNotificationsStream, useUnreadByConversationIds } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -28,6 +28,8 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuthContext } from '@/providers/auth-provider'
+import { useAuth } from '@/hooks/useAuth'
+import { useStarship } from '@/hooks/useStarships'
 
 interface ConversationListProps {
   starshipId: string
@@ -36,6 +38,34 @@ interface ConversationListProps {
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
+}
+
+const CHANNEL_NAME_MAX = 100
+const CHANNEL_SLUG_MAX = 100
+
+function toChannelSlug(input: string): string {
+  const s = String(input || '')
+    .trim()
+    .toLowerCase()
+  if (!s) return ''
+
+  // Keep it simple and deterministic:
+  // - spaces/periods -> hyphen
+  // - underscores -> hyphen
+  // - keep [a-z0-9-]
+  // - collapse multiple hyphens
+  // - trim hyphens at edges
+  const normalized = s
+    .replace(/[\s._]+/g, '-')
+    .replace(/[^a-z0-9-]+/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  if (normalized.length <= CHANNEL_SLUG_MAX) return normalized
+  // Ensure truncation doesn't end on '-'
+  return normalized
+    .slice(0, CHANNEL_SLUG_MAX)
+    .replace(/-+$/g, '')
 }
 
 function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; agent: AgentModel | null; busy?: boolean }) {
@@ -62,7 +92,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   return (
     <div className="relative">
       <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-        {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+        {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
@@ -72,7 +102,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
 
 type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel } | { kind: 'user'; key: string; label: string; user: StarshipMemberListItem }
 
-export function ConversationList({
+export const ConversationList = memo(function ConversationList({
   starshipId,
   starshipSlug,
   onConversationDelete,
@@ -159,14 +189,31 @@ export function ConversationList({
   const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as Record<string, { hasUnread: boolean }> | undefined
 
   const createChannel = useCreateChannel()
+  const updateChannel = useUpdateChannel()
+  const deleteChannel = useDeleteChannel()
   const { userId: authUserId } = useAuthContext()
+  const { user, isInstanceAdmin } = useAuth()
+  const { data: starship } = useStarship(starshipId, true)
+  const canManageChannels = Boolean(user?.id && starship?.ownerId && (isInstanceAdmin === true || String(starship.ownerId) === String(user.id)))
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
   const [isChannelsExpanded, setIsChannelsExpanded] = useState(true)
   const [isDirectMessagesExpanded, setIsDirectMessagesExpanded] = useState(true)
-  const [newChannelSlug, setNewChannelSlug] = useState('')
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
+  const [editChannel, setEditChannel] = useState<ChannelModel | null>(null)
+  const [editChannelName, setEditChannelName] = useState('')
+  const [editChannelPrivate, setEditChannelPrivate] = useState(false)
+  const [editChannelTopic, setEditChannelTopic] = useState('')
+  const [deleteChannelTarget, setDeleteChannelTarget] = useState<ChannelModel | null>(null)
+  const autogeneratedChannelSlug = useMemo(() => toChannelSlug(newChannelName), [newChannelName])
+  const newChannelNameLength = newChannelName.length
+  const isChannelNameEmpty = newChannelName.trim().length === 0
+  const isChannelNameTrimmed = newChannelName === newChannelName.trim()
+  const isChannelNameTooLong = newChannelNameLength > CHANNEL_NAME_MAX
+  const isChannelSlugEmpty = autogeneratedChannelSlug.length === 0
+  const canCreateChannel =
+    !createChannel.isPending && !isChannelNameEmpty && isChannelNameTrimmed && !isChannelNameTooLong && !isChannelSlugEmpty
   const channels = (channelsData?.channels || []) as ChannelModel[]
   const channelsForDisplay = useMemo(() => {
     // Navigation UX: the default channel should always be first.
@@ -183,6 +230,28 @@ export function ConversationList({
     const defaultChannel = channels[defaultIndex]
     return [defaultChannel, ...channels.slice(0, defaultIndex), ...channels.slice(defaultIndex + 1)]
   }, [channels])
+
+  const openEditChannel = (ch: ChannelModel) => {
+    setEditChannel(ch)
+    setEditChannelName(String(ch.name || ''))
+    setEditChannelPrivate(Boolean((ch as any).isPrivate))
+    setEditChannelTopic(typeof (ch as any).topic === 'string' ? String((ch as any).topic) : '')
+  }
+
+  const closeEditChannel = () => {
+    setEditChannel(null)
+    setEditChannelName('')
+    setEditChannelPrivate(false)
+    setEditChannelTopic('')
+  }
+
+  const openDeleteChannel = (ch: ChannelModel) => {
+    setDeleteChannelTarget(ch)
+  }
+
+  const closeDeleteChannel = () => {
+    setDeleteChannelTarget(null)
+  }
 
   const dmTargets = useMemo<DmTarget[]>(() => {
     const q = searchQuery.trim().toLowerCase()
@@ -368,12 +437,30 @@ export function ConversationList({
         <div className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="channel-name">Name</Label>
-            <Input id="channel-name" placeholder="Lobby" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} />
+            <Input
+              id="channel-name"
+              placeholder="Example"
+              value={newChannelName}
+              onChange={e => setNewChannelName(String(e.target.value || ''))}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className={cn('text-xs', isChannelNameTooLong ? 'text-destructive' : 'text-muted-foreground')}>
+                {newChannelNameLength}/{CHANNEL_NAME_MAX}
+              </p>
+              {!isChannelNameTrimmed ? <p className="text-xs text-destructive">Name must not have leading/trailing whitespace.</p> : null}
+              {isChannelNameTooLong ? <p className="text-xs text-destructive">Name must be {CHANNEL_NAME_MAX} characters or fewer.</p> : null}
+              {!isChannelNameEmpty && isChannelSlugEmpty ? <p className="text-xs text-destructive">Name must include at least one letter or number.</p> : null}
+            </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="channel-slug">Slug</Label>
-            <Input id="channel-slug" placeholder="lobby" value={newChannelSlug} onChange={e => setNewChannelSlug(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Lowercase letters, numbers, - or _</p>
+            <Input
+              id="channel-slug"
+              placeholder="-"
+              value={newChannelNameLength > CHANNEL_NAME_MAX ? '-' : autogeneratedChannelSlug || '-'}
+              readOnly
+              disabled
+            />
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-0.5">
@@ -390,22 +477,164 @@ export function ConversationList({
           </Button>
           <Button
             type="button"
-            disabled={!newChannelName.trim() || !newChannelSlug.trim() || createChannel.isPending}
+            disabled={!canCreateChannel}
             onClick={async () => {
-              const slug = newChannelSlug.trim().toLowerCase()
-              const name = newChannelName.trim()
+              const slug = autogeneratedChannelSlug
+              const name = newChannelName
               const created = await createChannel.mutateAsync({ starshipId, slug, name, isPrivate: newChannelPrivate })
               setIsCreateChannelOpen(false)
-              setNewChannelSlug('')
               setNewChannelName('')
               setNewChannelPrivate(false)
               // Canonical: navigate by channel slug (not conversationId).
               if (created?.conversationId) {
-                handleChannelClick(slug)
+                const createdSlug = String((created as any)?.channel?.slug || slug).trim()
+                handleChannelClick(createdSlug)
               }
             }}
           >
             {createChannel.isPending ? 'Creating…' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  const editChannelNameLength = editChannelName.length
+  const isEditChannelNameEmpty = editChannelName.trim().length === 0
+  const isEditChannelNameTrimmed = editChannelName === editChannelName.trim()
+  const isEditChannelNameTooLong = editChannelNameLength > CHANNEL_NAME_MAX
+  const canSaveChannelEdit =
+    Boolean(editChannel?.conversationId) && !updateChannel.isPending && !isEditChannelNameEmpty && isEditChannelNameTrimmed && !isEditChannelNameTooLong
+
+  const editChannelDialog = (
+    <Dialog
+      open={Boolean(editChannel)}
+      onOpenChange={open => {
+        if (!open) closeEditChannel()
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit channel</DialogTitle>
+          <DialogDescription>Update this channel’s settings.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="edit-channel-name">Name</Label>
+            <Input
+              id="edit-channel-name"
+              placeholder="Example"
+              value={editChannelName}
+              onChange={e => setEditChannelName(String(e.target.value || ''))}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className={cn('text-xs', isEditChannelNameTooLong ? 'text-destructive' : 'text-muted-foreground')}>
+                {editChannelNameLength}/{CHANNEL_NAME_MAX}
+              </p>
+              {!isEditChannelNameTrimmed ? <p className="text-xs text-destructive">Name must not have leading/trailing whitespace.</p> : null}
+              {isEditChannelNameTooLong ? <p className="text-xs text-destructive">Name must be {CHANNEL_NAME_MAX} characters or fewer.</p> : null}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="edit-channel-slug">Slug</Label>
+            <Input id="edit-channel-slug" value={String(editChannel?.slug || '')} readOnly disabled />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="edit-channel-topic">Topic (optional)</Label>
+            <Input
+              id="edit-channel-topic"
+              placeholder="What’s this channel for?"
+              value={editChannelTopic}
+              onChange={e => setEditChannelTopic(String(e.target.value || ''))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="edit-channel-private">Private</Label>
+              <p className="text-xs text-muted-foreground">Only explicitly added members can read/write.</p>
+            </div>
+            <Switch id="edit-channel-private" checked={editChannelPrivate} onCheckedChange={setEditChannelPrivate} />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="ghost" onClick={closeEditChannel} disabled={updateChannel.isPending}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSaveChannelEdit}
+            onClick={async () => {
+              if (!editChannel?.conversationId) return
+              await updateChannel.mutateAsync({
+                starshipId,
+                channelId: String(editChannel.conversationId),
+                name: editChannelName,
+                isPrivate: editChannelPrivate,
+                topic: editChannelTopic.trim().length > 0 ? editChannelTopic : null,
+              })
+              closeEditChannel()
+            }}
+          >
+            {updateChannel.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  const deleteChannelDialog = (
+    <Dialog
+      open={Boolean(deleteChannelTarget)}
+      onOpenChange={open => {
+        if (!open) closeDeleteChannel()
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete channel</DialogTitle>
+          <DialogDescription>This will permanently delete the channel and its conversation history.</DialogDescription>
+        </DialogHeader>
+
+        <div className="text-sm">
+          <p className="text-foreground">
+            Delete <span className="font-semibold">#{String(deleteChannelTarget?.slug || '').trim() || 'channel'}</span>?
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">This can’t be undone.</p>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="ghost" onClick={closeDeleteChannel} disabled={deleteChannel.isPending}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={!deleteChannelTarget?.conversationId || deleteChannel.isPending}
+            onClick={async () => {
+              const target = deleteChannelTarget
+              if (!target?.conversationId) return
+              // Prevent deleting the default channel from the UI (server/DB also enforce this).
+              const slugLower = String(target.slug || '').trim().toLowerCase()
+              if (slugLower === 'lobby') {
+                closeDeleteChannel()
+                return
+              }
+              await deleteChannel.mutateAsync({ starshipId, channelId: String(target.conversationId) })
+              closeDeleteChannel()
+
+              // If the user is currently viewing this channel, route away to a safe default.
+              const viewing = typeof currentChannelSlug === 'string' && currentChannelSlug.trim().toLowerCase() === slugLower
+              if (viewing && slug) {
+                router.push(`/ship/${encodeURIComponent(slug)}`)
+              }
+            }}
+          >
+            {deleteChannel.isPending ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -440,9 +669,13 @@ export function ConversationList({
 
     return (
       <>
-        <div className="flex flex-col h-full min-h-0">
+        <div
+          className="flex flex-col h-full min-h-0"
+          // Reserve space for the divider gap so 50% + 50% doesn't overflow.
+          style={{ ['--sidebar-half-h' as any]: 'calc((100% - 1.75rem) / 2)' }}
+        >
           {/* Channels - content-sized so Direct messages starts right below */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg">
+          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
             <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
@@ -480,7 +713,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <div id="sidebar-channels-list" className="min-h-0">
+              <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -507,6 +740,9 @@ export function ConversationList({
                       const reactionCount = Number((notifUnread as any)?.reactionUnreadByConversationId?.[cid] ?? 0) || 0
                       const notifCount = mentionCount + reactionCount
                       const hasNotifBadge = notifCount > 0
+                      const isDefaultChannel = String(ch.slug || '')
+                        .trim()
+                        .toLowerCase() === 'lobby'
                       return (
                         <div key={ch.conversationId}>
                           <div
@@ -568,11 +804,71 @@ export function ConversationList({
                             >
                               <span className="truncate min-w-0">{label}</span>
                             </div>
-                            {notifCount > 0 ? (
-                              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-                                {notifCount > 99 ? '99+' : String(notifCount)}
-                              </span>
-                            ) : null}
+                            <div className="ml-1 flex items-center justify-end gap-1">
+                              {notifCount > 0 ? (
+                                <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                  {notifCount > 99 ? '99+' : String(notifCount)}
+                                </span>
+                              ) : null}
+                              {canManageChannels ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        // When hidden, don't reserve space so the badge can sit at the far right.
+                                        // On hover (or when the menu is open), show the action button in the rightmost column.
+                                        'hidden group-hover:inline-flex data-[state=open]:inline-flex focus-visible:inline-flex',
+                                        'items-center justify-center w-6 h-6 rounded-md',
+                                        // Offset the list's scroll padding (`pr-1`) so ⋮ aligns with the header "+" column.
+                                        '-mr-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors'
+                                      )}
+                                      aria-label="Channel actions"
+                                      onClick={e => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                    >
+                                      <Icon name="dots-vertical" className="w-4 h-4" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    side="right"
+                                    sideOffset={8}
+                                    onClick={e => {
+                                      // Prevent row navigation when interacting with the menu.
+                                      e.stopPropagation()
+                                    }}
+                                  >
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onSelect={e => {
+                                        // IMPORTANT:
+                                        // Do NOT call preventDefault() here; Radix uses it to keep the menu open.
+                                        e.stopPropagation()
+                                        openEditChannel(ch)
+                                      }}
+                                    >
+                                      <Icon name="edit" className="h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={isDefaultChannel}
+                                      className="cursor-pointer text-destructive focus:text-destructive"
+                                      onSelect={e => {
+                                        e.stopPropagation()
+                                        if (isDefaultChannel) return
+                                        openDeleteChannel(ch)
+                                      }}
+                                    >
+                                      <Icon name="trash" className="h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : null}
+                            </div>
                           </div>
 
                           {/* Forum channels render threads in the main panel (no nested sidebar list). */}
@@ -585,10 +881,11 @@ export function ConversationList({
             ) : null}
           </div>
 
-          <div className="my-3 border-t border-border/60" />
+          {/* Separator between Channels and Direct messages (keep this in navigation). */}
+          <div className="my-3 mx-1 border-t border-border/60" role="separator" aria-hidden />
 
-          {/* Direct messages - takes remaining space below Channels */}
-          <div className="flex flex-col min-h-0 rounded-lg flex-1">
+          {/* Direct messages - content-sized; capped at 50% height like Channels */}
+          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
             <div className="w-full flex items-center justify-between h-8 pr-2">
               <button
                 type="button"
@@ -619,7 +916,7 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list" className="flex flex-col min-h-0">
+              <div id="sidebar-direct-messages-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {dmTargets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
@@ -633,6 +930,8 @@ export function ConversationList({
           </div>
         </div>
         {createChannelDialog}
+        {editChannelDialog}
+        {deleteChannelDialog}
       </>
     )
   }
@@ -758,8 +1057,6 @@ export function ConversationList({
             )}
           </div>
 
-          <div className="my-3 border-t border-border/60" />
-
           <div className="mb-4">
             <div className="px-2 mb-2 flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground">Direct messages</p>
@@ -836,12 +1133,14 @@ export function ConversationList({
       </ScrollArea>
 
       {/* Footer Stats */}
-      <div className="p-4 border-t frosted-glass-light">
+      <div className="p-4 frosted-glass-light">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{dmTargets.length} people</span>
         </div>
       </div>
       {createChannelDialog}
+      {editChannelDialog}
+      {deleteChannelDialog}
     </div>
   )
-}
+})

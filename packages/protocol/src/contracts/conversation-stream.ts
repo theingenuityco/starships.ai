@@ -33,12 +33,19 @@ export type ConversationStreamSnapshot = {
    * Latest known turn for this conversation (server authoritative).
    * When null, no turn exists yet.
    */
-  turn: { turnId: string; status: TurnStatus; startedAt?: string; completedAt?: string | null } | null;
+  turn: { turnId: string; status: TurnStatus; startedAt?: string; completedAt?: string | null; agentId?: string; agentName?: string } | null;
 };
 
 export type ConversationStreamTurnStarted = {
   conversationId: string;
   turnId: string;
+  /**
+   * Canonical agent identity for this turn (chosen by server routing).
+   *
+   * This enables consistent UI identity during "typing/loading" before any assistant output exists.
+   */
+  agentId?: string;
+  agentName?: string;
   at: string;
 };
 
@@ -58,6 +65,14 @@ export type ConversationStreamAssistantDelta = {
    */
   messageId: string;
   /**
+   * Canonical agent identity producing this delta.
+   *
+   * This lets clients stamp `agentId` onto the streaming placeholder message (`stream-<turnId>`)
+   * without fallbacks/heuristics.
+   */
+  agentId?: string;
+  agentName?: string;
+  /**
    * Content delta to append.
    */
   delta: string;
@@ -72,6 +87,8 @@ export type ConversationStreamAssistantReasoningDelta = {
   conversationId: string;
   turnId: string;
   messageId: string;
+  agentId?: string;
+  agentName?: string;
   delta: string;
   position?: number;
   at: string;

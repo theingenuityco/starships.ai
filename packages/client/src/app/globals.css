@@ -806,6 +806,8 @@
   display: inline-block;
   font-size: 1.15em;
   line-height: 1;
+  opacity: 1;
+  color: hsl(var(--foreground) / 1);
 }
 
 /* Inline streaming caret removed: rendering now fully store-driven (gap loader only) */

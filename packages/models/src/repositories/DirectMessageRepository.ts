@@ -31,6 +31,13 @@ export class DirectMessageRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Find a user↔user DM regardless of input ordering.
+   *
+   * IMPORTANT: The table enforces a normalized pair via CHECK (user_a_id < user_b_id).
+   * We must use Postgres ordering semantics (collation) when normalizing; do it in SQL
+   * via LEAST/GREATEST to avoid JS localeCompare() mismatches.
+   */
   async findUserUserDm(starshipId: string, userAId: string, userBId: string): Promise<DirectMessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {
@@ -41,8 +48,8 @@ export class DirectMessageRepository extends BaseRepository {
             FROM direct_messages
            WHERE starship_id = $1
              AND dm_type = 'user_user'
-             AND user_a_id = $2
-             AND user_b_id = $3
+             AND user_a_id = LEAST($2, $3)
+             AND user_b_id = GREATEST($2, $3)
            LIMIT 1
           `,
           [starshipId, userAId, userBId]
@@ -102,7 +109,7 @@ export class DirectMessageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
-        const data = {
+        const baseData = {
           conversationId: args.conversationId,
           starshipId: args.starshipId,
           dmType: args.dmType,
@@ -114,20 +121,60 @@ export class DirectMessageRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        await DirectMessageEntity.validate(data, 'create');
-        const entity = toEntityInstance(DirectMessageEntity, data);
-        const serialized = toDatabase(entity);
+        await DirectMessageEntity.validate(baseData, 'create');
 
         const connection = this.getConnection();
-        const cols = Object.keys(serialized);
-        const vals = Object.values(serialized);
-        const placeholders = cols.map((_, i) => `$${i + 1}`);
-        const sql = `
-          INSERT INTO direct_messages (${cols.join(', ')})
-          VALUES (${placeholders.join(', ')})
-          RETURNING *;
-        `;
-        const row = await connection.queryOne<Record<string, unknown>>(sql, vals);
+
+        // For user↔user DMs, normalize the pair using Postgres ordering semantics
+        // so we always satisfy CHECK (user_a_id < user_b_id).
+        let row: Record<string, unknown> | null;
+        if (args.dmType === 'user_user') {
+          const user1 = String(args.userAId ?? '');
+          const user2 = String(args.userBId ?? '');
+          if (!user1 || !user2) throw new Error('user_user DM requires userAId and userBId');
+
+          row = await connection.queryOne<Record<string, unknown>>(
+            `
+            INSERT INTO direct_messages (
+              conversation_id,
+              starship_id,
+              dm_type,
+              user_id,
+              agent_id,
+              user_a_id,
+              user_b_id,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              $1,
+              $2,
+              'user_user',
+              NULL,
+              NULL,
+              LEAST($3, $4),
+              GREATEST($3, $4),
+              $5,
+              $6
+            )
+            RETURNING *;
+            `,
+            [args.conversationId, args.starshipId, user1, user2, now, now]
+          );
+        } else {
+          const entity = toEntityInstance(DirectMessageEntity, baseData);
+          const serialized = toDatabase(entity);
+          const cols = Object.keys(serialized);
+          const vals = Object.values(serialized);
+          const placeholders = cols.map((_, i) => `$${i + 1}`);
+          const sql = `
+            INSERT INTO direct_messages (${cols.join(', ')})
+            VALUES (${placeholders.join(', ')})
+            RETURNING *;
+          `;
+          row = await connection.queryOne<Record<string, unknown>>(sql, vals);
+        }
+
         if (!row) throw new Error('Failed to create direct message');
         return fromDatabase(DirectMessageEntity, row);
       },

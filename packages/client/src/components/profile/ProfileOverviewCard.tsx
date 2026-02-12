@@ -44,7 +44,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, prof
                   alt={displayName || 'Profile'}
                   className="object-cover"
                   referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
+                  // NOTE: Do not set `crossOrigin` for simple avatar display.
                   onLoadingStatusChange={status => {
                     if (status === 'error') {
                       console.warn('Failed to load profile image:', profileImageUrl)

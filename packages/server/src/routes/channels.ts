@@ -18,8 +18,9 @@ const ChannelSlugSchema = z
   .string()
   .min(1)
   .max(100)
-  .transform((s) => s.trim())
-  .refine((s) => /^[a-z0-9][a-z0-9-_]*$/.test(s), 'slug must be lowercase and contain only letters, numbers, - or _');
+  .refine((s) => s === s.trim(), 'slug must not have leading/trailing whitespace')
+  .refine((s) => s === s.toLowerCase(), 'slug must be lowercase')
+  .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
 
 /**
  * GET /starships/:starshipId/channels
@@ -135,7 +136,8 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
           .string()
           .min(1)
           .max(100)
-          .transform((s) => s.trim()),
+          .refine((s) => s === s.trim(), 'name must not have leading/trailing whitespace')
+          .refine((s) => s.trim().length > 0, 'name cannot be empty'),
         isPrivate: z.boolean().optional(),
         topic: z.string().max(2000).optional().nullable(),
       }),
@@ -188,6 +190,192 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
     }
   } catch (error) {
     handleError(error, res, 'creating channel');
+  }
+});
+
+/**
+ * PATCH /channels/:channelId
+ *
+ * Updates a conversation-backed channel. MVP policy: starship owner/instance-admin only.
+ *
+ * Notes:
+ * - `channelId` is the backing conversation id (channels.conversation_id).
+ * - We keep conversation.title in sync with channel.name for UI consistency.
+ */
+router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const body = validateData(
+      z.object({
+        name: z
+          .string()
+          .min(1)
+          .max(100)
+          .refine((s) => s === s.trim(), 'name must not have leading/trailing whitespace')
+          .refine((s) => s.trim().length > 0, 'name cannot be empty')
+          .optional(),
+        isPrivate: z.boolean().optional(),
+        topic: z.string().max(2000).optional().nullable(),
+      }),
+      req.body,
+      res,
+      'channel update'
+    );
+    if (!body) return;
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    // MVP: owner-only (owner/instance-admin).
+    if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
+
+    const conn = getConnection();
+    const nextName = body.name !== undefined ? String(body.name) : undefined;
+    const nextIsPrivate = body.isPrivate !== undefined ? Boolean(body.isPrivate) : undefined;
+    const nextTopic = body.topic !== undefined ? (body.topic ?? null) : undefined;
+
+    // Update the channels row.
+    const setParts: string[] = [];
+    const values: any[] = [];
+    let i = 1;
+    if (nextName !== undefined) {
+      setParts.push(`name = $${i++}`);
+      values.push(nextName);
+    }
+    if (nextIsPrivate !== undefined) {
+      setParts.push(`is_private = $${i++}`);
+      values.push(nextIsPrivate);
+    }
+    if (nextTopic !== undefined) {
+      setParts.push(`topic = $${i++}`);
+      values.push(nextTopic);
+    }
+    // Always bump updated_at.
+    setParts.push(`updated_at = NOW()`);
+
+    const sql = `
+      UPDATE channels
+         SET ${setParts.join(', ')}
+       WHERE conversation_id = $${i++}
+       RETURNING *;
+    `;
+    values.push(channel.conversationId);
+
+    const updatedRow = await conn.queryOne<Record<string, any>>(sql, values);
+    if (!updatedRow) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update channel', 500);
+      return;
+    }
+
+    // Keep backing conversation title in sync with channel name.
+    if (nextName !== undefined) {
+      const conversationService = new ConversationService();
+      try {
+        await conversationService.updateConversation(channel.conversationId, { title: nextName });
+      } catch (e) {
+        // Best-effort: channel update already persisted; conversation title mismatch is non-fatal.
+        // (The UI will fall back to channel.name in navigation.)
+      }
+    }
+
+    // If the channel is now private, ensure the updater is a member (idempotent).
+    if (nextIsPrivate === true) {
+      const memberRepo = new ConversationMemberRepository();
+      try {
+        await memberRepo.createOrIgnoreMember({
+          conversationId: channel.conversationId,
+          userId: authUserId,
+          role: 'admin',
+          createdBy: authUserId,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const updated: ChannelModel = {
+      conversationId: String(updatedRow.conversation_id),
+      starshipId: String(updatedRow.starship_id),
+      slug: String(updatedRow.slug),
+      name: String(updatedRow.name),
+      isPrivate: Boolean(updatedRow.is_private),
+      channelType:
+        String((updatedRow as any).channel_type || 'chat')
+          .trim()
+          .toLowerCase() === 'forum'
+          ? 'forum'
+          : 'chat',
+      topic: updatedRow.topic ?? null,
+      createdAt: String(updatedRow.created_at),
+      updatedAt: String(updatedRow.updated_at),
+    };
+
+    sendSuccess(res, { channel: updated }, 200);
+  } catch (error) {
+    handleError(error, res, 'updating channel');
+  }
+});
+
+/**
+ * DELETE /channels/:channelId
+ *
+ * Deletes a channel by deleting its backing conversation (CASCADE deletes channels row).
+ * MVP policy: starship owner/instance-admin only.
+ */
+router.delete('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
+
+    // Prevent deleting the starship default channel (DB FK will also enforce this).
+    const conn = getConnection();
+    const starshipRow = await conn.queryOne<{ default_channel_conversation_id: string | null }>(
+      `SELECT default_channel_conversation_id FROM starships WHERE id = $1`,
+      [channel.starshipId]
+    );
+    const defaultCid = typeof starshipRow?.default_channel_conversation_id === 'string' ? String(starshipRow.default_channel_conversation_id) : '';
+    if (defaultCid && defaultCid === channel.conversationId) {
+      sendError(res, 'VALIDATION_ERROR', 'Cannot delete the default channel', 400, { channelId: params.channelId });
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const deleted = await conversationService.deleteConversation(channel.conversationId);
+    if (!deleted) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    sendSuccess(res, { deleted: true }, 200);
+  } catch (error) {
+    handleError(error, res, 'deleting channel');
   }
 });
 

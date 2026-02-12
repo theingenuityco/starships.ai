@@ -21,7 +21,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
   const router = useRouter()
 
   const handleGoToProfile = (): void => {
-    router.push('/profile')
+    router.push('/account')
   }
 
   if (!isAuthenticated || !user) {

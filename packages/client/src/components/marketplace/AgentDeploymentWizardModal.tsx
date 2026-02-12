@@ -546,7 +546,6 @@ export function AgentDeploymentWizardModal({
                             <Icon name="rocket" className="h-4 w-4 text-foreground shrink-0" />
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Target starship</div>
                           </div>
-                          {selectedStarship ? <Icon name="check-circle" className="h-4 w-4 text-primary shrink-0" /> : null}
                         </div>
 
                         {selectedStarship ? (

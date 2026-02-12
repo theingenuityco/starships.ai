@@ -131,6 +131,43 @@ export interface UseOwnedStarshipsForDeployOptions {
   explicitStarship?: DeployStarshipOption | null
 }
 
+export type DeployStarshipOptionWithAccess = DeployStarshipOption & {
+  /** When true, user can see but cannot deploy to this starship. */
+  deployDisabled?: boolean
+  /** Optional UX hint for why deploy is disabled. */
+  deployDisabledReason?: string
+}
+
+/**
+ * Returns ALL accessible starships (owned + member), in a shape suitable for deploy selection.
+ * Non-owned starships are included but flagged as disabled for deploy.
+ *
+ * Primary starship is the first OWNED starship (deployable), matching marketplace deploy semantics.
+ */
+export function useStarshipsForDeploySelection(
+  userId: string,
+  options: { enabled?: boolean } = {}
+): { deployStarships: DeployStarshipOptionWithAccess[]; primaryStarship: DeployStarshipOptionWithAccess | null } {
+  const { enabled = true } = options
+  const { data: starships = [] } = useUserStarships(userId, enabled)
+
+  return useMemo(() => {
+    const list = orderStarshipsOwnedFirst(starships as StarshipModel[], userId)
+    const deployStarships: DeployStarshipOptionWithAccess[] = list.map(s => {
+      const isOwner = Boolean(userId && s.ownerId === userId)
+      return {
+        id: s.id,
+        slug: s.slug,
+        name: s.name,
+        deployDisabled: !isOwner,
+        deployDisabledReason: !isOwner ? 'You must be the owner to deploy to this starship.' : undefined,
+      }
+    })
+    const primary = deployStarships.find(s => !s.deployDisabled) ?? null
+    return { deployStarships, primaryStarship: primary }
+  }, [userId, starships])
+}
+
 /**
  * Returns owned starships suitable for marketplace deploy (filtered by ownerId, minimal shape).
  * Use this instead of duplicating filter/map logic in deploy CTAs and modals.

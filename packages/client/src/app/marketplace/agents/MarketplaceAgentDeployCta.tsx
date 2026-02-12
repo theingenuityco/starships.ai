@@ -8,7 +8,7 @@ import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protoc
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
+import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { Button } from '@/components/ui/button'
@@ -24,7 +24,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
-  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
+  const { deployStarships, primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -148,7 +148,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
-        ownedStarships={ownedStarships}
+        ownedStarships={deployStarships}
       />
     </>
   )

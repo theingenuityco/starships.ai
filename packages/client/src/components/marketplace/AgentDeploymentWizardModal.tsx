@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
+import type { DeployStarshipOptionWithAccess } from '@/hooks/useStarships'
 
 type WizardStep = 1 | 2 | 3
 
@@ -32,7 +33,7 @@ interface AgentDeploymentWizardModalProps {
    * When provided, user can choose target starship.
    * If length > 1, this wizard will show a selection step.
    */
-  ownedStarships?: DeployStarshipOption[]
+  ownedStarships?: DeployStarshipOptionWithAccess[]
   /** Fallback when ownedStarships isn't provided. */
   starshipId?: string
   starshipSlug?: string
@@ -61,9 +62,9 @@ export function AgentDeploymentWizardModal({
   const assignedToolSlugs = (template?.assignedToolSlugs || []).filter(Boolean)
   const templateId = template?.id ?? ''
 
-  const singleStarshipFromProps: DeployStarshipOption | null =
+  const singleStarshipFromProps: DeployStarshipOptionWithAccess | null =
     starshipId && (starshipName || starshipSlug) ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName ?? '' } : null
-  const listForSelection = ownedStarships?.length ? ownedStarships : singleStarshipFromProps ? [singleStarshipFromProps] : []
+  const listForSelection = (ownedStarships?.length ? ownedStarships : singleStarshipFromProps ? [singleStarshipFromProps] : []) as DeployStarshipOptionWithAccess[]
 
   const [step, setStep] = useState<WizardStep>(1)
   const [selectedStarship, setSelectedStarship] = useState<DeployStarshipOption | null>(null)
@@ -76,7 +77,8 @@ export function AgentDeploymentWizardModal({
   useEffect(() => {
     if (!isOpen) return
     setStep(1)
-    setSelectedStarship(listForSelection[0] ?? null)
+    const firstEnabled = listForSelection.find(s => !(s as DeployStarshipOptionWithAccess)?.deployDisabled) ?? null
+    setSelectedStarship(firstEnabled)
   }, [isOpen, listForSelection[0]?.id, listForSelection.length])
 
   const toolTemplateBySlug = useMemo(() => {
@@ -116,7 +118,7 @@ export function AgentDeploymentWizardModal({
   const permissionMenuIconClassName = (p: AgentToolPermission): string => (p === 'allow' ? 'text-emerald-500' : p === 'ask' ? 'text-amber-500' : 'text-red-500')
 
   const canGoNext = useMemo(() => {
-    if (step === 1) return !!selectedStarship
+    if (step === 1) return !!selectedStarship && !(selectedStarship as DeployStarshipOptionWithAccess)?.deployDisabled
     if (step === 2) return true
     return false
   }, [step, selectedStarship])
@@ -189,6 +191,9 @@ export function AgentDeploymentWizardModal({
                     <Icon name="rocket" className="h-4 w-4 text-primary" />
                     <div className="text-sm font-semibold">Choose a starship</div>
                   </div>
+                  <div className="text-xs text-muted-foreground">
+                    You can deploy agents only to starships you own. Starships where you&apos;re a member are shown but disabled.
+                  </div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
@@ -197,26 +202,39 @@ export function AgentDeploymentWizardModal({
                   ) : showGridSelection ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {listForSelection.map(s => {
+                        const access = s as DeployStarshipOptionWithAccess
+                        const disabled = Boolean(access.deployDisabled)
                         const selected = selectedStarship?.id === s.id
                         return (
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => setSelectedStarship(s)}
-                            disabled={isProcessing}
+                            onClick={() => {
+                              if (disabled) return
+                              setSelectedStarship(s)
+                            }}
+                            disabled={isProcessing || disabled}
                             aria-pressed={selected}
                             className={cn(
                               'text-left rounded-xl border p-4 transition-all bg-card/40 hover:bg-card/60',
                               selected ? 'border-primary/50 ring-2 ring-primary/20' : 'border-border/60',
-                              isProcessing && 'opacity-70 cursor-not-allowed'
+                              (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
+                              disabled && 'hover:bg-card/40'
                             )}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-sm font-semibold truncate">{s.name || 'Unnamed starship'}</div>
                                 <div className="mt-1 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
+                                {disabled ? <div className="mt-1 text-[11px] text-muted-foreground truncate">{access.deployDisabledReason || 'Deploy disabled'}</div> : null}
                               </div>
-                              {selected ? <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" /> : <div className="h-5 w-5 shrink-0" />}
+                              {disabled ? (
+                                <Icon name="lock" className="h-5 w-5 text-muted-foreground shrink-0" />
+                              ) : selected ? (
+                                <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" />
+                              ) : (
+                                <div className="h-5 w-5 shrink-0" />
+                              )}
                             </div>
                           </button>
                         )
@@ -229,21 +247,27 @@ export function AgentDeploymentWizardModal({
                         {/* For large lists, we keep it simple: clickable list */}
                         <div className="space-y-2">
                           {listForSelection.map(s => {
+                            const access = s as DeployStarshipOptionWithAccess
+                            const disabled = Boolean(access.deployDisabled)
                             const selected = selectedStarship?.id === s.id
                             return (
                               <button
                                 key={s.id}
                                 type="button"
-                                onClick={() => setSelectedStarship(s)}
-                                disabled={isProcessing}
+                                onClick={() => {
+                                  if (disabled) return
+                                  setSelectedStarship(s)
+                                }}
+                                disabled={isProcessing || disabled}
                                 className={cn(
                                   'w-full flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm transition-colors',
                                   selected ? 'border-primary/50 bg-primary/10' : 'border-border/60 bg-background/30 hover:bg-muted/30',
-                                  isProcessing && 'opacity-70 cursor-not-allowed'
+                                  (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
+                                  disabled && 'hover:bg-background/30'
                                 )}
                               >
                                 <span className="truncate">{s.name || s.slug || s.id}</span>
-                                {selected ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
+                                {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
                               </button>
                             )
                           })}

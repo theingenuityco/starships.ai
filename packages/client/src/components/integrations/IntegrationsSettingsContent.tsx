@@ -47,6 +47,7 @@ function safeLower(s: unknown): string {
 const INTEGRATION_CTA_BUTTON_CLASS =
   'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
 const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+const INTEGRATION_OUTLINE_BUTTON_CLASS = 'h-8 bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
 
 export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsContentProps) {
   const router = useRouter()
@@ -106,6 +107,19 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const SECTION_PREVIEW_LIMIT = 5
   const TAB_PAGE_SIZE = isAllTab ? SECTION_PREVIEW_LIMIT : 18
 
+  const buildIntegrationsTabHref = useCallback(
+    (tab: IntegrationsTab) => {
+      const base = `/ship/${encodeURIComponent(slug)}/integrations`
+      const params = new URLSearchParams()
+      const q = debouncedQuery.trim()
+      if (q) params.set('q', q)
+      if (tab !== 'all') params.set('tab', tab)
+      const qs = params.toString()
+      return qs ? `${base}?${qs}` : base
+    },
+    [debouncedQuery, slug]
+  )
+
   // Agents (starship-scoped)
   const agentsQuery = useInfiniteStarshipAgents(starshipId, Boolean(starshipId), {
     limit: TAB_PAGE_SIZE,
@@ -126,6 +140,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     const pages = agentsQuery.data?.pages ?? []
     return pages.flatMap(p => (Array.isArray(p?.agents) ? p.agents : []))
   }, [agentsQuery.data])
+
+  const hasMoreAgentsThanPreview = useMemo(() => {
+    const total = typeof agentsPagination?.total === 'number' ? agentsPagination.total : agents.length
+    return total > SECTION_PREVIEW_LIMIT
+  }, [SECTION_PREVIEW_LIMIT, agents.length, agentsPagination?.total])
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = (agents || [])
@@ -287,7 +306,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && agentsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button variant="secondary" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className="h-8">
+            <Button variant="outline" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
             </Button>
           </div>
@@ -369,7 +388,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && toolsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button variant="secondary" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className="h-8">
+            <Button variant="outline" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more tools'}
             </Button>
           </div>
@@ -502,6 +521,15 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     </Button>
                   </div>
                   {renderAgentsList()}
+                  {isAllTab ? (
+                    <div className="flex justify-center pt-4">
+                      {hasMoreAgentsThanPreview ? (
+                        <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                          <Link href={buildIntegrationsTabHref('agents')}>Show all agents</Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -530,6 +558,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     </Button>
                   </div>
                   {renderToolsList()}
+                  {isAllTab ? (
+                    <div className="flex justify-center pt-4">
+                      <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                        <Link href={buildIntegrationsTabHref('tools')}>Show all tools</Link>
+                      </Button>
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -589,6 +624,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     showLoadMore={!isAllTab}
                     sortBy="recently_used"
                   />
+                  {isAllTab ? (
+                    <div className="flex justify-center pt-4">
+                      <Button asChild variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
+                        <Link href={buildIntegrationsTabHref('connectors')}>Show all connectors</Link>
+                      </Button>
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
             </div>

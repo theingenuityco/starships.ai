@@ -17,7 +17,7 @@ export default function ExploreCTA(props: { kind: ExploreRequestKind }) {
   const label = ctaLabelFor(kind)
 
   return (
-    <section className="relative z-20 py-14 px-4">
+    <section className="relative z-20 py-20 sm:py-24 px-4">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-3 sm:mb-4">Looking for something specific?</h2>
         <p className="text-sm sm:text-base text-muted-foreground mb-5 sm:mb-6">

@@ -888,12 +888,13 @@ export function StarshipConnectorsPanel({
           {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
             <div className="flex justify-center pt-4">
               <Button
+                size="sm"
                 variant="outline"
                 onClick={() => {
                   void pagedCatalog.fetchNextPage()
                 }}
                 disabled={isLoadingMoreCatalog}
-                className="h-8 bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                className="h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
               >
                 {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
               </Button>
@@ -911,12 +912,13 @@ export function StarshipConnectorsPanel({
           {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
             <div className="flex justify-center pt-2">
               <Button
+                size="sm"
                 variant="outline"
                 onClick={() => {
                   void pagedCatalog.fetchNextPage()
                 }}
                 disabled={isLoadingMoreCatalog}
-                className="h-8 bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                className="h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
               >
                 {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
               </Button>

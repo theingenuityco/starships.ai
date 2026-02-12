@@ -287,14 +287,8 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
         <PublicHeader />
 
         <main className="marketplace-agent-main pt-20 sm:pt-28">
-          {/* Decorative hero background */}
           <div className="relative">
-            <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
-              <div className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_60%)] blur-2xl" />
-              <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
-            </div>
-
-            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
               {/* Breadcrumb */}
               <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
                 <a href="/explore" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">

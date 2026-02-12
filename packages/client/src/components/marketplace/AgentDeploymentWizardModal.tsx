@@ -535,49 +535,60 @@ export function AgentDeploymentWizardModal({
               ) : null}
 
               {step === 4 ? (
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold">Target starship</div>
+                <div className="mt-8 space-y-2">
+                  <div className="text-sm font-semibold">Review</div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon name="rocket" className="h-4 w-4 text-foreground shrink-0" />
+                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Target starship</div>
+                          </div>
+                          {selectedStarship ? <Icon name="check-circle" className="h-4 w-4 text-primary shrink-0" /> : null}
+                        </div>
+
                         {selectedStarship ? (
                           <div className="mt-1 flex items-start gap-3 min-w-0">
                             <StarshipMonogram starship={selectedStarship} />
                             <div className="min-w-0">
-                              <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
-                              <div className="mt-0.5 text-xs text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
+                              <div className="text-xs text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
+                              <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
                             </div>
                           </div>
                         ) : (
-                          <div className="mt-1 text-sm text-muted-foreground truncate">Not selected</div>
+                          <div className="mt-1 text-xs text-muted-foreground truncate">Not selected</div>
                         )}
                       </div>
-                      {selectedStarship ? <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" /> : null}
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                      <div className="flex items-center gap-2">
-                        <Icon name="wrench" className="h-4 w-4 text-primary" />
-                          <div className="text-sm font-semibold">Automations & permissions</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon name="wrench" className="h-4 w-4 text-foreground shrink-0" />
+                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Automations & permissions</div>
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">
+                            {assignedToolSlugs.length > 0
+                              ? `${assignedToolSlugs.length} automations • ${permissionCounts.allow} Always • ${permissionCounts.ask} Ask First • ${permissionCounts.deny} Never`
+                              : 'No automations'}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm text-muted-foreground tabular-nums">
-                        {assignedToolSlugs.length > 0 ? (
-                          <>
-                            {assignedToolSlugs.length} automations • {permissionCounts.allow} Always • {permissionCounts.ask} Ask First • {permissionCounts.deny} Never
-                          </>
-                        ) : (
-                          'No automations'
-                        )}
+
+                      <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
+                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">
+                            {requiredConnectors.length > 0 ? `${requiredConnectors.length} required` : 'None required'}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                      <div className="flex items-center gap-2">
-                        <Icon name="plug" className="h-4 w-4 text-primary" />
-                        <div className="text-sm font-semibold">Connectors</div>
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">{requiredConnectors.length > 0 ? `${requiredConnectors.length} required` : 'None required'}</div>
                     </div>
                   </div>
                 </div>

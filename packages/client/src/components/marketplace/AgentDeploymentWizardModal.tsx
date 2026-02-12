@@ -326,7 +326,7 @@ export function AgentDeploymentWizardModal({
               <AgentTemplatePreviewCard template={template} className="mt-3 mb-6" />
 
               {step === 1 ? (
-                <div className="mt-8 space-y-3">
+                <div className="mt-8 space-y-4">
                   <div className="text-sm font-semibold">Choose a starship to install {agentDeployLabel}</div>
 
                   {listForSelection.length === 0 ? (
@@ -523,7 +523,7 @@ export function AgentDeploymentWizardModal({
               ) : null}
 
               {step === 3 ? (
-                <div className="mt-8 space-y-3">
+                <div className="mt-8 space-y-4">
                   <div className="text-sm font-semibold">{connectorsStepTitle(agentDeployLabel, requiredConnectors.length)}</div>
 
                   {requiredConnectors.length > 0 ? (
@@ -543,12 +543,14 @@ export function AgentDeploymentWizardModal({
                       </div>
                     )
                   ) : (
-                    <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                      <div className="flex items-center gap-2">
-                        <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">No connectors required</p>
+                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
+                          <p className="text-sm font-semibold leading-tight">No connectors required</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">This agent can be deployed without connecting any apps.</p>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">This agent can be deployed without connecting any apps.</p>
                     </div>
                   )}
                 </div>

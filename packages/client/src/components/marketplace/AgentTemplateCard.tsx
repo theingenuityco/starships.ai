@@ -219,99 +219,77 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
             {/* Right content */}
             <div className="min-w-0 flex-1 flex flex-col p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  {/* Name (small) + connector logos */}
-                  {displayRole ? (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div>
-                      {requiredConnectors.length > 0 ? (
-                        <div className="flex items-center gap-1 shrink-0">
-                          {requiredConnectors.slice(0, 4).map(({ provider, name }) => {
-                            const showLogo = !hiddenLogos[provider]
-                            const logoSrc = getConnectorLogoSrc(provider)
-                            return (
-                              <div key={provider} className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white border border-border/40" title={name}>
-                                {showLogo ? (
-                                  <Image
-                                    src={logoSrc}
-                                    alt=""
-                                    width={12}
-                                    height={12}
-                                    className="object-contain"
-                                    onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                                  />
-                                ) : null}
-                              </div>
-                            )
-                          })}
-                          {requiredConnectors.length > 4 ? (
-                            <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectors.length - 4}</span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+              <div className="flex items-start justify-between gap-3 min-w-0">
+                <div className="min-w-0 flex-1">
+                  {/* Name (small) */}
+                  {displayRole ? <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}
 
                   {/* Role (big) */}
-                  <div className={displayRole ? 'mt-0.5 flex items-center gap-2 min-w-0' : 'flex items-center gap-2 min-w-0'}>
-                    <div className="min-w-0 flex-1 text-base font-semibold leading-tight truncate">{displayRole || displayName || 'Unnamed agent'}</div>
-                    {!displayRole && requiredConnectors.length > 0 ? (
-                      <div className="flex items-center gap-1 shrink-0">
-                        {requiredConnectors.slice(0, 4).map(({ provider, name }) => {
+                  <div className={displayRole ? 'mt-0.5 text-base font-semibold leading-tight truncate' : 'text-base font-semibold leading-tight truncate'}>
+                    {displayRole || displayName || 'Unnamed agent'}
+                  </div>
+                </div>
+              </div>
+
+              {showCategory && template.category ? (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="capitalize border-border/60 bg-background/30 text-[11px] px-2 py-0.5">
+                    {template.category}
+                  </Badge>
+                </div>
+              ) : null}
+
+              {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+
+              {/* Footer row (bottom-left logos + bottom-right CTA) */}
+              {requiredConnectors.length > 0 || showDeployCta ? (
+                <div className="mt-auto pt-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1 min-w-0">
+                    {requiredConnectors.length > 0
+                      ? requiredConnectors.slice(0, 4).map(({ provider, name }) => {
                           const showLogo = !hiddenLogos[provider]
                           const logoSrc = getConnectorLogoSrc(provider)
                           return (
-                            <div key={provider} className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white border border-border/40" title={name}>
+                            <div key={provider} className="flex h-5 w-5 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
                               {showLogo ? (
                                 <Image
                                   src={logoSrc}
                                   alt=""
-                                  width={12}
-                                  height={12}
+                                  width={16}
+                                  height={16}
                                   className="object-contain"
                                   onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                                 />
                               ) : null}
                             </div>
                           )
-                        })}
-                        {requiredConnectors.length > 4 ? (
-                          <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectors.length - 4}</span>
-                        ) : null}
-                      </div>
+                        })
+                      : null}
+                    {requiredConnectors.length > 4 ? (
+                      <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectors.length - 4}</span>
                     ) : null}
                   </div>
 
-                  {showCategory && template.category ? (
-                    <div className="mt-2 flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="capitalize border-border/60 bg-background/30 text-[11px] px-2 py-0.5">
-                        {template.category}
-                      </Badge>
-                    </div>
-                  ) : null}
+                  {showDeployCta ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        requestDeploy()
+                      }}
+                      disabled={deployDisabled}
+                      className="h-8 px-3 shrink-0 text-primary hover:text-primary"
+                    >
+                      <Icon name={deployIconName} className="w-3.5 h-3.5 mr-2" />
+                      {deployLabel}
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
                 </div>
-
-                {/* CTA */}
-                {showDeployCta ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      requestDeploy()
-                    }}
-                    disabled={deployDisabled}
-                    className="h-8 px-3 shrink-0"
-                  >
-                    <Icon name={deployIconName} className="w-3.5 h-3.5 mr-2" />
-                    {deployLabel}
-                  </Button>
-                ) : null}
-              </div>
-
-              {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+              ) : null}
             </div>
           </div>
         ) : (

@@ -103,20 +103,29 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
           <div className="flex">
             {/* Compact content (logos inline after name) */}
             <div className="min-w-0 flex-1 flex flex-col p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
+              <div className="min-w-0">
+                <div className="flex items-start justify-between gap-3 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-semibold leading-tight truncate">{displayName}</div>
+                    {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
+                  </div>
+                </div>
+
+              </div>
+
+              {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+
+              {/* Footer row (bottom-left logos + bottom-right CTA) */}
+              {requiredConnectorProviders.length > 0 || showInstallCta ? (
+                <div className="mt-auto pt-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1 min-w-0">
                     {requiredConnectorProviders.length > 0 ? (
                       <>
                         {requiredConnectorProviders.slice(0, 4).map(provider => {
                           const showLogo = !hiddenLogos[provider]
                           const logoSrc = getConnectorLogoSrc(provider)
                           return (
-                            <div
-                              key={provider}
-                              className="flex h-5 w-5 items-center justify-center rounded-md bg-white border border-border/40"
-                              title={provider}
-                            >
+                            <div key={provider} className="flex h-5 w-5 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
                               {showLogo ? (
                                 <Image
                                   src={logoSrc}
@@ -141,30 +150,26 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                     )}
                   </div>
 
-                  <div className="mt-1 text-base font-semibold leading-tight truncate">{displayName}</div>
-
-                  {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
+                  {showInstallCta ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        requestInstall()
+                      }}
+                      disabled={deployDisabled}
+                      className="h-8 px-3 shrink-0 text-primary hover:text-primary"
+                    >
+                      <Icon name={isInstalling ? 'loader-2' : 'sparkles'} className={isInstalling ? 'w-3.5 h-3.5 mr-2 animate-spin' : 'w-3.5 h-3.5 mr-2'} />
+                      {isInstalling ? 'Installing…' : 'Install'}
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
                 </div>
-
-                {showInstallCta ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      requestInstall()
-                    }}
-                    disabled={deployDisabled}
-                    className="h-8 px-3 shrink-0"
-                  >
-                    <Icon name={isInstalling ? 'loader-2' : 'sparkles'} className={isInstalling ? 'w-3.5 h-3.5 mr-2 animate-spin' : 'w-3.5 h-3.5 mr-2'} />
-                    {isInstalling ? 'Installing…' : 'Install'}
-                  </Button>
-                ) : null}
-              </div>
-
-              {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+              ) : null}
             </div>
           </div>
         ) : (

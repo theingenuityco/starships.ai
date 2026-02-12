@@ -381,7 +381,7 @@ export default function MarketplacePageClient(props: {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: idx * 0.04 }}
                             >
-                              <ToolTemplateCard template={template} />
+                              <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={false} />
                             </motion.div>
                           ))}
                         </div>
@@ -421,7 +421,7 @@ export default function MarketplacePageClient(props: {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {toolsMatchingSearch.map((template: ToolTemplateModel, idx: number) => (
                       <motion.div key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                        <ToolTemplateCard template={template} />
+                        <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={false} />
                       </motion.div>
                     ))}
                   </div>

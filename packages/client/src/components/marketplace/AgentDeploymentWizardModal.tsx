@@ -325,7 +325,7 @@ export function AgentDeploymentWizardModal({
                             <span className="flex items-start gap-3 min-w-0">
                               <StarshipPickerIcon starship={selectedStarship ?? { id: '', name: 'S' }} />
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate">
+                                <span className="block truncate text-sm font-semibold leading-tight">
                                   {selectedStarship?.name || selectedStarship?.slug || 'Select a starship…'}
                                 </span>
                                 {selectedStarship ? (
@@ -389,7 +389,7 @@ export function AgentDeploymentWizardModal({
                                       <div className="flex items-center gap-3 min-w-0">
                                         <StarshipPickerIcon starship={s} disabled={disabled} />
                                         <div className="min-w-0 flex flex-col flex-1">
-                                          <div className="font-medium leading-5 text-foreground truncate">{s.name || s.slug || s.id}</div>
+                                          <div className="text-sm font-semibold leading-tight text-foreground truncate">{s.name || s.slug || s.id}</div>
                                           <div className="mt-0.5 text-xs leading-4 text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
                                         </div>
                                         {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : null}

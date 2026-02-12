@@ -14,6 +14,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
@@ -276,9 +277,40 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return true
   }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive])
 
+  const renderRowSkeleton = useCallback((key: string) => {
+    return (
+      <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className={cn('min-w-0 flex-1')}>
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+                <Skeleton className="h-[22px] w-[22px] rounded-md" />
+              </span>
+              <span className="absolute bottom-0 right-0 translate-x-[22%] translate-y-[6%] z-50 pointer-events-none">
+                <Skeleton className="h-2 w-2 rounded-full ring-2 ring-background outline outline-1 outline-border" />
+              </span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-40 max-w-[70%]" />
+                <Skeleton className="h-4 w-14 rounded-md" />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Skeleton className="h-3 w-64 max-w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 self-center">
+          <Skeleton className="h-8 min-w-[130px] rounded-2xl" />
+        </div>
+      </div>
+    )
+  }, [])
+
   const renderAgentsList = () => {
     if (agentsQuery.isLoading) {
-      return <div className="text-sm text-muted-foreground">Loading agents…</div>
+      return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`agent-skel-${i}`))}</div>
     }
     if (!Array.isArray(visibleAgents) || visibleAgents.length === 0) {
       return (
@@ -371,7 +403,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const renderAutomationsList = () => {
     if (toolsQuery.isLoading) {
-      return <div className="text-sm text-muted-foreground">Loading automations…</div>
+      return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`automation-skel-${i}`))}</div>
     }
     if (!Array.isArray(visibleAutomations) || visibleAutomations.length === 0) {
       return (

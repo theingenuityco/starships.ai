@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
+import { Button } from '@/components/ui/button'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -36,6 +38,11 @@ function toIntegrationsTab(raw: string | null | undefined): IntegrationsTab {
 function safeLower(s: unknown): string {
   return typeof s === 'string' ? s.toLowerCase() : ''
 }
+
+// Match connector list CTA styling (see `StarshipConnectorsPanel`).
+const INTEGRATION_CTA_BUTTON_CLASS =
+  'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 
 export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsContentProps) {
   const router = useRouter()
@@ -158,26 +165,47 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
           const agentSlug = String((a as any)?.slug || '')
           return (
             <div key={String(a.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1" aria-label={formatAgentDisplayName(a) || agentSlug || 'Agent'}>
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10">
-                    <Icon name="bot" className="h-4 w-4 text-muted-foreground" />
-                  </span>
+                  <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
+                      <Icon name="bot" className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                    <PresenceIndicator
+                      kind="online"
+                      active={true}
+                      size="sm"
+                      placement="outset"
+                      // Match Connectors/Members page placement for 40px avatar.
+                      className="translate-x-[22%] translate-y-[6%]"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <button
-                      type="button"
-                      className="text-sm font-medium text-foreground truncate hover:underline text-left"
-                      onClick={() => {
-                        if (!agentSlug) return
-                        router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
-                      }}
-                      title={formatAgentDisplayName(a)}
-                      disabled={!agentSlug}
-                    >
-                      {formatAgentDisplayName(a) || 'Untitled agent'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-sm font-medium truncate text-foreground hover:underline text-left"
+                        onClick={() => {
+                          if (!agentSlug) return
+                          router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
+                        }}
+                        title={formatAgentDisplayName(a) || agentSlug}
+                        disabled={!agentSlug}
+                      >
+                        {formatAgentDisplayName(a) || 'Untitled agent'}
+                      </button>
+                      <span
+                        className={cn(
+                          'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
+                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        )}
+                        aria-label="Deployed"
+                        title="Deployed"
+                      >
+                        Deployed
+                      </span>
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {agentSlug ? <span className="font-mono truncate">{agentSlug}</span> : null}
                       {(a as any)?.description ? <span className="truncate">{String((a as any).description)}</span> : null}
                     </div>
                   </div>
@@ -185,18 +213,19 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               </div>
 
               <div className="flex items-center gap-1 self-center">
-                <button
-                  type="button"
-                  className="h-8 min-w-[130px] inline-flex items-center justify-center rounded-2xl border border-border/60 bg-background/40 text-xs font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={INTEGRATION_CTA_BUTTON_CLASS}
                   onClick={() => {
                     if (!agentSlug) return
                     router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
                   }}
                   disabled={!agentSlug}
                 >
+                  <Icon name="chevron-right" className={INTEGRATION_CTA_ICON_CLASS} />
                   Open
-                  <Icon name="chevron-right" className="ml-1 h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
           )
@@ -223,26 +252,46 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
           const toolSlug = String((t as any)?.slug || '')
           return (
             <div key={String(t.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1" aria-label={t.name || toolSlug || 'Tool'}>
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10">
-                    <Icon name="magic-wand" className="h-4 w-4 text-muted-foreground" />
-                  </span>
+                  <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
+                      <Icon name="magic-wand" className="h-4 w-4 text-muted-foreground" />
+                    </span>
+                    <PresenceIndicator
+                      kind="online"
+                      active={true}
+                      size="sm"
+                      placement="outset"
+                      className="translate-x-[22%] translate-y-[6%]"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <button
-                      type="button"
-                      className="text-sm font-medium text-foreground truncate hover:underline text-left"
-                      onClick={() => {
-                        if (!toolSlug) return
-                        router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
-                      }}
-                      title={t.name || toolSlug}
-                      disabled={!toolSlug}
-                    >
-                      {t.name || 'Untitled tool'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-sm font-medium truncate text-foreground hover:underline text-left"
+                        onClick={() => {
+                          if (!toolSlug) return
+                          router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
+                        }}
+                        title={t.name || toolSlug}
+                        disabled={!toolSlug}
+                      >
+                        {t.name || 'Untitled tool'}
+                      </button>
+                      <span
+                        className={cn(
+                          'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
+                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                        )}
+                        aria-label="Installed"
+                        title="Installed"
+                      >
+                        Installed
+                      </span>
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {toolSlug ? <span className="font-mono truncate">{toolSlug}</span> : null}
                       {(t as any)?.description ? <span className="truncate">{String((t as any).description)}</span> : null}
                     </div>
                   </div>
@@ -250,18 +299,19 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               </div>
 
               <div className="flex items-center gap-1 self-center">
-                <button
-                  type="button"
-                  className="h-8 min-w-[130px] inline-flex items-center justify-center rounded-2xl border border-border/60 bg-background/40 text-xs font-medium text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={INTEGRATION_CTA_BUTTON_CLASS}
                   onClick={() => {
                     if (!toolSlug) return
                     router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
                   }}
                   disabled={!toolSlug}
                 >
+                  <Icon name="chevron-right" className={INTEGRATION_CTA_ICON_CLASS} />
                   Open
-                  <Icon name="chevron-right" className="ml-1 h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
           )

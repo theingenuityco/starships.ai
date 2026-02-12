@@ -4,64 +4,125 @@ import Icon from '@/components/primitives/Icon'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useAgentTemplates } from '@/hooks/useTemplates'
+import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
+import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
+import { useConnectorCatalog } from '@/hooks/useConnectors'
 import PublicHeader from '@/components/navigation/PublicHeader'
-import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
+import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { AgentTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
 
-export default function MarketplacePageClient(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const [searchQuery, setSearchQuery] = useState('')
+const MARKETPLACE_TABS = ['agents', 'tools', 'connectors'] as const
+type MarketplaceTab = typeof MARKETPLACE_TABS[number]
+
+function isMarketplaceTab(value: string): value is MarketplaceTab {
+  return (MARKETPLACE_TABS as readonly string[]).includes(value)
+}
+
+function titleCase(input: string): string {
+  const s = String(input || '').trim()
+  if (!s) return ''
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+export default function MarketplacePageClient(props: {
+  initialAgentTemplates?: AgentTemplateModel[]
+  initialToolTemplates?: ToolTemplateModel[]
+  initialConnectorCatalog?: ConnectorCatalogItem[]
+}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
-  const categoryFromUrl = useMemo(() => (searchParams?.get('category') ?? 'all').toLowerCase(), [searchParams])
-  const [selectedCategory, setSelectedCategory] = useState<string>(categoryFromUrl)
+  const tabFromUrl = useMemo(() => (searchParams?.get('tab') ?? 'agents').toLowerCase(), [searchParams])
+  const [tab, setTab] = useState<MarketplaceTab>(() => (isMarketplaceTab(tabFromUrl) ? tabFromUrl : 'agents'))
 
-  // Keep state in sync with URL changes (back/forward/navigation)
   useEffect(() => {
-    setSelectedCategory(categoryFromUrl)
-  }, [categoryFromUrl])
+    if (!isMarketplaceTab(tabFromUrl)) return
+    setTab(tabFromUrl)
+  }, [tabFromUrl])
+
+  const [searchText, setSearchText] = useState<string>('')
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('')
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(searchText.trim())
+    }, 250)
+    return () => window.clearTimeout(handle)
+  }, [searchText])
 
   const initialAgentTemplates = props.initialAgentTemplates ?? []
-  // Fetch templates data on the client even when ISR provided initial HTML.
-  // Use ISR payload as initialData, then refetch once on mount to stay fresh.
-  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(
-    undefined,
-    true,
-    initialAgentTemplates.length > 0 ? { initialData: initialAgentTemplates } : undefined
-  )
-  const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
-  const agentTemplatesLoading = agentTemplatesLoadingRaw && agentTemplates.length === 0
+  const initialToolTemplates = props.initialToolTemplates ?? []
+  const initialConnectorCatalog = props.initialConnectorCatalog ?? []
+
+  const useServerInitialAgents = initialAgentTemplates.length > 0
+  const useServerInitialTools = initialToolTemplates.length > 0
+  const useServerInitialConnectors = initialConnectorCatalog.length > 0
+
+  const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents)
+  const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools)
+  const { data: connectorData, isLoading: connectorLoadingRaw } = useConnectorCatalog({ enabled: !useServerInitialConnectors })
+
+  // IMPORTANT (hydration stability):
+  // If the page shipped server-provided initial templates/catalog, keep using them on hydration.
+  const agentTemplates = (useServerInitialAgents ? initialAgentTemplates : agentData ?? []) as AgentTemplateModel[]
+  const toolTemplates = (useServerInitialTools ? initialToolTemplates : toolData ?? []) as ToolTemplateModel[]
+  const connectorCatalog = (useServerInitialConnectors ? initialConnectorCatalog : connectorData ?? []) as ConnectorCatalogItem[]
+
+  const agentTemplatesLoading = agentLoadingRaw && !useServerInitialAgents
+  const toolTemplatesLoading = toolLoadingRaw && !useServerInitialTools
+  const connectorsLoading = connectorLoadingRaw && !useServerInitialConnectors
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 
-  // Agent categories
-  const allCategories = ['all', 'general', 'coding', 'creative', 'analysis', 'support', 'integration', 'automation', 'data', 'communication']
-  const selectedCategoryLabel = useMemo(() => {
-    const raw = String(selectedCategory || '').trim()
-    if (!raw || raw === 'all') return 'All Categories'
-    // Normalize to a pleasant display label (Title Case, spaces instead of separators)
-    const words = raw.replace(/[_-]+/g, ' ').split(' ').filter(Boolean)
-    return words.map(w => (w.length ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
-  }, [selectedCategory])
+  const agentsMatchingSearch = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return agentTemplates
+    return agentTemplates.filter(t => {
+      const name = typeof t?.name === 'string' ? t.name.toLowerCase() : ''
+      const description = typeof t?.description === 'string' ? t.description.toLowerCase() : ''
+      return name.includes(q) || description.includes(q)
+    })
+  }, [agentTemplates, debouncedSearch])
 
-  // Filter agent templates
-  const filteredAgentTemplates = agentTemplates.filter((template: AgentTemplateModel) => {
-    const matchesSearch =
-      !searchQuery || template.name.toLowerCase().includes(searchQuery.toLowerCase()) || (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  const toolsMatchingSearch = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return toolTemplates
+    return toolTemplates.filter(t => {
+      const name = typeof t?.name === 'string' ? t.name.toLowerCase() : ''
+      const description = typeof (t as any)?.description === 'string' ? String((t as any).description).toLowerCase() : ''
+      return name.includes(q) || description.includes(q)
+    })
+  }, [toolTemplates, debouncedSearch])
 
-    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory
+  const connectorsMatchingSearch = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return connectorCatalog
+    return connectorCatalog.filter(c => {
+      const provider = typeof (c as any)?.provider === 'string' ? String((c as any).provider).toLowerCase() : ''
+      const name = typeof (c as any)?.name === 'string' ? String((c as any).name).toLowerCase() : ''
+      const description = typeof (c as any)?.description === 'string' ? String((c as any).description).toLowerCase() : ''
+      return provider.includes(q) || name.includes(q) || description.includes(q)
+    })
+  }, [connectorCatalog, debouncedSearch])
 
-    return matchesSearch && matchesCategory
-  })
+  const countsByTab = useMemo(() => {
+    return {
+      agents: agentsMatchingSearch.length,
+      tools: toolsMatchingSearch.length,
+      connectors: connectorsMatchingSearch.length,
+    } satisfies Record<MarketplaceTab, number>
+  }, [agentsMatchingSearch.length, toolsMatchingSearch.length, connectorsMatchingSearch.length])
+
+  const activeCount = countsByTab[tab]
+  const activeLoading = tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
 
   // Handle template deployment/installation
   const handleAgentDeploy = (_template: AgentTemplateModel) => {
@@ -106,96 +167,128 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
           </div>
 
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
-            {/* Header */}
-            <div className="flex flex-col gap-5 sm:gap-6">
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm sm:text-base text-muted-foreground max-w-[72ch]">
-                    Find and install agents, tools, and connectors.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-sm px-3 py-1 border-border/60 bg-background/40">
-                    {filteredAgentTemplates.length} agents
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Search + filter panel (card style like listing cards) */}
-              <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-4 sm:p-5">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                    <Input
-                      type="text"
-                      placeholder="Search agents..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          const q = searchQuery.trim()
-                          if (q) track({ type: 'marketplace_search_used', query: q })
-                        }
-                      }}
-                      className="pl-10 pr-3 w-full rounded-lg border border-border/60 bg-background/40"
-                    />
+            <div className="pt-4 pb-2">
+              <Tabs
+                value={tab}
+                onValueChange={value => {
+                  const v = String(value || '').toLowerCase()
+                  if (!isMarketplaceTab(v)) return
+                  track({ type: 'marketplace_tab_selected', tab: v })
+                  setTab(v)
+                  const params = new URLSearchParams(searchParams?.toString() ?? '')
+                  if (v !== 'agents') params.set('tab', v)
+                  else params.delete('tab')
+                  const qs = params.toString()
+                  router.replace(qs ? `${pathname}?${qs}` : pathname)
+                }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex justify-start">
+                    <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                      {MARKETPLACE_TABS.map(t => (
+                        <TabsTrigger key={t} value={t}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span>{t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'}</span>
+                            {!(t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading) ? (
+                              <Badge
+                                variant={tab === t ? 'default' : 'secondary'}
+                                className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
+                              >
+                                {countsByTab[t]}
+                              </Badge>
+                            ) : null}
+                          </span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
                   </div>
 
-                  <Select
-                    value={selectedCategory}
-                    onValueChange={category => {
-                      track({ type: 'marketplace_category_selected', category })
-                      setSelectedCategory(category)
-                      const params = new URLSearchParams(searchParams?.toString() ?? '')
-                      if (category && category !== 'all') params.set('category', category)
-                      else params.delete('category')
-                      router.replace(`${pathname}?${params.toString()}`)
-                    }}
-                  >
-                    <SelectTrigger className="w-full sm:w-[220px] rounded-lg border border-border/60 bg-background/40 h-10">
-                      <div className="flex items-center gap-2">
-                        {selectedCategory && selectedCategory !== 'all' && <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(selectedCategory as any)}`} />}
-                        <span className="truncate">{selectedCategoryLabel}</span>
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allCategories.map(category => (
-                        <SelectItem key={category} value={category} className="capitalize">
-                          <div className="flex items-center gap-2">
-                            {category !== 'all' && <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />}
-                            <span>{category === 'all' ? 'All Categories' : category}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="w-full sm:w-64">
+                    <div className="relative">
+                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                      <Input
+                        value={searchText}
+                        onChange={e => setSearchText(e.target.value)}
+                        placeholder={tab === 'agents' ? 'Search agents' : tab === 'tools' ? 'Search tools' : 'Search connectors'}
+                        className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
+                        aria-label={tab === 'agents' ? 'Search agents' : tab === 'tools' ? 'Search tools' : 'Search connectors'}
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Tabs>
             </div>
 
             {/* Results */}
             <div className="mt-8">
-              {agentTemplatesLoading ? (
+              {activeLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="h-56 rounded-lg border border-border/60 bg-card animate-pulse" />
                   ))}
                 </div>
-              ) : filteredAgentTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
-                    <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                      <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
-                    </motion.div>
-                  ))}
-                </div>
+              ) : activeCount > 0 ? (
+                tab === 'agents' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
+                      <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                        <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : tab === 'tools' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {toolsMatchingSearch.map((template: ToolTemplateModel, idx: number) => (
+                      <motion.div key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                        <ToolTemplateCard template={template} />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {connectorsMatchingSearch.map((c: ConnectorCatalogItem, idx: number) => {
+                      const provider = String((c as any)?.provider || '').trim()
+                      const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
+                      const description = String((c as any)?.description || '').trim()
+                      const logoSrc = provider ? getConnectorLogoSrc(provider) : null
+                      return (
+                        <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                          <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md p-5">
+                            <div className="flex items-start gap-3">
+                              <div className="h-10 w-10 shrink-0 rounded-lg border border-border/40 bg-white flex items-center justify-center overflow-hidden">
+                                {logoSrc ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={logoSrc}
+                                    alt=""
+                                    className="h-6 w-6 object-contain"
+                                    onError={e => {
+                                      ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                                    }}
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-lg font-semibold leading-tight truncate">{name}</div>
+                                {provider ? <div className="mt-1 text-xs text-muted-foreground truncate">{provider}</div> : null}
+                              </div>
+                            </div>
+                            {description ? <div className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{description}</div> : null}
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                )
               ) : (
                 <div className="rounded-lg border border-border/60 bg-card shadow-sm p-10 text-center">
                   <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-muted/40 flex items-center justify-center">
                     <Icon name="head-circuit" className="w-6 h-6 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold">No agents found</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search or category filter.</p>
+                  <h3 className="text-lg font-semibold">
+                    {tab === 'agents' ? 'No agents found' : tab === 'tools' ? 'No tools found' : 'No connectors found'}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search.</p>
                 </div>
               )}
             </div>

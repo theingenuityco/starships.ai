@@ -102,31 +102,37 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
         {compact ? (
           <div className="min-h-[116px] p-4">
             <div className="min-w-0 flex flex-col">
-              {requiredConnectorProviders.length > 0 ? (
-                <div className="flex items-center gap-1 mb-2">
-                  {requiredConnectorProviders.slice(0, 8).map(provider => {
-                    const showLogo = !hiddenLogos[provider]
-                    const logoSrc = getConnectorLogoSrc(provider)
-                    return (
-                      <div key={provider} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-border/40" title={provider}>
-                        {showLogo ? (
-                          <Image
-                            src={logoSrc}
-                            alt=""
-                            width={24}
-                            height={24}
-                            className="object-contain"
-                            onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                          />
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                  {requiredConnectorProviders.length > 8 ? (
-                    <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 8}</span>
-                  ) : null}
-                </div>
-              ) : null}
+              <div className="flex items-center gap-1 mb-2">
+                {requiredConnectorProviders.length > 0 ? (
+                  <>
+                    {requiredConnectorProviders.slice(0, 8).map(provider => {
+                      const showLogo = !hiddenLogos[provider]
+                      const logoSrc = getConnectorLogoSrc(provider)
+                      return (
+                        <div key={provider} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
+                          {showLogo ? (
+                            <Image
+                              src={logoSrc}
+                              alt=""
+                              width={20}
+                              height={20}
+                              className="object-contain"
+                              onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                            />
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                    {requiredConnectorProviders.length > 8 ? (
+                      <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 8}</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
+                    <Icon name="workflow" className="h-5 w-5" />
+                  </div>
+                )}
+              </div>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-base font-semibold leading-tight truncate">{displayName}</div>
@@ -155,31 +161,37 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
           </div>
         ) : (
           <div className="p-5 flex-1 flex flex-col">
-            {requiredConnectorProviders.length > 0 ? (
-              <div className="flex items-center gap-1 mb-3">
-                {requiredConnectorProviders.slice(0, 10).map(provider => {
-                  const showLogo = !hiddenLogos[provider]
-                  const logoSrc = getConnectorLogoSrc(provider)
-                  return (
-                    <div key={provider} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-border/40" title={provider}>
-                      {showLogo ? (
-                        <Image
-                          src={logoSrc}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="object-contain"
-                          onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                        />
-                      ) : null}
-                    </div>
-                  )
-                })}
-                {requiredConnectorProviders.length > 10 ? (
-                  <span className="ml-1 text-xs text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 10}</span>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="flex items-center gap-1 mb-3">
+              {requiredConnectorProviders.length > 0 ? (
+                <>
+                  {requiredConnectorProviders.slice(0, 10).map(provider => {
+                    const showLogo = !hiddenLogos[provider]
+                    const logoSrc = getConnectorLogoSrc(provider)
+                    return (
+                      <div key={provider} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={provider}>
+                        {showLogo ? (
+                          <Image
+                            src={logoSrc}
+                            alt=""
+                            width={20}
+                            height={20}
+                            className="object-contain"
+                            onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                          />
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                  {requiredConnectorProviders.length > 10 ? (
+                    <span className="ml-1 text-xs text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 10}</span>
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
+                  <Icon name="workflow" className="h-5 w-5" />
+                </div>
+              )}
+            </div>
             <div className="min-w-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

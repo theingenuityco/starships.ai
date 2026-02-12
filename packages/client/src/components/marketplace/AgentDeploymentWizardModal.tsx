@@ -1,6 +1,5 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import type { AgentTemplateModel, AgentToolPermission, DeployStarshipOption, ToolTemplateModel } from '@starships/protocol'
@@ -12,15 +11,12 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { AgentTemplatePreviewCard } from '@/components/marketplace/AgentTemplatePreviewCard'
 import { cn } from '@/lib/utils'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
 import type { DeployStarshipOptionWithAccess } from '@/hooks/useStarships'
 
 type WizardStep = 1 | 2 | 3 | 4
-
-// Lazy import to avoid circular dependency:
-// `AgentTemplateCard` opens the wizard (imports this file), and the wizard wants to render the card.
-const AgentTemplateCard = dynamic(() => import('@/components/marketplace/AgentTemplateCard').then(m => m.AgentTemplateCard), { ssr: false })
 
 interface AgentDeploymentWizardModalProps {
   isOpen: boolean
@@ -271,10 +267,8 @@ export function AgentDeploymentWizardModal({
             </DialogHeader>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              {/* Agent preview card (reuse marketplace card without CTA). */}
-              <div className="pointer-events-none">
-                <AgentTemplateCard template={template} showDeployCta={false} showCategory={false} density="compact" compactAvatarStyle="tile" />
-              </div>
+              {/* Agent details (compact preview, matches marketplace card layout). */}
+              <AgentTemplatePreviewCard template={template} />
 
               {step === 1 ? (
                 <div className="mt-8 space-y-3">

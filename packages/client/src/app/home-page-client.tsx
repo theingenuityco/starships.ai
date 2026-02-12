@@ -20,7 +20,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
+      <div className="min-h-[100dvh] bg-background relative">
         <StarryBackground />
         {/* Bottom glow for the whole landing page (decorative background, never above content) */}
         <div
@@ -46,17 +46,19 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
         <div className="relative z-10">
           <PublicHeader />
 
-          {/* New Landing Sections */}
-          <Hero initialAgentTemplates={initialAgentTemplates} />
-          <HeroDemoSection initialAgentTemplates={initialAgentTemplates} />
-          <UseCases />
-          <Security />
-          <PricingTeaser />
-          <FAQ />
-          <FinalCTA />
+          <div className="overflow-x-hidden">
+            {/* New Landing Sections */}
+            <Hero initialAgentTemplates={initialAgentTemplates} />
+            <HeroDemoSection initialAgentTemplates={initialAgentTemplates} />
+            <UseCases />
+            <Security />
+            <PricingTeaser />
+            <FAQ />
+            <FinalCTA />
 
-          {/* Footer */}
-          <PublicFooter fromPath="/" />
+            {/* Footer */}
+            <PublicFooter fromPath="/" />
+          </div>
         </div>
       </div>
     </StarTheme>

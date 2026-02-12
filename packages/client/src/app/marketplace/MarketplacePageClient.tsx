@@ -99,7 +99,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
         <PublicHeader />
       </div>
 
-      <main className="marketplace-main pt-20 sm:pt-28 pb-12 sm:pb-16">
+      <main className="marketplace-main pb-12 sm:pb-16">
         <div className="relative">
           {/* Decorative hero background (match agent details) */}
           <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">

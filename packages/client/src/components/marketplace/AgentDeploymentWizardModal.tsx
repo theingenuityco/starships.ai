@@ -599,18 +599,17 @@ export function AgentDeploymentWizardModal({
 
             <DialogFooter className="shrink-0 px-6 py-4 border-t border-border/50 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
               <div>
-                {step > 1 ? (
-                  <Button type="button" variant="ghost" onClick={handleBack} disabled={isProcessing}>
-                    {'<- Back'}
-                  </Button>
-                ) : (
-                  <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-                    Cancel
-                  </Button>
-                )}
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+                  Cancel
+                </Button>
               </div>
 
               <div className="flex items-center gap-2">
+                {step > 1 ? (
+                  <Button type="button" variant="ghost" onClick={handleBack} disabled={isProcessing}>
+                    ← Back
+                  </Button>
+                ) : null}
                 {step < 4 ? (
                   <Button type="button" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
                     Next →

@@ -14,15 +14,22 @@ import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
 
-const MARKETPLACE_TABS = ['agents', 'tools', 'connectors'] as const
+const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
 type MarketplaceTab = typeof MARKETPLACE_TABS[number]
 
 function isMarketplaceTab(value: string): value is MarketplaceTab {
   return (MARKETPLACE_TABS as readonly string[]).includes(value)
+}
+
+const TAB_TO_ROUTE: Record<MarketplaceTab, string> = {
+  all: '/explore/all',
+  agents: '/explore/agents',
+  tools: '/explore/tools',
+  connectors: '/explore/connectors',
 }
 
 function titleCase(input: string): string {
@@ -35,18 +42,14 @@ export default function MarketplacePageClient(props: {
   initialAgentTemplates?: AgentTemplateModel[]
   initialToolTemplates?: ToolTemplateModel[]
   initialConnectorCatalog?: ConnectorCatalogItem[]
+  activeTab?: MarketplaceTab
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const pathname = usePathname()
 
-  const tabFromUrl = useMemo(() => (searchParams?.get('tab') ?? 'agents').toLowerCase(), [searchParams])
-  const [tab, setTab] = useState<MarketplaceTab>(() => (isMarketplaceTab(tabFromUrl) ? tabFromUrl : 'agents'))
-
-  useEffect(() => {
-    if (!isMarketplaceTab(tabFromUrl)) return
-    setTab(tabFromUrl)
-  }, [tabFromUrl])
+  const tab: MarketplaceTab = isMarketplaceTab(String(props.activeTab || '').trim().toLowerCase())
+    ? (String(props.activeTab).trim().toLowerCase() as MarketplaceTab)
+    : 'all'
 
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
@@ -114,15 +117,21 @@ export default function MarketplacePageClient(props: {
   }, [connectorCatalog, debouncedSearch])
 
   const countsByTab = useMemo(() => {
+    const agents = agentsMatchingSearch.length
+    const tools = toolsMatchingSearch.length
+    const connectors = connectorsMatchingSearch.length
     return {
-      agents: agentsMatchingSearch.length,
-      tools: toolsMatchingSearch.length,
-      connectors: connectorsMatchingSearch.length,
+      all: agents + tools + connectors,
+      agents,
+      tools,
+      connectors,
     } satisfies Record<MarketplaceTab, number>
   }, [agentsMatchingSearch.length, toolsMatchingSearch.length, connectorsMatchingSearch.length])
 
   const activeCount = countsByTab[tab]
-  const activeLoading = tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
+  const isAllLoading = agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
+  const activeLoading =
+    tab === 'all' ? isAllLoading : tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
 
   // Handle template deployment/installation
   const handleAgentDeploy = (_template: AgentTemplateModel) => {
@@ -142,6 +151,7 @@ export default function MarketplacePageClient(props: {
   // Back-compat: old links used `?agent=<id|slug>` to open a modal.
   // Redirect them to the dedicated agent page.
   useEffect(() => {
+    if (tab !== 'agents') return
     if (!agentFromUrl) return
     if (agentTemplatesLoading) return
     if (!Array.isArray(agentTemplates) || agentTemplates.length === 0) return
@@ -153,6 +163,45 @@ export default function MarketplacePageClient(props: {
     // and pushing the canonical details route.
     router.replace(`/explore/agents/${encodeURIComponent(found.slug)}`)
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
+
+  const hero = useMemo(() => {
+    const t = tab === 'all' ? 'Explore' : tab === 'agents' ? 'Explore agents' : tab === 'tools' ? 'Explore tools' : 'Explore connectors'
+    const subtitle = 'Search and install agents, tools, and connectors.'
+    return { title: t, subtitle }
+  }, [tab])
+
+  const renderConnectorCard = (c: ConnectorCatalogItem, idx: number) => {
+    const provider = String((c as any)?.provider || '').trim()
+    const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
+    const description = String((c as any)?.description || '').trim()
+    const logoSrc = provider ? getConnectorLogoSrc(provider) : null
+    return (
+      <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md p-5">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-lg border border-border/40 bg-white flex items-center justify-center overflow-hidden">
+              {logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoSrc}
+                  alt=""
+                  className="h-6 w-6 object-contain"
+                  onError={e => {
+                    ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-semibold leading-tight truncate">{name}</div>
+              {provider ? <div className="mt-1 text-xs text-muted-foreground truncate">{provider}</div> : null}
+            </div>
+          </div>
+          {description ? <div className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{description}</div> : null}
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <>
@@ -167,19 +216,40 @@ export default function MarketplacePageClient(props: {
           </div>
 
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
-            <div className="pt-4 pb-2">
+            {/* Hero */}
+            <div className="pt-8 sm:pt-10 pb-4">
+              <div className="max-w-[72ch]">
+                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">{hero.title}</h1>
+                <p className="mt-2 text-sm sm:text-base text-muted-foreground">{hero.subtitle}</p>
+              </div>
+              <div className="mt-5 max-w-xl">
+                <div className="relative">
+                  <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                  <Input
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const q = searchText.trim()
+                        if (q) track({ type: 'marketplace_search_used', query: q })
+                      }
+                    }}
+                    placeholder="Search agents, tools, and connectors"
+                    className="pl-11 h-11 py-2 text-[14px] rounded-2xl border-border/60 bg-card shadow-sm"
+                    aria-label="Search Explore"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pb-2">
               <Tabs
                 value={tab}
                 onValueChange={value => {
                   const v = String(value || '').toLowerCase()
                   if (!isMarketplaceTab(v)) return
                   track({ type: 'marketplace_tab_selected', tab: v })
-                  setTab(v)
-                  const params = new URLSearchParams(searchParams?.toString() ?? '')
-                  if (v !== 'agents') params.set('tab', v)
-                  else params.delete('tab')
-                  const qs = params.toString()
-                  router.replace(qs ? `${pathname}?${qs}` : pathname)
+                  router.push(TAB_TO_ROUTE[v])
                 }}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -188,8 +258,8 @@ export default function MarketplacePageClient(props: {
                       {MARKETPLACE_TABS.map(t => (
                         <TabsTrigger key={t} value={t}>
                           <span className="inline-flex items-center gap-1.5">
-                            <span>{t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'}</span>
-                            {!(t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading) ? (
+                            <span>{t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'}</span>
+                            {!(t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading) ? (
                               <Badge
                                 variant={tab === t ? 'default' : 'secondary'}
                                 className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
@@ -201,19 +271,6 @@ export default function MarketplacePageClient(props: {
                         </TabsTrigger>
                       ))}
                     </TabsList>
-                  </div>
-
-                  <div className="w-full sm:w-64">
-                    <div className="relative">
-                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                      <Input
-                        value={searchText}
-                        onChange={e => setSearchText(e.target.value)}
-                        placeholder={tab === 'agents' ? 'Search agents' : tab === 'tools' ? 'Search tools' : 'Search connectors'}
-                        className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
-                        aria-label={tab === 'agents' ? 'Search agents' : tab === 'tools' ? 'Search tools' : 'Search connectors'}
-                      />
-                    </div>
                   </div>
                 </div>
               </Tabs>
@@ -228,7 +285,91 @@ export default function MarketplacePageClient(props: {
                   ))}
                 </div>
               ) : activeCount > 0 ? (
-                tab === 'agents' ? (
+                tab === 'all' ? (
+                  <div className="space-y-10">
+                    {agentsMatchingSearch.length > 0 ? (
+                      <section>
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-baseline gap-3">
+                            <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
+                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
+                              {agentsMatchingSearch.length}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-sm text-primary hover:underline underline-offset-2"
+                            onClick={() => router.push(TAB_TO_ROUTE.agents)}
+                          >
+                            View all
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {agentsMatchingSearch.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
+                            <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                              <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {toolsMatchingSearch.length > 0 ? (
+                      <section>
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-baseline gap-3">
+                            <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
+                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
+                              {toolsMatchingSearch.length}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-sm text-primary hover:underline underline-offset-2"
+                            onClick={() => router.push(TAB_TO_ROUTE.tools)}
+                          >
+                            View all
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {toolsMatchingSearch.slice(0, 6).map((template: ToolTemplateModel, idx: number) => (
+                            <motion.div
+                              key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
+                              initial={{ opacity: 0, y: 14 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: idx * 0.04 }}
+                            >
+                              <ToolTemplateCard template={template} />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {connectorsMatchingSearch.length > 0 ? (
+                      <section>
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex items-baseline gap-3">
+                            <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
+                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
+                              {connectorsMatchingSearch.length}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            className="text-sm text-primary hover:underline underline-offset-2"
+                            onClick={() => router.push(TAB_TO_ROUTE.connectors)}
+                          >
+                            View all
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                          {connectorsMatchingSearch.slice(0, 6).map(renderConnectorCard)}
+                        </div>
+                      </section>
+                    ) : null}
+                  </div>
+                ) : tab === 'agents' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
                       <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
@@ -246,38 +387,7 @@ export default function MarketplacePageClient(props: {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {connectorsMatchingSearch.map((c: ConnectorCatalogItem, idx: number) => {
-                      const provider = String((c as any)?.provider || '').trim()
-                      const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
-                      const description = String((c as any)?.description || '').trim()
-                      const logoSrc = provider ? getConnectorLogoSrc(provider) : null
-                      return (
-                        <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                          <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md p-5">
-                            <div className="flex items-start gap-3">
-                              <div className="h-10 w-10 shrink-0 rounded-lg border border-border/40 bg-white flex items-center justify-center overflow-hidden">
-                                {logoSrc ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={logoSrc}
-                                    alt=""
-                                    className="h-6 w-6 object-contain"
-                                    onError={e => {
-                                      ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                                    }}
-                                  />
-                                ) : null}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-lg font-semibold leading-tight truncate">{name}</div>
-                                {provider ? <div className="mt-1 text-xs text-muted-foreground truncate">{provider}</div> : null}
-                              </div>
-                            </div>
-                            {description ? <div className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{description}</div> : null}
-                          </div>
-                        </motion.div>
-                      )
-                    })}
+                    {connectorsMatchingSearch.map(renderConnectorCard)}
                   </div>
                 )
               ) : (
@@ -286,7 +396,7 @@ export default function MarketplacePageClient(props: {
                     <Icon name="head-circuit" className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <h3 className="text-lg font-semibold">
-                    {tab === 'agents' ? 'No agents found' : tab === 'tools' ? 'No tools found' : 'No connectors found'}
+                    {tab === 'agents' ? 'No agents found' : tab === 'tools' ? 'No tools found' : tab === 'connectors' ? 'No connectors found' : 'No results found'}
                   </h3>
                   <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search.</p>
                 </div>

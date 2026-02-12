@@ -1,64 +1,27 @@
-import { Suspense } from 'react'
-import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 
-import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
-
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
-export const revalidate = 3600 // 1 hour
-
-export const metadata: Metadata = {
-  title: 'Explore | Starships.ai',
-  description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
-  alternates: {
-    canonical: 'https://starships.ai/explore',
-  },
-  keywords: [
-    'AI agents marketplace',
-    'agent templates',
-    'AI tools',
-    'automation templates',
-    'pre-built agents',
-    'AI marketplace',
-    'agent library',
-  ],
-  openGraph: {
-    type: 'website',
-    siteName: 'Starships.ai',
-    title: 'Explore | Starships.ai',
-    description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
-    url: 'https://starships.ai/explore',
-    locale: 'en_US',
-    images: [
-      {
-        url: '/static-assets/og.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Starships.ai Explore',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Explore | Starships.ai',
-    description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
-    images: ['/static-assets/og.jpg'],
-  },
+type PageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-export default async function ExplorePage() {
-  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
-    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
-  ])
-  return (
-    <>
-      <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-        <MarketplacePageClient initialAgentTemplates={agentTemplates} initialToolTemplates={toolTemplates} initialConnectorCatalog={connectorCatalog} />
-      </Suspense>
-    </>
-  )
+function toQueryString(params: Record<string, string | string[] | undefined> | null | undefined): string {
+  const sp = new URLSearchParams()
+  const p = params ?? {}
+  for (const [k, v] of Object.entries(p)) {
+    if (k === 'tab') continue
+    if (typeof v === 'string' && v.length) sp.set(k, v)
+    else if (Array.isArray(v)) for (const item of v) if (typeof item === 'string' && item.length) sp.append(k, item)
+  }
+  const qs = sp.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export default async function ExploreRedirectPage(props: PageProps) {
+  const searchParams = (await props.searchParams) ?? {}
+  const tabRaw = searchParams?.tab
+  const tab = typeof tabRaw === 'string' ? tabRaw : Array.isArray(tabRaw) ? tabRaw[0] : ''
+  const t = String(tab || '').trim().toLowerCase()
+  const dest = t === 'agents' ? '/explore/agents' : t === 'tools' ? '/explore/tools' : t === 'connectors' ? '/explore/connectors' : '/explore/all'
+  redirect(`${dest}${toQueryString(searchParams)}`)
 }
 

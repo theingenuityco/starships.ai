@@ -233,9 +233,8 @@ export default function MarketplacePageClient(props: {
                     if (!provider) return
                     router.push(`/connectors/${encodeURIComponent(provider)}/install`)
                   }}
-                  className="h-8 px-3 shrink-0 text-primary hover:text-primary"
+                  className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
                 >
-                  <Icon name="plug" className="w-3.5 h-3.5 mr-2" />
                   Connect
                 </Button>
               </div>

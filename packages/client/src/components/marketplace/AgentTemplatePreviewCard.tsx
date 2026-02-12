@@ -14,29 +14,25 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
   const displayDescription = String(template.description || '').trim()
 
   return (
-    <div className={cn('relative overflow-hidden rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm', className)}>
-      <div className="flex min-h-[116px]">
-        {/* Left avatar */}
-        <div className="relative w-24 shrink-0 overflow-hidden bg-muted/30">
-          <div className="absolute inset-0 h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
-            <MarketplaceAvatar
-              imageUrl={avatarUrl || null}
-              label={displayName || 'Agent'}
-              seed={displayName || template.slug || 'AI'}
-              sizeClassName="h-14 w-14"
-              shapeClassName="rounded-xl"
-              ringClassName="ring-1 ring-border/40"
-              shadowClassName="shadow-sm"
-              showInsetRing={false}
-              showTintWhenMissing={true}
-              fallbackTextClassName="text-base font-semibold text-muted-foreground"
-              tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
-            />
-          </div>
-        </div>
+    <div className={cn('relative overflow-hidden rounded-lg bg-transparent', className)}>
+      <div className="flex items-start gap-4">
+        {/* Square avatar tile */}
+        <MarketplaceAvatar
+          imageUrl={avatarUrl || null}
+          label={displayName || 'Agent'}
+          seed={displayName || template.slug || 'AI'}
+          sizeClassName="h-14 w-14"
+          shapeClassName="rounded-xl"
+          ringClassName="ring-1 ring-border/40"
+          shadowClassName="shadow-sm"
+          showInsetRing={false}
+          showTintWhenMissing={true}
+          fallbackTextClassName="text-base font-semibold text-muted-foreground"
+          tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
+        />
 
-        {/* Right content */}
-        <div className="min-w-0 flex-1 flex flex-col p-4">
+        {/* Content */}
+        <div className="min-w-0 flex-1 flex flex-col pt-0.5">
           <div className="min-w-0">
             {/* Name (small) */}
             {displayRole ? <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}

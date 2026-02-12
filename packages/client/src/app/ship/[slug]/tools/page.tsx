@@ -179,7 +179,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                     <Icon name="wrench" className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-base text-muted-foreground mb-3">No tools installed</p>
-                  <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
+                  <p className="text-sm text-muted-foreground">Install tools from Explore to get started.</p>
                 </div>
               ) : (
                 <>

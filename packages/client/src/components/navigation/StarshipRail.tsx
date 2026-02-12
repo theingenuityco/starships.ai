@@ -126,7 +126,7 @@ export function StarshipRail({
                 'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
                 isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
               ].join(' ')}
-              aria-label="Marketplace"
+              aria-label="Explore"
               aria-current={isMarketplaceActive ? 'page' : undefined}
             >
               {/* Discord-like active indicator */}
@@ -144,7 +144,7 @@ export function StarshipRail({
               <div className="mt-0.5">
                 <Icon name="store" className="h-[22px] w-[22px] text-muted-foreground" />
               </div>
-              <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Marketplace</div>
+              <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Explore</div>
               <div className="col-span-2 text-xs text-muted-foreground">Explore agents</div>
             </div>
           </TooltipContent>

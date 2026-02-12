@@ -95,7 +95,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [isMobile])
 
-  // When Marketplace is selected, collapse the sidebar to give more space for browsing (icons-only rail).
+  // When Explore is selected, collapse the sidebar to give more space for browsing (icons-only rail).
   const isMarketplaceRoute = pathname === '/marketplace' || pathname.startsWith('/marketplace/')
   useEffect(() => {
     if (!isMobile && isMarketplaceRoute) {

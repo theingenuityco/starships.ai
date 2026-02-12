@@ -113,14 +113,14 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
 
   if (!template) {
     return {
-      title: 'Agent not found | Marketplace | Starships.ai',
-      description: 'This marketplace agent doesn’t exist (or is no longer published).',
+      title: 'Agent not found | Explore | Starships.ai',
+      description: 'This agent doesn’t exist (or is no longer published).',
       alternates: { canonical: 'https://starships.ai/marketplace' },
     }
   }
 
-  const title = `${template.name} | Marketplace | Starships.ai`
-  const description = template.description || `Learn more about ${template.name} on the Starships.ai Marketplace.`
+  const title = `${template.name} | Explore | Starships.ai`
+  const description = template.description || `Learn more about ${template.name} in Explore on Starships.ai.`
   const url = `https://starships.ai/marketplace/agents/${encodeURIComponent(template.slug)}`
   const imageUrl = safeSocialImageUrl(template.avatarUrl, '/static-assets/og.jpg')
 
@@ -315,7 +315,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
               <a href="/marketplace" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
                 <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
-                <span>Marketplace</span>
+                <span>Explore</span>
               </a>
               <span className="opacity-60">/</span>
               <span className="text-foreground/80 truncate max-w-[40ch]">{template.name}</span>

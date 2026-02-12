@@ -11,7 +11,7 @@ const QA = [
   },
   {
     q: 'How do I get started?',
-    a: 'Create an account, launch a template from the marketplace, then start a conversation. You can customize teammates and add skills as you go.',
+    a: 'Create an account, launch a template from Explore, then start a conversation. You can customize teammates and add skills as you go.',
   },
   {
     q: 'Do I need to be technical?',

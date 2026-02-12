@@ -35,7 +35,7 @@ export default function ChannelsError({
             href="/marketplace"
             className="inline-flex items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent"
           >
-            Back to Marketplace
+            Back to Explore
           </a>
         </div>
       </div>

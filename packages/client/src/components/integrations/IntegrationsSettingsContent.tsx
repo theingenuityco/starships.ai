@@ -31,11 +31,13 @@ interface IntegrationsSettingsContentProps {
   slug: string
 }
 
-type IntegrationsTab = 'all' | 'agents' | 'tools' | 'connectors'
+type IntegrationsTab = 'all' | 'agents' | 'automations' | 'connectors'
 
 function toIntegrationsTab(raw: string | null | undefined): IntegrationsTab {
   const v = String(raw || '').trim()
-  if (v === 'agents' || v === 'tools' || v === 'connectors' || v === 'all') return v
+  // Back-compat: old URLs used `tab=tools`
+  if (v === 'tools') return 'automations'
+  if (v === 'agents' || v === 'automations' || v === 'connectors' || v === 'all') return v
   return 'all'
 }
 
@@ -165,10 +167,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return m
   }, [agentAvatarAttachments])
 
-  // Tools (starship-scoped)
+  // Automations (starship tools, starship-scoped)
   type ToolsPage = { tools: ToolModel[]; pagination: PaginationMeta | null }
   const toolsQuery = useInfiniteQuery({
-    queryKey: ['starship-tools', starshipId, 'paged', { limit: TAB_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
+    queryKey: ['starship-automations', starshipId, 'paged', { limit: TAB_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
     enabled: Boolean(starshipId),
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<ToolsPage> => {
@@ -225,7 +227,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
 
   const showAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
-  const showTools = tabFromUrl === 'all' || tabFromUrl === 'tools'
+  const showAutomations = tabFromUrl === 'all' || tabFromUrl === 'automations'
   const showConnectors = (tabFromUrl === 'all' || tabFromUrl === 'connectors') && canManageConnectors
 
   const renderAgentsList = () => {
@@ -321,14 +323,14 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     )
   }
 
-  const renderToolsList = () => {
+  const renderAutomationsList = () => {
     if (toolsQuery.isLoading) {
-      return <div className="text-sm text-muted-foreground">Loading tools…</div>
+      return <div className="text-sm text-muted-foreground">Loading automations…</div>
     }
     if (!Array.isArray(tools) || tools.length === 0) {
       return (
         <div className="flex items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No tools match “${debouncedQuery}”.` : 'No tools installed in this starship yet.'}</p>
+          <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No automations match “${debouncedQuery}”.` : 'No automations installed in this starship yet.'}</p>
         </div>
       )
     }
@@ -401,7 +403,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               disabled={toolsQuery.isFetchingNextPage}
               className={INTEGRATION_OUTLINE_BUTTON_CLASS}
             >
-              {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more tools'}
+              {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more automations'}
             </Button>
           </div>
         ) : null}
@@ -424,7 +426,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">Agents, tools, and connectors installed in this starship.</span>
+                  <span className="font-medium leading-none text-muted-foreground">Agents, automations, and connectors installed in this starship.</span>
                 </div>
               </div>
             </div>
@@ -454,11 +456,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="tools">
+                    <TabsTrigger value="automations">
                       <span className="inline-flex items-center gap-1.5">
-                        <span>Tools</span>
+                        <span>Automations</span>
                         {typeof toolsPagination?.total === 'number' ? (
-                          <Badge variant={tabFromUrl === 'tools' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
+                          <Badge variant={tabFromUrl === 'automations' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {toolsPagination.total}
                           </Badge>
                         ) : null}
@@ -513,17 +515,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
-                      {typeof agentsPagination?.total === 'number' ? (
-                        <Badge
-                          variant="outline"
-                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
-                        >
-                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
-                            <Icon name="bot" className="h-3 w-3 text-muted-foreground" />
-                          </span>
-                          {agentsPagination.total} agents
-                        </Badge>
-                      ) : null}
+                      {typeof agentsPagination?.total === 'number' ? <span className="text-xs text-muted-foreground tabular-nums">({agentsPagination.total})</span> : null}
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                       <Link href="/explore">
@@ -545,35 +537,25 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                 </section>
               ) : null}
 
-              {showTools ? (
+              {showAutomations ? (
                 <section>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
-                      <h3 className="text-lg font-semibold leading-tight text-foreground">Tools</h3>
-                      {typeof toolsPagination?.total === 'number' ? (
-                        <Badge
-                          variant="outline"
-                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
-                        >
-                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
-                            <Icon name="magic-wand" className="h-3 w-3 text-muted-foreground" />
-                          </span>
-                          {toolsPagination.total} tools
-                        </Badge>
-                      ) : null}
+                      <h3 className="text-lg font-semibold leading-tight text-foreground">Automations</h3>
+                      {typeof toolsPagination?.total === 'number' ? <span className="text-xs text-muted-foreground tabular-nums">({toolsPagination.total})</span> : null}
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/explore">
+                      <Link href="/explore/automations">
                         <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
-                        Explore tools
+                        Explore automations
                       </Link>
                     </Button>
                   </div>
-                  {renderToolsList()}
+                  {renderAutomationsList()}
                   {isAllTab ? (
                     <div className="flex justify-center pt-4">
                       <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                        <Link href={buildIntegrationsTabHref('tools')}>Show all tools</Link>
+                        <Link href={buildIntegrationsTabHref('automations')}>Show all automations</Link>
                       </Button>
                     </div>
                   ) : null}
@@ -593,25 +575,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Connectors</h3>
                       {typeof catalogTotal === 'number' ? (
-                        <Badge
-                          variant="outline"
-                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
-                        >
-                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
-                            <Icon name="plug" className="h-3 w-3 text-muted-foreground" />
-                          </span>
-                          {catalogTotal} connectors
-                        </Badge>
+                        <span className="text-xs text-muted-foreground tabular-nums">({catalogTotal})</span>
                       ) : typeof totalConnectors === 'number' ? (
-                        <Badge
-                          variant="outline"
-                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
-                        >
-                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
-                            <Icon name="plug" className="h-3 w-3 text-muted-foreground" />
-                          </span>
-                          {totalConnectors} connectors
-                        </Badge>
+                        <span className="text-xs text-muted-foreground tabular-nums">({totalConnectors})</span>
                       ) : null}
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">

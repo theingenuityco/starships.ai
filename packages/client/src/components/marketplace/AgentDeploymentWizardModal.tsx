@@ -42,6 +42,13 @@ interface AgentDeploymentWizardModalProps {
 
 const TOTAL_STEPS = 3
 
+type StepMeta = { id: WizardStep; label: string; subtitle: string }
+const WIZARD_STEPS: StepMeta[] = [
+  { id: 1, label: 'Starship', subtitle: 'Choose a destination' },
+  { id: 2, label: 'Configure', subtitle: 'Connect apps & permissions' },
+  { id: 3, label: 'Deploy', subtitle: 'Review & launch' },
+]
+
 function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
   const label = String(input?.name || input?.slug || input?.id || '').trim()
   if (!label) return 'S'
@@ -76,6 +83,50 @@ function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select starship'
   if (step === 2) return 'Configure'
   return 'Review & deploy'
+}
+
+function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
+  const progressValue = (currentStep / TOTAL_STEPS) * 100
+
+  return (
+    <div className="space-y-3">
+      <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {WIZARD_STEPS.map(s => {
+          const isCompleted = currentStep > s.id
+          const isActive = currentStep === s.id
+          return (
+            <li
+              key={s.id}
+              className={cn(
+                'rounded-xl border px-3 py-2.5 bg-card/40 backdrop-blur-sm transition-colors',
+                isActive ? 'border-primary/40 bg-primary/10' : isCompleted ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-border/60'
+              )}
+              aria-current={isActive ? 'step' : undefined}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={cn(
+                    'h-7 w-7 rounded-lg border flex items-center justify-center shrink-0',
+                    isActive ? 'border-primary/40 bg-primary/10 text-primary' : isCompleted ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600' : 'border-border/60 bg-background/30 text-muted-foreground'
+                  )}
+                  aria-hidden
+                >
+                  {isCompleted ? <Icon name="check" className="h-4 w-4" /> : <span className="text-xs font-semibold tabular-nums">{s.id}</span>}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className={cn('text-sm font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.subtitle}</div>
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+
+      <Progress value={progressValue} className="h-1.5" />
+    </div>
+  )
 }
 
 export function AgentDeploymentWizardModal({
@@ -185,7 +236,6 @@ export function AgentDeploymentWizardModal({
   }, [assignedToolSlugs, toolPermissions])
 
   const showGridSelection = listForSelection.length > 0 && listForSelection.length <= 6
-  const progressValue = (step / TOTAL_STEPS) * 100
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -195,14 +245,8 @@ export function AgentDeploymentWizardModal({
             <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/50">
               <DialogTitle>Deploy agent</DialogTitle>
 
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold">{stepTitle(step)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Step {step} of {TOTAL_STEPS}
-                  </div>
-                </div>
-                <Progress value={progressValue} />
+              <div className="mt-6">
+                <WizardStepper currentStep={step} />
               </div>
             </DialogHeader>
 

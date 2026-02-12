@@ -12,7 +12,7 @@ import type {
   StartOAuthRequest,
   StartOAuthResponse,
 } from '@starships/protocol';
-import { IdSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -83,12 +83,13 @@ function addQueryParamsToPath(path: string, params: Record<string, string>): str
 // GET /connectors/catalog - Static connector catalog (with optional search)
 router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
   try {
-    const ConnectorCatalogQuerySchema = z
-      .object({
-        q: z.string().optional(),
-        limit: z.coerce.number().min(1).max(100).optional(),
-      })
-      .strict();
+    const ConnectorCatalogQuerySchema = PaginationSchema.extend({
+      q: z.string().optional(),
+      // Keep legacy behavior: `limit` is optional and capped smaller.
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+      // `page` is optional: if omitted, we return the legacy "all connectors" payload.
+      page: z.coerce.number().int().min(1).optional(),
+    }).strict();
 
     const queryData = validateData(ConnectorCatalogQuerySchema, req.query, res, 'connector catalog query');
     if (!queryData) return;
@@ -100,8 +101,8 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
     let results: ConnectorCatalogItem[];
 
     if (!query) {
-      // No query: return all enabled connectors
-      results = queryData.limit ? catalog.slice(0, queryData.limit) : catalog;
+      // No query: start from full enabled catalog
+      results = catalog;
     } else {
       // Search: filter by provider name, description, and category
       const filtered = catalog.filter((connector) => {
@@ -111,7 +112,7 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
         const categoryMatch = (connector as { category?: string }).category?.toLowerCase().includes(query) ?? false;
         return providerMatch || nameMatch || descMatch || categoryMatch;
       });
-      results = queryData.limit ? filtered.slice(0, queryData.limit) : filtered;
+      results = filtered;
     }
 
     // Sort catalog by observed usage in conversations (do NOT use connector_templates.usage_count).
@@ -194,6 +195,28 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
       }
     } catch {
       // Best-effort only: fall back to ConnectorService ordering
+    }
+
+    const total = results.length;
+
+    // Legacy behavior:
+    // - If the caller didn't ask for a specific page AND didn't set a limit, return everything.
+    const wantsPaging = queryData.page !== undefined || queryData.limit !== undefined;
+    if (wantsPaging) {
+      const page = queryData.page ?? 1;
+      const limit = queryData.limit ?? 50;
+      const offset = (page - 1) * limit;
+      results = results.slice(offset, offset + limit);
+      sendSuccess(res, { connectors: results } satisfies ConnectorCatalogResponse, 200, {
+        pagination: {
+          page,
+          limit,
+          total,
+          has_next: page * limit < total,
+          has_prev: page > 1,
+        },
+      });
+      return;
     }
 
     const response: ConnectorCatalogResponse = {

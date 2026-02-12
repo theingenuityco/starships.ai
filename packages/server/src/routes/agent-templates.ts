@@ -394,7 +394,7 @@ router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Re
     const { id } = req.params;
 
     // Validate template ID format
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    const paramValidation = validateData(z.object({ id: z.union([IdSchema, SlugSchema]) }), req.params, res, 'template parameter');
     if (!paramValidation) return;
 
     const templateService = getAgentTemplateService();
@@ -405,15 +405,20 @@ router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Re
 
     const repo = new AgentTemplateRepository();
     const requesterUserId = req.user?.id;
-    const creatorUserId = requesterUserId ? await repo.getCreatorUserIdByTemplateId(id) : null;
+    // Support slugs in addition to internal ids. Slugs can match our broad IdSchema,
+    // so always try slug lookup first, then fall back to id.
+    const bySlug = await repo.findBySlug(id);
+    const resolvedTemplateId = bySlug?.id ?? id;
+
+    const creatorUserId = requesterUserId ? await repo.getCreatorUserIdByTemplateId(resolvedTemplateId) : null;
     const isCreator = !!requesterUserId && !!creatorUserId && requesterUserId === creatorUserId;
 
-    const template = isCreator ? await repo.findInternalById(id) : await templateService.getTemplateById(id);
+    const template = isCreator ? await repo.findInternalById(resolvedTemplateId) : await templateService.getTemplateById(resolvedTemplateId);
 
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
         resource: 'agent-template',
-        id: id,
+        id: resolvedTemplateId,
       });
       return;
     }

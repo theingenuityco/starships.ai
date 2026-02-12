@@ -1,23 +1,30 @@
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplatesPage, fetchPublicConnectorCatalogPage, fetchPublicToolTemplatesPage } from '@/lib/server/public-templates'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
 
 export default async function ExploreConnectorsPage() {
-  const [agentTemplates, toolTemplates, connectorCatalog] = await Promise.all([
-    fetchPublicAgentTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicToolTemplates({ revalidateSeconds: revalidate }),
-    fetchPublicConnectorCatalog({ revalidateSeconds: revalidate }),
+  const PAGE_SIZE = 24
+  const [connectorsPage, agentsCountPage, toolsCountPage] = await Promise.all([
+    fetchPublicConnectorCatalogPage({ page: 1, limit: PAGE_SIZE, revalidateSeconds: revalidate }),
+    fetchPublicAgentTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate }),
+    fetchPublicToolTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate }),
   ])
 
   return (
     <MarketplacePageClient
       activeTab="connectors"
-      initialAgentTemplates={agentTemplates}
-      initialToolTemplates={toolTemplates}
-      initialConnectorCatalog={connectorCatalog}
+      initialAgentTemplates={[]}
+      initialToolTemplates={[]}
+      initialConnectorCatalog={connectorsPage.items}
+      initialTotals={{
+        agents: agentsCountPage.pagination.total,
+        tools: toolsCountPage.pagination.total,
+        connectors: connectorsPage.pagination.total,
+      }}
+      pagination={connectorsPage.pagination}
     />
   )
 }

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 
-import { fetchPublicAgentTemplates, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplateBySlug, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
@@ -103,8 +103,7 @@ function titleCase(input: string): string {
 }
 
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
-  const templates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
-  return templates.find(t => t.slug === slug) ?? null
+  return await fetchPublicAgentTemplateBySlug({ slug, revalidateSeconds: revalidate })
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {

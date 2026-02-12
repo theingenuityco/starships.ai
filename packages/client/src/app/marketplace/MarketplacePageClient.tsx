@@ -15,6 +15,7 @@ import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
@@ -46,6 +47,8 @@ export default function MarketplacePageClient(props: {
   initialToolTemplates?: ToolTemplateModel[]
   initialConnectorCatalog?: ConnectorCatalogItem[]
   activeTab?: MarketplaceTab
+  initialTotals?: { agents: number; tools: number; connectors: number }
+  pagination?: { page: number; limit: number; total: number; has_next: boolean; has_prev: boolean }
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -71,14 +74,19 @@ export default function MarketplacePageClient(props: {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const initialToolTemplates = props.initialToolTemplates ?? []
   const initialConnectorCatalog = props.initialConnectorCatalog ?? []
+  const initialTotals = props.initialTotals
 
   const useServerInitialAgents = initialAgentTemplates.length > 0
   const useServerInitialTools = initialToolTemplates.length > 0
   const useServerInitialConnectors = initialConnectorCatalog.length > 0
 
-  const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents)
-  const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools)
-  const { data: connectorData, isLoading: connectorLoadingRaw } = useConnectorCatalog({ enabled: !useServerInitialConnectors })
+  const shouldNeedAgents = tab === 'all' || tab === 'agents'
+  const shouldNeedTools = tab === 'all' || tab === 'tools'
+  const shouldNeedConnectors = tab === 'all' || tab === 'connectors'
+
+  const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents && shouldNeedAgents)
+  const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools && shouldNeedTools)
+  const { data: connectorData, isLoading: connectorLoadingRaw } = useConnectorCatalog({ enabled: !useServerInitialConnectors && shouldNeedConnectors })
 
   // IMPORTANT (hydration stability):
   // If the page shipped server-provided initial templates/catalog, keep using them on hydration.
@@ -132,9 +140,15 @@ export default function MarketplacePageClient(props: {
 
   const countsByTab = useMemo(() => {
     // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
-    const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : agentsMatchingSearch.length
-    const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : toolsMatchingSearch.length
-    const connectors = shouldUseServerSearch ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length) : connectorsMatchingSearch.length
+    const agents = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
+      : (initialTotals?.agents ?? agentsMatchingSearch.length)
+    const tools = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
+      : (initialTotals?.tools ?? toolsMatchingSearch.length)
+    const connectors = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
+      : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
     return {
       all: agents + tools + connectors,
       agents,
@@ -145,11 +159,63 @@ export default function MarketplacePageClient(props: {
     agentsMatchingSearch.length,
     toolsMatchingSearch.length,
     connectorsMatchingSearch.length,
+    initialTotals?.agents,
+    initialTotals?.tools,
+    initialTotals?.connectors,
     serverSearch.data?.totals?.agents,
     serverSearch.data?.totals?.tools,
     serverSearch.data?.totals?.connectors,
     shouldUseServerSearch,
   ])
+
+  const pagination = props.pagination
+  const hasPagination = !shouldUseServerSearch && tab !== 'all' && !!pagination && (pagination.has_next || pagination.has_prev)
+
+  function routeForPage(t: MarketplaceTab, page: number): string {
+    const base = TAB_TO_ROUTE[t]
+    const p = Math.max(1, Math.floor(page))
+    if (p <= 1) return base
+    return `${base}/page/${p}`
+  }
+
+  const renderPaginationNav = () => {
+    if (!hasPagination || !pagination) return null
+    const prevHref = pagination.has_prev ? routeForPage(tab, pagination.page - 1) : null
+    const nextHref = pagination.has_next ? routeForPage(tab, pagination.page + 1) : null
+    return (
+      <nav aria-label="Explore pagination" className="mt-8 flex items-center justify-center gap-3">
+        {prevHref ? (
+          <Link
+            href={prevHref}
+            className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors"
+          >
+            Previous
+          </Link>
+        ) : (
+          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+            Previous
+          </span>
+        )}
+
+        <span className="text-sm text-muted-foreground tabular-nums">
+          Page {pagination.page}
+        </span>
+
+        {nextHref ? (
+          <Link
+            href={nextHref}
+            className="inline-flex items-center justify-center rounded-md border border-border/70 bg-card px-3 py-2 text-sm hover:bg-accent transition-colors"
+          >
+            Next
+          </Link>
+        ) : (
+          <span className="inline-flex items-center justify-center rounded-md border border-border/40 bg-card/50 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
+            Next
+          </span>
+        )}
+      </nav>
+    )
+  }
 
   const activeCount = countsByTab[tab]
   // Initial list loading (no query). Search loading is handled separately (Members-style).
@@ -464,6 +530,7 @@ export default function MarketplacePageClient(props: {
                           </motion.div>
                         ))}
                       </div>
+                      {renderPaginationNav()}
                     </section>
                   ) : tab === 'tools' ? (
                     <section>
@@ -487,6 +554,7 @@ export default function MarketplacePageClient(props: {
                           </motion.div>
                         ))}
                       </div>
+                      {renderPaginationNav()}
                     </section>
                   ) : (
                     <section>
@@ -499,6 +567,7 @@ export default function MarketplacePageClient(props: {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
+                      {renderPaginationNav()}
                     </section>
                   )
                 ) : (

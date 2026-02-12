@@ -46,15 +46,7 @@ interface AgentTemplateCardProps {
   showDeployCta?: boolean
 }
 
-export function AgentTemplateCard({
-  template,
-  onDeploy,
-  onClick,
-  showDeployCta = true,
-  targetStarshipId,
-  density = 'default',
-  showCategory = true,
-}: AgentTemplateCardProps) {
+export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId, density = 'default', showCategory = true }: AgentTemplateCardProps) {
   const compact = density === 'compact'
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
@@ -209,11 +201,7 @@ export function AgentTemplateCard({
             <div className="relative w-24 shrink-0 overflow-hidden bg-muted/30">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt={`${displayName || 'Agent'} avatar`}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                />
+                <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
               ) : (
                 <div className="absolute inset-0 h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
                   <MarketplaceAvatar
@@ -233,9 +221,42 @@ export function AgentTemplateCard({
             <div className="min-w-0 flex-1 flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
+                  {/* Name (small) + connector logos */}
+                  {displayRole ? (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div>
+                      {requiredConnectors.length > 0 ? (
+                        <div className="flex items-center gap-1 shrink-0">
+                          {requiredConnectors.slice(0, 4).map(({ provider, name }) => {
+                            const showLogo = !hiddenLogos[provider]
+                            const logoSrc = getConnectorLogoSrc(provider)
+                            return (
+                              <div key={provider} className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white border border-border/40" title={name}>
+                                {showLogo ? (
+                                  <Image
+                                    src={logoSrc}
+                                    alt=""
+                                    width={12}
+                                    height={12}
+                                    className="object-contain"
+                                    onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                                  />
+                                ) : null}
+                              </div>
+                            )
+                          })}
+                          {requiredConnectors.length > 4 ? (
+                            <span className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectors.length - 4}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Role (big) */}
+                  <div className={displayRole ? 'mt-0.5 flex items-center gap-2 min-w-0' : 'flex items-center gap-2 min-w-0'}>
                     <div className="min-w-0 flex-1 text-base font-semibold leading-tight truncate">{displayRole || displayName || 'Unnamed agent'}</div>
-                    {requiredConnectors.length > 0 ? (
+                    {!displayRole && requiredConnectors.length > 0 ? (
                       <div className="flex items-center gap-1 shrink-0">
                         {requiredConnectors.slice(0, 4).map(({ provider, name }) => {
                           const showLogo = !hiddenLogos[provider]
@@ -261,7 +282,6 @@ export function AgentTemplateCard({
                       </div>
                     ) : null}
                   </div>
-                  {displayRole ? <div className="mt-0.5 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}
 
                   {showCategory && template.category ? (
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -306,11 +326,7 @@ export function AgentTemplateCard({
             <div className="relative w-full aspect-[4/3] overflow-hidden bg-muted/30">
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt={`${displayName || 'Agent'} avatar`}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                />
+                <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
               ) : (
                 <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
                   <MarketplaceAvatar
@@ -338,16 +354,7 @@ export function AgentTemplateCard({
                       const logoSrc = getConnectorLogoSrc(provider)
                       return (
                         <div key={provider} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
-                          {showLogo ? (
-                            <Image
-                              src={logoSrc}
-                              alt=""
-                              width={16}
-                              height={16}
-                              className="object-contain"
-                              onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
-                            />
-                          ) : null}
+                          {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
                         </div>
                       )
                     })}

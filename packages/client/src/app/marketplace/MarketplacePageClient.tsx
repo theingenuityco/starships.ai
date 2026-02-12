@@ -11,10 +11,10 @@ import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog } from '@/hooks/useConnectors'
 import { useExploreSearch } from '@/hooks/useExploreSearch'
 import PublicHeader from '@/components/navigation/PublicHeader'
-import { getConnectorLogoSrc } from '@/utils/connectorLogos'
+import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 import { motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
@@ -249,67 +249,62 @@ export default function MarketplacePageClient(props: {
     return { title: t, subtitle }
   }, [tab])
 
-  const renderConnectorCard = (c: ConnectorCatalogItem, idx: number) => {
-    const provider = String((c as any)?.provider || '').trim()
-    const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
-    const description = String((c as any)?.description || '').trim()
-    const logoSrc = provider ? getConnectorLogoSrc(provider) : null
-    return (
-      <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
-          <div className="flex">
-            {/* Left logo strip (edge-to-edge) */}
-            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
-              <div className="absolute inset-0 flex items-center justify-center">
-                {logoSrc ? (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || name}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={logoSrc}
-                      alt=""
-                      className="h-6 w-6 object-contain"
-                      onError={e => {
-                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
-                    <Icon name="workflow" className="h-4.5 w-4.5" />
-                  </div>
-                )}
-              </div>
-            </div>
+  const renderConnectorCard = useCallback(
+    (c: ConnectorCatalogItem, idx: number) => {
+      const provider = String((c as any)?.provider || '').trim()
+      const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
+      const description = String((c as any)?.description || '').trim()
 
-            {/* Right content */}
-            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
-              <div className="min-w-0">
-                <div className="text-base font-semibold leading-tight truncate">{name}</div>
+      return (
+        <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+          <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
+            <div className="flex">
+              {/* Left logo strip (edge-to-edge) */}
+              <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {provider ? (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || name}>
+                      <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Flow">
+                      <Icon name="workflow" className="h-4.5 w-4.5" />
+                    </div>
+                  )}
+                </div>
               </div>
-              {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
 
-              <div className="mt-auto pt-3 flex items-center justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={!provider}
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (!provider) return
-                    router.push(`/connectors/${encodeURIComponent(provider)}/install`)
-                  }}
-                  className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
-                >
-                  Connect
-                </Button>
+              {/* Right content */}
+              <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+                <div className="min-w-0">
+                  <div className="text-base font-semibold leading-tight truncate">{name}</div>
+                </div>
+                {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
+
+                <div className="mt-auto pt-3 flex items-center justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!provider}
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (!provider) return
+                      router.push(`/connectors/${encodeURIComponent(provider)}/install`)
+                    }}
+                    className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
+                  >
+                    Connect
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-    )
-  }
+        </motion.div>
+      )
+    },
+    [router]
+  )
 
   return (
     <>

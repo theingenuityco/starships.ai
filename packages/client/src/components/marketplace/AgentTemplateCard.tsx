@@ -13,7 +13,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 
-import { useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -46,7 +46,7 @@ interface AgentTemplateCardProps {
   showDeployCta?: boolean
 }
 
-export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId, density = 'default', showCategory = true }: AgentTemplateCardProps) {
+function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId, density = 'default', showCategory = true }: AgentTemplateCardProps) {
   const compact = density === 'compact'
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
@@ -127,6 +127,22 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const deployLabel = isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Deploying…' : 'Deploy'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
+
+  const requiredConnectorLogoItems = useMemo(() => {
+    return requiredConnectors.map(({ provider, name }) => ({
+      provider,
+      name,
+      logoSrc: getConnectorLogoSrc(provider),
+    }))
+  }, [requiredConnectors])
+
+  const hideLogo = useCallback((provider: string) => {
+    if (!provider) return
+    setHiddenLogos(prev => {
+      if (prev[provider]) return prev
+      return { ...prev, [provider]: true }
+    })
+  }, [])
 
   const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission>; starship?: DeployStarshipOption }) => {
     const targetStarship = input?.starship ?? starship
@@ -246,13 +262,12 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                 <div className="mt-auto pt-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1 min-w-0">
                     {requiredConnectors.length > 0
-                      ? requiredConnectors.slice(0, 4).map(({ provider, name }) => {
+                      ? requiredConnectorLogoItems.slice(0, 4).map(({ provider, name, logoSrc }) => {
                           const showLogo = !hiddenLogos[provider]
-                          const logoSrc = getConnectorLogoSrc(provider)
                           return (
                             <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
                               {showLogo ? (
-                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
+                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} />
                               ) : null}
                             </div>
                           )
@@ -311,12 +326,11 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
                 {displayRole ? <div className="mt-1 text-sm text-muted-foreground truncate">{displayRole}</div> : null}
                 {requiredConnectors.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    {requiredConnectors.map(({ provider, name }) => {
+                    {requiredConnectorLogoItems.map(({ provider, name, logoSrc }) => {
                       const showLogo = !hiddenLogos[provider]
-                      const logoSrc = getConnectorLogoSrc(provider)
                       return (
                         <div key={provider} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
-                          {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} /> : null}
+                          {showLogo ? <Image src={logoSrc} alt="" width={16} height={16} className="object-contain" onError={() => hideLogo(provider)} /> : null}
                         </div>
                       )
                     })}
@@ -385,3 +399,5 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     </>
   )
 }
+
+export const AgentTemplateCard = memo(AgentTemplateCardImpl)

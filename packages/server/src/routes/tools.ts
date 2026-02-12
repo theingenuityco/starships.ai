@@ -211,6 +211,15 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
 
     let templates: ToolTemplateModel[] = [];
 
+    function isStarshipsOnlyConnectorToolTemplate(t: ToolTemplateModel): boolean {
+      const raw = (t as unknown as { requiredConnectorProviders?: unknown })?.requiredConnectorProviders;
+      if (!Array.isArray(raw)) return false;
+      const normalized = raw
+        .map((p) => (typeof p === 'string' ? p.trim().toLowerCase() : ''))
+        .filter((p) => p.length > 0);
+      return normalized.length === 1 && normalized[0] === 'starships';
+    }
+
     if (q) {
       // Search mode: keep deterministic created_at ordering from repository search.
       templates = await toolTemplateRepository.search({
@@ -284,6 +293,14 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
           LEFT JOIN tool_tokens tok ON tok.tool_slug = tt.slug
           ${whereSql}
           ORDER BY
+            -- Keep "starships"-only connector-based tools at the end, regardless of popularity.
+            CASE
+              WHEN tt.required_connector_providers IS NOT NULL
+                AND array_length(tt.required_connector_providers, 1) = 1
+                AND lower(trim(tt.required_connector_providers[1])) = 'starships'
+              THEN 1
+              ELSE 0
+            END ASC,
             COALESCE(tu.conversation_count, 0) DESC,
             COALESCE(tok.token_count, 0) DESC,
             COALESCE(tu.call_count, 0) DESC,
@@ -302,6 +319,14 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
         .filter((x: string) => x.length > 0);
       const fetched = await Promise.all(ids.map((id: string) => toolTemplateRepository.findById(id)));
       templates = fetched.filter((t): t is ToolTemplateModel => !!t);
+    }
+
+    // If we couldn't run DB popularity sort, keep existing order but still push starships-only to the end.
+    if (!q && !connection?.query && Array.isArray(templates) && templates.length > 1) {
+      const nonStarshipsOnly: ToolTemplateModel[] = [];
+      const starshipsOnly: ToolTemplateModel[] = [];
+      for (const t of templates) (isStarshipsOnlyConnectorToolTemplate(t) ? starshipsOnly : nonStarshipsOnly).push(t);
+      templates = nonStarshipsOnly.concat(starshipsOnly);
     }
 
     // Public template routes should not expose executable blueprints

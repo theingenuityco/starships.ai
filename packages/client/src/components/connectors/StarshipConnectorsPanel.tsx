@@ -51,6 +51,12 @@ interface StarshipConnectorsPanelProps {
   catalogPageSize?: number
   /** Optional callback to surface server catalog total (pagination.total). */
   onCatalogTotalChange?: (total: number | null) => void
+  /** Limit the number of rendered connector rows/cards (UI-only). */
+  maxItems?: number
+  /** Sort order for rendered connectors. */
+  sortBy?: 'catalog' | 'recently_used'
+  /** Whether to show "Load more" when catalog is paginated. */
+  showLoadMore?: boolean
   /** Filter which connectors to show. */
   statusFilter?: 'all' | 'connected' | 'unconnected'
   /**
@@ -129,6 +135,9 @@ export function StarshipConnectorsPanel({
   paginateCatalog = false,
   catalogPageSize = 24,
   onCatalogTotalChange,
+  maxItems,
+  sortBy = 'catalog',
+  showLoadMore = true,
   statusFilter = 'all',
   layout = 'grid',
   hideDisconnect = false,
@@ -402,6 +411,26 @@ export function StarshipConnectorsPanel({
     if (statusFilter === 'unconnected') return visibleCatalog.filter(c => !connectedProviderSet.has(String(c.provider)))
     return visibleCatalog
   }, [connectedProviderSet, statusFilter, visibleCatalog])
+
+  const renderedCatalog = useMemo(() => {
+    const base = Array.isArray(filteredCatalog) ? [...filteredCatalog] : []
+    if (sortBy === 'recently_used') {
+      base.sort((a, b) => {
+        const ap = String((a as any)?.provider || '').trim()
+        const bp = String((b as any)?.provider || '').trim()
+        const aState: any = getConnectorState(ap)
+        const bState: any = getConnectorState(bp)
+        const aTsRaw = aState?.updatedAt || aState?.createdAt || null
+        const bTsRaw = bState?.updatedAt || bState?.createdAt || null
+        const aTs = typeof aTsRaw === 'string' ? new Date(aTsRaw).getTime() : 0
+        const bTs = typeof bTsRaw === 'string' ? new Date(bTsRaw).getTime() : 0
+        if (aTs !== bTs) return bTs - aTs
+        return ap.localeCompare(bp)
+      })
+    }
+    const n = typeof maxItems === 'number' && Number.isFinite(maxItems) ? Math.max(0, Math.floor(maxItems)) : null
+    return n != null ? base.slice(0, n) : base
+  }, [filteredCatalog, getConnectorState, maxItems, sortBy])
 
   const lastStatsRef = useRef<{ total: number; connected: number } | null>(null)
   useEffect(() => {
@@ -851,12 +880,12 @@ export function StarshipConnectorsPanel({
         <div>
           {isSearching ? (
             renderCenteredState(`Searching “${q}”…`)
-          ) : filteredCatalog.length === 0 ? (
+          ) : renderedCatalog.length === 0 ? (
             renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
           ) : (
-            <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
+            <div className="space-y-2">{renderedCatalog.map(entry => listRow(entry.provider))}</div>
           )}
-          {paginateCatalog && canLoadMoreCatalog ? (
+          {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
             <div className="flex justify-center pt-4">
               <Button
                 variant="secondary"
@@ -878,8 +907,8 @@ export function StarshipConnectorsPanel({
           ) : filteredCatalog.length === 0 ? (
             renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
           ) : null}
-          <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
-          {paginateCatalog && canLoadMoreCatalog ? (
+          <div className={gridClassName}>{renderedCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+          {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
             <div className="flex justify-center pt-2">
               <Button
                 variant="secondary"

@@ -102,11 +102,14 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     [router]
   )
 
+  const isAllTab = tabFromUrl === 'all'
+  const SECTION_PREVIEW_LIMIT = 5
+  const TAB_PAGE_SIZE = isAllTab ? SECTION_PREVIEW_LIMIT : 18
+
   // Agents (starship-scoped)
-  const AGENTS_PAGE_SIZE = 25
   const agentsQuery = useInfiniteStarshipAgents(starshipId, Boolean(starshipId), {
-    limit: AGENTS_PAGE_SIZE,
-    order: 'ASC',
+    limit: TAB_PAGE_SIZE,
+    order: 'DESC',
     search: debouncedQuery || undefined,
   })
 
@@ -144,10 +147,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [agentAvatarAttachments])
 
   // Tools (starship-scoped)
-  const TOOLS_PAGE_SIZE = 25
   type ToolsPage = { tools: ToolModel[]; pagination: PaginationMeta | null }
   const toolsQuery = useInfiniteQuery({
-    queryKey: ['starship-tools', starshipId, 'paged', { limit: TOOLS_PAGE_SIZE, search: debouncedQuery || null }] as const,
+    queryKey: ['starship-tools', starshipId, 'paged', { limit: TAB_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
     enabled: Boolean(starshipId),
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<ToolsPage> => {
@@ -155,8 +157,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
       const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`, {
         params: {
           page,
-          limit: TOOLS_PAGE_SIZE,
+          limit: TAB_PAGE_SIZE,
           search: debouncedQuery || undefined,
+          order: 'DESC',
         },
       })
       return { tools: response.data.data || [], pagination: response.data.meta?.pagination ?? null }
@@ -282,7 +285,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
             </div>
           )
         })}
-        {agentsQuery.hasNextPage ? (
+        {!isAllTab && agentsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
             <Button variant="secondary" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className="h-8">
               {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
@@ -364,7 +367,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
             </div>
           )
         })}
-        {toolsQuery.hasNextPage ? (
+        {!isAllTab && toolsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
             <Button variant="secondary" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className="h-8">
               {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more tools'}
@@ -581,7 +584,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     catalogQuery={debouncedQuery}
                     layout="list"
                     paginateCatalog
-                    catalogPageSize={25}
+                    catalogPageSize={TAB_PAGE_SIZE}
+                    maxItems={isAllTab ? SECTION_PREVIEW_LIMIT : undefined}
+                    showLoadMore={!isAllTab}
+                    sortBy="recently_used"
                   />
                 </section>
               ) : null}

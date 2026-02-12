@@ -2,5 +2,5 @@
   "title": "Core Concepts",
   "icon": "Boxes",
   "defaultOpen": true,
-  "pages": ["agents", "connectors", "marketplace", "tools", "blueprints"]
+  "pages": ["agents", "connectors", "explore", "tools", "blueprints"]
 }

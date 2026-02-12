@@ -193,10 +193,7 @@ export function AgentDeploymentWizardModal({
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/50">
-              <DialogTitle className="flex items-center gap-2">
-                <Icon name="sparkles" className="w-5 h-5 text-primary" />
-                <span>Deploy agent</span>
-              </DialogTitle>
+              <DialogTitle>Deploy agent</DialogTitle>
 
               <div className="mt-4 space-y-2">
                 <div className="flex items-center justify-between gap-3">

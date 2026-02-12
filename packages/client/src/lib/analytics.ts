@@ -10,7 +10,7 @@ export type AnalyticsEvent =
   | { type: 'public_header_mobile_menu_toggled'; fromPath: string; isOpen: boolean }
   | { type: 'public_footer_link_clicked'; fromPath: string; destination: '/privacy' | '/terms' | '/docs' | 'https://theingenuity.co' }
   | { type: 'marketplace_category_selected'; category: string }
-  | { type: 'marketplace_tab_selected'; tab: 'agents' | 'tools' | 'connectors' }
+  | { type: 'marketplace_tab_selected'; tab: 'all' | 'agents' | 'tools' | 'connectors' }
   | { type: 'marketplace_search_used'; query: string }
   | { type: 'marketplace_agent_template_opened'; templateId: string; templateName: string; category?: string; source?: string }
   | { type: 'marketplace_agent_deploy_clicked'; templateId: string; templateName: string; category?: string; authenticated: boolean }

@@ -297,7 +297,7 @@ export function AgentDeploymentWizardModal({
                                       <StarshipMonogram starship={s} disabled={disabled} />
                                       <span className="min-w-0 flex-1">
                                         <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
-                                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
+                                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
                                       </span>
                                     </span>
                                     {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary shrink-0" /> : null}
@@ -456,7 +456,7 @@ export function AgentDeploymentWizardModal({
                             <StarshipMonogram starship={selectedStarship} />
                             <div className="min-w-0">
                               <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
-                              <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
+                              <div className="mt-0.5 text-xs text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
                             </div>
                           </div>
                         ) : (

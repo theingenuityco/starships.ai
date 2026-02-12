@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentTemplatePreviewCard } from '@/components/marketplace/AgentTemplatePreviewCard'
 import { cn } from '@/lib/utils'
+import { useStarshipConnectors } from '@/hooks/useConnectors'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
 import type { DeployStarshipOptionWithAccess } from '@/hooks/useStarships'
 import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
@@ -189,6 +190,18 @@ export function AgentDeploymentWizardModal({
   const shouldFetchConnectors = isOpen && step >= 3
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, shouldFetchTools && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, shouldFetchConnectors && !!templateId)
+  const selectedStarshipId = String((selectedStarship as any)?.id || '')
+  const { data: selectedStarshipConnectors = [] } = useStarshipConnectors(selectedStarshipId, Boolean(shouldFetchConnectors && selectedStarshipId))
+
+  const connectedRequiredConnectorsCount = useMemo(() => {
+    const requiredProviders = new Set((requiredConnectors ?? []).map(c => String((c as any)?.provider || '').trim()).filter(Boolean))
+    if (requiredProviders.size === 0) return 0
+    return (selectedStarshipConnectors ?? []).filter(c => {
+      const provider = String((c as any)?.provider || '').trim()
+      const status = String((c as any)?.status || '').trim()
+      return requiredProviders.has(provider) && status === 'connected'
+    }).length
+  }, [requiredConnectors, selectedStarshipConnectors])
 
   useEffect(() => {
     if (!isOpen) return
@@ -572,12 +585,29 @@ export function AgentDeploymentWizardModal({
                           {assignedToolSlugs.length > 0 ? (
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                               <span className="font-medium leading-none tabular-nums text-muted-foreground">{assignedToolSlugs.length} automations</span>
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{permissionCounts.allow} Always</span>
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span className="font-medium leading-none tabular-nums text-amber-700 dark:text-amber-300">{permissionCounts.ask} Ask First</span>
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span className="font-medium leading-none tabular-nums text-red-700 dark:text-red-300">{permissionCounts.deny} Never</span>
+                              {(() => {
+                                const parts = [
+                                  { key: 'allow', count: permissionCounts.allow, label: 'Always', className: 'text-emerald-700 dark:text-emerald-300' },
+                                  { key: 'ask', count: permissionCounts.ask, label: 'Ask First', className: 'text-yellow-700 dark:text-yellow-300' },
+                                  { key: 'deny', count: permissionCounts.deny, label: 'Never', className: 'text-red-700 dark:text-red-300' },
+                                ].filter(p => (p.count ?? 0) > 0)
+
+                                if (parts.length === 0) return null
+
+                                return (
+                                  <>
+                                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                                    {parts.map((p, idx) => (
+                                      <React.Fragment key={p.key}>
+                                        {idx > 0 ? <span aria-hidden="true" className="h-3 w-px bg-border/60" /> : null}
+                                        <span className={cn('font-medium leading-none tabular-nums', p.className)}>
+                                          {p.count} {p.label}
+                                        </span>
+                                      </React.Fragment>
+                                    ))}
+                                  </>
+                                )
+                              })()}
                             </div>
                           ) : (
                             <div className="mt-1 text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">No automations</div>
@@ -591,8 +621,10 @@ export function AgentDeploymentWizardModal({
                             <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
                           </div>
-                          <div className="text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">
-                            {requiredConnectors.length > 0 ? `${requiredConnectors.length} required` : 'None required'}
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                            <span className="font-medium leading-none tabular-nums text-muted-foreground">{requiredConnectors.length} required</span>
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
                           </div>
                         </div>
                       </div>

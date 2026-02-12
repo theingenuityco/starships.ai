@@ -43,7 +43,7 @@ const TOTAL_STEPS = 4
 type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
   { id: 1, label: 'Starship', subtitle: 'Select a starship' },
-  { id: 2, label: 'Tools', subtitle: 'Suggested tools & permissions' },
+  { id: 2, label: 'Automations', subtitle: 'Automations & permissions' },
   { id: 3, label: 'Connectors', subtitle: 'Connect required apps' },
   { id: 4, label: 'Review', subtitle: 'Confirm & install' },
 ]
@@ -96,7 +96,7 @@ function StarshipRightSlot({ children }: { children: React.ReactNode }) {
 
 function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select starship'
-  if (step === 2) return 'Suggested tools'
+  if (step === 2) return 'Automations & permissions'
   if (step === 3) return 'Connectors'
   return 'Review & install'
 }
@@ -492,9 +492,9 @@ export function AgentDeploymentWizardModal({
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
                       <div className="flex items-center gap-2">
                         <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">No tools required</p>
+                        <p className="text-sm font-semibold">No automations required</p>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">This agent doesn’t require any tools to be deployed.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">This agent doesn’t require any automations to be installed.</p>
                     </div>
                   )}
 
@@ -559,15 +559,15 @@ export function AgentDeploymentWizardModal({
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
                       <div className="flex items-center gap-2">
                         <Icon name="wrench" className="h-4 w-4 text-primary" />
-                        <div className="text-sm font-semibold">Tools</div>
+                          <div className="text-sm font-semibold">Automations & permissions</div>
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground tabular-nums">
                         {assignedToolSlugs.length > 0 ? (
                           <>
-                            {assignedToolSlugs.length} tools • {permissionCounts.allow} Always • {permissionCounts.ask} Ask First • {permissionCounts.deny} Never
+                            {assignedToolSlugs.length} automations • {permissionCounts.allow} Always • {permissionCounts.ask} Ask First • {permissionCounts.deny} Never
                           </>
                         ) : (
-                          'No tools'
+                          'No automations'
                         )}
                       </div>
                     </div>

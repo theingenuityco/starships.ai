@@ -217,11 +217,12 @@ export default function MarketplacePageClient(props: {
 
             {/* Right content */}
             <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-base font-semibold leading-tight truncate">{name}</div>
-                </div>
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-tight truncate">{name}</div>
+              </div>
+              {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
 
+              <div className="mt-auto pt-3 flex items-center justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -232,13 +233,12 @@ export default function MarketplacePageClient(props: {
                     if (!provider) return
                     router.push(`/connectors/${encodeURIComponent(provider)}/install`)
                   }}
-                  className="h-8 px-3 shrink-0"
+                  className="h-8 px-3 shrink-0 text-primary hover:text-primary"
                 >
                   <Icon name="plug" className="w-3.5 h-3.5 mr-2" />
                   Connect
                 </Button>
               </div>
-              {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
             </div>
           </div>
         </div>

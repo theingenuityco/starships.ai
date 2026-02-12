@@ -115,9 +115,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   // aren't inadvertently excluded by a tiny server-side limit.
   const QUERY_PAGE_SIZE = 18
 
-  const buildIntegrationsTabHref = useCallback(
+  const buildInstalledTabHref = useCallback(
     (tab: IntegrationsTab) => {
-      const base = `/ship/${encodeURIComponent(slug)}/integrations`
+      const base = `/ship/${encodeURIComponent(slug)}/installed`
       const params = new URLSearchParams()
       const q = debouncedQuery.trim()
       if (q) params.set('q', q)
@@ -583,7 +583,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     <Icon name="link" weight="bold" className="h-5 w-5" />
                   </span>
-                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Integrations</h3>
+                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Installed</h3>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
@@ -661,9 +661,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <Input
                       value={searchValue}
                       onChange={e => setSearchValue(e.target.value)}
-                      placeholder="Search integrations"
+                      placeholder="Search installed"
                       className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
-                      aria-label="Search integrations"
+                      aria-label="Search installed"
                     />
                   </div>
                 </div>
@@ -699,7 +699,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <div className="flex justify-center pt-4">
                       {hasMoreAgentsThanPreview ? (
                         <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                          <Link href={buildIntegrationsTabHref('agents')}>Show all agents</Link>
+                          <Link href={buildInstalledTabHref('agents')}>Show all agents</Link>
                         </Button>
                       ) : null}
                     </div>
@@ -725,7 +725,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   {isAllTab && !isSearchActive ? (
                     <div className="flex justify-center pt-4">
                       <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                        <Link href={buildIntegrationsTabHref('automations')}>Show all automations</Link>
+                        <Link href={buildInstalledTabHref('automations')}>Show all automations</Link>
                       </Button>
                     </div>
                   ) : null}
@@ -777,7 +777,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   {isAllTab && !isSearchActive ? (
                     <div className="flex justify-center pt-4">
                       <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                        <Link href={buildIntegrationsTabHref('connectors')}>Show all connectors</Link>
+                        <Link href={buildInstalledTabHref('connectors')}>Show all connectors</Link>
                       </Button>
                     </div>
                   ) : null}

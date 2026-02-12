@@ -10,12 +10,12 @@ interface PageProps {
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Integrations | Starships.ai',
-    description: 'Manage agents, tools, and connectors for your starship.',
+    title: 'Installed | Starships.ai',
+    description: 'Manage agents, automations, and connectors installed in your starship.',
   }
 }
 
-export default async function IntegrationsPage({ params }: PageProps) {
+export default async function InstalledPage({ params }: PageProps) {
   const { slug } = await params
 
   return (

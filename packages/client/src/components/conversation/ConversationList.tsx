@@ -804,67 +804,71 @@ export const ConversationList = memo(function ConversationList({
                             >
                               <span className="truncate min-w-0">{label}</span>
                             </div>
-                            {canManageChannels ? (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className={cn(
-                                      'ml-1 inline-flex items-center justify-center w-6 h-6 rounded-md',
-                                      'text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors',
-                                      // Only show on hover/focus to keep the list clean.
-                                      'opacity-0 group-hover:opacity-100 focus:opacity-100'
-                                    )}
-                                    aria-label="Channel actions"
+                            <div className="ml-1 flex items-center justify-end gap-1">
+                              {notifCount > 0 ? (
+                                <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                  {notifCount > 99 ? '99+' : String(notifCount)}
+                                </span>
+                              ) : null}
+                              {canManageChannels ? (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        // When hidden, don't reserve space so the badge can sit at the far right.
+                                        // On hover (or when the menu is open), show the action button in the rightmost column.
+                                        'hidden group-hover:inline-flex data-[state=open]:inline-flex focus-visible:inline-flex',
+                                        'items-center justify-center w-6 h-6 rounded-md',
+                                        // Offset the list's scroll padding (`pr-1`) so ⋮ aligns with the header "+" column.
+                                        '-mr-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors'
+                                      )}
+                                      aria-label="Channel actions"
+                                      onClick={e => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                      }}
+                                    >
+                                      <Icon name="dots-vertical" className="w-4 h-4" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    side="right"
+                                    sideOffset={8}
                                     onClick={e => {
-                                      e.preventDefault()
+                                      // Prevent row navigation when interacting with the menu.
                                       e.stopPropagation()
                                     }}
                                   >
-                                    <Icon name="dots-vertical" className="w-4 h-4" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  side="right"
-                                  sideOffset={8}
-                                  onClick={e => {
-                                    // Prevent row navigation when interacting with the menu.
-                                    e.stopPropagation()
-                                  }}
-                                >
-                                  <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onSelect={e => {
-                                      // IMPORTANT:
-                                      // Do NOT call preventDefault() here; Radix uses it to keep the menu open.
-                                      e.stopPropagation()
-                                      openEditChannel(ch)
-                                    }}
-                                  >
-                                    <Icon name="edit" className="h-4 w-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    disabled={isDefaultChannel}
-                                    className="cursor-pointer text-destructive focus:text-destructive"
-                                    onSelect={e => {
-                                      e.stopPropagation()
-                                      if (isDefaultChannel) return
-                                      openDeleteChannel(ch)
-                                    }}
-                                  >
-                                    <Icon name="trash" className="h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            ) : null}
-                            {notifCount > 0 ? (
-                              <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
-                                {notifCount > 99 ? '99+' : String(notifCount)}
-                              </span>
-                            ) : null}
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onSelect={e => {
+                                        // IMPORTANT:
+                                        // Do NOT call preventDefault() here; Radix uses it to keep the menu open.
+                                        e.stopPropagation()
+                                        openEditChannel(ch)
+                                      }}
+                                    >
+                                      <Icon name="edit" className="h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={isDefaultChannel}
+                                      className="cursor-pointer text-destructive focus:text-destructive"
+                                      onSelect={e => {
+                                        e.stopPropagation()
+                                        if (isDefaultChannel) return
+                                        openDeleteChannel(ch)
+                                      }}
+                                    >
+                                      <Icon name="trash" className="h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              ) : null}
+                            </div>
                           </div>
 
                           {/* Forum channels render threads in the main panel (no nested sidebar list). */}

@@ -9,7 +9,7 @@ import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
@@ -112,6 +112,7 @@ export function Navigation(props: NavigationProps) {
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
+  const railStarships = useMemo(() => orderStarshipsOwnedFirst(userStarships ?? [], user?.id), [userStarships, user?.id])
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -363,12 +364,12 @@ export function Navigation(props: NavigationProps) {
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className={`group flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
+        className={`group/navigation flex flex-row h-full overflow-hidden border-r border-border/60 bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
         style={{ willChange: isMobile ? 'transform' : 'width', cursor: !isMobile && !isExpanded ? 'e-resize' : 'auto' }}
         onClick={handleSidebarBackgroundClick}
       >
         {/* Discord-style starship rail */}
-        {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
+        {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
         <div
           className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
@@ -392,7 +393,7 @@ export function Navigation(props: NavigationProps) {
                 <div
                   className={[
                     'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover:opacity-0' : 'opacity-100',
+                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover/navigation:opacity-0' : 'opacity-100',
                   ].join(' ')}
                 >
                   <StarshipsLogo
@@ -410,7 +411,7 @@ export function Navigation(props: NavigationProps) {
                 <div
                   className={[
                     'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover:opacity-100' : 'opacity-0',
+                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover/navigation:opacity-100' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 >

@@ -569,8 +569,19 @@ export default function MembersPage() {
     }
     return n
   }, [humans, presence])
+
+  const onlineVisibleHumansCount = useMemo(() => {
+    let n = 0
+    for (const m of filteredHumans) {
+      const userId = typeof (m as any)?.userId === 'string' ? String((m as any).userId).trim() : ''
+      if (!userId) continue
+      if (presence.isUserOnline(userId)) n += 1
+    }
+    return n
+  }, [filteredHumans, presence])
   // Agents are rendered as "Online" throughout this page.
   const onlineAgentsCount = agentsCount
+  const onlineVisibleAgentsCount = filteredAgents.length
 
   const canInviteUsers = Boolean(starship?.id && (isInstanceAdmin === true || (user?.id && starship?.ownerId && String(starship.ownerId) === String(user.id))))
 
@@ -754,7 +765,7 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
-                      <span className="text-xs text-muted-foreground tabular-nums">({filteredHumans.length + filteredInvites.length})</span>
+                      <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">({onlineVisibleHumansCount} online)</span>
                     </div>
                     {slug && canInviteUsers ? (
                       <Button type="button" size="sm" variant="ghost" className="h-8 text-primary hover:text-primary" onClick={openInviteFlow}>
@@ -782,7 +793,7 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
-                      <span className="text-xs text-muted-foreground tabular-nums">({filteredAgents.length})</span>
+                      <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">({onlineVisibleAgentsCount} online)</span>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
                       <Link href="/explore">

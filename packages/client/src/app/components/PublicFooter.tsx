@@ -13,7 +13,7 @@ export function PublicFooter(props: { fromPath?: string }) {
     <footer className="py-16 px-4 relative">
       {/* Gradient horizontal line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-      <div className="max-w-6xl mx-auto relative">
+      <div className="w-full relative">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="mb-6 md:mb-0 text-center md:text-left">
             <p className="text-muted-foreground mb-2">© 2026 Starships.ai - Where Ideas meet Intelligence</p>

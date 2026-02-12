@@ -16,9 +16,10 @@ import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
+import { PublicFooter } from '@/app/components/PublicFooter'
 
 const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
 type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
@@ -52,6 +53,7 @@ export default function MarketplacePageClient(props: {
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
 
   const tab: MarketplaceTab = isMarketplaceTab(
     String(props.activeTab || '')
@@ -658,6 +660,8 @@ export default function MarketplacePageClient(props: {
             </div>
           </div>
         </main>
+
+        <PublicFooter fromPath={pathname ?? '/explore'} />
       </div>
     </>
   )

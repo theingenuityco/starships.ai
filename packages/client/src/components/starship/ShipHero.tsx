@@ -76,7 +76,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline" className="whitespace-nowrap">
-            <Link href="/marketplace">
+            <Link href="/explore">
               <Icon name="store" className="h-5 w-5" />
               <span className="ml-1">Explore</span>
             </Link>

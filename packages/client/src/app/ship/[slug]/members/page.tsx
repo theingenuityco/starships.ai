@@ -731,7 +731,7 @@ export default function MembersPage() {
                       <Skeleton className="h-4 w-8" />
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/marketplace">
+                      <Link href="/explore">
                         <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
                         Explore agents
                       </Link>
@@ -795,7 +795,7 @@ export default function MembersPage() {
                       </Badge>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/marketplace">
+                      <Link href="/explore">
                         <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
                         Explore agents
                       </Link>

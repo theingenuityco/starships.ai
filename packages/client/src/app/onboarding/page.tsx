@@ -132,7 +132,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return
     if (isWizardComplete) {
-      router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/marketplace')
+      router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/explore')
       return
     }
     if (!hasStarship && !starshipsLoading) {
@@ -246,7 +246,7 @@ export default function OnboardingPage() {
     if (primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}`)
     } else {
-      router.push('/marketplace')
+      router.push('/explore')
     }
   }, [completeWizard, queryClient, primaryStarship?.slug, router])
 

@@ -41,7 +41,7 @@ export default function StarshipOverviewPage({ params }: { params: Promise<{ slu
     }
 
     if (!defaultChannelSlug) {
-      router.replace('/marketplace')
+      router.replace('/explore')
       return
     }
     router.replace(`/ship/${slug}/channels/${encodeURIComponent(defaultChannelSlug)}`)

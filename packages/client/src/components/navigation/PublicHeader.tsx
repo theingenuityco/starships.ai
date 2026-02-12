@@ -63,10 +63,10 @@ export function PublicHeader(): React.JSX.Element {
             Home
           </Link>
           <Link
-            href="/marketplace"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/marketplace', variant: 'desktop' })}
-            className={`${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
-            aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
+            href="/explore"
+            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
+            className={`${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            aria-current={pathname.startsWith('/explore') ? 'page' : undefined}
           >
             Explore
           </Link>
@@ -110,12 +110,12 @@ export function PublicHeader(): React.JSX.Element {
                 Home
               </Link>
               <Link
-                href="/marketplace"
+                href="/explore"
                 onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/marketplace', variant: 'mobile' })
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
                 Explore
               </Link>

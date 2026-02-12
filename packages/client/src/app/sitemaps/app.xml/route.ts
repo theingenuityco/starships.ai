@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     .map(t => String(t?.slug || '').trim())
     .filter(Boolean)
     .map(slug => ({
-      path: `/marketplace/agents/${encodeURIComponent(slug)}`,
+      path: `/explore/agents/${encodeURIComponent(slug)}`,
       changefreq: 'weekly',
       priority: 0.7,
       lastmod: now,
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
 
   const urls: UrlEntry[] = [
     { path: '/', changefreq: 'weekly', priority: 1.0, lastmod: now },
-    { path: '/marketplace', changefreq: 'daily', priority: 0.8, lastmod: now },
+    { path: '/explore', changefreq: 'daily', priority: 0.8, lastmod: now },
     { path: '/docs', changefreq: 'weekly', priority: 0.6, lastmod: now },
     { path: '/privacy', changefreq: 'yearly', priority: 0.3, lastmod: now },
     { path: '/terms', changefreq: 'yearly', priority: 0.3, lastmod: now },

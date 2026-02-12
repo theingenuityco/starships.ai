@@ -52,7 +52,7 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
 
-  const goToMarketplace = () => router.push('/marketplace')
+  const goToMarketplace = () => router.push('/explore')
 
   useEffect(() => {
     if (!carouselApi) return

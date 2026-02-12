@@ -514,7 +514,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     }
     // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
     hasAutoNavigatedRef.current = true
-    router.replace('/marketplace')
+    router.replace('/explore')
   }, [agentFromUrl, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.

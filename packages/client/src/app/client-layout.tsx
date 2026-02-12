@@ -55,7 +55,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
-  const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
+  const isMarketplace = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
   const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
@@ -74,8 +74,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     const titleForPath = (path: string): string | null => {
       // Public pages
       if (path === '/') return 'Starships.ai | Hire your AI staff, brief them in plain language'
-      if (path === '/marketplace') return 'Explore | Starships.ai'
-      if (path.startsWith('/marketplace/')) return 'Explore | Starships.ai'
+      if (path === '/explore' || path === '/marketplace') return 'Explore | Starships.ai'
+      if (path.startsWith('/explore/') || path.startsWith('/marketplace/')) return 'Explore | Starships.ai'
       if (path === '/login') return 'Login | Starships.ai'
       if (path === '/forgot-password') return 'Forgot Password | Starships.ai'
       if (path === '/reset-password') return 'Reset Password | Starships.ai'

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
-import { useConnectorCatalog } from '@/hooks/useConnectors'
+import { useConnectorCatalog, useStarshipConnectors } from '@/hooks/useConnectors'
 import { useExploreSearch } from '@/hooks/useExploreSearch'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
@@ -21,6 +21,8 @@ import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from
 import { track } from '@/lib/analytics'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import ExploreCTA from '@/app/components/ExploreCTA'
+import { useAuth } from '@/hooks/useAuth'
+import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 
 const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
 type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
@@ -55,6 +57,20 @@ export default function MarketplacePageClient(props: {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  // Authenticated users: show connector connection state on listing cards.
+  const { userId, isAuthenticated } = useAuth()
+  const { primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
+  const starshipId = String((primaryStarship as any)?.id || '')
+  const { data: starshipConnectors = [] } = useStarshipConnectors(starshipId, Boolean(isAuthenticated && starshipId))
+  const connectedProviderSet = useMemo(() => {
+    return new Set(
+      (starshipConnectors ?? [])
+        .filter(c => String((c as any)?.status || '').trim() === 'connected')
+        .map(c => String((c as any)?.provider || '').trim())
+        .filter(Boolean)
+    )
+  }, [starshipConnectors])
 
   const tab: MarketplaceTab = isMarketplaceTab(
     String(props.activeTab || '')
@@ -353,6 +369,7 @@ export default function MarketplacePageClient(props: {
       const provider = String((c as any)?.provider || '').trim()
       const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
       const description = String((c as any)?.description || '').trim()
+      const isConnected = !!provider && connectedProviderSet.has(provider)
 
       return (
         <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
@@ -381,20 +398,27 @@ export default function MarketplacePageClient(props: {
                 {description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{description}</div> : null}
 
                 <div className="mt-auto pt-3 flex items-center justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={!provider}
-                    onClick={e => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      if (!provider) return
-                      router.push(`/connectors/${encodeURIComponent(provider)}/install`)
-                    }}
-                    className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
-                  >
-                    Connect
-                  </Button>
+                  {isConnected ? (
+                    <Button variant="ghost" size="sm" disabled className="h-7 px-2 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
+                      <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
+                      Connected
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!provider}
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (!provider) return
+                        router.push(`/connectors/${encodeURIComponent(provider)}/install`)
+                      }}
+                      className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
+                    >
+                      Connect
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -402,7 +426,7 @@ export default function MarketplacePageClient(props: {
         </motion.div>
       )
     },
-    [router]
+    [connectedProviderSet, router]
   )
 
   return (
@@ -663,11 +687,7 @@ export default function MarketplacePageClient(props: {
         </main>
 
         <ExploreCTA kind={tab === 'all' ? 'anything' : tab === 'agents' ? 'agent' : tab === 'connectors' ? 'connector' : 'automation'} />
-        <div
-          suppressHydrationWarning
-          className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent"
-          aria-hidden
-        />
+        <div suppressHydrationWarning className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent" aria-hidden />
         <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={false} />
       </div>
     </>

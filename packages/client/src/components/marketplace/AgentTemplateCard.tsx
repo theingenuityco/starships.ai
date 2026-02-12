@@ -293,9 +293,7 @@ function AgentTemplateCardImpl({
                           const showLogo = !hiddenLogos[provider]
                           return (
                             <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={name}>
-                              {showLogo ? (
-                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} />
-                              ) : null}
+                              {showLogo ? <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} /> : null}
                             </div>
                           )
                         })

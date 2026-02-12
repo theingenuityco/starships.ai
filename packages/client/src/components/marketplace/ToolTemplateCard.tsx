@@ -151,67 +151,60 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
     <>
       <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
         {compact ? (
-          <div className="flex">
-            {/* Left fixed strip (edge-to-edge): tools/capabilities icon */}
-            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40" title={leftIcon.title}>
-                  <Icon name={leftIcon.name} className="h-6 w-6 text-muted-foreground" />
-                </div>
-              </div>
-            </div>
-
-            {/* Right content */}
-            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
-              <div className="min-w-0">
+          <div className="min-w-0 flex-1 flex flex-col p-4">
+            <div className="min-w-0">
+              {/* Name (icon prepended inline) */}
+              <div className="flex items-center gap-2 min-w-0 text-foreground">
+                <span className="shrink-0" title={leftIcon.title} aria-hidden>
+                  <Icon name={leftIcon.name} className="h-4 w-4" />
+                </span>
                 <div className="text-base font-semibold leading-tight truncate">{displayName}</div>
-                {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
               </div>
 
-              {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
-
-              {/* Footer row (bottom-left logos + bottom-right CTA) */}
-              {requiredConnectorProviders.length > 0 || showInstallCta ? (
-                <div className="mt-auto pt-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-1 min-w-0">
-                    {requiredConnectorProviders.length > 0 ? (
-                      <>
-                        {connectorLogoItems.slice(0, 4).map(({ provider, logoSrc }) => {
-                          const showLogo = !hiddenLogos[provider]
-                          return (
-                            <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
-                              {showLogo ? (
-                                <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} />
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                        {requiredConnectorProviders.length > 4 ? <div className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div> : null}
-                      </>
-                    ) : null}
-                  </div>
-
-                  {showInstallCta ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        if (installDisabled) return
-                        requestInstall()
-                      }}
-                      disabled={installDisabled}
-                      className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
-                    >
-                      {installLabel}
-                    </Button>
-                  ) : (
-                    <div />
-                  )}
-                </div>
-              ) : null}
+              {showCategory && category ? <div className="mt-1 text-xs text-muted-foreground truncate">{category}</div> : null}
             </div>
+
+            {displayDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+
+            {/* Footer row (bottom-left logos + bottom-right CTA) */}
+            {requiredConnectorProviders.length > 0 || showInstallCta ? (
+              <div className="mt-auto pt-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1 min-w-0">
+                  {requiredConnectorProviders.length > 0 ? (
+                    <>
+                      {connectorLogoItems.slice(0, 4).map(({ provider, logoSrc }) => {
+                        const showLogo = !hiddenLogos[provider]
+                        return (
+                          <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
+                            {showLogo ? <Image src={logoSrc} alt="" width={14} height={14} className="object-contain" onError={() => hideLogo(provider)} /> : null}
+                          </div>
+                        )
+                      })}
+                      {requiredConnectorProviders.length > 4 ? <div className="ml-0.5 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 4}</div> : null}
+                    </>
+                  ) : null}
+                </div>
+
+                {showInstallCta ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (installDisabled) return
+                      requestInstall()
+                    }}
+                    disabled={installDisabled}
+                    className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
+                  >
+                    {installLabel}
+                  </Button>
+                ) : (
+                  <div />
+                )}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="p-5 flex-1 flex flex-col">

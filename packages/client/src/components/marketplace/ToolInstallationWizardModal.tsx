@@ -1,12 +1,12 @@
 'use client'
 
-import Image from 'next/image'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import type { DeployStarshipOption, ToolTemplateModel } from '@starships/protocol'
 
 import Icon from '@/components/primitives/Icon'
 import { ConnectorSuggestionCard } from '@/components/widgets/ConnectorSuggestionCard'
+import { ToolTemplatePreviewCard } from '@/components/marketplace/ToolTemplatePreviewCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,8 +14,6 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useStarshipConnectors } from '@/hooks/useConnectors'
-import { getConnectorLogoSrc } from '@/utils/connectorLogos'
-import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
 
 type WizardStep = 1 | 2 | 3
 
@@ -146,8 +144,6 @@ export function ToolInstallationWizardModal({
 }: ToolInstallationWizardModalProps) {
   const templateSlug = String((template as any)?.slug || '').trim()
   const toolName = String(template?.name || 'tool').trim() || 'tool'
-  const toolDescription = String((template as any)?.description || '').trim()
-  const category = typeof template?.category === 'string' ? template.category.trim() : ''
   const requiresApiKey = Boolean((template as any)?.requiresApiKey)
 
   const requiredConnectorProviders = useMemo(() => {
@@ -157,15 +153,6 @@ export function ToolInstallationWizardModal({
     return Array.from(new Set(normalized))
   }, [template])
 
-  const connectorLogoItems = useMemo(() => {
-    return requiredConnectorProviders.map(provider => ({
-      provider,
-      logoSrc: getConnectorLogoSrc(provider),
-    }))
-  }, [requiredConnectorProviders])
-
-  const leftIcon = useMemo(() => pickToolLeftIcon(toolName), [toolName])
-
   const singleStarshipFromProps: DeployStarshipOption | null =
     starshipId && (starshipName || starshipSlug) ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName ?? '' } : null
   const listForSelection = ownedStarships?.length ? ownedStarships : singleStarshipFromProps ? [singleStarshipFromProps] : []
@@ -174,7 +161,6 @@ export function ToolInstallationWizardModal({
   const [selectedStarship, setSelectedStarship] = useState<DeployStarshipOption | null>(null)
   const [starshipPickerOpen, setStarshipPickerOpen] = useState(false)
   const [starshipPickerSearch, setStarshipPickerSearch] = useState('')
-  const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
 
   const selectedStarshipId = String((selectedStarship as any)?.id || '')
   const shouldFetchConnectors = isOpen && step >= 2 && !!selectedStarshipId
@@ -254,61 +240,7 @@ export function ToolInstallationWizardModal({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <div className="text-sm font-semibold">Tool details</div>
-            <div className="mt-3 mb-6 rounded-xl border border-border/60 bg-card/50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-background/40 text-foreground shrink-0" aria-hidden>
-                  <Icon name={leftIcon.name} className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold leading-tight truncate">{toolName}</div>
-                  <div className="mt-1 flex items-center gap-2 flex-wrap">
-                    {category ? (
-                      <Badge variant="outline" className="capitalize border-border/60 bg-background/40 text-[11px] px-2 py-0.5">
-                        {category}
-                      </Badge>
-                    ) : null}
-                    {templateSlug ? (
-                      <Badge variant="outline" className="font-mono text-[11px] border-border/60 bg-background/40 px-2 py-0.5">
-                        {templateSlug}
-                      </Badge>
-                    ) : null}
-                    {requiresApiKey ? (
-                      <Badge variant="outline" className="border-yellow-500/30 bg-yellow-500/10 text-yellow-800 dark:text-yellow-200 text-[11px] px-2 py-0.5">
-                        API key required
-                      </Badge>
-                    ) : null}
-                  </div>
-                  {toolDescription ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-3">{toolDescription}</div> : null}
-
-                  {requiredConnectorProviders.length > 0 ? (
-                    <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                      {connectorLogoItems.slice(0, 10).map(({ provider, logoSrc }) => {
-                        const showLogo = !hiddenLogos[provider]
-                        return (
-                          <div
-                            key={provider}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white border border-border/40"
-                            title={provider}
-                          >
-                            {showLogo ? (
-                              <Image
-                                src={logoSrc}
-                                alt=""
-                                width={16}
-                                height={16}
-                                className="h-4 w-4 object-contain"
-                                onError={() => setHiddenLogos(prev => (prev[provider] ? prev : { ...prev, [provider]: true }))}
-                              />
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                      {requiredConnectorProviders.length > 10 ? <div className="ml-1 text-[11px] text-muted-foreground tabular-nums">+{requiredConnectorProviders.length - 10}</div> : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
+            <ToolTemplatePreviewCard template={template} className="mt-3 mb-6" />
 
             {step === 1 ? (
               <div className="mt-8 space-y-4">

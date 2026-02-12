@@ -203,8 +203,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <NotificationSoundBootstrap />
           <EmailChangeToastHandler />
-          <div className="relative min-h-[100dvh] bg-background">
-            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+          <div className="relative h-[100dvh] overflow-hidden bg-background">
+            <main className="relative h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
       )

@@ -283,248 +283,265 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
 
   return (
     <>
-      <div className="marketplace-public-chrome">
+      <div className="relative z-10">
         <PublicHeader />
-      </div>
 
-      <main className="marketplace-agent-main pt-20 sm:pt-28">
-        {/* Decorative hero background */}
-        <div className="relative">
-          <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
-            <div className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_60%)] blur-2xl" />
-            <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
-          </div>
-
-          <div className="max-w-4xl mx-auto px-4 sm:px-6">
-            {/* Breadcrumb */}
-            <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
-              <a href="/explore" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
-                <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
-                <span>Explore</span>
-              </a>
-              <span className="opacity-60">/</span>
-              <span className="text-foreground/80 truncate max-w-[40ch]">{template.name}</span>
+        <main className="marketplace-agent-main pt-20 sm:pt-28">
+          {/* Decorative hero background */}
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
+              <div className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_60%)] blur-2xl" />
+              <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
             </div>
 
-            {/* Hero header */}
-            <section className="mt-4 sm:mt-6 mb-10 sm:mb-12">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                <div className="flex items-start gap-4 min-w-0 flex-1">
-                  <MarketplaceAvatar
-                    imageUrl={template.avatarUrl || null}
-                    label={`${template.name || 'Agent'} avatar`}
-                    seed={template.name || template.slug || 'AI'}
-                    sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
-                    fallbackTextClassName="text-lg sm:text-xl font-semibold text-muted-foreground"
-                  />
+            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+              {/* Breadcrumb */}
+              <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
+                <a href="/explore" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
+                  <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
+                  <span>Explore</span>
+                </a>
+                <span className="opacity-60">/</span>
+                <span className="text-foreground/80 truncate max-w-[40ch]">{template.name}</span>
+              </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
-                    {template.role ? <div className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+              {/* Hero header */}
+              <section className="mt-4 sm:mt-6 mb-10 sm:mb-12">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                  <div className="flex items-start gap-4 min-w-0 flex-1">
+                    <MarketplaceAvatar
+                      imageUrl={template.avatarUrl || null}
+                      label={`${template.name || 'Agent'} avatar`}
+                      seed={template.name || template.slug || 'AI'}
+                      sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
+                      fallbackTextClassName="text-lg sm:text-xl font-semibold text-muted-foreground"
+                    />
 
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {template.category ? (
-                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
-                      ) : null}
-                      {template.version ? (
-                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
-                      ) : null}
-                      {typeof template.usageCount === 'number' ? (
-                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
-                          {template.usageCount.toLocaleString()} deployments
-                        </span>
-                      ) : null}
-                      {template.model ? (
-                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
-                      ) : null}
+                    <div className="min-w-0 flex-1">
+                      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
+                      {template.role ? <div className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {template.category ? (
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
+                        ) : null}
+                        {template.version ? (
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
+                        ) : null}
+                        {typeof template.usageCount === 'number' ? (
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            {template.usageCount.toLocaleString()} deployments
+                          </span>
+                        ) : null}
+                        {template.model ? (
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
+                        ) : null}
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Action buttons at extreme right */}
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <MarketplaceAgentDeployCta template={template} />
+                    <MarketplaceShareLinkCard shareUrl={shareUrl} compact />
                   </div>
                 </div>
 
-                {/* Action buttons at extreme right */}
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <MarketplaceAgentDeployCta template={template} />
-                  <MarketplaceShareLinkCard shareUrl={shareUrl} compact />
-                </div>
-              </div>
+                {/* Description as separate section below */}
+                {template.description ? <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
+              </section>
 
-              {/* Description as separate section below */}
-              {template.description ? <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
-            </section>
+              {/* Main content grid */}
+              <section className="mt-8 pb-10 sm:pb-16">
+                <div className="space-y-16 sm:space-y-20">
+                  {hasCapabilitiesSection ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                      {/* Capabilities */}
+                      <section className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-2'}`}>
+                        {(
+                          [
+                            { key: 'allow' as const, permissionLabel: 'Always allow' },
+                            { key: 'ask' as const, permissionLabel: 'Ask first' },
+                            { key: 'deny' as const, permissionLabel: 'Never' },
+                          ] as const
+                        )
+                          .map(meta => ({ ...meta, items: capabilityGroups[meta.key] }))
+                          .filter(g => Array.isArray(g.items) && g.items.length > 0)
+                          .map(group => (
+                            <section key={group.key} className="space-y-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`h-2 w-2 rounded-full ${permissionDotClassName(group.key)}`} aria-hidden />
+                                <h2 className={SECTION_TITLE_CLASS}>
+                                  {group.key === 'allow'
+                                    ? `${agentSubjectLabel(template.name)} can use`
+                                    : group.key === 'ask'
+                                      ? `${agentSubjectLabel(template.name)} will ask before using`
+                                      : `${agentSubjectLabel(template.name)} can’t use`}
+                                </h2>
+                                {group.key === 'deny' ? <span className={SECTION_SUBTITLE_CLASS}>(can be changed after deploy)</span> : null}
+                              </div>
 
-            {/* Main content grid */}
-            <section className="mt-8 pb-10 sm:pb-16">
-              <div className="space-y-16 sm:space-y-20">
-                {hasCapabilitiesSection ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    {/* Capabilities */}
-                    <section className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-2'}`}>
-                      {(
-                        [
-                          { key: 'allow' as const, permissionLabel: 'Always allow' },
-                          { key: 'ask' as const, permissionLabel: 'Ask first' },
-                          { key: 'deny' as const, permissionLabel: 'Never' },
-                        ] as const
-                      )
-                        .map(meta => ({ ...meta, items: capabilityGroups[meta.key] }))
-                        .filter(g => Array.isArray(g.items) && g.items.length > 0)
-                        .map(group => (
-                          <section key={group.key} className="space-y-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {group.items.map(item => (
+                                  <div key={item.slug} className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                                    <div className="flex items-start gap-3">
+                                      {Array.isArray(item.connectors) && item.connectors.length > 0 ? (
+                                        <div className="relative mt-0.5 flex-shrink-0">
+                                          <div
+                                            className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
+                                            title={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
+                                            aria-label={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
+                                          >
+                                            <ConnectorLogo provider={item.connectors[0]} className="h-5 w-5" />
+                                          </div>
+                                          {item.connectors.length > 1 ? (
+                                            <span className="absolute -bottom-1 -right-1 rounded-full border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm">
+                                              +{item.connectors.length - 1}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-semibold leading-5 text-foreground">{item.title}</div>
+                                        {item.desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-1">{item.desc}</div> : null}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </section>
+                          ))}
+                      </section>
+
+                      {/* Connectors / setup (styled to match Capabilities cards) */}
+                      <div className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
+                        {!marketplaceMarketingRenderingDisabled ? (
+                          <section className="space-y-4">
                             <div className="flex items-center gap-2">
-                              <span className={`h-2 w-2 rounded-full ${permissionDotClassName(group.key)}`} aria-hidden />
-                              <h2 className={SECTION_TITLE_CLASS}>
-                                {group.key === 'allow'
-                                  ? `${agentSubjectLabel(template.name)} can use`
-                                  : group.key === 'ask'
-                                    ? `${agentSubjectLabel(template.name)} will ask before using`
-                                    : `${agentSubjectLabel(template.name)} can’t use`}
-                              </h2>
-                              {group.key === 'deny' ? <span className={SECTION_SUBTITLE_CLASS}>(can be changed after deploy)</span> : null}
+                              <h2 className={SECTION_TITLE_CLASS}>Connectors required</h2>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3">
+                              {requiredConnectorProviders.length > 0 ? (
+                                requiredConnectorProviders.map(p => (
+                                  <div key={p} className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                                    <div className="flex items-start gap-3">
+                                      <div className="mt-0.5 flex-shrink-0">
+                                        <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
+                                          <ConnectorLogo provider={p} className="h-5 w-5" />
+                                        </div>
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-sm font-semibold leading-5 text-foreground">
+                                          {connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                        </div>
+                                        <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                                          {connectorInfoByProvider.get(String(p).toLowerCase())?.description?.trim() || `Connect ${titleCase(p)} to enable this agent’s tools.`}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                                  <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 flex-shrink-0">
+                                      <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
+                                        <Icon name="check-circle" className="h-5 w-5 text-emerald-600" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-semibold leading-5 text-foreground">None</div>
+                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">No connectors required for this agent.</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </section>
+                        ) : null}
+
+                        {toolsRequiringSetup.length > 0 ? (
+                          <section className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <h2 className={SECTION_TITLE_CLASS}>Setup required</h2>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {group.items.map(item => (
-                                <div key={item.slug} className={`group relative ${NAV_CARD_CLASS} p-4`}>
+                              {toolsRequiringSetup.map(t => (
+                                <div key={t.slug} className={`group relative ${NAV_CARD_CLASS} p-4`}>
                                   <div className="flex items-start gap-3">
-                                    {Array.isArray(item.connectors) && item.connectors.length > 0 ? (
-                                      <div className="relative mt-0.5 flex-shrink-0">
-                                        <div
-                                          className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
-                                          title={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
-                                          aria-label={connectorInfoByProvider.get(String(item.connectors[0]).toLowerCase())?.name?.trim() || titleCase(item.connectors[0])}
-                                        >
-                                          <ConnectorLogo provider={item.connectors[0]} className="h-5 w-5" />
-                                        </div>
-                                        {item.connectors.length > 1 ? (
-                                          <span className="absolute -bottom-1 -right-1 rounded-full border border-border/60 bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground shadow-sm">
-                                            +{item.connectors.length - 1}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    ) : null}
-
+                                    <div className="mt-0.5 flex-shrink-0">
+                                      <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                    </div>
                                     <div className="min-w-0 flex-1">
-                                      <div className="text-sm font-semibold leading-5 text-foreground">{item.title}</div>
-                                      {item.desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-1">{item.desc}</div> : null}
+                                      <div className="text-sm font-semibold leading-5 text-foreground">{t.name}</div>
+                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                                        {t.requiresApiKey && t.requiresConfig
+                                          ? 'Requires an API key and additional configuration.'
+                                          : t.requiresApiKey
+                                            ? 'Requires an API key.'
+                                            : 'Requires configuration.'}
+                                      </div>
+
+                                      {Array.isArray(t.connectors) && t.connectors.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                          {t.connectors.slice(0, 6).map(p => (
+                                            <div
+                                              key={p}
+                                              className="h-6 w-6 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
+                                              title={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                              aria-label={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
+                                            >
+                                              <ConnectorLogo provider={p} className="h-4 w-4" />
+                                            </div>
+                                          ))}
+                                          {t.connectors.length > 6 ? <span className="text-[11px] text-muted-foreground">+{t.connectors.length - 6}</span> : null}
+                                        </div>
+                                      ) : null}
                                     </div>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           </section>
-                        ))}
-                    </section>
-
-                    {/* Connectors / setup (styled to match Capabilities cards) */}
-                    <div className={`space-y-10 ${marketplaceMarketingRenderingDisabled ? 'lg:col-span-3' : 'lg:col-span-1'}`}>
-                      {!marketplaceMarketingRenderingDisabled ? (
-                        <section className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <h2 className={SECTION_TITLE_CLASS}>Connectors required</h2>
-                          </div>
-                          <div className="grid grid-cols-1 gap-3">
-                            {requiredConnectorProviders.length > 0 ? (
-                              requiredConnectorProviders.map(p => (
-                                <div key={p} className={`group relative ${NAV_CARD_CLASS} p-4`}>
-                                  <div className="flex items-start gap-3">
-                                    <div className="mt-0.5 flex-shrink-0">
-                                      <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
-                                        <ConnectorLogo provider={p} className="h-5 w-5" />
-                                      </div>
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="text-sm font-semibold leading-5 text-foreground">
-                                        {connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
-                                      </div>
-                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                                        {connectorInfoByProvider.get(String(p).toLowerCase())?.description?.trim() || `Connect ${titleCase(p)} to enable this agent’s tools.`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <div className={`group relative ${NAV_CARD_CLASS} p-4`}>
-                                <div className="flex items-start gap-3">
-                                  <div className="mt-0.5 flex-shrink-0">
-                                    <div className="h-8 w-8 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden">
-                                      <Icon name="check-circle" className="h-5 w-5 text-emerald-600" />
-                                    </div>
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold leading-5 text-foreground">None</div>
-                                    <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">No connectors required for this agent.</div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {toolsRequiringSetup.length > 0 ? (
-                        <section className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <h2 className={SECTION_TITLE_CLASS}>Setup required</h2>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {toolsRequiringSetup.map(t => (
-                              <div key={t.slug} className={`group relative ${NAV_CARD_CLASS} p-4`}>
-                                <div className="flex items-start gap-3">
-                                  <div className="mt-0.5 flex-shrink-0">
-                                    <div className="h-2 w-2 rounded-full bg-amber-500" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold leading-5 text-foreground">{t.name}</div>
-                                    <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
-                                      {t.requiresApiKey && t.requiresConfig
-                                        ? 'Requires an API key and additional configuration.'
-                                        : t.requiresApiKey
-                                          ? 'Requires an API key.'
-                                          : 'Requires configuration.'}
-                                    </div>
-
-                                    {Array.isArray(t.connectors) && t.connectors.length > 0 ? (
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                        {t.connectors.slice(0, 6).map(p => (
-                                          <div
-                                            key={p}
-                                            className="h-6 w-6 rounded-md border border-border/60 bg-white flex items-center justify-center overflow-hidden"
-                                            title={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
-                                            aria-label={connectorInfoByProvider.get(String(p).toLowerCase())?.name?.trim() || titleCase(p)}
-                                          >
-                                            <ConnectorLogo provider={p} className="h-4 w-4" />
-                                          </div>
-                                        ))}
-                                        {t.connectors.length > 6 ? <span className="text-[11px] text-muted-foreground">+{t.connectors.length - 6}</span> : null}
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
 
-                {!marketplaceMarketingRenderingDisabled ? (
-                  <>
-                    {/* Screenshots (marketplace-style) */}
-                    {hasScreenshotsSection ? (
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <h2 className={SECTION_TITLE_CLASS}>Screenshots</h2>
-                        </div>
+                  {!marketplaceMarketingRenderingDisabled ? (
+                    <>
+                      {/* Screenshots (marketplace-style) */}
+                      {hasScreenshotsSection ? (
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <h2 className={SECTION_TITLE_CLASS}>Screenshots</h2>
+                          </div>
 
-                        {/* Mobile: horizontal screenshot strip */}
-                        <div className="sm:hidden -mx-4 px-4 overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
-                          <div className="flex gap-4 snap-x snap-mandatory">
+                          {/* Mobile: horizontal screenshot strip */}
+                          <div className="sm:hidden -mx-4 px-4 overflow-x-auto overflow-y-hidden pb-1 custom-scrollbar">
+                            <div className="flex gap-4 snap-x snap-mandatory">
+                              {screenshots.map(s3 => (
+                                <div key={s3.key} className={`snap-start shrink-0 w-[86%] ${NAV_CARD_CLASS} overflow-hidden`}>
+                                  <div className="aspect-[16/10] bg-background/20">
+                                    <AgentProfileImage
+                                      src={s3.src}
+                                      alt={s3.alt}
+                                      className="w-full h-full"
+                                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                                    />
+                                  </div>
+                                  <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s3.label}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Desktop: 3-up grid */}
+                          <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {screenshots.map(s3 => (
-                              <div key={s3.key} className={`snap-start shrink-0 w-[86%] ${NAV_CARD_CLASS} overflow-hidden`}>
+                              <div key={s3.key} className={`${NAV_CARD_CLASS} overflow-hidden`}>
                                 <div className="aspect-[16/10] bg-background/20">
                                   <AgentProfileImage
                                     src={s3.src}
@@ -537,79 +554,62 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                               </div>
                             ))}
                           </div>
-                        </div>
+                        </section>
+                      ) : null}
 
-                        {/* Desktop: 3-up grid */}
-                        <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {screenshots.map(s3 => (
-                            <div key={s3.key} className={`${NAV_CARD_CLASS} overflow-hidden`}>
-                              <div className="aspect-[16/10] bg-background/20">
-                                <AgentProfileImage
-                                  src={s3.src}
-                                  alt={s3.alt}
-                                  className="w-full h-full"
-                                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                                />
-                              </div>
-                              <div className="px-4 py-3 text-xs font-semibold text-muted-foreground">{s3.label}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
-
-                    {/* Problem Statements Section */}
-                    {hasProblemSection ? (
-                      <section className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <h2 className={SECTION_TITLE_CLASS}>Problems this agent solves</h2>
-                          <span className={SECTION_SUBTITLE_CLASS}>(examples)</span>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3">
-                          {problemStatementsText.slice(0, 3).map((statement, index) => (
-                            <div key={index} className={`${NAV_CARD_CLASS} p-4`}>
-                              <p className="text-sm leading-relaxed text-foreground">{statement}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
-                  </>
-                ) : null}
-
-                {/* Try These Prompts Row - sourced from template.previewPrompts (NOT marketing_content) */}
-                {hasTryPrompts ? (
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      {previewPrompts.map((p, idx) => (
-                        <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex-shrink-0">
-                              <Icon name="sparkles" className="h-4 w-4 text-primary" />
-                            </div>
-                            <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
+                      {/* Problem Statements Section */}
+                      {hasProblemSection ? (
+                        <section className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <h2 className={SECTION_TITLE_CLASS}>Problems this agent solves</h2>
+                            <span className={SECTION_SUBTITLE_CLASS}>(examples)</span>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-            </section>
-          </div>
-        </div>
-      </main>
+                          <div className="grid grid-cols-1 gap-3">
+                            {problemStatementsText.slice(0, 3).map((statement, index) => (
+                              <div key={index} className={`${NAV_CARD_CLASS} p-4`}>
+                                <p className="text-sm leading-relaxed text-foreground">{statement}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+                    </>
+                  ) : null}
 
-      <ExploreCTA kind="agent" />
-      <div
-        suppressHydrationWarning
-        className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent"
-        aria-hidden
-      />
-      <PublicFooter fromPath={`/explore/agents/${encodeURIComponent(template.slug)}`} />
+                  {/* Try These Prompts Row - sourced from template.previewPrompts (NOT marketing_content) */}
+                  {hasTryPrompts ? (
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <h2 className={SECTION_TITLE_CLASS}>Try these prompts</h2>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
+                        {previewPrompts.map((p, idx) => (
+                          <div key={idx} className={`group relative ${NAV_CARD_CLASS} p-4 cursor-pointer`}>
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex-shrink-0">
+                                <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                              </div>
+                              <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+
+        <ExploreCTA kind="agent" />
+        <div
+          suppressHydrationWarning
+          className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent"
+          aria-hidden
+        />
+        <PublicFooter fromPath={`/explore/agents/${encodeURIComponent(template.slug)}`} />
+      </div>
 
       {/* Instance-admin-only: generate marketplace marketing content */}
       <MarketplaceAgentMarketingFab templateId={template.id} marketingRenderingDisabled={marketplaceMarketingRenderingDisabled} />

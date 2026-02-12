@@ -42,6 +42,30 @@ interface AgentDeploymentWizardModalProps {
 
 const TOTAL_STEPS = 3
 
+function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
+  const label = String(input?.name || input?.slug || input?.id || '').trim()
+  if (!label) return 'S'
+  const parts = label.split(/\s+/).filter(Boolean)
+  const first = parts[0]?.[0] ?? 'S'
+  const second = parts.length > 1 ? parts[1]?.[0] : undefined
+  return (first + (second ?? '')).toUpperCase()
+}
+
+function StarshipMonogram({ starship, disabled }: { starship: { name?: string; slug?: string; id?: string }; disabled?: boolean }) {
+  const initials = getStarshipInitials(starship)
+  return (
+    <div
+      className={cn(
+        'h-7 w-7 shrink-0 rounded-lg border flex items-center justify-center text-[11px] font-semibold tabular-nums',
+        disabled ? 'border-border/60 bg-muted/20 text-muted-foreground' : 'border-primary/25 bg-primary/10 text-primary'
+      )}
+      aria-hidden
+    >
+      {initials}
+    </div>
+  )
+}
+
 function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select starship'
   if (step === 2) return 'Configure'
@@ -224,7 +248,10 @@ export function AgentDeploymentWizardModal({
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="text-sm font-semibold truncate">{s.name || 'Unnamed starship'}</div>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <StarshipMonogram starship={s} disabled={disabled} />
+                                  <div className="text-sm font-semibold truncate">{s.name || 'Unnamed starship'}</div>
+                                </div>
                                 <div className="mt-1 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
                                 {disabled ? <div className="mt-1 text-[11px] text-muted-foreground truncate">{access.deployDisabledReason || 'Deploy disabled'}</div> : null}
                               </div>
@@ -266,7 +293,10 @@ export function AgentDeploymentWizardModal({
                                   disabled && 'hover:bg-background/30'
                                 )}
                               >
-                                <span className="truncate">{s.name || s.slug || s.id}</span>
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <StarshipMonogram starship={s} disabled={disabled} />
+                                  <span className="truncate">{s.name || s.slug || s.id}</span>
+                                </span>
                                 {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
                               </button>
                             )
@@ -411,7 +441,14 @@ export function AgentDeploymentWizardModal({
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-semibold">Target starship</div>
-                        <div className="mt-1 text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id || 'Not selected'}</div>
+                        {selectedStarship ? (
+                          <div className="mt-1 flex items-center gap-2 min-w-0">
+                            <StarshipMonogram starship={selectedStarship} />
+                            <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-sm text-muted-foreground truncate">Not selected</div>
+                        )}
                       </div>
                       {selectedStarship ? <Icon name="check-circle" className="h-5 w-5 text-primary shrink-0" /> : null}
                     </div>

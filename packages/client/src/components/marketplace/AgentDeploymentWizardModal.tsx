@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
@@ -86,45 +85,45 @@ function stepTitle(step: WizardStep): string {
 }
 
 function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
-  const progressValue = (currentStep / TOTAL_STEPS) * 100
+  const progressValue = TOTAL_STEPS <= 1 ? 0 : ((currentStep - 1) / (TOTAL_STEPS - 1)) * 100
 
   return (
-    <div className="space-y-3">
-      <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <div className="relative pt-1">
+      {/* Track line */}
+      <div className="absolute left-3 right-3 top-4 h-px bg-border/60" aria-hidden />
+      {/* Progress line */}
+      <div className="absolute left-3 right-3 top-4 h-px" aria-hidden>
+        <div className="h-full bg-primary/50 origin-left" style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressValue / 100))})` }} />
+      </div>
+
+      <ol className="relative grid grid-cols-3 gap-3">
         {WIZARD_STEPS.map(s => {
           const isCompleted = currentStep > s.id
           const isActive = currentStep === s.id
           return (
-            <li
-              key={s.id}
-              className={cn(
-                'rounded-xl border px-3 py-2.5 bg-card/40 backdrop-blur-sm transition-colors',
-                isActive ? 'border-primary/40 bg-primary/10' : isCompleted ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-border/60'
-              )}
-              aria-current={isActive ? 'step' : undefined}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className={cn(
-                    'h-7 w-7 rounded-lg border flex items-center justify-center shrink-0',
-                    isActive ? 'border-primary/40 bg-primary/10 text-primary' : isCompleted ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600' : 'border-border/60 bg-background/30 text-muted-foreground'
-                  )}
-                  aria-hidden
-                >
-                  {isCompleted ? <Icon name="check" className="h-4 w-4" /> : <span className="text-xs font-semibold tabular-nums">{s.id}</span>}
-                </div>
+            <li key={s.id} className="min-w-0 flex flex-col items-center text-center" aria-current={isActive ? 'step' : undefined}>
+              <div
+                className={cn(
+                  'h-7 w-7 rounded-full border flex items-center justify-center bg-background shadow-sm',
+                  isCompleted
+                    ? 'border-emerald-500/40 bg-emerald-500 text-white'
+                    : isActive
+                      ? 'border-primary/50 bg-primary/10 text-primary'
+                      : 'border-border/60 text-muted-foreground'
+                )}
+                aria-hidden
+              >
+                {isCompleted ? <Icon name="check" className="h-4 w-4" /> : <span className="text-xs font-semibold tabular-nums">{s.id}</span>}
+              </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className={cn('text-sm font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.subtitle}</div>
-                </div>
+              <div className="mt-2 min-w-0">
+                <div className={cn('text-xs font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{s.subtitle}</div>
               </div>
             </li>
           )
         })}
       </ol>
-
-      <Progress value={progressValue} className="h-1.5" />
     </div>
   )
 }
@@ -242,10 +241,10 @@ export function AgentDeploymentWizardModal({
       <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-4xl max-h-[85vh] overflow-hidden p-0">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/50">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-4 border-b border-border/50 space-y-6">
               <DialogTitle>Deploy agent</DialogTitle>
 
-              <div className="mt-6">
+              <div>
                 <WizardStepper currentStep={step} />
               </div>
             </DialogHeader>
@@ -283,7 +282,7 @@ export function AgentDeploymentWizardModal({
                             className={cn(
                               // Min height ensures consistent layout even when disabled warning is present.
                               'text-left rounded-xl border p-4 transition-all bg-card/40 hover:bg-card/60 min-h-[108px]',
-                              selected ? 'border-primary/50 ring-2 ring-primary/20' : 'border-border/60',
+                              selected ? 'border-primary/40 bg-primary/10' : 'border-border/60',
                               (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
                               disabled && 'hover:bg-card/40'
                             )}

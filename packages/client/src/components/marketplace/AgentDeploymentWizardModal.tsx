@@ -48,6 +48,13 @@ const WIZARD_STEPS: StepMeta[] = [
   { id: 4, label: 'Review', subtitle: 'Confirm & deploy' },
 ]
 
+function toolsStepTitle(agentName: string, count: number): string {
+  const n = Number.isFinite(count) ? count : 0
+  if (n <= 0) return `${agentName} has no automations`
+  if (n === 1) return `${agentName} can use this automation`
+  return `${agentName} can use these ${n} automations`
+}
+
 function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
   const label = String(input?.name || input?.slug || input?.id || '').trim()
   if (!label) return 'S'
@@ -216,7 +223,7 @@ export function AgentDeploymentWizardModal({
     })
   }, [isOpen, assignedToolSlugs.join('|'), template])
 
-  const permissionLabel = (p: AgentToolPermission): string => (p === 'allow' ? 'Allow' : p === 'ask' ? 'Ask first' : 'Deny')
+  const permissionLabel = (p: AgentToolPermission): string => (p === 'allow' ? 'Always' : p === 'ask' ? 'Ask First' : 'Never')
   const permissionDescription = (p: AgentToolPermission): string =>
     p === 'allow' ? 'Agent can trigger this tool without confirmation.' : p === 'ask' ? 'Agent can trigger this tool, but you will be asked to confirm.' : 'Agent cannot trigger this tool.'
   const permissionIconName = (p: AgentToolPermission): string => (p === 'allow' ? 'check-circle' : p === 'ask' ? 'help-circle' : 'x-circle')
@@ -411,7 +418,9 @@ export function AgentDeploymentWizardModal({
 
               {step === 2 ? (
                 <div className="mt-8 space-y-2">
-                  <div className="text-sm font-semibold">Suggested tools ({assignedToolSlugs.length})</div>
+                  <div className="text-sm font-semibold">
+                    {toolsStepTitle(agentDeployLabel, assignedToolSlugs.length)}
+                  </div>
 
                   {assignedToolSlugs.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -555,7 +564,7 @@ export function AgentDeploymentWizardModal({
                       <div className="mt-2 text-sm text-muted-foreground tabular-nums">
                         {assignedToolSlugs.length > 0 ? (
                           <>
-                            {assignedToolSlugs.length} tools • {permissionCounts.allow} allow • {permissionCounts.ask} ask • {permissionCounts.deny} deny
+                            {assignedToolSlugs.length} tools • {permissionCounts.allow} Always • {permissionCounts.ask} Ask First • {permissionCounts.deny} Never
                           </>
                         ) : (
                           'No tools'

@@ -281,7 +281,7 @@ export function AgentDeploymentWizardModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-4xl h-[85vh] overflow-hidden p-0">
+      <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl h-[80vh] overflow-hidden p-0">
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">

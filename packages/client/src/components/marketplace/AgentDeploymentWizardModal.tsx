@@ -56,7 +56,7 @@ function StarshipMonogram({ starship, disabled }: { starship: { name?: string; s
   return (
     <div
       className={cn(
-        'h-7 w-7 shrink-0 rounded-lg border flex items-center justify-center text-[11px] font-semibold tabular-nums',
+        'h-6 w-6 shrink-0 rounded-md border flex items-center justify-center text-[10px] font-semibold tabular-nums',
         disabled ? 'border-border/60 bg-muted/20 text-muted-foreground' : 'border-primary/25 bg-primary/10 text-primary'
       )}
       aria-hidden
@@ -240,20 +240,26 @@ export function AgentDeploymentWizardModal({
                             disabled={isProcessing || disabled}
                             aria-pressed={selected}
                             className={cn(
-                              'text-left rounded-xl border p-4 transition-all bg-card/40 hover:bg-card/60',
+                              // Min height ensures consistent layout even when disabled warning is present.
+                              'text-left rounded-xl border p-4 transition-all bg-card/40 hover:bg-card/60 min-h-[108px]',
                               selected ? 'border-primary/50 ring-2 ring-primary/20' : 'border-border/60',
                               (isProcessing || disabled) && 'opacity-60 cursor-not-allowed',
                               disabled && 'hover:bg-card/40'
                             )}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-start justify-between gap-3 h-full">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start gap-2 min-w-0">
                                   <StarshipMonogram starship={s} disabled={disabled} />
-                                  <div className="text-sm font-semibold truncate">{s.name || 'Unnamed starship'}</div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-base font-semibold leading-tight truncate">{s.name || 'Unnamed starship'}</div>
+                                    <div className="mt-0.5 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
+                                    {/* Reserve space for disabled warning so cards stay uniform height. */}
+                                    <div className="mt-2 text-[11px] text-muted-foreground truncate min-h-[1.1rem]">
+                                      {disabled ? access.deployDisabledReason || 'Deploy disabled' : ''}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="mt-1 text-xs text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
-                                {disabled ? <div className="mt-1 text-[11px] text-muted-foreground truncate">{access.deployDisabledReason || 'Deploy disabled'}</div> : null}
                               </div>
                               {disabled ? (
                                 <Icon name="lock" className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -293,9 +299,12 @@ export function AgentDeploymentWizardModal({
                                   disabled && 'hover:bg-background/30'
                                 )}
                               >
-                                <span className="flex items-center gap-2 min-w-0">
+                                <span className="flex items-start gap-2 min-w-0 flex-1">
                                   <StarshipMonogram starship={s} disabled={disabled} />
-                                  <span className="truncate">{s.name || s.slug || s.id}</span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-base font-semibold leading-tight">{s.name || s.slug || s.id}</span>
+                                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{s.slug ? `/${s.slug}` : s.id}</span>
+                                  </span>
                                 </span>
                                 {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground" /> : selected ? <Icon name="check" className="h-4 w-4 text-primary" /> : null}
                               </button>
@@ -442,9 +451,12 @@ export function AgentDeploymentWizardModal({
                       <div className="min-w-0">
                         <div className="text-sm font-semibold">Target starship</div>
                         {selectedStarship ? (
-                          <div className="mt-1 flex items-center gap-2 min-w-0">
+                          <div className="mt-1 flex items-start gap-2 min-w-0">
                             <StarshipMonogram starship={selectedStarship} />
-                            <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
+                            <div className="min-w-0">
+                              <div className="text-sm text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
+                              <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
+                            </div>
                           </div>
                         ) : (
                           <div className="mt-1 text-sm text-muted-foreground truncate">Not selected</div>

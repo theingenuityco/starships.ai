@@ -611,7 +611,7 @@ export function AgentDeploymentWizardModal({
                   </Button>
                 ) : null}
                 {step < 4 ? (
-                  <Button type="button" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
+                  <Button type="button" variant="primaryOutline" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
                     Next
                     <Icon name="caret-right" className="h-4 w-4 ml-1" />
                   </Button>

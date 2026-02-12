@@ -152,7 +152,8 @@ export function ToolInstallationWizardModal({
     const normalized = list
       .map(p => String(p ?? '').trim())
       .filter(Boolean)
-      .filter(p => p.toLowerCase() !== 'starship')
+      // Ignore the built-in Starships connector requirement.
+      .filter(p => p.toLowerCase() !== 'starships')
     return Array.from(new Set(normalized))
   }, [template])
 
@@ -174,7 +175,7 @@ export function ToolInstallationWizardModal({
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
       const provider = String((c as any)?.provider || '').trim().toLowerCase()
-      if (!provider || provider === 'starship') return false
+      if (!provider || provider === 'starships') return false
       const status = String((c as any)?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length
@@ -373,20 +374,8 @@ export function ToolInstallationWizardModal({
                     </div>
                   )
                 ) : (
-                  <div className="rounded-lg border border-border/60 bg-card/10 p-3">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
-                        <p className="text-sm font-semibold leading-tight">No connectors required</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">This tool can be installed without connecting any apps.</p>
-                      {requiresApiKey ? (
-                        <div className="pt-2 text-xs text-muted-foreground">
-                          <span className="font-semibold text-yellow-800 dark:text-yellow-200">API key required.</span> Add it after installation in your starship settings.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                  // Show an empty connectors panel (do not show "no connectors" copy).
+                  <div className="rounded-xl border border-border/60 bg-card/10 p-3 min-h-[92px]" />
                 )}
               </div>
             ) : null}

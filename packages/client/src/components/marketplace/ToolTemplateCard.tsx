@@ -125,13 +125,13 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                           const showLogo = !hiddenLogos[provider]
                           const logoSrc = getConnectorLogoSrc(provider)
                           return (
-                            <div key={provider} className="flex h-5 w-5 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
+                            <div key={provider} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40" title={provider}>
                               {showLogo ? (
                                 <Image
                                   src={logoSrc}
                                   alt=""
-                                  width={16}
-                                  height={16}
+                                  width={12}
+                                  height={12}
                                   className="object-contain"
                                   onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
                                 />
@@ -144,7 +144,7 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                         ) : null}
                       </>
                     ) : (
-                      <div className="flex h-5 w-5 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Flow">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Flow">
                         <Icon name="workflow" className="h-3.5 w-3.5" />
                       </div>
                     )}
@@ -160,9 +160,8 @@ export function ToolTemplateCard(props: { template: ToolTemplateModel; density?:
                         requestInstall()
                       }}
                       disabled={deployDisabled}
-                      className="h-8 px-3 shrink-0 text-primary hover:text-primary"
+                      className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
                     >
-                      <Icon name={isInstalling ? 'loader-2' : 'sparkles'} className={isInstalling ? 'w-3.5 h-3.5 mr-2 animate-spin' : 'w-3.5 h-3.5 mr-2'} />
                       {isInstalling ? 'Installing…' : 'Install'}
                     </Button>
                   ) : (

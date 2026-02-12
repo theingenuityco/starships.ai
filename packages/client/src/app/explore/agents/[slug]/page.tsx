@@ -312,8 +312,13 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
                     />
 
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
-                      {template.role ? <div className="mt-1 text-sm leading-relaxed text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+                      {/* Match AgentTemplateCard hierarchy:
+                          - If role exists: role is the primary headline, name becomes the small label
+                          - Else: name is the primary headline */}
+                      {template.role ? <div className="min-w-0 text-sm text-muted-foreground truncate">{template.name}</div> : null}
+                      <h1 className={template.role ? 'mt-0.5 text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]' : 'text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]'}>
+                        {template.role || template.name}
+                      </h1>
 
                       {template.description ? <p className="mt-3 text-sm leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
                     </div>

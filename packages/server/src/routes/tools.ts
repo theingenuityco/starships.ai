@@ -7,7 +7,7 @@ import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from
 import { AgentRepository, ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
-import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
@@ -25,7 +25,7 @@ import type {
 const router: Router = Router();
 
 type ConnectionLike = {
-  query: (sql: string, params?: unknown[]) => Promise<Array<Record<string, unknown>>>;
+  query: <T = Array<Record<string, unknown>>>(sql: string, params?: unknown[]) => Promise<T[]>;
 };
 
 // Zod schemas for validation
@@ -210,6 +210,7 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
     const q = String(queryValidation.query || '').trim();
 
     let templates: ToolTemplateModel[] = [];
+    let total = 0;
 
     function isStarshipsOnlyConnectorToolTemplate(t: ToolTemplateModel): boolean {
       const raw = (t as unknown as { requiredConnectorProviders?: unknown })?.requiredConnectorProviders;
@@ -222,31 +223,53 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
 
     if (q) {
       // Search mode: keep deterministic created_at ordering from repository search.
-      templates = await toolTemplateRepository.search({
+      const base = await toolTemplateRepository.search({
         category: queryValidation.category,
         query: q,
         requiresApiKey: queryValidation.requiresApiKey,
       });
+      total = base.length;
+      templates = base.slice(offset, offset + limit);
     } else if (!connection?.query) {
-      templates = await toolTemplateRepository.search({
+      const base = await toolTemplateRepository.search({
         category: queryValidation.category,
         query: undefined,
         requiresApiKey: queryValidation.requiresApiKey,
       });
+      total = base.length;
+      templates = base.slice(offset, offset + limit);
     } else {
+      // Build WHERE clauses twice:
+      // - Count query uses $1.. placeholders
+      // - Popularity query reserves $1 for windowDays, so filters start at $2
+      const whereCount: string[] = [];
+      const countParams: unknown[] = [];
+      let ci = 1;
+
+      if (queryValidation.category) {
+        whereCount.push(`tt.category = $${ci++}`);
+        countParams.push(queryValidation.category);
+      }
+      if (queryValidation.requiresApiKey !== undefined) {
+        whereCount.push(`tt.requires_api_key = $${ci++}`);
+        countParams.push(queryValidation.requiresApiKey);
+      }
+
+      const whereCountSql = whereCount.length ? `WHERE ${whereCount.join(' AND ')}` : '';
+      const countRows = await connection.query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM tool_templates tt ${whereCountSql}`, countParams);
+      total = countRows?.[0]?.n ?? 0;
+
       const where: string[] = [];
       const params: unknown[] = [windowDays];
       let i = 2;
 
       if (queryValidation.category) {
-        where.push(`tt.category = $${i}`);
+        where.push(`tt.category = $${i++}`);
         params.push(queryValidation.category);
-        i++;
       }
       if (queryValidation.requiresApiKey !== undefined) {
-        where.push(`tt.requires_api_key = $${i}`);
+        where.push(`tt.requires_api_key = $${i++}`);
         params.push(queryValidation.requiresApiKey);
-        i++;
       }
 
       params.push(limit);
@@ -256,7 +279,7 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
 
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-      const rows = await connection.query(
+      const rows = await connection.query<Record<string, unknown>>(
         `
           WITH tool_calls AS (
             SELECT
@@ -336,7 +359,7 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
       return rest;
     });
 
-    sendSuccess(res, sanitized);
+    sendSuccess(res, sanitized, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     console.error('[TOOLS] Error fetching tool templates:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch tool templates');

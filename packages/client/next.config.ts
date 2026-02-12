@@ -63,6 +63,7 @@ const nextConfig: NextConfig = {
       // Public pages (cache at edge; browsers revalidate)
       { source: '/', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/explore', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      { source: '/explore/:path*', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       // Back-compat redirect route (keep cached similarly)
       { source: '/marketplace', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/privacy', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },

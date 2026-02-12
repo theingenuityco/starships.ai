@@ -250,7 +250,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
         <PublicHeader />
       </div>
 
-      <main className="marketplace-agent-main pt-20 sm:pt-28">
+      <main className="marketplace-agent-main">
         {/* Decorative hero background */}
         <div className="relative">
           <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">

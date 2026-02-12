@@ -30,8 +30,8 @@ export function PublicHeader(): React.JSX.Element {
   }, [])
 
   return (
-    <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
-      <div className="px-4 sm:px-8 flex items-center justify-between h-8">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="px-4 sm:px-8 flex items-center justify-between py-4 sm:py-5">
         <button
           className="cursor-pointer select-none h-8 flex items-center"
           onClick={() => {

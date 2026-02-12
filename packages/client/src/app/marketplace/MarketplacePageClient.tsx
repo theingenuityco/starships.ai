@@ -225,11 +225,6 @@ export default function MarketplacePageClient(props: {
             {/* Hero (transparent, normal container width) */}
             <div className="pt-10 sm:pt-12 pb-6">
               <div className="flex flex-col items-center text-center">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/30 px-3 py-1 text-xs text-muted-foreground">
-                  <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary/70" aria-hidden="true" />
-                  Starships Explore
-                </div>
-
                 <h1 className="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
                   {hero.title}
                 </h1>
@@ -266,21 +261,6 @@ export default function MarketplacePageClient(props: {
                   </div>
                 </div>
 
-                {!isAllLoading ? (
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="font-mono text-foreground">{countsByTab.agents}</span> agents
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="font-mono text-foreground">{countsByTab.tools}</span> tools
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="font-mono text-foreground">{countsByTab.connectors}</span> connectors
-                    </span>
-                  </div>
-                ) : null}
               </div>
             </div>
 

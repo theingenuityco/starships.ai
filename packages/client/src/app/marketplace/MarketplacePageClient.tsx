@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog } from '@/hooks/useConnectors'
+import { useExploreSearch } from '@/hooks/useExploreSearch'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 
@@ -83,53 +84,55 @@ export default function MarketplacePageClient(props: {
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 
+  const shouldUseServerSearch = debouncedSearch.trim().length > 0
+  const serverSearch = useExploreSearch({ q: debouncedSearch, type: tab, limit: 24, enabled: shouldUseServerSearch })
+
   const agentsMatchingSearch = useMemo(() => {
-    const q = debouncedSearch.toLowerCase()
-    if (!q) return agentTemplates
-    return agentTemplates.filter(t => {
-      const name = typeof t?.name === 'string' ? t.name.toLowerCase() : ''
-      const description = typeof t?.description === 'string' ? t.description.toLowerCase() : ''
-      return name.includes(q) || description.includes(q)
-    })
-  }, [agentTemplates, debouncedSearch])
+    if (!shouldUseServerSearch) return agentTemplates
+    return serverSearch.data?.agents ?? []
+  }, [agentTemplates, serverSearch.data?.agents, shouldUseServerSearch])
 
   const toolsMatchingSearch = useMemo(() => {
-    const q = debouncedSearch.toLowerCase()
-    if (!q) return toolTemplates
-    return toolTemplates.filter(t => {
-      const name = typeof t?.name === 'string' ? t.name.toLowerCase() : ''
-      const description = typeof (t as any)?.description === 'string' ? String((t as any).description).toLowerCase() : ''
-      return name.includes(q) || description.includes(q)
-    })
-  }, [toolTemplates, debouncedSearch])
+    if (!shouldUseServerSearch) return toolTemplates
+    return serverSearch.data?.tools ?? []
+  }, [toolTemplates, serverSearch.data?.tools, shouldUseServerSearch])
 
   const connectorsMatchingSearch = useMemo(() => {
-    const q = debouncedSearch.toLowerCase()
-    if (!q) return connectorCatalog
-    return connectorCatalog.filter(c => {
-      const provider = typeof (c as any)?.provider === 'string' ? String((c as any).provider).toLowerCase() : ''
-      const name = typeof (c as any)?.name === 'string' ? String((c as any).name).toLowerCase() : ''
-      const description = typeof (c as any)?.description === 'string' ? String((c as any).description).toLowerCase() : ''
-      return provider.includes(q) || name.includes(q) || description.includes(q)
-    })
-  }, [connectorCatalog, debouncedSearch])
+    if (!shouldUseServerSearch) return connectorCatalog
+    return serverSearch.data?.connectors ?? []
+  }, [connectorCatalog, serverSearch.data?.connectors, shouldUseServerSearch])
 
   const countsByTab = useMemo(() => {
-    const agents = agentsMatchingSearch.length
-    const tools = toolsMatchingSearch.length
-    const connectors = connectorsMatchingSearch.length
+    const agents = shouldUseServerSearch ? serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length : agentsMatchingSearch.length
+    const tools = shouldUseServerSearch ? serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length : toolsMatchingSearch.length
+    const connectors = shouldUseServerSearch ? serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length : connectorsMatchingSearch.length
     return {
       all: agents + tools + connectors,
       agents,
       tools,
       connectors,
     } satisfies Record<MarketplaceTab, number>
-  }, [agentsMatchingSearch.length, toolsMatchingSearch.length, connectorsMatchingSearch.length])
+  }, [
+    agentsMatchingSearch.length,
+    toolsMatchingSearch.length,
+    connectorsMatchingSearch.length,
+    serverSearch.data?.totals?.agents,
+    serverSearch.data?.totals?.tools,
+    serverSearch.data?.totals?.connectors,
+    shouldUseServerSearch,
+  ])
 
   const activeCount = countsByTab[tab]
-  const isAllLoading = agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
-  const activeLoading =
-    tab === 'all' ? isAllLoading : tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
+  const isAllLoading = shouldUseServerSearch ? serverSearch.isLoading : agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
+  const activeLoading = shouldUseServerSearch
+    ? serverSearch.isLoading
+    : tab === 'all'
+      ? isAllLoading
+      : tab === 'agents'
+        ? agentTemplatesLoading
+        : tab === 'tools'
+          ? toolTemplatesLoading
+          : connectorsLoading
 
   // Handle template deployment/installation
   const handleAgentDeploy = (_template: AgentTemplateModel) => {

@@ -263,7 +263,7 @@ export default function MarketplacePageClient(props: {
 
             if (isCurrent) {
               return (
-                <Button key={p} asChild variant="secondary" size="sm">
+                <Button key={p} asChild variant="primaryOutline" size="sm">
                   <span aria-current="page" className="tabular-nums">
                     {p}
                   </span>

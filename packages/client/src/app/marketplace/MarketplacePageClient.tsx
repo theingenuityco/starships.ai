@@ -157,6 +157,11 @@ export default function MarketplacePageClient(props: {
     return tab === 'all' ? connectorsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : connectorsMatchingSearch
   }, [connectorsMatchingSearch, shouldUseServerSearch, tab])
 
+  // Hide the internal Starships connector from public Explore listings.
+  const connectorsVisibleFiltered = useMemo(() => {
+    return (connectorsVisible ?? []).filter(c => String((c as any)?.provider || '').trim().toLowerCase() !== 'starships')
+  }, [connectorsVisible])
+
   const countsByTab = useMemo(() => {
     // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
     const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : (initialTotals?.agents ?? agentsMatchingSearch.length)
@@ -589,7 +594,7 @@ export default function MarketplacePageClient(props: {
                             <div className="min-w-0 flex items-center gap-3">
                               <h2 className="text-lg font-semibold leading-tight text-foreground">Popular connectors</h2>
                               <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
-                                {connectorsVisible.length}
+                                {connectorsVisibleFiltered.length}
                               </Badge>
                             </div>
                             <button
@@ -601,7 +606,7 @@ export default function MarketplacePageClient(props: {
                               <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
                         </section>
                       ) : null}
                     </div>
@@ -658,7 +663,7 @@ export default function MarketplacePageClient(props: {
                           </Badge>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
                       {renderPaginationNav()}
                     </section>
                   )

@@ -4,8 +4,6 @@ import Icon from '@/components/primitives/Icon'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog } from '@/hooks/useConnectors'
@@ -287,37 +285,45 @@ export default function MarketplacePageClient(props: {
             </div>
 
             <div className="pb-2">
-              <Tabs
-                value={tab}
-                onValueChange={value => {
-                  const v = String(value || '').toLowerCase()
-                  if (!isMarketplaceTab(v)) return
-                  track({ type: 'marketplace_tab_selected', tab: v })
-                  router.push(TAB_TO_ROUTE[v])
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex justify-center w-full">
-                    <TabsList className="w-full sm:w-auto flex-nowrap justify-center gap-1 overflow-x-auto custom-scrollbar">
-                      {MARKETPLACE_TABS.map(t => (
-                        <TabsTrigger key={t} value={t}>
-                          <span className="inline-flex items-center gap-1.5">
-                            <span>{t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'}</span>
-                            {!(t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading) ? (
-                              <Badge
-                                variant={tab === t ? 'default' : 'secondary'}
-                                className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                              >
-                                {countsByTab[t]}
-                              </Badge>
+              <nav aria-label="Explore categories" className="flex justify-center">
+                <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
+                  <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
+                    {MARKETPLACE_TABS.map(t => {
+                      const label = t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Tools' : 'Connectors'
+                      const isActive = tab === t
+                      const isLoading = t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            track({ type: 'marketplace_tab_selected', tab: t })
+                            router.push(TAB_TO_ROUTE[t])
+                          }}
+                          className={[
+                            'inline-flex items-center gap-2 text-sm font-medium transition-colors',
+                            isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                          ].join(' ')}
+                        >
+                          <span
+                            className={[
+                              'inline-flex items-baseline gap-2 pb-1 border-b-2',
+                              isActive ? 'border-primary' : 'border-transparent',
+                            ].join(' ')}
+                          >
+                            <span>{label}</span>
+                            {!isLoading ? (
+                              <span className={['tabular-nums', isActive ? 'text-foreground/80' : 'text-muted-foreground'].join(' ')}>
+                                ({countsByTab[t]})
+                              </span>
                             ) : null}
                           </span>
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-              </Tabs>
+              </nav>
             </div>
 
             {/* Results */}
@@ -336,9 +342,7 @@ export default function MarketplacePageClient(props: {
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex items-baseline gap-3">
                             <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
-                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
-                              {agentsMatchingSearch.length}
-                            </Badge>
+                            <span className="text-sm text-muted-foreground tabular-nums">({agentsMatchingSearch.length})</span>
                           </div>
                           <button
                             type="button"
@@ -363,9 +367,7 @@ export default function MarketplacePageClient(props: {
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex items-baseline gap-3">
                             <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
-                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
-                              {toolsMatchingSearch.length}
-                            </Badge>
+                            <span className="text-sm text-muted-foreground tabular-nums">({toolsMatchingSearch.length})</span>
                           </div>
                           <button
                             type="button"
@@ -395,9 +397,7 @@ export default function MarketplacePageClient(props: {
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex items-baseline gap-3">
                             <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
-                            <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none tabular-nums">
-                              {connectorsMatchingSearch.length}
-                            </Badge>
+                            <span className="text-sm text-muted-foreground tabular-nums">({connectorsMatchingSearch.length})</span>
                           </div>
                           <button
                             type="button"

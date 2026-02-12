@@ -302,19 +302,33 @@ function AgentTemplateCardImpl({
                   </div>
 
                   {showDeployCta ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        requestDeploy()
-                      }}
-                      disabled={deployDisabled}
-                      className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
-                    >
-                      {deployLabel}
-                    </Button>
+                    isAlreadyDeployed ? (
+                      <span
+                        onClickCapture={e => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
+                      >
+                        <Button variant="ghost" size="sm" disabled className="h-7 px-2 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
+                          <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
+                          Deployed
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={e => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          requestDeploy()
+                        }}
+                        disabled={deployDisabled}
+                        className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
+                      >
+                        {deployLabel}
+                      </Button>
+                    )
                   ) : (
                     <div />
                   )}
@@ -382,10 +396,17 @@ function AgentTemplateCardImpl({
               <div className="mt-auto pt-4 flex items-center justify-end gap-2">
                 {showDeployCta ? (
                   isAlreadyDeployed ? (
-                    <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 border border-emerald-500/30 dark:border-emerald-500/30 shrink-0">
-                      <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
-                    </div>
+                    <span
+                      onClickCapture={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                      }}
+                    >
+                      <Button variant="ghost" size="sm" disabled className="h-9 px-3 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
+                        <Icon name="check-circle" className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
+                        Deployed
+                      </Button>
+                    </span>
                   ) : (
                     <Button
                       size="sm"

@@ -6,7 +6,7 @@ export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
 
 export default async function ExploreAutomationsPage() {
-  const PAGE_SIZE = 24
+  const PAGE_SIZE = 18
   const [toolsPage, agentsCountPage, connectorsCountPage] = await Promise.all([
     fetchPublicToolTemplatesPage({ page: 1, limit: PAGE_SIZE, revalidateSeconds: revalidate }),
     fetchPublicAgentTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate }),

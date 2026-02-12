@@ -38,7 +38,7 @@ export default async function ExploreAutomationsPagedPage(props: PageProps) {
   if (!p) notFound()
   if (p === 1) redirect('/explore/automations')
 
-  const PAGE_SIZE = 24
+  const PAGE_SIZE = 18
   const [toolsPage, agentsCountPage, connectorsCountPage] = await Promise.all([
     fetchPublicToolTemplatesPage({ page: p, limit: PAGE_SIZE, revalidateSeconds: revalidate }),
     fetchPublicAgentTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate }),

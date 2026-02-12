@@ -23,7 +23,7 @@ export const EXPLORE_SEARCH_QUERY_KEYS = {
 export function useExploreSearch(args: { q: string; type: ExploreSearchType; limit?: number; enabled?: boolean }) {
   const q = String(args.q || '').trim()
   const type = args.type
-  const limit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 24
+  const limit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 18
   const enabled = args.enabled ?? true
 
   return useQuery({

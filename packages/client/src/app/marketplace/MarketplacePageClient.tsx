@@ -102,7 +102,7 @@ export default function MarketplacePageClient(props: {
 
   const q = debouncedSearch.trim()
   const shouldUseServerSearch = q.length > 0
-  const serverSearch = useExploreSearch({ q: debouncedSearch, type: tab, limit: 24, enabled: shouldUseServerSearch })
+  const serverSearch = useExploreSearch({ q: debouncedSearch, type: tab, limit: 18, enabled: shouldUseServerSearch })
   const isSearching = shouldUseServerSearch && (serverSearch.isFetching || serverSearch.isLoading)
 
   const agentsMatchingSearch = useMemo(() => {

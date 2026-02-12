@@ -94,7 +94,7 @@ export async function GET(req: Request) {
 
   // Add paginated Explore listing pages for SEO/ISR discoverability.
   // Keep this bounded so we don't emit enormous sitemaps.
-  const LISTING_PAGE_SIZE = 24
+  const LISTING_PAGE_SIZE = 18
   const MAX_LISTING_PAGES = 25
   const toolsCount = await fetchPublicToolTemplatesPage({ page: 1, limit: 1, revalidateSeconds: 0 })
   const connectorsCount = await fetchPublicConnectorCatalogPage({ page: 1, limit: 1, revalidateSeconds: 0 })

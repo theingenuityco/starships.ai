@@ -16,6 +16,7 @@ export function PublicHeader(): React.JSX.Element {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [brandCollapsed, setBrandCollapsed] = useState(false)
+  const headerRef = useRef<HTMLElement | null>(null)
   const pendingLogoActionRef = useRef<null | (() => void)>(null)
   const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -32,11 +33,31 @@ export function PublicHeader(): React.JSX.Element {
   // Collapse brand text after scrolling past threshold
   useEffect(() => {
     const COLLAPSE_SCROLL_Y = 48
+    const getScrollParent = (node: HTMLElement | null): HTMLElement | null => {
+      let el: HTMLElement | null = node
+      while (el && el.parentElement) {
+        const parent = el.parentElement as HTMLElement
+        if (parent === document.body) return null
+        const style = window.getComputedStyle(parent)
+        const overflowY = style.overflowY
+        const isScrollable = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay'
+        if (isScrollable && parent.scrollHeight > parent.clientHeight) return parent
+        el = parent
+      }
+      return null
+    }
+
+    const scrollParent = getScrollParent(headerRef.current)
     const onScroll = () => {
-      const shouldCollapse = window.scrollY > COLLAPSE_SCROLL_Y
+      const y = scrollParent ? scrollParent.scrollTop : window.scrollY
+      const shouldCollapse = y > COLLAPSE_SCROLL_Y
       setBrandCollapsed(shouldCollapse)
     }
     onScroll()
+    if (scrollParent) {
+      scrollParent.addEventListener('scroll', onScroll, { passive: true })
+      return () => scrollParent.removeEventListener('scroll', onScroll)
+    }
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -48,7 +69,7 @@ export function PublicHeader(): React.JSX.Element {
   }, [])
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-transparent">
+    <header ref={headerRef} className="sticky top-0 z-50 w-full bg-transparent">
       <div className="px-4 sm:px-8 flex items-center justify-between py-6 sm:py-7">
         <button
           className="cursor-pointer select-none h-8 flex items-center"

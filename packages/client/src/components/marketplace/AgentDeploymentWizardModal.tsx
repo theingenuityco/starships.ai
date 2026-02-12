@@ -569,11 +569,31 @@ export function AgentDeploymentWizardModal({
                             <Icon name="wrench" className="h-4 w-4 text-foreground shrink-0" />
                             <div className="text-sm font-semibold leading-tight text-foreground truncate">Automations & permissions</div>
                           </div>
-                          <div className="text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">
-                            {assignedToolSlugs.length > 0
-                              ? `${assignedToolSlugs.length} automations • ${permissionCounts.allow} Always • ${permissionCounts.ask} Ask First • ${permissionCounts.deny} Never`
-                              : 'No automations'}
-                          </div>
+                          {assignedToolSlugs.length > 0 ? (
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground tabular-nums">{assignedToolSlugs.length} automations</span>
+                              <span className="text-xs text-muted-foreground" aria-hidden>
+                                |
+                              </span>
+                              <span className="text-xs tabular-nums text-emerald-700 dark:text-emerald-300">
+                                {permissionCounts.allow} Always
+                              </span>
+                              <span className="text-xs text-muted-foreground" aria-hidden>
+                                |
+                              </span>
+                              <span className="text-xs tabular-nums text-amber-700 dark:text-amber-300">
+                                {permissionCounts.ask} Ask First
+                              </span>
+                              <span className="text-xs text-muted-foreground" aria-hidden>
+                                |
+                              </span>
+                              <span className="text-xs tabular-nums text-red-700 dark:text-red-300">
+                                {permissionCounts.deny} Never
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">No automations</div>
+                          )}
                         </div>
                       </div>
 

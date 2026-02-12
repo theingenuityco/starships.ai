@@ -32,6 +32,12 @@ interface AgentTemplateCardProps {
    * - compact: tighter layout for Explore list pages
    */
   density?: 'default' | 'compact'
+  /**
+   * Avatar presentation in compact layout.
+   * - cover: current full-bleed left thumbnail
+   * - tile: centered square avatar tile (useful for wizards/modals)
+   */
+  compactAvatarStyle?: 'cover' | 'tile'
   /** Show/hide the category badge. Defaults to true. */
   showCategory?: boolean
   /**
@@ -46,7 +52,16 @@ interface AgentTemplateCardProps {
   showDeployCta?: boolean
 }
 
-function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId, density = 'default', showCategory = true }: AgentTemplateCardProps) {
+function AgentTemplateCardImpl({
+  template,
+  onDeploy,
+  onClick,
+  showDeployCta = true,
+  targetStarshipId,
+  density = 'default',
+  showCategory = true,
+  compactAvatarStyle = 'cover',
+}: AgentTemplateCardProps) {
   const compact = density === 'compact'
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
@@ -212,7 +227,22 @@ function AgentTemplateCardImpl({ template, onDeploy, onClick, showDeployCta = tr
           <div className="flex min-h-[116px]">
             {/* Left avatar */}
             <div className="relative w-24 shrink-0 overflow-hidden bg-muted/30">
-              {avatarUrl ? (
+              {compactAvatarStyle === 'tile' ? (
+                <div className="absolute inset-0 h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
+                  <MarketplaceAvatar
+                    imageUrl={avatarUrl || null}
+                    label={displayName || 'Agent'}
+                    seed={displayName || 'AI'}
+                    sizeClassName="h-14 w-14"
+                    shapeClassName="rounded-xl"
+                    ringClassName="ring-1 ring-border/40"
+                    shadowClassName="shadow-sm"
+                    showInsetRing={false}
+                    fallbackTextClassName="text-base font-semibold text-muted-foreground"
+                    tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
+                  />
+                </div>
+              ) : avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
               ) : (

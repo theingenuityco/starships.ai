@@ -448,28 +448,58 @@ export default function MarketplacePageClient(props: {
                       ) : null}
                     </div>
                   ) : tab === 'agents' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                      {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
-                        <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                          <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
-                        </motion.div>
-                      ))}
-                    </div>
+                    <section>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex items-center gap-3">
+                          <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
+                          <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                            {activeCount}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                          <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                            <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </section>
                   ) : tab === 'tools' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                      {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
-                        <motion.div
-                          key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
-                          initial={{ opacity: 0, y: 14 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.04 }}
-                        >
-                          <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
-                        </motion.div>
-                      ))}
-                    </div>
+                    <section>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex items-center gap-3">
+                          <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
+                          <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                            {activeCount}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
+                          <motion.div
+                            key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
+                            initial={{ opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.04 }}
+                          >
+                            <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </section>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
+                    <section>
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex items-center gap-3">
+                          <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
+                          <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                            {activeCount}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisible.map(renderConnectorCard)}</div>
+                    </section>
                   )
                 ) : (
                   renderCenteredState(

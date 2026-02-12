@@ -9,19 +9,21 @@ import type { ApiResponse, AgentModel, ToolModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 
 import Icon from '@/components/primitives/Icon'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
-import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
 
 interface IntegrationsSettingsContentProps {
   slug: string
@@ -101,6 +103,25 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   // Agents (starship-scoped)
   const { data: agents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, Boolean(starshipId))
 
+  const agentAvatarAttachmentIds = useMemo(() => {
+    const ids = (agents || [])
+      .map(a => String((a as any)?.avatarAttachmentId || '').trim())
+      .filter(Boolean)
+    return Array.from(new Set(ids))
+  }, [agents])
+
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId || undefined)
+
+  const agentAvatarUrlById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const att of agentAvatarAttachments || []) {
+      const id = String((att as any)?.id || '').trim()
+      const url = String((att as any)?.previewUrl || '').trim()
+      if (id && url) m.set(id, url)
+    }
+    return m
+  }, [agentAvatarAttachments])
+
   const filteredAgents = useMemo(() => {
     const q = safeLower(debouncedQuery).trim()
     if (!q) return agents
@@ -136,6 +157,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     })
   }, [debouncedQuery, tools])
 
+  const toolLeftIconById = useMemo(() => {
+    const m = new Map<string, { name: string; title: string }>()
+    for (const t of tools || []) {
+      const id = String((t as any)?.id || '').trim()
+      if (!id) continue
+      const label = String((t as any)?.name || '').trim() || String((t as any)?.slug || '').trim() || 'Tool'
+      m.set(id, pickToolLeftIcon(label))
+    }
+    return m
+  }, [tools])
+
   const [connectorStats, setConnectorStats] = useState<{ total: number; connected: number } | null>(null)
   const handleConnectorStatsChange = useCallback((stats: { total: number; connected: number }) => {
     setConnectorStats(prev => (prev && prev.total === stats.total && prev.connected === stats.connected ? prev : stats))
@@ -163,22 +195,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
       <div className="space-y-2">
         {filteredAgents.map((a: AgentModel) => {
           const agentSlug = String((a as any)?.slug || '')
+          const avatarAttachmentId = String((a as any)?.avatarAttachmentId || '').trim()
+          const avatarUrl = avatarAttachmentId ? agentAvatarUrlById.get(avatarAttachmentId) : undefined
+          const avatarSeed = formatAgentDisplayName(a) || String((a as any)?.name || '').trim() || agentSlug || 'Agent'
           return (
             <div key={String(a.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1" aria-label={formatAgentDisplayName(a) || agentSlug || 'Agent'}>
                 <div className="flex items-start gap-3">
                   <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
-                      <Icon name="bot" className="h-4 w-4 text-muted-foreground" />
+                      <AgentAvatar seed={avatarSeed} imageUrl={avatarUrl} size={40} rounded instanceId={String(a.id)} />
                     </span>
-                    <PresenceIndicator
-                      kind="online"
-                      active={true}
-                      size="sm"
-                      placement="outset"
-                      // Match Connectors/Members page placement for 40px avatar.
-                      className="translate-x-[22%] translate-y-[6%]"
-                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -194,16 +221,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       >
                         {formatAgentDisplayName(a) || 'Untitled agent'}
                       </button>
-                      <span
-                        className={cn(
-                          'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                        )}
-                        aria-label="Deployed"
-                        title="Deployed"
-                      >
-                        Deployed
-                      </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {(a as any)?.description ? <span className="truncate">{String((a as any).description)}</span> : null}
@@ -250,21 +267,19 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
       <div className="space-y-2">
         {filteredTools.map((t: ToolModel) => {
           const toolSlug = String((t as any)?.slug || '')
+          const toolLeftIcon = toolLeftIconById.get(String((t as any)?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
           return (
             <div key={String(t.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1" aria-label={t.name || toolSlug || 'Tool'}>
                 <div className="flex items-start gap-3">
                   <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
-                      <Icon name="magic-wand" className="h-4 w-4 text-muted-foreground" />
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden"
+                      title={toolLeftIcon.title}
+                      aria-label={toolLeftIcon.title}
+                    >
+                      <Icon name={toolLeftIcon.name} className="h-4 w-4 text-muted-foreground" />
                     </span>
-                    <PresenceIndicator
-                      kind="online"
-                      active={true}
-                      size="sm"
-                      placement="outset"
-                      className="translate-x-[22%] translate-y-[6%]"
-                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -280,16 +295,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       >
                         {t.name || 'Untitled tool'}
                       </button>
-                      <span
-                        className={cn(
-                          'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                        )}
-                        aria-label="Installed"
-                        title="Installed"
-                      >
-                        Installed
-                      </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                       {(t as any)?.description ? <span className="truncate">{String((t as any).description)}</span> : null}

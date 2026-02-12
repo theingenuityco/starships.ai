@@ -107,7 +107,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const isAllTab = tabFromUrl === 'all'
   const SECTION_PREVIEW_LIMIT = 5
-  const TAB_PAGE_SIZE = isAllTab ? SECTION_PREVIEW_LIMIT : 18
+  const TAB_PAGE_SIZE = 18
+  // Even on the All tab, fetch a full page so search results
+  // aren't inadvertently excluded by a tiny server-side limit.
+  const QUERY_PAGE_SIZE = 18
 
   const buildIntegrationsTabHref = useCallback(
     (tab: IntegrationsTab) => {
@@ -124,7 +127,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   // Agents (starship-scoped)
   const agentsQuery = useInfiniteStarshipAgents(starshipId, Boolean(starshipId), {
-    limit: TAB_PAGE_SIZE,
+    limit: QUERY_PAGE_SIZE,
     order: 'DESC',
     search: debouncedQuery || undefined,
   })
@@ -142,6 +145,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     const pages = agentsQuery.data?.pages ?? []
     return pages.flatMap(p => (Array.isArray(p?.agents) ? p.agents : []))
   }, [agentsQuery.data])
+
+  const visibleAgents = useMemo(() => {
+    return isAllTab ? agents.slice(0, SECTION_PREVIEW_LIMIT) : agents
+  }, [SECTION_PREVIEW_LIMIT, agents, isAllTab])
 
   const hasMoreAgentsThanPreview = useMemo(() => {
     const total = typeof agentsPagination?.total === 'number' ? agentsPagination.total : agents.length
@@ -170,7 +177,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   // Automations (starship tools, starship-scoped)
   type ToolsPage = { tools: ToolModel[]; pagination: PaginationMeta | null }
   const toolsQuery = useInfiniteQuery({
-    queryKey: ['starship-automations', starshipId, 'paged', { limit: TAB_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
+    queryKey: ['starship-automations', starshipId, 'paged', { limit: QUERY_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
     enabled: Boolean(starshipId),
     initialPageParam: 1,
     queryFn: async ({ pageParam }): Promise<ToolsPage> => {
@@ -178,7 +185,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
       const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`, {
         params: {
           page,
-          limit: TAB_PAGE_SIZE,
+          limit: QUERY_PAGE_SIZE,
           search: debouncedQuery || undefined,
           order: 'DESC',
         },
@@ -207,6 +214,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return pages.flatMap(p => (Array.isArray(p?.tools) ? p.tools : []))
   }, [toolsQuery.data])
 
+  const visibleAutomations = useMemo(() => {
+    return isAllTab ? tools.slice(0, SECTION_PREVIEW_LIMIT) : tools
+  }, [SECTION_PREVIEW_LIMIT, isAllTab, tools])
+
   const toolLeftIconById = useMemo(() => {
     const m = new Map<string, { name: string; title: string }>()
     for (const t of tools || []) {
@@ -227,6 +238,16 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
 
   const isSearchActive = debouncedQuery.trim().length > 0
+
+  // IMPORTANT: During search on the All tab, we hide empty sections.
+  // For connectors, the "emptiness" signal (catalog total) is emitted by `StarshipConnectorsPanel`.
+  // If we hide the section based on a stale 0 from a previous query, the panel never mounts,
+  // so it can never fetch and update totals => deadlock.
+  // Reset totals on query changes so "unknown" stays visible until the latest fetch resolves.
+  useEffect(() => {
+    setCatalogTotal(null)
+    setConnectorStats(null)
+  }, [debouncedQuery, tabFromUrl])
 
   const baseShowAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
   const baseShowAutomations = tabFromUrl === 'all' || tabFromUrl === 'automations'
@@ -249,17 +270,16 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const showConnectors = useMemo(() => {
     if (!baseShowConnectors) return false
     if (!isAllTab || !isSearchActive) return true
-    // Prefer server total when available; otherwise fall back to visible count while loading.
+    // Prefer server total when available; otherwise keep visible until the panel reports a total.
     if (typeof catalogTotal === 'number') return catalogTotal > 0
-    if (typeof totalConnectors === 'number') return totalConnectors > 0
     return true
-  }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive, totalConnectors])
+  }, [baseShowConnectors, catalogTotal, isAllTab, isSearchActive])
 
   const renderAgentsList = () => {
     if (agentsQuery.isLoading) {
       return <div className="text-sm text-muted-foreground">Loading agents…</div>
     }
-    if (!Array.isArray(agents) || agents.length === 0) {
+    if (!Array.isArray(visibleAgents) || visibleAgents.length === 0) {
       return (
         <div className="flex items-center justify-center py-10">
           <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No agents match “${debouncedQuery}”.` : 'No agents in this starship yet.'}</p>
@@ -269,7 +289,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
     return (
       <div className="space-y-2">
-        {agents.map((a: AgentModel) => {
+        {visibleAgents.map((a: AgentModel) => {
           const agentSlug = String((a as any)?.slug || '')
           const avatarAttachmentId = String((a as any)?.avatarAttachmentId || '').trim()
           const avatarUrl = avatarAttachmentId ? agentAvatarUrlById.get(avatarAttachmentId) : undefined
@@ -352,7 +372,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (toolsQuery.isLoading) {
       return <div className="text-sm text-muted-foreground">Loading automations…</div>
     }
-    if (!Array.isArray(tools) || tools.length === 0) {
+    if (!Array.isArray(visibleAutomations) || visibleAutomations.length === 0) {
       return (
         <div className="flex items-center justify-center py-10">
           <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No automations match “${debouncedQuery}”.` : 'No automations installed in this starship yet.'}</p>
@@ -362,7 +382,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
     return (
       <div className="space-y-2">
-        {tools.map((t: ToolModel) => {
+        {visibleAutomations.map((t: ToolModel) => {
           const toolSlug = String((t as any)?.slug || '')
           const toolLeftIcon = toolLeftIconById.get(String((t as any)?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
           return (

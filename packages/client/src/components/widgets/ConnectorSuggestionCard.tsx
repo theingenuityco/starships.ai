@@ -44,6 +44,7 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         // Widget cards should match Explore listing, including description.
         hideCardDescription={false}
         cardVariant="explore"
+        density={compactCard ? 'compact' : 'default'}
         connectButtonLabel={connectButtonLabel}
       />
     </div>

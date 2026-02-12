@@ -61,6 +61,12 @@ interface StarshipConnectorsPanelProps {
   /** Override connect button label (e.g. "Connect" instead of "Connect Gmail"). */
   connectButtonLabel?: string
   /**
+   * Visual density for grid cards.
+   * - default: existing spacing (roomier)
+   * - compact: match wizard "Automations" step 2 card density
+   */
+  density?: 'default' | 'compact'
+  /**
    * Controls the visual style of connector cards in grid layout.
    * - panel: existing connectors/settings card design
    * - explore: match the public Explore connector listing card design
@@ -105,6 +111,7 @@ export function StarshipConnectorsPanel({
   hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
+  density = 'default',
   cardVariant = 'panel',
   matchAgentCardStyle = false,
   onStatsChange,
@@ -455,6 +462,7 @@ export function StarshipConnectorsPanel({
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
     if (cardVariant === 'explore') {
+      const compact = density === 'compact'
       const exploreConnectButton = (
         <Button
           variant={isConnected ? 'ghost' : 'ghost'}
@@ -505,6 +513,41 @@ export function StarshipConnectorsPanel({
           Disconnect
         </Button>
       ) : null
+
+      if (compact) {
+        return (
+          <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+            <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {provider && showLogo ? (
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                        <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
+                        <Icon name="plug" className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+
+                    <div className="text-sm font-semibold leading-tight text-foreground truncate">{label}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {exploreDisconnectButton}
+                    {!shouldHideConnectButton ? exploreConnectButton : null}
+                  </div>
+                </div>
+
+                {!hideCardDescription && catalogItem.description ? (
+                  <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+                ) : null}
+              </div>
+            </div>
+          </motion.div>
+        )
+      }
 
       return (
         <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
@@ -635,7 +678,9 @@ export function StarshipConnectorsPanel({
     )
   }
 
-  const gridClassName = maxColumns === 1 ? 'grid gap-6 grid-cols-1' : maxColumns === 2 ? 'grid gap-6 grid-cols-1 md:grid-cols-2' : 'grid gap-6 md:grid-cols-2 lg:grid-cols-3'
+  const gapClassName = density === 'compact' ? 'gap-3' : 'gap-6'
+  const gridClassName =
+    maxColumns === 1 ? `grid ${gapClassName} grid-cols-1` : maxColumns === 2 ? `grid ${gapClassName} grid-cols-1 md:grid-cols-2` : `grid ${gapClassName} md:grid-cols-2 lg:grid-cols-3`
 
   const listRow = (provider: string) => {
     const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)

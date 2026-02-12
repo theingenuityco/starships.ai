@@ -41,7 +41,7 @@ const TOTAL_STEPS = 4
 
 type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
-  { id: 1, label: 'Starship', subtitle: 'Choose a destination' },
+  { id: 1, label: 'Starship', subtitle: 'Select a starship' },
   { id: 2, label: 'Tools', subtitle: 'Suggested tools & permissions' },
   { id: 3, label: 'Connectors', subtitle: 'Connect required apps' },
   { id: 4, label: 'Review', subtitle: 'Confirm & deploy' },

@@ -205,40 +205,84 @@ export default function MarketplacePageClient(props: {
 
   return (
     <>
-      <PublicHeader />
+      {/* Pseudo hero background (full-width, starts at very top edge) */}
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[620px] overflow-hidden"
+        aria-hidden
+        style={{
+          backgroundImage: [
+            'radial-gradient(900px 360px at 50% 0%, rgba(124,58,237,0.22), transparent 60%)',
+            'radial-gradient(700px 300px at 15% 30%, rgba(59,130,246,0.14), transparent 62%)',
+            'radial-gradient(720px 320px at 85% 22%, rgba(245,158,11,0.14), transparent 62%)',
+          ].join(', '),
+        }}
+      />
 
-      <main className="marketplace-main pb-12 sm:pb-16">
-        <div className="relative">
-          {/* Decorative hero background (match agent details) */}
-          <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
-            <div className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_60%)] blur-2xl" />
-            <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
-          </div>
+      <div className="relative z-10">
+        <PublicHeader />
 
-          <div className="max-w-4xl mx-auto px-4 sm:px-6">
-            {/* Hero */}
-            <div className="pt-8 sm:pt-10 pb-4">
-              <div className="max-w-[72ch]">
-                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">{hero.title}</h1>
-                <p className="mt-2 text-sm sm:text-base text-muted-foreground">{hero.subtitle}</p>
-              </div>
-              <div className="mt-5 max-w-xl">
-                <div className="relative">
-                  <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                  <Input
-                    value={searchText}
-                    onChange={e => setSearchText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const q = searchText.trim()
-                        if (q) track({ type: 'marketplace_search_used', query: q })
-                      }
-                    }}
-                    placeholder="Search agents, tools, and connectors"
-                    className="pl-11 h-11 py-2 text-[14px] rounded-2xl border-border/60 bg-card shadow-sm"
-                    aria-label="Search Explore"
-                  />
+        <main className="marketplace-main pb-12 sm:pb-16">
+          <div className="relative">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            {/* Hero (transparent, normal container width) */}
+            <div className="pt-10 sm:pt-12 pb-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/30 px-3 py-1 text-xs text-muted-foreground">
+                  <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary/70" aria-hidden="true" />
+                  Starships Explore
                 </div>
+
+                <h1 className="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+                  {hero.title}
+                </h1>
+                <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-2xl">
+                  {hero.subtitle}
+                </p>
+
+                <div className="mt-6 max-w-2xl mx-auto w-full">
+                  <div
+                    className={
+                      // Match ConversationMessageInput "minimal/compact" composer styling:
+                      // bg + border + shadow + focus border. Keep rounded edges on all breakpoints.
+                      'relative transition-all overflow-visible bg-card shadow-sm border border-border/80 rounded-2xl focus-within:border-primary/70'
+                    }
+                  >
+                    <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">
+                      <span className="flex flex-shrink-0 items-center justify-center p-1.5 rounded-lg text-muted-foreground">
+                        <Icon name="search" className="h-5 w-5" />
+                      </span>
+                      <Input
+                        value={searchText}
+                        onChange={e => setSearchText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const q = searchText.trim()
+                            if (q) track({ type: 'marketplace_search_used', query: q })
+                          }
+                        }}
+                        placeholder="Search agents, tools, and connectors"
+                        aria-label="Search Explore"
+                        className="h-auto border-0 bg-transparent shadow-none p-0 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {!isAllLoading ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-mono text-foreground">{countsByTab.agents}</span> agents
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-mono text-foreground">{countsByTab.tools}</span> tools
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-mono text-foreground">{countsByTab.connectors}</span> connectors
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -253,8 +297,8 @@ export default function MarketplacePageClient(props: {
                 }}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex justify-start">
-                    <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                  <div className="flex justify-center w-full">
+                    <TabsList className="w-full sm:w-auto flex-nowrap justify-center gap-1 overflow-x-auto custom-scrollbar">
                       {MARKETPLACE_TABS.map(t => (
                         <TabsTrigger key={t} value={t}>
                           <span className="inline-flex items-center gap-1.5">
@@ -402,9 +446,10 @@ export default function MarketplacePageClient(props: {
                 </div>
               )}
             </div>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </>
   )
 }

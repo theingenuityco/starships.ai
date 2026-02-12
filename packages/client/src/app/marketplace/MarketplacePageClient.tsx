@@ -368,7 +368,7 @@ export default function MarketplacePageClient(props: {
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular agents</h2>
                               <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
                                 {agentsVisible.length}
                               </Badge>
@@ -396,7 +396,7 @@ export default function MarketplacePageClient(props: {
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Tools</h2>
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular tools</h2>
                               <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
                                 {toolsVisible.length}
                               </Badge>
@@ -429,7 +429,7 @@ export default function MarketplacePageClient(props: {
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular connectors</h2>
                               <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
                                 {connectorsVisible.length}
                               </Badge>

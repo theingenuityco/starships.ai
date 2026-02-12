@@ -45,7 +45,7 @@ const WIZARD_STEPS: StepMeta[] = [
   { id: 1, label: 'Starship', subtitle: 'Select a starship' },
   { id: 2, label: 'Tools', subtitle: 'Suggested tools & permissions' },
   { id: 3, label: 'Connectors', subtitle: 'Connect required apps' },
-  { id: 4, label: 'Review', subtitle: 'Confirm & deploy' },
+  { id: 4, label: 'Review', subtitle: 'Confirm & install' },
 ]
 
 function toolsStepTitle(agentName: string, count: number): string {
@@ -98,7 +98,7 @@ function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select starship'
   if (step === 2) return 'Suggested tools'
   if (step === 3) return 'Connectors'
-  return 'Review & deploy'
+  return 'Review & install'
 }
 
 function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
@@ -274,7 +274,7 @@ export function AgentDeploymentWizardModal({
       await onConfirm({ toolPermissions, starship: selectedStarship ?? undefined })
       onOpenChange(false)
     } catch {
-      // Keep wizard open if deploy fails.
+      // Keep wizard open if install fails.
     }
   }
 
@@ -293,7 +293,7 @@ export function AgentDeploymentWizardModal({
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
-              <DialogTitle>Deploy agent</DialogTitle>
+              <DialogTitle>Install agent</DialogTitle>
 
               <div>
                 <WizardStepper currentStep={step} />
@@ -307,7 +307,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 1 ? (
                 <div className="mt-8 space-y-3">
-                  <div className="text-sm font-semibold">Choose a starship to deploy {agentDeployLabel}</div>
+                  <div className="text-sm font-semibold">Choose a starship to install {agentDeployLabel}</div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
@@ -607,12 +607,12 @@ export function AgentDeploymentWizardModal({
                     {isProcessing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                        Deploying...
+                        Installing…
                       </>
                     ) : (
                       <>
                         <Icon name="sparkles" className="w-4 h-4 mr-2" />
-                        Deploy
+                        Install
                       </>
                     )}
                   </Button>

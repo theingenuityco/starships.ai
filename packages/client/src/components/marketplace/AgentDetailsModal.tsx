@@ -128,8 +128,8 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   if (!template) return null
   const avatarUrl = template.avatarUrl
 
-  // Match Marketplace card CTA semantics
-  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  // Match marketplace agent CTA semantics
+  const deployLabel = isAlreadyDeployed ? 'Installed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Installing…' : 'Install'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
 

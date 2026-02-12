@@ -136,7 +136,7 @@ function AgentTemplateCardImpl({
     .map(p => p[0]?.toUpperCase())
     .join('')
 
-  const deployLabel = isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Deploying…' : 'Deploy'
+  const deployLabel = isAlreadyDeployed ? 'Installed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Installing…' : 'Install'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
 
@@ -311,7 +311,7 @@ function AgentTemplateCardImpl({
                       >
                         <Button variant="ghost" size="sm" disabled className="h-7 px-2 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
                           <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
-                          Deployed
+                          Installed
                         </Button>
                       </span>
                     ) : (
@@ -404,7 +404,7 @@ function AgentTemplateCardImpl({
                     >
                       <Button variant="ghost" size="sm" disabled className="h-9 px-3 shrink-0 text-emerald-700 dark:text-emerald-300 text-xs opacity-100">
                         <Icon name="check-circle" className="h-4 w-4 mr-2 text-emerald-600 dark:text-emerald-400" />
-                        Deployed
+                        Installed
                       </Button>
                     </span>
                   ) : (

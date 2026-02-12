@@ -235,7 +235,7 @@ export default function MarketplacePageClient(props: {
 
         <main className="marketplace-main pb-12 sm:pb-16">
           <div className="relative">
-            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
             {/* Hero (transparent, normal container width) */}
             <div className="pt-10 sm:pt-12 pb-6">
               <div className="flex flex-col items-center text-center">
@@ -325,7 +325,7 @@ export default function MarketplacePageClient(props: {
               {isSearching ? (
                 renderCenteredState(`Searching “${q}”…`)
               ) : activeLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="h-56 rounded-lg border border-border/60 bg-card animate-pulse" />
                   ))}
@@ -348,7 +348,7 @@ export default function MarketplacePageClient(props: {
                             View all
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {agentsMatchingSearch.slice(0, 6).map((template: AgentTemplateModel, idx: number) => (
                             <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                               <AgentTemplateCard template={template} density="compact" onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
@@ -373,7 +373,7 @@ export default function MarketplacePageClient(props: {
                             View all
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {toolsMatchingSearch.slice(0, 6).map((template: ToolTemplateModel, idx: number) => (
                             <motion.div
                               key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
@@ -403,14 +403,14 @@ export default function MarketplacePageClient(props: {
                             View all
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {connectorsMatchingSearch.slice(0, 6).map(renderConnectorCard)}
                         </div>
                       </section>
                     ) : null}
                   </div>
                 ) : tab === 'agents' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {agentsMatchingSearch.map((template: AgentTemplateModel, idx: number) => (
                       <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                         <AgentTemplateCard template={template} density="compact" onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
@@ -418,7 +418,7 @@ export default function MarketplacePageClient(props: {
                     ))}
                   </div>
                 ) : tab === 'tools' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {toolsMatchingSearch.map((template: ToolTemplateModel, idx: number) => (
                       <motion.div key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
                         <ToolTemplateCard template={template} />
@@ -426,7 +426,7 @@ export default function MarketplacePageClient(props: {
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {connectorsMatchingSearch.map(renderConnectorCard)}
                   </div>
                 )

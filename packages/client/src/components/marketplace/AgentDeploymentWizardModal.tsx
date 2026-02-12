@@ -425,11 +425,11 @@ export function AgentDeploymentWizardModal({
                           <div key={slug} className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-start gap-3 min-w-0 flex-1">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-border/40 flex-shrink-0">
-                                  <Icon name={leftIcon.name} className="h-4 w-4 text-primary" />
-                                </div>
-                                <div className="min-w-0 flex-1 pt-0.5">
-                                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Icon name={leftIcon.name} className="h-4 w-4 text-foreground shrink-0" />
+                                    <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
+                                  </div>
                                   {desc ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{desc}</div> : null}
                                 </div>
                               </div>

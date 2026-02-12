@@ -450,6 +450,7 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
         page: z.coerce.number().int().min(1).optional(),
         limit: z.coerce.number().int().min(1).max(200).optional(),
         search: z.string().optional(),
+        order: z.enum(['ASC', 'DESC']).optional(),
       }),
       req.query,
       res,
@@ -479,6 +480,7 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const limit = Number.isFinite(queryValidation.limit as any) ? Math.max(1, Math.floor(Number(queryValidation.limit))) : 50;
     const offset = (page - 1) * limit;
     const q = String(queryValidation.search || '').trim().toLowerCase();
+    const order = queryValidation.order ?? 'DESC';
 
     const filtered = q
       ? (tools || []).filter((t: any) => {
@@ -489,8 +491,20 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
         })
       : tools || [];
 
-    const total = filtered.length;
-    const pageItems = filtered.slice(offset, offset + limit);
+    // Sort tools by most recently updated (or created), then by name for stability.
+    const sorted = [...filtered].sort((a: any, b: any) => {
+      const aTsRaw = (a?.updatedAt || a?.createdAt) as unknown;
+      const bTsRaw = (b?.updatedAt || b?.createdAt) as unknown;
+      const aTs = typeof aTsRaw === 'string' ? new Date(aTsRaw).getTime() : 0;
+      const bTs = typeof bTsRaw === 'string' ? new Date(bTsRaw).getTime() : 0;
+      if (aTs !== bTs) return order === 'ASC' ? aTs - bTs : bTs - aTs;
+      const aName = String(a?.name || a?.slug || '');
+      const bName = String(b?.name || b?.slug || '');
+      return aName.localeCompare(bName);
+    });
+
+    const total = sorted.length;
+    const pageItems = sorted.slice(offset, offset + limit);
     sendSuccess(res, pageItems, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     console.error('[TOOLS] Error fetching starship tools:', error);

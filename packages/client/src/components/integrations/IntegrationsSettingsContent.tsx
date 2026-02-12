@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import api from '@/lib/api'
-import type { ApiResponse, AgentModel, ToolModel } from '@starships/protocol'
+import type { AgentModel, ApiResponse, PaginationMeta, ToolModel } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 
 import Icon from '@/components/primitives/Icon'
@@ -21,7 +21,7 @@ import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useStarshipAgents } from '@/hooks/useAgents'
+import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -103,7 +103,26 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   )
 
   // Agents (starship-scoped)
-  const { data: agents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, Boolean(starshipId))
+  const AGENTS_PAGE_SIZE = 25
+  const agentsQuery = useInfiniteStarshipAgents(starshipId, Boolean(starshipId), {
+    limit: AGENTS_PAGE_SIZE,
+    order: 'ASC',
+    search: debouncedQuery || undefined,
+  })
+
+  const agentsPagination = useMemo<PaginationMeta | null>(() => {
+    const pages = agentsQuery.data?.pages ?? []
+    for (let i = pages.length - 1; i >= 0; i--) {
+      const p = pages[i]?.pagination ?? null
+      if (p) return p
+    }
+    return null
+  }, [agentsQuery.data])
+
+  const agents = useMemo(() => {
+    const pages = agentsQuery.data?.pages ?? []
+    return pages.flatMap(p => (Array.isArray(p?.agents) ? p.agents : []))
+  }, [agentsQuery.data])
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = (agents || [])
@@ -124,40 +143,45 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return m
   }, [agentAvatarAttachments])
 
-  const filteredAgents = useMemo(() => {
-    const q = safeLower(debouncedQuery).trim()
-    if (!q) return agents
-    return (agents || []).filter(a => {
-      const name = safeLower(a?.name)
-      const role = safeLower((a as any)?.role)
-      const agentSlug = safeLower((a as any)?.slug)
-      const desc = safeLower((a as any)?.description)
-      return name.includes(q) || role.includes(q) || agentSlug.includes(q) || desc.includes(q)
-    })
-  }, [agents, debouncedQuery])
-
   // Tools (starship-scoped)
-  const { data: tools = [], isLoading: toolsLoading } = useQuery({
-    queryKey: ['starship-tools', starshipId] as const,
-    queryFn: async (): Promise<ToolModel[]> => {
-      if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`)
-      return response.data.data || []
-    },
+  const TOOLS_PAGE_SIZE = 25
+  type ToolsPage = { tools: ToolModel[]; pagination: PaginationMeta | null }
+  const toolsQuery = useInfiniteQuery({
+    queryKey: ['starship-tools', starshipId, 'paged', { limit: TOOLS_PAGE_SIZE, search: debouncedQuery || null }] as const,
     enabled: Boolean(starshipId),
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }): Promise<ToolsPage> => {
+      const page = typeof pageParam === 'number' ? pageParam : Number(pageParam)
+      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`, {
+        params: {
+          page,
+          limit: TOOLS_PAGE_SIZE,
+          search: debouncedQuery || undefined,
+        },
+      })
+      return { tools: response.data.data || [], pagination: response.data.meta?.pagination ?? null }
+    },
+    getNextPageParam: last => {
+      const p = last?.pagination
+      if (!p) return undefined
+      return p.has_next ? p.page + 1 : undefined
+    },
     staleTime: 30 * 1000,
   })
 
-  const filteredTools = useMemo(() => {
-    const q = safeLower(debouncedQuery).trim()
-    if (!q) return tools
-    return (tools || []).filter(t => {
-      const name = safeLower(t?.name)
-      const toolSlug = safeLower((t as any)?.slug)
-      const desc = safeLower((t as any)?.description)
-      return name.includes(q) || toolSlug.includes(q) || desc.includes(q)
-    })
-  }, [debouncedQuery, tools])
+  const toolsPagination = useMemo<PaginationMeta | null>(() => {
+    const pages = toolsQuery.data?.pages ?? []
+    for (let i = pages.length - 1; i >= 0; i--) {
+      const p = pages[i]?.pagination ?? null
+      if (p) return p
+    }
+    return null
+  }, [toolsQuery.data])
+
+  const tools = useMemo(() => {
+    const pages = toolsQuery.data?.pages ?? []
+    return pages.flatMap(p => (Array.isArray(p?.tools) ? p.tools : []))
+  }, [toolsQuery.data])
 
   const toolLeftIconById = useMemo(() => {
     const m = new Map<string, { name: string; title: string }>()
@@ -176,16 +200,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [])
 
   const totalConnectors = typeof connectorStats?.total === 'number' ? connectorStats.total : null
+  const [catalogTotal, setCatalogTotal] = useState<number | null>(null)
 
   const showAgents = tabFromUrl === 'all' || tabFromUrl === 'agents'
   const showTools = tabFromUrl === 'all' || tabFromUrl === 'tools'
   const showConnectors = (tabFromUrl === 'all' || tabFromUrl === 'connectors') && canManageConnectors
 
   const renderAgentsList = () => {
-    if (agentsLoading) {
+    if (agentsQuery.isLoading) {
       return <div className="text-sm text-muted-foreground">Loading agents…</div>
     }
-    if (!Array.isArray(filteredAgents) || filteredAgents.length === 0) {
+    if (!Array.isArray(agents) || agents.length === 0) {
       return (
         <div className="flex items-center justify-center py-10">
           <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No agents match “${debouncedQuery}”.` : 'No agents in this starship yet.'}</p>
@@ -195,7 +220,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
     return (
       <div className="space-y-2">
-        {filteredAgents.map((a: AgentModel) => {
+        {agents.map((a: AgentModel) => {
           const agentSlug = String((a as any)?.slug || '')
           const avatarAttachmentId = String((a as any)?.avatarAttachmentId || '').trim()
           const avatarUrl = avatarAttachmentId ? agentAvatarUrlById.get(avatarAttachmentId) : undefined
@@ -257,15 +282,22 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
             </div>
           )
         })}
+        {agentsQuery.hasNextPage ? (
+          <div className="flex justify-center pt-4">
+            <Button variant="secondary" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className="h-8">
+              {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
+            </Button>
+          </div>
+        ) : null}
       </div>
     )
   }
 
   const renderToolsList = () => {
-    if (toolsLoading) {
+    if (toolsQuery.isLoading) {
       return <div className="text-sm text-muted-foreground">Loading tools…</div>
     }
-    if (!Array.isArray(filteredTools) || filteredTools.length === 0) {
+    if (!Array.isArray(tools) || tools.length === 0) {
       return (
         <div className="flex items-center justify-center py-10">
           <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No tools match “${debouncedQuery}”.` : 'No tools installed in this starship yet.'}</p>
@@ -275,7 +307,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
     return (
       <div className="space-y-2">
-        {filteredTools.map((t: ToolModel) => {
+        {tools.map((t: ToolModel) => {
           const toolSlug = String((t as any)?.slug || '')
           const toolLeftIcon = toolLeftIconById.get(String((t as any)?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
           return (
@@ -332,6 +364,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
             </div>
           )
         })}
+        {toolsQuery.hasNextPage ? (
+          <div className="flex justify-center pt-4">
+            <Button variant="secondary" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className="h-8">
+              {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more tools'}
+            </Button>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -374,9 +413,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <TabsTrigger value="agents">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
-                        {Array.isArray(agents) ? (
+                        {typeof agentsPagination?.total === 'number' ? (
                           <Badge variant={tabFromUrl === 'agents' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                            {agents.length}
+                            {agentsPagination.total}
                           </Badge>
                         ) : null}
                       </span>
@@ -384,9 +423,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <TabsTrigger value="tools">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Tools</span>
-                        {Array.isArray(tools) ? (
+                        {typeof toolsPagination?.total === 'number' ? (
                           <Badge variant={tabFromUrl === 'tools' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                            {tools.length}
+                            {toolsPagination.total}
                           </Badge>
                         ) : null}
                       </span>
@@ -395,7 +434,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       <TabsTrigger value="connectors">
                         <span className="inline-flex items-center gap-1.5">
                           <span>Connectors</span>
-                          {typeof totalConnectors === 'number' ? (
+                          {typeof catalogTotal === 'number' ? (
+                            <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
+                              {catalogTotal}
+                            </Badge>
+                          ) : typeof totalConnectors === 'number' ? (
                             <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                               {totalConnectors}
                             </Badge>
@@ -436,7 +479,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
-                      {Array.isArray(filteredAgents) ? (
+                      {typeof agentsPagination?.total === 'number' ? (
                         <Badge
                           variant="outline"
                           className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
@@ -444,7 +487,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                           <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
                             <Icon name="bot" className="h-3 w-3 text-muted-foreground" />
                           </span>
-                          {filteredAgents.length} agents
+                          {agentsPagination.total} agents
                         </Badge>
                       ) : null}
                     </div>
@@ -464,7 +507,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Tools</h3>
-                      {Array.isArray(filteredTools) ? (
+                      {typeof toolsPagination?.total === 'number' ? (
                         <Badge
                           variant="outline"
                           className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
@@ -472,7 +515,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                           <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
                             <Icon name="magic-wand" className="h-3 w-3 text-muted-foreground" />
                           </span>
-                          {filteredTools.length} tools
+                          {toolsPagination.total} tools
                         </Badge>
                       ) : null}
                     </div>
@@ -499,7 +542,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Connectors</h3>
-                      {typeof totalConnectors === 'number' ? (
+                      {typeof catalogTotal === 'number' ? (
+                        <Badge
+                          variant="outline"
+                          className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
+                        >
+                          <span aria-hidden="true" className="relative inline-flex h-3 w-3 items-center justify-center">
+                            <Icon name="plug" className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                          {catalogTotal} connectors
+                        </Badge>
+                      ) : typeof totalConnectors === 'number' ? (
                         <Badge
                           variant="outline"
                           className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums"
@@ -523,9 +576,12 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     starshipId={starshipId}
                     maxColumns={2}
                     onStatsChange={handleConnectorStatsChange}
+                    onCatalogTotalChange={setCatalogTotal}
                     statusFilter="all"
                     catalogQuery={debouncedQuery}
                     layout="list"
+                    paginateCatalog
+                    catalogPageSize={25}
                   />
                 </section>
               ) : null}

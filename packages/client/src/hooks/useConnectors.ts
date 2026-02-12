@@ -1,6 +1,7 @@
 import api from '@/lib/api'
 import type {
   ApiResponse,
+  PaginationMeta,
   ConnectWithApiKeyRequest,
   ConnectWithBasicAuthRequest,
   ConnectorCatalogItem,
@@ -12,7 +13,7 @@ import type {
   StartOAuthRequest,
   StartOAuthResponse,
 } from '@starships/protocol'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -20,6 +21,7 @@ export const CONNECTOR_QUERY_KEYS = {
   all: ['connectors'] as const,
   catalog: () => [...CONNECTOR_QUERY_KEYS.all, 'catalog'] as const,
   catalogSearch: (args: { q?: string | null; limit?: number | null }) => [...CONNECTOR_QUERY_KEYS.catalog(), args] as const,
+  catalogSearchPaged: (args: { q?: string | null; limit?: number | null }) => [...CONNECTOR_QUERY_KEYS.catalog(), 'paged', args] as const,
   byStarship: (starshipId: string) => [...CONNECTOR_QUERY_KEYS.all, 'starship', starshipId] as const,
 } as const
 
@@ -40,6 +42,39 @@ export function useConnectorCatalog(args?: { q?: string; limit?: number; enabled
       return response.data.data.connectors
     },
     enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+}
+
+export type ConnectorCatalogPage = { connectors: ConnectorCatalogItem[]; pagination: PaginationMeta | null }
+
+export function useInfiniteConnectorCatalog(args?: { q?: string; limit?: number; enabled?: boolean }) {
+  const q = typeof args?.q === 'string' ? args.q.trim() : ''
+  const limit = typeof args?.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 24
+  const enabled = args?.enabled ?? true
+
+  return useInfiniteQuery({
+    queryKey: CONNECTOR_QUERY_KEYS.catalogSearchPaged({ q: q || null, limit: limit ?? null }),
+    enabled,
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }): Promise<ConnectorCatalogPage> => {
+      const page = typeof pageParam === 'number' ? pageParam : Number(pageParam)
+      const response: FetchResponse<ApiResponse<ConnectorCatalogResponse>> = await api.get('/api/v1/connectors/catalog', {
+        params: {
+          page,
+          limit,
+          q: q || undefined,
+        },
+      })
+      return { connectors: response.data.data.connectors, pagination: response.data.meta?.pagination ?? null }
+    },
+    getNextPageParam: last => {
+      const p = last?.pagination
+      if (!p) return undefined
+      return p.has_next ? p.page + 1 : undefined
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

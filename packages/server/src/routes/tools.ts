@@ -443,6 +443,20 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
+    // Optional pagination/search for clients that want server-driven pagination.
+    // Back-compat: if no `page` and no `limit` are provided, return the full list as before.
+    const queryValidation = validateData(
+      z.object({
+        page: z.coerce.number().int().min(1).optional(),
+        limit: z.coerce.number().int().min(1).max(200).optional(),
+        search: z.string().optional(),
+      }),
+      req.query,
+      res,
+      'query parameters'
+    );
+    if (!queryValidation) return;
+
     const userId = req.user?.id as string | undefined;
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
@@ -455,7 +469,29 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const toolRepository = new ToolRepository();
     const tools = await toolRepository.findByStarship(paramValidation.starshipId);
 
-    sendSuccess(res, tools);
+    const wantsPagination = queryValidation.page !== undefined || queryValidation.limit !== undefined || (queryValidation.search ?? '').trim().length > 0;
+    if (!wantsPagination) {
+      sendSuccess(res, tools);
+      return;
+    }
+
+    const page = Number.isFinite(queryValidation.page as any) ? Math.max(1, Math.floor(Number(queryValidation.page))) : 1;
+    const limit = Number.isFinite(queryValidation.limit as any) ? Math.max(1, Math.floor(Number(queryValidation.limit))) : 50;
+    const offset = (page - 1) * limit;
+    const q = String(queryValidation.search || '').trim().toLowerCase();
+
+    const filtered = q
+      ? (tools || []).filter((t: any) => {
+          const name = String(t?.name || '').toLowerCase();
+          const slug = String(t?.slug || '').toLowerCase();
+          const desc = String(t?.description || '').toLowerCase();
+          return name.includes(q) || slug.includes(q) || desc.includes(q);
+        })
+      : tools || [];
+
+    const total = filtered.length;
+    const pageItems = filtered.slice(offset, offset + limit);
+    sendSuccess(res, pageItems, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     console.error('[TOOLS] Error fetching starship tools:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship tools');

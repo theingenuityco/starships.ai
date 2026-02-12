@@ -165,6 +165,7 @@ export function AgentDeploymentWizardModal({
 }: AgentDeploymentWizardModalProps) {
   const assignedToolSlugs = (template?.assignedToolSlugs || []).filter(Boolean)
   const templateId = template?.id ?? ''
+  const agentDeployLabel = String(template?.name || 'agent').trim() || 'agent'
 
   const singleStarshipFromProps: DeployStarshipOptionWithAccess | null =
     starshipId && (starshipName || starshipSlug) ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName ?? '' } : null
@@ -297,7 +298,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 1 ? (
                 <div className="mt-8 space-y-3">
-                  <div className="text-sm font-semibold">Choose a starship</div>
+                  <div className="text-sm font-semibold">Choose a starship to deploy {agentDeployLabel}</div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">

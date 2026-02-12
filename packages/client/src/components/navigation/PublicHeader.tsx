@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
@@ -16,6 +16,18 @@ export function PublicHeader(): React.JSX.Element {
   const [logoTrigger, setLogoTrigger] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [brandCollapsed, setBrandCollapsed] = useState(false)
+  const pendingLogoActionRef = useRef<null | (() => void)>(null)
+  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const runPendingLogoAction = useCallback(() => {
+    const fn = pendingLogoActionRef.current
+    pendingLogoActionRef.current = null
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current)
+      fallbackTimeoutRef.current = null
+    }
+    fn?.()
+  }, [])
 
   // Collapse brand text after scrolling past threshold
   useEffect(() => {
@@ -29,6 +41,12 @@ export function PublicHeader(): React.JSX.Element {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current)
+    }
+  }, [])
+
   return (
     <header className="sticky top-0 z-50 w-full bg-transparent">
       <div className="px-4 sm:px-8 flex items-center justify-between py-6 sm:py-7">
@@ -37,12 +55,27 @@ export function PublicHeader(): React.JSX.Element {
           onClick={() => {
             setLogoTrigger(v => v + 1)
             track({ type: 'public_header_logo_clicked', fromPath: pathname ?? '' })
-            router.push('/')
+            // On non-home routes, wait for the logo entry animation so the effect is visible
+            // (otherwise navigation happens immediately and the animation never paints).
+            if (pathname === '/') return
+            pendingLogoActionRef.current = () => router.push('/')
+            // Fallback for reduced motion / missed animation completion callbacks.
+            fallbackTimeoutRef.current = setTimeout(() => {
+              runPendingLogoAction()
+            }, 1100)
           }}
           title="Go to home"
         >
           <span className="flex items-center gap-2">
-            <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+            <StarshipsLogo
+              width={36}
+              height={36}
+              className="text-foreground"
+              idleLoop={false}
+              playOnMountOnce={false}
+              triggerAnimation={logoTrigger}
+              onEntryAnimationComplete={runPendingLogoAction}
+            />
             <span
               className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none transition-all duration-200 ease-out ${
                 brandCollapsed ? 'opacity-0 -translate-x-1 max-w-0 w-0 overflow-hidden' : 'opacity-100 translate-x-0 max-w-[260px] w-auto'

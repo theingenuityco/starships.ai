@@ -175,7 +175,7 @@ export function FaviconThemeSync() {
     const sid = String(selectedStarshipId || '').trim()
     if (!sid) return null
     const list = Array.isArray(userStarships) ? userStarships : []
-    return list.some(s => String((s as any)?.id || '') === sid) ? sid : null
+    return list.some(s => String(s?.id || '') === sid) ? sid : null
   }, [selectedStarshipId, userStarships])
   const primaryStarship = useMemo(
     () => pickPrimaryStarshipForUser(userStarships ?? [], user?.id, selectedStarshipId),
@@ -212,7 +212,9 @@ export function FaviconThemeSync() {
         const sameKey = (a: unknown, b: unknown): boolean => {
           if (!Array.isArray(a) || !Array.isArray(b)) return false
           if (a.length !== b.length) return false
-          for (let i = 0; i < a.length; i++) if ((a as any)[i] !== (b as any)[i]) return false
+          const aa = a as unknown[]
+          const bb = b as unknown[]
+          for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false
           return true
         }
         const cache = queryClient.getQueryCache()
@@ -240,7 +242,7 @@ export function FaviconThemeSync() {
       if (!streamKey) return null
       try {
         const data = queryClient.getQueryData(streamKey)
-        return Array.isArray(data) ? (data as any[]) : null
+        return Array.isArray(data) ? (data as unknown[]) : null
       } catch {
         return null
       }
@@ -250,19 +252,21 @@ export function FaviconThemeSync() {
 
   const { data: notifList } = useNotificationsList(starshipId, Boolean(isAuthenticated && starshipId))
   const unreadTotal = useMemo(() => {
-    const chunks = Array.isArray(streamChunks) ? (streamChunks as any[]) : []
+    const chunks = Array.isArray(streamChunks) ? (streamChunks as unknown[]) : []
     for (let i = chunks.length - 1; i >= 0; i--) {
-      const c: any = chunks[i] as any
-      if (c?.type === 'notification.state' && c?.data?.unread) {
-        const n = Number(c.data.unread.totalUnread ?? 0)
+      const c = chunks[i] as { type?: unknown; data?: unknown } | null
+      if (c && c.type === 'notification.state') {
+        const unread = (c.data as { unread?: { totalUnread?: unknown } } | null)?.unread
+        const n = Number(unread?.totalUnread ?? 0)
         return Number.isFinite(n) ? n : 0
       }
-      if (c?.type === 'snapshot' && c?.data?.unread) {
-        const n = Number(c.data.unread.totalUnread ?? 0)
+      if (c && c.type === 'snapshot') {
+        const unread = (c.data as { unread?: { totalUnread?: unknown } } | null)?.unread
+        const n = Number(unread?.totalUnread ?? 0)
         return Number.isFinite(n) ? n : 0
       }
     }
-    const fallback = Number((notifList as any)?.unread?.totalUnread ?? 0)
+    const fallback = Number((notifList as { unread?: { totalUnread?: unknown } } | null)?.unread?.totalUnread ?? 0)
     return Number.isFinite(fallback) ? fallback : 0
   }, [streamChunks, notifList])
 

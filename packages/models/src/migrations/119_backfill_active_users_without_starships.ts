@@ -1,5 +1,134 @@
 import type { Client } from 'pg';
 import { nanoid } from 'nanoid';
+import { AgentRepository } from '@/repositories/AgentRepository';
+import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
+import { ToolRepository } from '@/repositories/ToolRepository';
+
+// Keep this dictionary aligned with the server's starship name generator
+// (`packages/server/src/utils/starshipNames.ts`) so backfilled starships match
+// the naming style used for new signups.
+const STARSHIP_NAMES = [
+  'Endeavour',
+  'Discovery',
+  'Voyager',
+  'Pioneer',
+  'Explorer',
+  'Pathfinder',
+  'Navigator',
+  'Horizon',
+  'Aurora',
+  'Meridian',
+  'Andromeda',
+  'Cassiopeia',
+  'Orion',
+  'Vega',
+  'Sirius',
+  'Polaris',
+  'Centauri',
+  'Nebula',
+  'Pulsar',
+  'Quasar',
+  'Phoenix',
+  'Titan',
+  'Atlas',
+  'Prometheus',
+  'Icarus',
+  'Odyssey',
+  'Genesis',
+  'Excalibur',
+  'Valkyrie',
+  'Serenity',
+  'Quantum',
+  'Vector',
+  'Prism',
+  'Nexus',
+  'Helix',
+  'Matrix',
+  'Catalyst',
+  'Synthesis',
+  'Axiom',
+  'Theorem',
+  'Tempest',
+  'Thunder',
+  'Lightning',
+  'Storm',
+  'Comet',
+  'Meteor',
+  'Eclipse',
+  'Solar',
+  'Lunar',
+  'Stellar',
+  'Infinity',
+  'Eternity',
+  'Legacy',
+  'Destiny',
+  'Fortune',
+  'Glory',
+  'Honor',
+  'Liberty',
+  'Justice',
+  'Triumph',
+  'Stardust',
+  'Starlight',
+  'Starfire',
+  'Starborn',
+  'Starwind',
+  'Starforge',
+  'Starfall',
+  'Starhawk',
+  'Starseeker',
+  'Starwalker',
+  'Ascendant',
+  'Transcendent',
+  'Radiant',
+  'Luminous',
+  'Brilliant',
+  'Majestic',
+  'Noble',
+  'Sovereign',
+  'Supreme',
+  'Ultimate',
+  'Harbinger',
+  'Sentinel',
+  'Guardian',
+  'Defiant',
+  'Resolute',
+  'Intrepid',
+  'Dauntless',
+  'Fearless',
+  'Relentless',
+  'Unstoppable',
+  'Dreamcatcher',
+  'Wishmaker',
+  'Starwhisper',
+  'Voidwalker',
+  'Timekeeper',
+  'Spaceforge',
+  'Moonrider',
+  'Sunblade',
+  'Nightfall',
+  'Dawnbreaker',
+] as const;
+
+function getRandomStarshipName(): string {
+  const randomIndex = Math.floor(Math.random() * STARSHIP_NAMES.length);
+  return String(STARSHIP_NAMES[randomIndex] ?? 'Voyager');
+}
+
+function getOwnerLabel(displayName: string | null, email: string | null): string | null {
+  const fromDisplay = String(displayName ?? '').trim();
+  if (fromDisplay) {
+    const first = fromDisplay.split(/\s+/).filter(Boolean)[0] ?? '';
+    return first.trim() || null;
+  }
+  const fromEmail = String(email ?? '').trim();
+  if (fromEmail) {
+    const local = fromEmail.split('@')[0] ?? '';
+    const cleaned = local.trim();
+    return cleaned || null;
+  }
+  return null;
+}
 
 /**
  * Migration 119: Backfill default starships for active users who have zero accessible starships.
@@ -23,6 +152,7 @@ import { nanoid } from 'nanoid';
  * - Re-running the migration should create 0 additional rows.
  */
 export async function up(client: Client): Promise<void> {
+  const createdStarshipIds: string[] = [];
   await client.query('BEGIN');
   try {
     const getRows = <T>(result: unknown): T[] => {
@@ -50,7 +180,9 @@ export async function up(client: Client): Promise<void> {
 
       const starshipId = nanoid();
       const slug = `my-starship-${nanoid(8).toLowerCase()}`;
-      const starshipName = 'My Starship';
+      const randomShipName = getRandomStarshipName();
+      const ownerLabel = getOwnerLabel(t.display_name ?? null, t.email ?? null);
+      const starshipName = ownerLabel ? `${ownerLabel}'s ${randomShipName}` : `My ${randomShipName}`;
 
       const defaultConversationId = nanoid();
       const walletId = nanoid();
@@ -148,12 +280,150 @@ export async function up(client: Client): Promise<void> {
           }),
         ]
       );
+
+      createdStarshipIds.push(starshipId);
     }
 
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Provisioning pass (best-effort)
+  //
+  // These users historically ended up with no starship at all. After creating the
+  // default starship record + wallet + #lobby, also provision:
+  // - baseline starship-level tools: read-url, read-older-messages (permission allow)
+  // - Aria agent + all her assigned tools + allow permissions
+  //
+  // Note: Repositories use the normal app connection pool rather than the migration
+  // client passed into this function. This is consistent with earlier migrations
+  // (e.g. 021/022/079) and is intentionally best-effort.
+  // ---------------------------------------------------------------------------
+  try {
+    const agentRepo = new AgentRepository();
+    const templateRepo = new AgentTemplateRepository();
+    const toolRepo = new ToolRepository();
+
+    const ariaTemplate = await templateRepo.findBySlug('aria');
+    if (!ariaTemplate?.id) {
+      console.warn('[119_backfill_active_users_without_starships] Aria agent template not found (slug="aria"); skipping Aria provisioning.');
+      return;
+    }
+
+    const ariaToolSlugs =
+      Array.isArray(ariaTemplate.assignedToolSlugs) && ariaTemplate.assignedToolSlugs.length > 0
+        ? ariaTemplate.assignedToolSlugs
+        : [
+            // Fallback to the expected Aria toolset (see models seeders).
+            'list-agents',
+            'list-agents-from-marketplace',
+            'call-agent',
+            'list-tools',
+            'read-older-messages',
+            'search-connector',
+            'suggest-connectors',
+            'suggest-agents',
+            'render-starship-details',
+          ];
+
+    for (const starshipId of createdStarshipIds) {
+      if (!starshipId) continue;
+
+      // Best-effort advisory lock on the migration connection (matches earlier migrations).
+      try {
+        await client.query('SELECT pg_advisory_lock(hashtext($1))', [starshipId]);
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        // 1) Baseline starship-level tools + allow permissions
+        for (const baseSlug of ['read-url', 'read-older-messages'] as const) {
+          try {
+            let tool = await toolRepo.findByTemplateSlugAndStarship(baseSlug, starshipId);
+            if (!tool) {
+              tool = await toolRepo.createFromTemplate(baseSlug, starshipId);
+            }
+            // Upsert the starship-level permission mapping.
+            await agentRepo.setStarshipToolPermissionBySlug({ starshipId, toolSlug: baseSlug, permission: 'allow' });
+            void tool;
+          } catch (e) {
+            console.warn('[119_backfill_active_users_without_starships] Failed to ensure baseline tool for starship', {
+              starshipId,
+              tool: baseSlug,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        // 2) Ensure Aria exists on the starship
+        let ariaAgentId: string | null = null;
+        try {
+          const agents = await agentRepo.findByStarship(starshipId);
+          const existing = agents.find((a) => a.sourceTemplateId === ariaTemplate.id) ?? null;
+          if (existing?.id) {
+            ariaAgentId = existing.id;
+          } else {
+            const created = await agentRepo.createFromTemplate(ariaTemplate.id, starshipId);
+            ariaAgentId = created?.id ?? null;
+          }
+        } catch (e) {
+          console.warn('[119_backfill_active_users_without_starships] Failed to ensure Aria agent for starship', {
+            starshipId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
+        if (!ariaAgentId) continue;
+
+        // 3) Ensure Aria's assigned tools are deployed and wired to the agent
+        const deployedToolIds: string[] = [];
+        for (const toolSlug of ariaToolSlugs) {
+          const slug = String(toolSlug || '').trim();
+          if (!slug) continue;
+          try {
+            let tool = await toolRepo.findByTemplateSlugAndStarship(slug, starshipId);
+            if (!tool) {
+              tool = await toolRepo.createFromTemplate(slug, starshipId);
+            }
+            if (tool?.id) deployedToolIds.push(tool.id);
+          } catch (e) {
+            console.warn('[119_backfill_active_users_without_starships] Failed to ensure Aria tool for starship', {
+              starshipId,
+              tool: slug,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+
+        for (const toolId of deployedToolIds) {
+          try {
+            await agentRepo.addToolRelationship(ariaAgentId, toolId);
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // 4) Allow all assigned tool relationships for Aria (matches current default-starship provisioning)
+        try {
+          await agentRepo.setAllAssignedToolPermissionsForAgent(ariaAgentId, 'allow');
+        } catch {
+          /* ignore */
+        }
+      } finally {
+        try {
+          await client.query('SELECT pg_advisory_unlock(hashtext($1))', [starshipId]);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch (e) {
+    // Do not fail the migration after the starship backfill has succeeded.
+    console.warn('[119_backfill_active_users_without_starships] Provisioning pass failed (non-fatal):', e);
   }
 }
 

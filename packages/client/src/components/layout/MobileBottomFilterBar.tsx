@@ -40,9 +40,46 @@ export function MobileBottomFilterBar(props: {
   } = props
 
   const showSearch = typeof searchValue === 'string'
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
+
+  // Expose the rendered bar height as a CSS var so pages can pad content
+  // to avoid being covered by the fixed-position footer.
+  React.useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const varName = '--mobile-bottom-filter-bar-height'
+    const apply = () => {
+      try {
+        const h = Math.ceil(el.getBoundingClientRect().height)
+        if (h > 0) document.documentElement.style.setProperty(varName, `${h}px`)
+      } catch {
+        /* ignore */
+      }
+    }
+
+    apply()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => apply()) : null
+    ro?.observe(el)
+    window.addEventListener('resize', apply)
+    return () => {
+      try {
+        ro?.disconnect()
+      } catch {
+        /* ignore */
+      }
+      window.removeEventListener('resize', apply)
+      // Best-effort cleanup (safe even if another page sets it later).
+      try {
+        document.documentElement.style.removeProperty(varName)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
 
   return (
     <div
+      ref={rootRef}
       className={cn(
         'md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border/60',
         'bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75',

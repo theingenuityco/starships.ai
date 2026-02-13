@@ -20,6 +20,7 @@ import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnect
 import { Button } from '@/components/ui/button'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -354,6 +355,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const isInitialAutomationsLoading = !q && Boolean(toolsQuery.isLoading)
   const isSearchingAutomations = Boolean(q && (toolsQuery.isLoading || (toolsQuery.isFetching && !toolsQuery.isFetchingNextPage)))
 
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number | null) => (typeof n === 'number' ? `${label} (${n})` : label)
+    const opts = [
+      { value: 'all', label: withCount('All', allTabTotalForBadges) },
+      { value: 'agents', label: withCount('Agents', agentsTotalForBadges) },
+      { value: 'automations', label: withCount('Automations', automationsTotalForBadges) },
+      ...(canManageConnectors ? [{ value: 'connectors', label: withCount('Connectors', connectorsTotalForBadges) }] : []),
+    ]
+    return opts
+  }, [agentsTotalForBadges, allTabTotalForBadges, automationsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
+
   const renderRowSkeleton = useCallback((key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -613,9 +625,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-28 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs value={tabFromUrl} onValueChange={value => setTab(toIntegrationsTab(value))}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
@@ -805,6 +817,16 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
           )}
         </div>
       </div>
+
+      <MobileBottomFilterBar
+        filterValue={tabFromUrl}
+        onFilterChange={v => setTab(toIntegrationsTab(v))}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        searchPlaceholder="Search installed"
+      />
     </div>
   )
 }

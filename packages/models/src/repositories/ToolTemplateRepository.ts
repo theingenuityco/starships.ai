@@ -91,6 +91,25 @@ export class ToolTemplateRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Batch fetch tool templates by id (single query).
+   * Note: the returned array is not guaranteed to preserve the input ordering.
+   */
+  async findByIds(ids: string[]): Promise<ToolTemplateModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const cleanIds = (ids || []).map((x) => String(x)).filter((x) => x.trim().length > 0);
+        if (cleanIds.length === 0) return [];
+
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM tool_templates WHERE id = ANY($1)', [cleanIds]);
+        return fromDatabaseArray(ToolTemplateEntity, result);
+      },
+      'findByIds',
+      'ToolTemplate'
+    );
+  }
+
   async findBySlug(slug: string): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {

@@ -62,6 +62,60 @@ export class ConnectorTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Search connector templates for Explore catalog (DB-backed), including a total count.
+   *
+   * This exists to support API routes that need totals for UX without reaching into private DB internals.
+   */
+  async searchCatalogWithTotal(args?: {
+    q?: string;
+    limit?: number;
+  }): Promise<{ total: number; rows: Array<Record<string, unknown>> }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const q = typeof args?.q === 'string' ? args.q.trim() : '';
+        const limit = typeof args?.limit === 'number' && Number.isFinite(args.limit) ? Math.max(1, Math.min(200, args.limit)) : 200;
+
+        const connection = this.getConnection();
+        const where: string[] = ['(is_enabled IS DISTINCT FROM FALSE)'];
+        const params: unknown[] = [];
+        let i = 1;
+
+        if (q) {
+          if (q.length > 200) throw new Error('Search query cannot exceed 200 characters');
+          params.push(`%${q}%`);
+          const p = `$${i++}`;
+          where.push(`(
+            provider ILIKE ${p}
+            OR name ILIKE ${p}
+            OR description ILIKE ${p}
+            OR category ILIKE ${p}
+          )`);
+        }
+
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        const countRow = await connection.queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM connector_templates ${whereSql}`, params);
+
+        params.push(limit);
+        const pLimit = `$${i++}`;
+
+        const sql = `
+          SELECT *
+          FROM connector_templates
+          ${whereSql}
+          ORDER BY usage_count DESC, provider ASC, created_at DESC
+          LIMIT ${pLimit}
+        `;
+
+        const rows = await connection.query<Record<string, unknown>>(sql, params);
+        return { total: countRow?.n ?? 0, rows: rows ?? [] };
+      },
+      'searchCatalogWithTotal',
+      'ConnectorTemplate'
+    );
+  }
+
+  /**
    * Read-only access to the legacy endpoints catalog stored on connector_templates.endpoints_json.
    *
    * IMPORTANT: This exists only for admin transparency/debugging. Runtime execution must use

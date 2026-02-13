@@ -11,11 +11,6 @@ import type { AgentTemplateModel, ConnectorCatalogItem, ConnectorProvider, ToolT
 
 const router: Router = Router()
 
-type ConnectionLike = {
-  queryOne: <T>(sql: string, params?: unknown[]) => Promise<T | null | undefined>
-  query: <T>(sql: string, params?: unknown[]) => Promise<T[]>
-}
-
 const ExploreSearchQuerySchema = z
   .object({
     q: z.string().optional(),
@@ -48,6 +43,8 @@ router.get('/explore/search', optionalJwtAuth, async (req: Request, res: Respons
     const type = qd.type ?? 'all'
     const limit = qd.limit ?? 24
 
+    if (q && q.length > 200) throw new Error('Search query cannot exceed 200 characters')
+
     const agentRepo = new AgentTemplateRepository()
     const toolRepo = new ToolTemplateRepository()
     const connectorRepo = new ConnectorTemplateRepository()
@@ -61,53 +58,27 @@ router.get('/explore/search', optionalJwtAuth, async (req: Request, res: Respons
       shouldTools ? toolRepo.search({ query: q || undefined }) : Promise.resolve([] as ToolTemplateModel[]),
       shouldConnectors
         ? (async () => {
-            // NOTE:
-            // We intentionally query connector_templates directly here (DB-backed search).
-            // Avoid relying on a repository method that might not be present at runtime in all dev setups.
-            const connection = ((connectorRepo as any).getConnection?.() ?? null) as ConnectionLike | null
-            if (!connection) {
+            try {
+              return await connectorRepo.searchCatalogWithTotal({ q: q || undefined, limit })
+            } catch {
+              // Fallback for dev/test setups without DB connectivity: in-memory search.
               const all = await connectorRepo.list()
               const lowered = q.toLowerCase()
               const filtered = q
                 ? all.filter(t => {
-                    const provider = String((t as any)?.provider ?? '').toLowerCase()
-                    const name = String((t as any)?.name ?? '').toLowerCase()
-                    const desc = String((t as any)?.description ?? '').toLowerCase()
-                    const category = String((t as any)?.category ?? '').toLowerCase()
+                    const provider = String(t?.provider ?? '').toLowerCase()
+                    const name = String(t?.name ?? '').toLowerCase()
+                    const desc = String(t?.description ?? '').toLowerCase()
+                    const category = String((t as unknown as { category?: unknown })?.category ?? '').toLowerCase()
                     return provider.includes(lowered) || name.includes(lowered) || desc.includes(lowered) || category.includes(lowered)
                   })
                 : all
-              const enabledOnly = filtered.filter(t => (t as any)?.isEnabled !== false)
-              return { total: enabledOnly.length, rows: enabledOnly.slice(0, limit) as unknown as Array<Record<string, unknown>> }
+              const enabledOnly = filtered.filter(t => (t as unknown as { isEnabled?: unknown })?.isEnabled !== false)
+              return {
+                total: enabledOnly.length,
+                rows: enabledOnly.slice(0, limit) as unknown as Array<Record<string, unknown>>,
+              }
             }
-
-            const where: string[] = ['(is_enabled IS DISTINCT FROM FALSE)']
-            const params: unknown[] = []
-            let i = 1
-
-            if (q) {
-              if (q.length > 200) throw new Error('Search query cannot exceed 200 characters')
-              params.push(`%${q}%`)
-              const p = `$${i++}`
-              where.push(`(provider ILIKE ${p} OR name ILIKE ${p} OR description ILIKE ${p} OR category ILIKE ${p})`)
-            }
-
-            const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
-
-            const countSql = `SELECT COUNT(*)::int AS n FROM connector_templates ${whereSql}`
-            const countRow = await connection.queryOne<{ n: number }>(countSql, params)
-
-            params.push(limit)
-            const pLimit = `$${i++}`
-            const selectSql = `
-              SELECT *
-              FROM connector_templates
-              ${whereSql}
-              ORDER BY provider ASC, created_at DESC
-              LIMIT ${pLimit}
-            `
-            const rows = await connection.query<Record<string, unknown>>(selectSql, params)
-            return { total: countRow?.n ?? 0, rows: rows ?? [] }
           })()
         : Promise.resolve({ total: 0, rows: [] as Array<Record<string, unknown>> }),
     ])

@@ -160,7 +160,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids = (agents || [])
-      .map(a => String((a as any)?.avatarAttachmentId || '').trim())
+      .map(a => String(a?.avatarAttachmentId || '').trim())
       .filter(Boolean)
     return Array.from(new Set(ids))
   }, [agents])
@@ -170,8 +170,8 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const agentAvatarUrlById = useMemo(() => {
     const m = new Map<string, string>()
     for (const att of agentAvatarAttachments || []) {
-      const id = String((att as any)?.id || '').trim()
-      const url = String((att as any)?.previewUrl || '').trim()
+      const id = String(att?.id || '').trim()
+      const url = String(att?.previewUrl || '').trim()
       if (id && url) m.set(id, url)
     }
     return m
@@ -224,9 +224,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const toolLeftIconById = useMemo(() => {
     const m = new Map<string, { name: string; title: string }>()
     for (const t of tools || []) {
-      const id = String((t as any)?.id || '').trim()
+      const id = String(t?.id || '').trim()
       if (!id) continue
-      const label = String((t as any)?.name || '').trim() || String((t as any)?.slug || '').trim() || 'Tool'
+      const label = String(t?.name || '').trim() || String(t?.slug || '').trim() || 'Tool'
       m.set(id, pickToolLeftIcon(label))
     }
     return m
@@ -252,7 +252,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const connectorCatalogTotal = useMemo<number | null>(() => {
     const pages = connectorCatalogTotalQuery.data?.pages ?? []
     for (let i = pages.length - 1; i >= 0; i--) {
-      const t = (pages[i] as any)?.pagination?.total
+      const t = pages[i]?.pagination?.total
       const n = typeof t === 'number' ? t : Number(t)
       if (Number.isFinite(n)) return n
     }
@@ -403,10 +403,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return (
       <div className="space-y-2">
         {visibleAgents.map((a: AgentModel) => {
-          const agentSlug = String((a as any)?.slug || '')
-          const avatarAttachmentId = String((a as any)?.avatarAttachmentId || '').trim()
+          const agentSlug = String(a?.slug || '')
+          const avatarAttachmentId = String(a?.avatarAttachmentId || '').trim()
           const avatarUrl = avatarAttachmentId ? agentAvatarUrlById.get(avatarAttachmentId) : undefined
-          const avatarSeed = formatAgentDisplayName(a) || String((a as any)?.name || '').trim() || agentSlug || 'Agent'
+          const avatarSeed = formatAgentDisplayName(a) || String(a?.name || '').trim() || agentSlug || 'Agent'
           return (
             <div key={String(a.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1" aria-label={formatAgentDisplayName(a) || agentSlug || 'Agent'}>
@@ -440,7 +440,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       </button>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {(a as any)?.description ? <span className="truncate">{String((a as any).description)}</span> : null}
+                      {a?.description ? <span className="truncate">{String(a.description)}</span> : null}
                     </div>
                   </div>
                 </div>
@@ -499,8 +499,8 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return (
       <div className="space-y-2">
         {visibleAutomations.map((t: ToolModel) => {
-          const toolSlug = String((t as any)?.slug || '')
-          const toolLeftIcon = toolLeftIconById.get(String((t as any)?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
+          const toolSlug = String(t?.slug || '')
+          const toolLeftIcon = toolLeftIconById.get(String(t?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
           return (
             <div key={String(t.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1" aria-label={t.name || toolSlug || 'Tool'}>
@@ -531,7 +531,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       </button>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {(t as any)?.description ? <span className="truncate">{String((t as any).description)}</span> : null}
+                      {t?.description ? <span className="truncate">{String(t.description)}</span> : null}
                     </div>
                   </div>
                 </div>

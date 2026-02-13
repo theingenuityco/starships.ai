@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useStarshipConnectors } from '@/hooks/useConnectors'
+import { StarshipMonogram, StarshipPickerIcon } from '@/components/marketplace/StarshipIdentity'
+import { WizardStepper } from '@/components/marketplace/WizardStepper'
 
 type WizardStep = 1 | 2 | 3
 
@@ -34,102 +36,12 @@ interface ToolInstallationWizardModalProps {
   starshipName?: string
 }
 
-const TOTAL_STEPS = 3
-
 type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
   { id: 1, label: 'Starship', subtitle: 'Select a starship' },
   { id: 2, label: 'Connectors', subtitle: 'Connect required apps' },
   { id: 3, label: 'Review', subtitle: 'Confirm & install' },
 ]
-
-function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
-  const label = String(input?.name || input?.slug || input?.id || '').trim()
-  if (!label) return 'S'
-  const parts = label.split(/\s+/).filter(Boolean)
-  const first = parts[0]?.[0] ?? 'S'
-  const second = parts.length > 1 ? parts[1]?.[0] : undefined
-  return (first + (second ?? '')).toUpperCase()
-}
-
-function StarshipMonogram({ starship }: { starship: { name?: string; slug?: string; id?: string } }) {
-  const initials = getStarshipInitials(starship)
-  return (
-    <div
-      className={cn(
-        'h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center text-[12px] font-semibold tabular-nums',
-        'border-primary/25 bg-primary/10 text-primary'
-      )}
-      aria-hidden
-    >
-      {initials}
-    </div>
-  )
-}
-
-function StarshipPickerIcon({ starship }: { starship: { name?: string; slug?: string; id?: string } }) {
-  const initials = getStarshipInitials(starship)
-  return (
-    <div className={cn('flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border/40 flex-shrink-0')}>
-      <span className="text-sm font-semibold text-primary tabular-nums">{initials}</span>
-    </div>
-  )
-}
-
-function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
-  const progressValue = TOTAL_STEPS <= 1 ? 0 : ((currentStep - 1) / (TOTAL_STEPS - 1)) * 100
-  const n = WIZARD_STEPS.length
-  const lastIndex = Math.max(0, n - 1)
-
-  return (
-    <div className="relative pt-1">
-      <div className="absolute left-[16px] right-[16px] top-[16px] h-px bg-border/60 z-0" aria-hidden />
-      <div className="absolute left-[16px] right-[16px] top-[16px] h-px z-0" aria-hidden>
-        <div className="h-full bg-primary/50 origin-left" style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressValue / 100))})` }} />
-      </div>
-
-      <ol className="relative min-h-[62px] z-10">
-        {WIZARD_STEPS.map((s, index) => {
-          const isCompleted = currentStep > s.id
-          const isActive = currentStep === s.id
-          const pct = lastIndex === 0 ? 0 : (index / lastIndex) * 100
-          const isFirst = index === 0
-          const isLast = index === lastIndex
-          const transform = isFirst ? 'translateX(0)' : isLast ? 'translateX(-100%)' : 'translateX(-50%)'
-          const alignment = isFirst ? 'items-start text-left' : isLast ? 'items-end text-right' : 'items-center text-center'
-          return (
-            <li
-              key={s.id}
-              className={cn('absolute top-0 flex flex-col', alignment)}
-              style={{ left: `${pct}%`, transform }}
-              aria-current={isActive ? 'step' : undefined}
-            >
-              <div className="relative z-10 rounded-full bg-card p-[2px]" aria-hidden>
-                <div
-                  className={cn(
-                    'h-7 w-7 rounded-full border flex items-center justify-center shadow-sm',
-                    isCompleted
-                      ? 'border-emerald-500/40 bg-emerald-500 text-white'
-                      : isActive
-                        ? 'border-primary/50 bg-primary/10 text-primary'
-                        : 'border-border/60 bg-background text-muted-foreground'
-                  )}
-                >
-                  {isCompleted ? <Icon name="check" className="h-4 w-4" /> : <span className="text-xs font-semibold tabular-nums">{s.id}</span>}
-                </div>
-              </div>
-
-              <div className="mt-2 min-w-0 w-36 sm:w-44">
-                <div className={cn('text-xs font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{s.subtitle}</div>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-    </div>
-  )
-}
 
 export function ToolInstallationWizardModal({
   isOpen,
@@ -142,15 +54,14 @@ export function ToolInstallationWizardModal({
   starshipSlug,
   starshipName,
 }: ToolInstallationWizardModalProps) {
-  const templateSlug = String((template as any)?.slug || '').trim()
+  const templateSlug = String(template?.slug || '').trim()
   const toolName = String(template?.name || 'tool').trim() || 'tool'
-  const requiresApiKey = Boolean((template as any)?.requiresApiKey)
+  const requiresApiKey = Boolean(template?.requiresApiKey)
 
   const requiredConnectorProviders = useMemo(() => {
-    const raw = (template as any)?.requiredConnectorProviders
-    const list = Array.isArray(raw) ? raw : []
+    const list = Array.isArray(template?.requiredConnectorProviders) ? template.requiredConnectorProviders : []
     const normalized = list
-      .map(p => String(p ?? '').trim())
+      .map(p => String(p || '').trim())
       .filter(Boolean)
       // Ignore the built-in Starships connector requirement.
       .filter(p => p.toLowerCase() !== 'starships')
@@ -166,7 +77,7 @@ export function ToolInstallationWizardModal({
   const [starshipPickerOpen, setStarshipPickerOpen] = useState(false)
   const [starshipPickerSearch, setStarshipPickerSearch] = useState('')
 
-  const selectedStarshipId = String((selectedStarship as any)?.id || '')
+  const selectedStarshipId = String(selectedStarship?.id || '')
   const shouldFetchConnectors = isOpen && step >= 2 && !!selectedStarshipId
   const { data: selectedStarshipConnectors = [] } = useStarshipConnectors(selectedStarshipId, Boolean(shouldFetchConnectors))
 
@@ -174,9 +85,9 @@ export function ToolInstallationWizardModal({
     const requiredProviders = new Set(requiredConnectorProviders.map(p => String(p || '').trim().toLowerCase()).filter(Boolean))
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
-      const provider = String((c as any)?.provider || '').trim().toLowerCase()
+      const provider = String(c?.provider || '').trim().toLowerCase()
       if (!provider || provider === 'starships') return false
-      const status = String((c as any)?.status || '').trim()
+      const status = String(c?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length
   }, [requiredConnectorProviders, selectedStarshipConnectors])
@@ -239,7 +150,7 @@ export function ToolInstallationWizardModal({
           <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
             <DialogTitle>Install tool</DialogTitle>
             <div>
-              <WizardStepper currentStep={step} />
+              <WizardStepper currentStep={step} steps={WIZARD_STEPS} />
             </div>
           </DialogHeader>
 

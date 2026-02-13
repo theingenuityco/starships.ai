@@ -27,6 +27,11 @@ type ConnectionLike = {
   query: <T>(sql: string, params?: unknown[]) => Promise<T[]>;
 };
 
+// Cache the agents table template id column name once per process.
+// This is a one-time migration compatibility check and should not hit information_schema on every request.
+let cachedAgentsTemplateColumn: 'source_template_id' | 'template_id' | null = null;
+let cachedAgentsTemplateColumnPromise: Promise<'source_template_id' | 'template_id'> | null = null;
+
 function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<string, unknown> {
   // Never expose raw S3 pointers even to creators (serve via direct public URL).
   const hasAvatar = typeof template['avatarS3Key'] === 'string' && String(template['avatarS3Key']).length > 0;
@@ -100,16 +105,31 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     const windowDays = 30; // popularity window for listing (avoid `usage_count`)
 
     async function resolveAgentsTemplateColumn(): Promise<'source_template_id' | 'template_id'> {
+      if (cachedAgentsTemplateColumn) return cachedAgentsTemplateColumn;
       if (!connection?.queryOne) return 'template_id';
-      const row = await connection.queryOne<{ has_source: boolean; has_template: boolean }>(
-        `
-          SELECT
-            EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'source_template_id') AS has_source,
-            EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'template_id') AS has_template
-        `
-      );
-      if (row?.has_source) return 'source_template_id';
-      return 'template_id';
+
+      if (cachedAgentsTemplateColumnPromise) return await cachedAgentsTemplateColumnPromise;
+
+      cachedAgentsTemplateColumnPromise = (async () => {
+        const row = await connection.queryOne<{ has_source: boolean; has_template: boolean }>(
+          `
+            SELECT
+              EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'source_template_id') AS has_source,
+              EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'template_id') AS has_template
+          `
+        );
+        const resolved: 'source_template_id' | 'template_id' = row?.has_source ? 'source_template_id' : 'template_id';
+        cachedAgentsTemplateColumn = resolved;
+        return resolved;
+      })();
+
+      try {
+        return await cachedAgentsTemplateColumnPromise;
+      } catch (e) {
+        // If the query fails, don't poison the cache; allow a later retry.
+        cachedAgentsTemplateColumnPromise = null;
+        throw e;
+      }
     }
 
     // Popularity-sorted listing (no search).
@@ -194,8 +214,13 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
           .map((r: { id?: unknown }) => (typeof r?.id === 'string' ? String(r.id).trim() : ''))
           .filter((x: string) => x.length > 0);
 
-        const fetched = await Promise.all(ids.map((id: string) => templateService.getTemplateById(id)));
-        paginatedTemplates = fetched.filter((t): t is AgentTemplateModel => !!t);
+        const fetched = await templateService.getTemplatesByIds(ids);
+        const byId = new Map<string, AgentTemplateModel>();
+        for (const t of fetched || []) {
+          const tid = (t as unknown as { id?: unknown })?.id;
+          if (typeof tid === 'string' && tid.trim().length > 0) byId.set(tid, t);
+        }
+        paginatedTemplates = ids.map((id) => byId.get(id)).filter((t): t is AgentTemplateModel => !!t);
         paginationMeta = createPaginationMeta(page, limit, countRow?.n ?? 0);
       }
     }

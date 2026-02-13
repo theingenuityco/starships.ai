@@ -28,7 +28,7 @@ export async function triggerNextRevalidate(args: { tags?: string[]; paths?: str
     const { token, baseUrl } = getRevalidateConfig()
     if (!token) {
       if (process.env.NODE_ENV === 'development') {
-        // eslint-disable-next-line no-console
+         
         console.warn('[nextRevalidate] REVALIDATE_TOKEN is not set; skipping on-demand revalidation')
       }
       return
@@ -56,10 +56,10 @@ export async function triggerNextRevalidate(args: { tags?: string[]; paths?: str
 
       if (process.env.NODE_ENV === 'development') {
         if (!res) {
-          // eslint-disable-next-line no-console
+           
           console.warn('[nextRevalidate] Request failed (no response)', { url, tags, paths })
         } else if (!res.ok) {
-          // eslint-disable-next-line no-console
+           
           console.warn('[nextRevalidate] Request failed', { url, status: res.status, tags, paths })
         }
       }

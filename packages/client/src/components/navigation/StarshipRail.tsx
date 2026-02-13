@@ -37,7 +37,7 @@ function StarshipRailItem({
           type="button"
           onClick={() => onSelect(starship)}
           className={[
-            'relative flex h-8 w-8 items-center justify-center rounded-xl border transition-all',
+            'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
             'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
             isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
           ].join(' ')}
@@ -47,7 +47,7 @@ function StarshipRailItem({
           {/* Discord-like active indicator */}
           <span
             className={[
-              'absolute -left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full transition-opacity',
+              'absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity',
               isActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0',
             ].join(' ')}
           />
@@ -61,7 +61,7 @@ function StarshipRailItem({
             />
           ) : null}
 
-          <span className="text-[10px] font-semibold">{getInitials(starship.name)}</span>
+          <span className="text-xs font-semibold">{getInitials(starship.name)}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
@@ -120,7 +120,7 @@ export function StarshipRail({
 
   return (
     <div
-      className="flex h-full w-11 flex-col items-center gap-1 bg-card py-2"
+      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card py-3"
       aria-label="Starship switcher"
     >
       {/* Top logo */}
@@ -129,13 +129,13 @@ export function StarshipRail({
           <button
             type="button"
             onClick={handleTopLogoClick}
-            className="relative mt-1 flex w-full items-center justify-center py-1 text-muted-foreground hover:text-foreground transition-colors"
+            className="relative mt-2 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Home"
             title="Home"
           >
             <StarshipsLogo
-              width={24}
-              height={24}
+              width={28}
+              height={28}
               className="text-current"
               gradientId="rail-top-gradient"
               triggerAnimation={logoTrigger}
@@ -165,7 +165,7 @@ export function StarshipRail({
       </Tooltip>
 
       {/* Add vertical padding so corner badges/indicators never clip at scroll edges. */}
-      <div className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-visible px-1.5 pt-0 pb-2 custom-scrollbar">
+      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pt-0 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
@@ -179,7 +179,7 @@ export function StarshipRail({
               type="button"
               onClick={() => router.push('/explore')}
               className={[
-                'relative flex h-8 w-8 items-center justify-center rounded-xl border transition-all',
+                'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
                 'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
                 isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
               ].join(' ')}
@@ -189,11 +189,11 @@ export function StarshipRail({
               {/* Discord-like active indicator */}
               <span
                 className={[
-                  'absolute -left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full transition-opacity',
+                  'absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity',
                   isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0',
                 ].join(' ')}
               />
-              <Icon name="store" className="h-4 w-4" />
+              <Icon name="store" className="h-5 w-5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">

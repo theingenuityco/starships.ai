@@ -386,7 +386,11 @@ export class StarshipService {
   // ============================================================================
 
   /**
-   * Create a default starship for a new user with 200 welcome credits
+   * Create a default starship for a new user with 200 welcome credits.
+   *
+   * Provisioning expectations:
+   * - Deploy baseline starship-level tools (read-url, read-older-messages)
+   * - Deploy the initial default agent (Aria) and her assigned tools
    */
   static async createDefaultStarship(userId: string): Promise<StarshipModel> {
     const starshipService = new StarshipService();
@@ -401,6 +405,23 @@ export class StarshipService {
       shipClass: 'scout',
       initialCredits: 200, // 200 welcome credits for new users
     });
+
+    // Ensure baseline tools exist and are allowed at the starship level.
+    // `createStarship()` already attempts this, but we run it again here to make the
+    // provisioning intent explicit for default starships.
+    try {
+      await starshipService.ensureBaselineStarshipToolsAllowed(starship.id);
+    } catch (err) {
+      console.error('[STARSHIP-SERVICE] Failed to ensure baseline tools for default starship:', starship.id, err);
+    }
+
+    // Deploy Aria + her tools/permissions. Best-effort: the starship should still exist even if
+    // the template/tooling layer is temporarily unavailable.
+    try {
+      await StarshipService.createInitialAgents(userId, starship.id);
+    } catch (err) {
+      console.error('[STARSHIP-SERVICE] Failed to create initial agents for default starship:', starship.id, err);
+    }
 
     return starship;
   }

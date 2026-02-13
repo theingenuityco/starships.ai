@@ -86,12 +86,7 @@ export class RegistrationOrchestrator {
     // Create a default starship immediately for ALL new signups (password + invite flows).
     // This avoids "0 starships" states and ensures new users always have a workspace.
     try {
-      const ship = await StarshipService.createDefaultStarship(user.id);
-      try {
-        await StarshipService.createInitialAgents(user.id, ship.id);
-      } catch {
-        // Best-effort: agents can be added later from marketplace.
-      }
+      await StarshipService.createDefaultStarship(user.id);
     } catch (error) {
       // Compensating action: if we can't create a default starship, delete the user
       // so a retry doesn't leave an orphaned account with no workspace.

@@ -404,12 +404,7 @@ export class UserService {
     // Invite-joiners will still be able to join the invited starship; onboarding is handled client-side.
     if (isNewUser) {
       try {
-        const ship = await StarshipService.createDefaultStarship(user.id);
-        try {
-          await StarshipService.createInitialAgents(user.id, ship.id);
-        } catch {
-          // Best-effort: agents can be added later from marketplace.
-        }
+        await StarshipService.createDefaultStarship(user.id);
       } catch (error) {
         // Compensating action: remove the new user so retry doesn't strand them without a workspace.
         try {

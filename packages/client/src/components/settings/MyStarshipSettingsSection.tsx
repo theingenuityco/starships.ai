@@ -172,7 +172,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   return (
     <>
       {/* Match Profile layout: sticky top bar + two-column cards */}
-      <div className={`sticky top-0 z-10 p-4 ${PROFILE_SECTION_CARD_CLASS}`}>
+      <div className={`sticky top-0 z-10 px-4 pb-4 pt-6 md:p-4 ${PROFILE_SECTION_CARD_CLASS}`}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
             <Icon name="rocket" className="h-5 w-5 text-primary" />

@@ -604,7 +604,7 @@ export function ConversationSummaryBar({
 
     return (
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 py-2">
+        <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
@@ -808,7 +808,7 @@ export function ConversationSummaryBar({
       }
       className="sticky top-0 z-10 border-b border-border/60 bg-card"
     >
-      <div className="px-4 py-2">
+      <div className="px-4 pt-3.5 pb-2 md:py-2">
         <div className="w-full">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}

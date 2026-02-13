@@ -624,20 +624,24 @@ export default function MembersPage() {
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
+                <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                    <MobileNavToggleButton className="-ml-2" />
                   </span>
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="users" weight="bold" className="h-4 w-4" />
-                  </span>
-                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Members</h3>
-                </div>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        <Icon name="users" weight="bold" className="h-4 w-4" />
+                      </span>
+                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Members</h3>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">
-                    Invite collaborators, manage roles, and deploy agents to your starship.
-                  </span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                      <span className="font-medium leading-none text-muted-foreground">
+                        Invite collaborators, manage roles, and deploy agents to your starship.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

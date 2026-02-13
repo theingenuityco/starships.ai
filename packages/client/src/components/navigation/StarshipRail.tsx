@@ -120,7 +120,7 @@ export function StarshipRail({
 
   return (
     <div
-      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card pt-4 pb-3"
+      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card pt-5 pb-3"
       aria-label="Starship switcher"
     >
       {/* Top logo */}

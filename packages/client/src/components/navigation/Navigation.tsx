@@ -386,7 +386,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-2 pt-4 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
+          <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
               className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/40 transition-colors"
               onClick={handleHeaderClick}
@@ -504,7 +504,7 @@ export function Navigation(props: NavigationProps) {
           <div className="ml-2 mr-1.5 my-0 h-px bg-border/60" />
 
           {/* Bottom controls */}
-          <div className="pl-2 pr-1.5 pt-2 flex-shrink-0">
+          <div className="pl-2 pr-1.5 pt-2 pb-3 flex-shrink-0">
             <div className="flex flex-col gap-1">
               {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (
@@ -515,13 +515,13 @@ export function Navigation(props: NavigationProps) {
                       if (!activeStarshipSlug) return
                       router.push(`/ship/${activeStarshipSlug}/settings/billing`)
                     }}
-                    className="h-9 w-full flex items-center gap-2 rounded-lg px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="h-7 w-full flex items-center gap-1.5 rounded-lg px-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-60 disabled:cursor-not-allowed"
                     aria-label="View credits and billing"
                   >
-                    <span className="flex-1 text-left text-[13px] font-medium">Credits</span>
-                    <div className="flex items-center gap-1.5">
-                      <Icon name="coins" className="h-3.5 w-3.5" />
-                      <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                    <span className="flex-1 text-left text-[11px] font-medium">Credits</span>
+                    <div className="flex items-center gap-1">
+                      <Icon name="coins" className="h-3 w-3" />
+                      <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
                     </div>
                   </button>
                 ) : (
@@ -535,10 +535,10 @@ export function Navigation(props: NavigationProps) {
                             if (!activeStarshipSlug) return
                             router.push(`/ship/${activeStarshipSlug}/settings/billing`)
                           }}
-                          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                           aria-label="View credits and billing"
                         >
-                          <Icon name="coins" className="h-3.5 w-3.5" />
+                          <Icon name="coins" className="h-3 w-3" />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent
@@ -548,8 +548,8 @@ export function Navigation(props: NavigationProps) {
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-medium">Credits</span>
-                          <Icon name="coins" className="h-3.5 w-3.5" />
-                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                          <Icon name="coins" className="h-3 w-3" />
+                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
                         </div>
                       </TooltipContent>
                     </Tooltip>

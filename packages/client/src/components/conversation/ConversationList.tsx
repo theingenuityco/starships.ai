@@ -37,6 +37,8 @@ interface ConversationListProps {
   starshipSlug?: string
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
+  /** Called whenever the list triggers navigation (channels/DMs). Useful for closing mobile nav overlays. */
+  onNavigate?: () => void
   compact?: boolean
 }
 
@@ -109,6 +111,7 @@ export const ConversationList = memo(function ConversationList({
   starshipSlug,
   onConversationDelete,
   onConversationSelect,
+  onNavigate,
   compact = false,
 }: ConversationListProps) {
   const router = useRouter()
@@ -384,6 +387,7 @@ export const ConversationList = memo(function ConversationList({
     if (!slug) return
     router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
     onConversationSelect?.(channelSlug)
+    onNavigate?.()
   }
 
   const existingDmConversationIdByAgentId = useMemo(() => {
@@ -420,6 +424,7 @@ export const ConversationList = memo(function ConversationList({
     const href = dmHrefForTarget(t)
     if (!href) return
     router.push(href)
+    onNavigate?.()
 
     // Keep the parent callback behavior for consumers that care about "selection",
     // even though canonical navigation is now by peer key (not conversationId).

@@ -93,7 +93,7 @@ export function MobileBottomFilterBar(props: {
             className={cn(
               // Mirror `ConversationMessageInput` mobile composer container.
               // Mobile: only a top border (flush to screen edges).
-              'relative bg-card shadow-sm border-t border-border/80 border-x-0 border-b-0 rounded-none'
+              'relative bg-card shadow-sm border-t border-border/40 border-x-0 border-b-0 rounded-none'
             )}
           >
             <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">
@@ -129,14 +129,14 @@ export function MobileBottomFilterBar(props: {
                   <button
                     type="button"
                     className={cn(
-                      // Match conversation input action buttons.
-                      'p-1.5 rounded-lg transition-colors',
-                      'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      // Match conversation input send button treatment (rounded, sized, primary).
+                      'h-8 w-8 rounded-full shrink-0 transition-all inline-flex items-center justify-center',
+                      'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
                     )}
                     aria-label={filterPlaceholder}
                     title={filterPlaceholder}
                   >
-                    <Icon name="filter" className="h-5 w-5" />
+                    <Icon name="filter" className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" side="top" sideOffset={12} className="w-56">

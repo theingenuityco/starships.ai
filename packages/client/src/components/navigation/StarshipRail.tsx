@@ -4,8 +4,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import Icon from '@/components/primitives/Icon'
 import { useNotificationsList } from '@/hooks/useNotifications'
+import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
-import { useMemo } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
 function getInitials(name: string): string {
@@ -17,15 +18,16 @@ function getInitials(name: string): string {
   return (first + (second ?? '')).toUpperCase()
 }
 
-function StarshipRailItem({
-  starship,
-  isActive,
-  onSelect,
-}: {
-  starship: StarshipModel
-  isActive: boolean
-  onSelect: (starship: StarshipModel) => void
-}) {
+const StarshipRailItem = memo(
+  function StarshipRailItem({
+    starship,
+    isActive,
+    onSelect,
+  }: {
+    starship: StarshipModel
+    isActive: boolean
+    onSelect: (starship: StarshipModel) => void
+  }) {
   const { data } = useNotificationsList(starship.id, Boolean(starship?.id))
   const hasUnread = Boolean((data as any)?.unread?.totalUnread && (data as any).unread.totalUnread > 0)
 
@@ -36,7 +38,7 @@ function StarshipRailItem({
           type="button"
           onClick={() => onSelect(starship)}
           className={[
-            'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
+            'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
             'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
             isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
           ].join(' ')}
@@ -60,7 +62,7 @@ function StarshipRailItem({
             />
           ) : null}
 
-          <span className="text-xs font-semibold">{getInitials(starship.name)}</span>
+          <span className="text-[11px] font-semibold">{getInitials(starship.name)}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
@@ -81,7 +83,15 @@ function StarshipRailItem({
       </TooltipContent>
     </Tooltip>
   )
-}
+  },
+  (prev, next) =>
+    prev.isActive === next.isActive &&
+    prev.onSelect === next.onSelect &&
+    prev.starship?.id === next.starship?.id &&
+    prev.starship?.slug === next.starship?.slug &&
+    prev.starship?.name === next.starship?.name
+)
+StarshipRailItem.displayName = 'StarshipRailItem'
 
 export function StarshipRail({
   starships,
@@ -96,19 +106,76 @@ export function StarshipRail({
   const items = useMemo(() => (Array.isArray(starships) ? starships : []), [starships])
   const pathname = usePathname()
   const router = useRouter()
+  const { user } = useAuth()
+  const [logoTrigger, setLogoTrigger] = useState(0)
+
+  const ownedTargetSlug = useMemo(() => {
+    // Preferred destination is an owned starship, but non-owners should still get a sane default.
+    const uid = typeof user?.id === 'string' ? user.id : ''
+    const owned = uid ? items.find(s => String((s as any)?.ownerId || '') === uid) : null
+    return (owned?.slug || activeSlug || items[0]?.slug || '').trim() || null
+  }, [activeSlug, items, user?.id])
+
+  const handleTopLogoClick = useCallback(() => {
+    // Keep the logo animated even if idleLoop is disabled in the future.
+    setLogoTrigger(v => v + 1)
+    if (ownedTargetSlug) {
+      router.push(`/ship/${encodeURIComponent(ownedTargetSlug)}`)
+      return
+    }
+    router.push('/')
+  }, [ownedTargetSlug, router])
 
   const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
   return (
     <div
-      className="flex h-full w-14 flex-col items-center gap-2 border-r border-border/60 bg-card py-3"
+      className="flex h-full w-[52px] flex-col items-center gap-1.5 bg-card pt-5 pb-3"
       aria-label="Starship switcher"
     >
-      {/* Top spacer (aligns visually with sidebar header) */}
-      <div className="h-1" />
+      {/* Top logo */}
+      <Tooltip delayDuration={250}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={handleTopLogoClick}
+            className="relative mt-0 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Home"
+            title="Home"
+          >
+            <StarshipsLogo
+              width={24}
+              height={24}
+              className="text-current"
+              gradientId="rail-top-gradient"
+              triggerAnimation={logoTrigger}
+              activeStroke="currentColor"
+              idleLoop={false}
+              playOnMountOnce={false}
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
+          <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
+            <div className="mt-0.5">
+              <StarshipsLogo
+                width={22}
+                height={22}
+                className="text-muted-foreground"
+                gradientId="rail-tooltip-gradient"
+                activeStroke="currentColor"
+                idleLoop={false}
+                playOnMountOnce={false}
+              />
+            </div>
+            <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Starships.ai</div>
+            <div className="col-span-2 text-xs text-muted-foreground">Go to your default channel</div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
 
       {/* Add vertical padding so corner badges/indicators never clip at scroll edges. */}
-      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 py-2 custom-scrollbar">
+      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pt-0 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
@@ -122,7 +189,7 @@ export function StarshipRail({
               type="button"
               onClick={() => router.push('/explore')}
               className={[
-                'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
+                'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
                 'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
                 isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
               ].join(' ')}
@@ -136,7 +203,7 @@ export function StarshipRail({
                   isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0',
                 ].join(' ')}
               />
-              <Icon name="store" className="h-5 w-5" />
+              <Icon name="store" className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">

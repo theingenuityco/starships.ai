@@ -1,7 +1,15 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectApiKeyConnector, useConnectBasicAuthConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
+import {
+  useConnectApiKeyConnector,
+  useConnectBasicAuthConnector,
+  useConnectorCatalog,
+  useDisconnectConnector,
+  useInfiniteConnectorCatalog,
+  useStarshipConnectors,
+  useStartOAuthConnector,
+} from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,10 +23,19 @@ import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
 const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+
+const INTERNAL_STARSHIPS_CONNECTOR_PROVIDER = 'starships'
+
+function excludeInternalStarshipsConnectorFromTotal(total: number | null): number | null {
+  if (typeof total !== 'number' || !Number.isFinite(total)) return null
+  // Catalog endpoint includes the built-in Starships connector; the UI hides it.
+  return Math.max(0, total - 1)
+}
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -33,6 +50,21 @@ interface StarshipConnectorsPanelProps {
   hideSearch?: boolean
   /** Optional server-side search query (catalog endpoint supports `q`). */
   catalogQuery?: string
+  /**
+   * When true, fetch the connector catalog via server pagination (page/limit).
+   * Useful when the catalog is large and we don't want to load everything at once.
+   */
+  paginateCatalog?: boolean
+  /** Page size for paginated catalog mode. */
+  catalogPageSize?: number
+  /** Optional callback to surface server catalog total (pagination.total). */
+  onCatalogTotalChange?: (total: number | null) => void
+  /** Limit the number of rendered connector rows/cards (UI-only). */
+  maxItems?: number
+  /** Sort order for rendered connectors. */
+  sortBy?: 'catalog' | 'recently_used'
+  /** Whether to show "Load more" when catalog is paginated. */
+  showLoadMore?: boolean
   /** Filter which connectors to show. */
   statusFilter?: 'all' | 'connected' | 'unconnected'
   /**
@@ -60,6 +92,18 @@ interface StarshipConnectorsPanelProps {
   /** Override connect button label (e.g. "Connect" instead of "Connect Gmail"). */
   connectButtonLabel?: string
   /**
+   * Visual density for grid cards.
+   * - default: existing spacing (roomier)
+   * - compact: match wizard "Automations" step 2 card density
+   */
+  density?: 'default' | 'compact'
+  /**
+   * Controls the visual style of connector cards in grid layout.
+   * - panel: existing connectors/settings card design
+   * - explore: match the public Explore connector listing card design
+   */
+  cardVariant?: 'panel' | 'explore'
+  /**
    * Use the same card background/border as onboarding step 3 agent cards
    * (e.g. bg-card/10, border-border/40) for visual consistency.
    */
@@ -70,6 +114,11 @@ interface StarshipConnectorsPanelProps {
    * counts how many of those are currently connected.
    */
   onStatsChange?: (stats: { total: number; connected: number }) => void
+  /**
+   * When false, disables entrance animations for cards (no motion wrappers).
+   * Useful for wizard/modals where staggered animations feel distracting.
+   */
+  animateCards?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -91,6 +140,12 @@ export function StarshipConnectorsPanel({
   onlyProviders,
   hideSearch,
   catalogQuery,
+  paginateCatalog = false,
+  catalogPageSize = 24,
+  onCatalogTotalChange,
+  maxItems,
+  sortBy = 'catalog',
+  showLoadMore = true,
   statusFilter = 'all',
   layout = 'grid',
   hideDisconnect = false,
@@ -98,13 +153,35 @@ export function StarshipConnectorsPanel({
   hideReconnect = false,
   hideCardDescription = false,
   connectButtonLabel,
+  density = 'default',
+  cardVariant = 'panel',
   matchAgentCardStyle = false,
   onStatsChange,
+  animateCards = true,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const q = typeof catalogQuery === 'string' ? catalogQuery.trim() : ''
-  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q })
+  const pagedCatalog = useInfiniteConnectorCatalog({ q, limit: catalogPageSize, enabled: paginateCatalog })
+  const flatPagedCatalog = useMemo(() => {
+    const pages = pagedCatalog.data?.pages ?? []
+    return pages.flatMap(p => (Array.isArray(p?.connectors) ? p.connectors : []))
+  }, [pagedCatalog.data])
+  const pagedTotal = useMemo(() => {
+    const pages = pagedCatalog.data?.pages ?? []
+    for (let i = pages.length - 1; i >= 0; i--) {
+      const t = (pages[i] as any)?.pagination?.total
+      const n = typeof t === 'number' ? t : Number(t)
+      if (Number.isFinite(n)) return n
+    }
+    return null
+  }, [pagedCatalog.data])
+
+  const { data: catalog = [], isFetching: isCatalogFetching } = useConnectorCatalog({ q, enabled: !paginateCatalog })
+  const catalogItems = paginateCatalog ? flatPagedCatalog : catalog
+  const isCatalogFetchingUnified = paginateCatalog ? pagedCatalog.isFetching : isCatalogFetching
+  const canLoadMoreCatalog = paginateCatalog ? Boolean(pagedCatalog.hasNextPage) : false
+  const isLoadingMoreCatalog = paginateCatalog ? Boolean(pagedCatalog.isFetchingNextPage) : false
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
@@ -315,13 +392,13 @@ export function StarshipConnectorsPanel({
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
-    const base = catalog.filter(item => item.provider !== 'starships')
+    const base = (catalogItems || []).filter(item => item.provider !== 'starships')
     if (Array.isArray(onlyProviders) && onlyProviders.length > 0) {
       const allow = new Set(onlyProviders.map(p => String(p)))
       return base.filter(item => allow.has(String(item.provider)))
     }
     return base
-  }, [catalog, onlyProviders])
+  }, [catalogItems, onlyProviders])
 
   const connectedProviderSet = useMemo(() => {
     return new Set((connectors ?? []).filter(c => (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
@@ -329,11 +406,7 @@ export function StarshipConnectorsPanel({
 
   const connectedCount = useMemo(() => {
     const providerSet = new Set(visibleCatalog.map(c => String(c.provider)))
-    const connectedProviders = new Set(
-      (connectors ?? [])
-        .filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected')
-        .map(c => String((c as any)?.provider))
-    )
+    const connectedProviders = new Set((connectors ?? []).filter(c => providerSet.has(String((c as any)?.provider)) && (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
     return connectedProviders.size
   }, [connectors, visibleCatalog])
 
@@ -342,6 +415,26 @@ export function StarshipConnectorsPanel({
     if (statusFilter === 'unconnected') return visibleCatalog.filter(c => !connectedProviderSet.has(String(c.provider)))
     return visibleCatalog
   }, [connectedProviderSet, statusFilter, visibleCatalog])
+
+  const renderedCatalog = useMemo(() => {
+    const base = Array.isArray(filteredCatalog) ? [...filteredCatalog] : []
+    if (sortBy === 'recently_used') {
+      base.sort((a, b) => {
+        const ap = String((a as any)?.provider || '').trim()
+        const bp = String((b as any)?.provider || '').trim()
+        const aState: any = getConnectorState(ap)
+        const bState: any = getConnectorState(bp)
+        const aTsRaw = aState?.updatedAt || aState?.createdAt || null
+        const bTsRaw = bState?.updatedAt || bState?.createdAt || null
+        const aTs = typeof aTsRaw === 'string' ? new Date(aTsRaw).getTime() : 0
+        const bTs = typeof bTsRaw === 'string' ? new Date(bTsRaw).getTime() : 0
+        if (aTs !== bTs) return bTs - aTs
+        return ap.localeCompare(bp)
+      })
+    }
+    const n = typeof maxItems === 'number' && Number.isFinite(maxItems) ? Math.max(0, Math.floor(maxItems)) : null
+    return n != null ? base.slice(0, n) : base
+  }, [filteredCatalog, getConnectorState, maxItems, sortBy])
 
   const lastStatsRef = useRef<{ total: number; connected: number } | null>(null)
   useEffect(() => {
@@ -358,12 +451,19 @@ export function StarshipConnectorsPanel({
     return visibleCatalog.find((c: { provider: string }) => c.provider === provider)?.name ?? provider
   }
 
-  const isSearching = Boolean(q) && isCatalogFetching
-  const isInitialCatalogLoading = !q && isCatalogFetching && catalog.length === 0
+  const isSearching = Boolean(q) && isCatalogFetchingUnified
+  const isInitialCatalogLoading = !q && isCatalogFetchingUnified && catalogItems.length === 0
   const isPanelLoading = isLoading || isInitialCatalogLoading
 
-  const sectionTitle = statusFilter === 'connected' ? 'Connected' : statusFilter === 'unconnected' ? 'Unconnected' : 'All connectors'
-  const sectionCount = filteredCatalog.length
+  const lastCatalogTotalRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!onCatalogTotalChange) return
+    const nextRaw = paginateCatalog ? pagedTotal : visibleCatalog.length
+    const next = paginateCatalog ? excludeInternalStarshipsConnectorFromTotal(nextRaw) : nextRaw
+    if (lastCatalogTotalRef.current === next) return
+    lastCatalogTotalRef.current = next
+    onCatalogTotalChange(next)
+  }, [onCatalogTotalChange, paginateCatalog, pagedTotal, visibleCatalog.length])
 
   const renderConnectorRowSkeleton = (key: string) => {
     return (
@@ -408,12 +508,6 @@ export function StarshipConnectorsPanel({
   if (isPanelLoading && layout === 'list') {
     return (
       <div>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex items-baseline gap-3">
-            <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
-            <Skeleton className="h-4 w-8" />
-          </div>
-        </div>
         <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderConnectorRowSkeleton(`connector-skel-${i}`))}</div>
       </div>
     )
@@ -446,6 +540,134 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
+    if (cardVariant === 'explore') {
+      const compact = density === 'compact'
+      const exploreConnectButton = (
+        <Button
+          variant={isConnected ? 'ghost' : 'ghost'}
+          size="sm"
+          disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
+          onClick={() => {
+            if (isConnected) return
+            if (isManaged) return
+            if (isOauthConnectable) return void handleConnect(provider)
+            if (isApiKeyConnectable) return openApiKeyDialog(provider)
+            if (isBasicConnectable) return openBasicDialog(provider)
+          }}
+          className={cn('h-7 px-2 shrink-0 text-xs', isConnected ? 'text-emerald-700 dark:text-emerald-300 opacity-100' : 'text-primary hover:text-primary disabled:text-muted-foreground')}
+        >
+          {isConnected ? (
+            <>
+              <Icon name="check-circle" className="h-3.5 w-3.5 mr-1 text-emerald-600 dark:text-emerald-400" />
+              Connected
+            </>
+          ) : isManaged ? (
+            'Managed by platform'
+          ) : (
+            (connectButtonLabel ?? 'Connect')
+          )}
+        </Button>
+      )
+
+      const exploreDisconnectButton = canDisconnect ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => openDisconnectConfirm(provider)}
+          disabled={disconnectMutation.isPending}
+          className="h-7 px-2 shrink-0 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        >
+          Disconnect
+        </Button>
+      ) : null
+
+      if (compact) {
+        const CardShell = (
+          <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  {provider && showLogo ? (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                      <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
+                      <Icon name="plug" className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+
+                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{label}</div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {exploreDisconnectButton}
+                  {!shouldHideConnectButton ? exploreConnectButton : null}
+                </div>
+              </div>
+
+              {!hideCardDescription && catalogItem.description ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+            </div>
+          </div>
+        )
+
+        return animateCards ? (
+          <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+            {CardShell}
+          </motion.div>
+        ) : (
+          <div key={provider} className="h-full">
+            {CardShell}
+          </div>
+        )
+      }
+
+      const DefaultExploreShell = (
+        <div className="group relative overflow-hidden h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md">
+          <div className="flex">
+            {/* Left logo strip (edge-to-edge), matching Explore listing */}
+            <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
+              <div className="absolute inset-0 flex items-center justify-center">
+                {provider ? (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                    <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                  </div>
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">
+                    <Icon name="plug" className="h-4.5 w-4.5" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right content */}
+            <div className="min-w-0 flex-1 flex flex-col py-4 pr-4 pl-0">
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-tight truncate">{label}</div>
+              </div>
+
+              {!hideCardDescription && catalogItem.description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+
+              <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                {exploreDisconnectButton}
+                {!shouldHideConnectButton ? exploreConnectButton : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+      return animateCards ? (
+        <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+          {DefaultExploreShell}
+        </motion.div>
+      ) : (
+        <div key={provider} className="h-full">
+          {DefaultExploreShell}
+        </div>
+      )
+    }
+
     const connectButton = (
       <Button
         size="sm"
@@ -464,7 +686,7 @@ export function StarshipConnectorsPanel({
           ? 'Managed by platform'
           : isOauthConnectable
             ? isConnected
-              ? connectButtonLabel ?? `Connect ${label}`
+              ? (connectButtonLabel ?? `Connect ${label}`)
               : (connectButtonLabel ?? `Connect ${label}`)
             : isApiKeyConnectable
               ? isConnected
@@ -535,7 +757,9 @@ export function StarshipConnectorsPanel({
     )
   }
 
-  const gridClassName = maxColumns === 1 ? 'grid gap-6 grid-cols-1' : maxColumns === 2 ? 'grid gap-6 grid-cols-1 md:grid-cols-2' : 'grid gap-6 md:grid-cols-2 lg:grid-cols-3'
+  const gapClassName = density === 'compact' ? 'gap-3' : 'gap-6'
+  const gridClassName =
+    maxColumns === 1 ? `grid ${gapClassName} grid-cols-1` : maxColumns === 2 ? `grid ${gapClassName} grid-cols-1 md:grid-cols-2` : `grid ${gapClassName} md:grid-cols-2 lg:grid-cols-3`
 
   const listRow = (provider: string) => {
     const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
@@ -586,7 +810,7 @@ export function StarshipConnectorsPanel({
       </Button>
     ) : null
 
-    const cta = isConnected ? disconnectButton ?? connectButton : connectButton
+    const cta = isConnected ? (disconnectButton ?? connectButton) : connectButton
 
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -615,9 +839,7 @@ export function StarshipConnectorsPanel({
                 <span
                   className={cn(
                     'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                    isConnected
-                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                      : 'border-border/50 bg-muted/20 text-muted-foreground'
+                    isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-border/50 bg-muted/20 text-muted-foreground'
                   )}
                   aria-label={isConnected ? 'Connected' : 'Not connected'}
                   title={isConnected ? 'Connected' : 'Not connected'}
@@ -632,9 +854,7 @@ export function StarshipConnectorsPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 self-center">
-          {!shouldHideConnectButton ? cta : null}
-        </div>
+        <div className="flex items-center gap-1 self-center">{!shouldHideConnectButton ? cta : null}</div>
       </div>
     )
   }
@@ -643,27 +863,48 @@ export function StarshipConnectorsPanel({
     <div className="space-y-6">
       {layout === 'list' ? (
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex items-baseline gap-3">
-              <h3 className="text-lg font-semibold leading-tight text-foreground">{sectionTitle}</h3>
-            </div>
-          </div>
           {isSearching ? (
             renderCenteredState(`Searching “${q}”…`)
-          ) : filteredCatalog.length === 0 ? (
+          ) : renderedCatalog.length === 0 ? (
             renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
           ) : (
-            <div className="space-y-2">{filteredCatalog.map(entry => listRow(entry.provider))}</div>
+            <div className="space-y-2">{renderedCatalog.map(entry => listRow(entry.provider))}</div>
           )}
+          {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
+            <div className="flex justify-center pt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void pagedCatalog.fetchNextPage()
+                }}
+                disabled={isLoadingMoreCatalog}
+                className="h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              >
+                {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="space-y-4">
-          {isSearching ? (
-            renderCenteredState(`Searching “${q}”…`)
-          ) : filteredCatalog.length === 0 ? (
-            renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.')
+          {isSearching ? renderCenteredState(`Searching “${q}”…`) : filteredCatalog.length === 0 ? renderCenteredState(q ? `No connectors match “${q}”.` : 'No connectors available.') : null}
+          <div className={gridClassName}>{renderedCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+          {paginateCatalog && showLoadMore && canLoadMoreCatalog ? (
+            <div className="flex justify-center pt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void pagedCatalog.fetchNextPage()
+                }}
+                disabled={isLoadingMoreCatalog}
+                className="h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40"
+              >
+                {isLoadingMoreCatalog ? 'Loading…' : 'Load more connectors'}
+              </Button>
+            </div>
           ) : null}
-          <div className={gridClassName}>{filteredCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
         </div>
       )}
 

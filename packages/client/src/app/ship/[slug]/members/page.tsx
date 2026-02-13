@@ -74,10 +74,10 @@ function getAgentLabel(a: AgentWithAvatar): { primary: string; secondary?: strin
 
 function getAgentMarketplaceStatus(a: AgentWithAvatar): { label: string; className: string } {
   const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
-  if (fromMarketplace) return { label: 'Deployed from Marketplace', className: 'text-muted-foreground' }
+  if (fromMarketplace) return { label: 'Deployed from Explore', className: 'text-muted-foreground' }
 
   const status = a.publicationStatus
-  if (status === 'published') return { label: 'Published to Marketplace', className: 'text-muted-foreground' }
+  if (status === 'published') return { label: 'Published to Explore', className: 'text-muted-foreground' }
   if (status === 'pending_approval') return { label: 'Publish pending', className: 'text-muted-foreground' }
   if (status === 'rejected') return { label: 'Publish rejected', className: 'text-destructive' }
   return { label: 'Private', className: 'text-muted-foreground' }
@@ -111,16 +111,15 @@ export default function MembersPage() {
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
 
+  const SEARCH_DEBOUNCE_MS = 400
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    const handle = window.setTimeout(() => {
-      setDebouncedSearch(searchText.trim())
-    }, 250)
+    const handle = window.setTimeout(() => setDebouncedSearch(searchText.trim()), SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(handle)
-  }, [searchText])
+  }, [SEARCH_DEBOUNCE_MS, searchText])
 
   useEffect(() => {
     if (!inviteOpen) return
@@ -569,8 +568,19 @@ export default function MembersPage() {
     }
     return n
   }, [humans, presence])
+
+  const onlineVisibleHumansCount = useMemo(() => {
+    let n = 0
+    for (const m of filteredHumans) {
+      const userId = typeof (m as any)?.userId === 'string' ? String((m as any).userId).trim() : ''
+      if (!userId) continue
+      if (presence.isUserOnline(userId)) n += 1
+    }
+    return n
+  }, [filteredHumans, presence])
   // Agents are rendered as "Online" throughout this page.
   const onlineAgentsCount = agentsCount
+  const onlineVisibleAgentsCount = filteredAgents.length
 
   const canInviteUsers = Boolean(starship?.id && (isInstanceAdmin === true || (user?.id && starship?.ownerId && String(starship.ownerId) === String(user.id))))
 
@@ -731,7 +741,7 @@ export default function MembersPage() {
                       <Skeleton className="h-4 w-8" />
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/marketplace">
+                      <Link href="/explore">
                         <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
                         Explore agents
                       </Link>
@@ -754,12 +764,7 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Humans</h3>
-                      <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums">
-                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
-                        </span>
-                        {onlineHumansCount} online
-                      </Badge>
+                      <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">({onlineVisibleHumansCount} online)</span>
                     </div>
                     {slug && canInviteUsers ? (
                       <Button type="button" size="sm" variant="ghost" className="h-8 text-primary hover:text-primary" onClick={openInviteFlow}>
@@ -787,15 +792,10 @@ export default function MembersPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Agents</h3>
-                      <Badge variant="outline" className="h-5 px-2 py-0 bg-muted/10 text-[10px] font-medium leading-none inline-flex items-center gap-1.5 tabular-nums">
-                        <span aria-hidden="true" className="relative inline-flex h-3 w-3">
-                          <PresenceIndicator kind="online" active={true} size="xs" placement="inset" />
-                        </span>
-                        {onlineAgentsCount} online
-                      </Badge>
+                      <span className="text-xs tabular-nums text-emerald-600 dark:text-emerald-400">({onlineVisibleAgentsCount} online)</span>
                     </div>
                     <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/marketplace">
+                      <Link href="/explore">
                         <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
                         Explore agents
                       </Link>
@@ -934,7 +934,7 @@ export default function MembersPage() {
                   : confirmAction?.kind === 'deleteAgent'
                     ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
                     : confirmAction?.kind === 'unpublishAgent'
-                      ? 'This will remove the agent from the Marketplace (it will stay deployed in your starship).'
+                      ? 'This will remove the agent from Explore (it will stay deployed in your starship).'
                       : ''}
             </DialogDescription>
           </DialogHeader>

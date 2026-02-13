@@ -95,8 +95,8 @@ export function AgentPublishModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl rounded-lg">
         <DialogHeader>
-          <DialogTitle>Request: Publish to marketplace</DialogTitle>
-          <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
+          <DialogTitle>Request: Publish to Explore</DialogTitle>
+          <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to Explore.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -152,7 +152,7 @@ export function AgentPublishModal({
                 ) : (
                   <div className="space-y-0.5">
                     <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
-                    <p className="text-[11px] text-muted-foreground">First time publishing this agent to the marketplace.</p>
+                    <p className="text-[11px] text-muted-foreground">First time publishing this agent to Explore.</p>
                   </div>
                 )}
 

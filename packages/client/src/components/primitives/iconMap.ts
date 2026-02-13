@@ -11,6 +11,7 @@ const map: Record<string, ResolvedIcon> = {
   'arrow-down': { type: 'phosphor', component: 'ArrowDown' },
   'arrow-up': { type: 'phosphor', component: 'ArrowUp' },
   // Caret (filled supported via weight)
+  'caret-left': { type: 'phosphor', component: 'CaretLeft' },
   'caret-right': { type: 'phosphor', component: 'CaretRight' },
   // Sidebar toggle icon (used for nav collapse/expand)
   sidebar: { type: 'iconify', icon: 'ph:sidebar-simple' },
@@ -44,6 +45,7 @@ const map: Record<string, ResolvedIcon> = {
   stars: { type: 'phosphor', component: 'Stars' },
   heart: { type: 'phosphor', component: 'Heart' },
   info: { type: 'phosphor', component: 'Info' },
+  eyeglasses: { type: 'phosphor', component: 'Eyeglasses' },
   calendar: { type: 'phosphor', component: 'Calendar' },
   clock: { type: 'phosphor', component: 'Clock' },
   percent: { type: 'phosphor', component: 'Percent' },

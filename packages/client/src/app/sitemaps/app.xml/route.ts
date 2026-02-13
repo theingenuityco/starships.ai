@@ -1,6 +1,6 @@
 import { isIndexingEnabled } from '@/lib/indexing'
 import { publicEnvConfig } from '@starships/env/public'
-import { fetchPublicAgentTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplatesPage, fetchPublicConnectorCatalogPage, fetchPublicToolTemplatesPage } from '@/lib/server/public-templates'
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
@@ -69,20 +69,71 @@ export async function GET(req: Request) {
   const base = normalizeSiteUrl(getBaseUrlFromRequest(req))
   const now = new Date()
 
-  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: 0 })
-  const agentDetailUrls: UrlEntry[] = agentTemplates
-    .map(t => String(t?.slug || '').trim())
-    .filter(Boolean)
-    .map(slug => ({
-      path: `/marketplace/agents/${encodeURIComponent(slug)}`,
-      changefreq: 'weekly',
-      priority: 0.7,
+  // Fetch all agent slugs in pages (avoid assuming the list endpoint returns everything).
+  const AGENT_PAGE_SIZE = 200
+  const MAX_AGENT_PAGES = 50 // safety cap
+  const agentSlugs: string[] = []
+  let agentTotal = 0
+
+  for (let page = 1; page <= MAX_AGENT_PAGES; page++) {
+    const bundle = await fetchPublicAgentTemplatesPage({ page, limit: AGENT_PAGE_SIZE, revalidateSeconds: 0 })
+    if (page === 1) agentTotal = bundle.pagination.total
+    for (const t of bundle.items) {
+      const slug = String(t?.slug || '').trim()
+      if (slug) agentSlugs.push(slug)
+    }
+    if (!bundle.pagination.has_next) break
+  }
+
+  const agentDetailUrls: UrlEntry[] = agentSlugs.map(slug => ({
+    path: `/explore/agents/${encodeURIComponent(slug)}`,
+    changefreq: 'weekly',
+    priority: 0.7,
+    lastmod: now,
+  }))
+
+  // Add paginated Explore listing pages for SEO/ISR discoverability.
+  // Keep this bounded so we don't emit enormous sitemaps.
+  const LISTING_PAGE_SIZE = 18
+  const MAX_LISTING_PAGES = 25
+  const toolsCount = await fetchPublicToolTemplatesPage({ page: 1, limit: 1, revalidateSeconds: 0 })
+  const connectorsCount = await fetchPublicConnectorCatalogPage({ page: 1, limit: 1, revalidateSeconds: 0 })
+
+  const toolsTotal = toolsCount.pagination.total
+  const connectorsTotal = connectorsCount.pagination.total
+
+  const agentPages = Math.min(MAX_LISTING_PAGES, Math.max(1, Math.ceil(agentTotal / LISTING_PAGE_SIZE)))
+  const toolPages = Math.min(MAX_LISTING_PAGES, Math.max(1, Math.ceil(toolsTotal / LISTING_PAGE_SIZE)))
+  const connectorPages = Math.min(MAX_LISTING_PAGES, Math.max(1, Math.ceil(connectorsTotal / LISTING_PAGE_SIZE)))
+
+  const listingUrls: UrlEntry[] = [
+    { path: '/explore/agents', changefreq: 'daily', priority: 0.7, lastmod: now },
+    { path: '/explore/automations', changefreq: 'daily', priority: 0.7, lastmod: now },
+    { path: '/explore/connectors', changefreq: 'daily', priority: 0.7, lastmod: now },
+    ...Array.from({ length: Math.max(0, agentPages - 1) }).map((_, i) => ({
+      path: `/explore/agents/page/${i + 2}`,
+      changefreq: 'daily' as const,
+      priority: 0.6,
       lastmod: now,
-    }))
+    })),
+    ...Array.from({ length: Math.max(0, toolPages - 1) }).map((_, i) => ({
+      path: `/explore/automations/page/${i + 2}`,
+      changefreq: 'daily' as const,
+      priority: 0.6,
+      lastmod: now,
+    })),
+    ...Array.from({ length: Math.max(0, connectorPages - 1) }).map((_, i) => ({
+      path: `/explore/connectors/page/${i + 2}`,
+      changefreq: 'daily' as const,
+      priority: 0.6,
+      lastmod: now,
+    })),
+  ]
 
   const urls: UrlEntry[] = [
     { path: '/', changefreq: 'weekly', priority: 1.0, lastmod: now },
-    { path: '/marketplace', changefreq: 'daily', priority: 0.8, lastmod: now },
+    { path: '/explore', changefreq: 'daily', priority: 0.8, lastmod: now },
+    ...listingUrls,
     { path: '/docs', changefreq: 'weekly', priority: 0.6, lastmod: now },
     { path: '/privacy', changefreq: 'yearly', priority: 0.3, lastmod: now },
     { path: '/terms', changefreq: 'yearly', priority: 0.3, lastmod: now },

@@ -477,7 +477,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       ? qs
         ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
         : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
-      : '/marketplace'
+      : '/explore'
 
     // StrictMode/concurrent safety: schedule navigation and cancel it if this effect is cleaned up
     // before it gets to run (e.g. dev double-invocation).

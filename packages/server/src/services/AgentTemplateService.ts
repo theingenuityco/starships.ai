@@ -71,6 +71,10 @@ export class AgentTemplateService {
     return this.templateRepository.findById(id);
   }
 
+  async getTemplatesByIds(ids: string[]): Promise<AgentTemplateModel[]> {
+    return this.templateRepository.findByIds(ids);
+  }
+
   async getTemplatesByCategory(category: string): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findByCategory(category);
   }

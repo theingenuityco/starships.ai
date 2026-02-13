@@ -52,7 +52,7 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
 
-  const goToMarketplace = () => router.push('/marketplace')
+  const goToMarketplace = () => router.push('/explore')
 
   useEffect(() => {
     if (!carouselApi) return
@@ -70,8 +70,8 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col items-center text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Hire from the Marketplace</h2>
-          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Start with ready‑made AI teammates and skills. Deploy in one click.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Explore agents and tools</h2>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Find and install agents, tools, and connectors. Deploy in one click.</p>
         </div>
 
         {/* Featured agents carousel */}
@@ -139,7 +139,7 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
           </div>
           <div className="mt-2 sm:mt-3 md:mt-4">
             <Button size="lg" variant="outline" className="h-12 sm:h-14 px-8 sm:px-10 text-base sm:text-lg border-primary/60 text-primary hover:bg-primary/10" onClick={goToMarketplace}>
-              <Icon name="store" className="w-8 h-8 sm:w-9 sm:h-9 mr-2" /> Browse marketplace
+              <Icon name="store" className="w-8 h-8 sm:w-9 sm:h-9 mr-2" /> Explore
             </Button>
           </div>
         </div>

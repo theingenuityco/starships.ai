@@ -5,7 +5,13 @@ import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { MarketingContentRepository } from '@/repositories/MarketingContentRepository';
 import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
-import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
+import type {
+  AgentTemplateModel,
+  CreateAgentTemplateRequest,
+  MarketingContentModel,
+  UpdateAgentTemplateRequest,
+  ToolTemplateModel,
+} from '@starships/protocol';
 
 function encodeS3KeyForUrl(s3Key: string): string {
   return String(s3Key || '')
@@ -491,11 +497,14 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  private async toPublicModel(model: AgentTemplateModel & Record<string, unknown>): Promise<AgentTemplateModel> {
+  private async toPublicModel(
+    model: AgentTemplateModel & Record<string, unknown>,
+    preloadedMarketingContent?: MarketingContentModel[]
+  ): Promise<AgentTemplateModel> {
     const templateId = String(model.id);
 
     // Fetch all marketing content for this template
-    const allContent = await this.marketingContentRepo.findByEntity('agent_template', templateId);
+    const allContent = preloadedMarketingContent ?? (await this.marketingContentRepo.findByEntity('agent_template', templateId));
     const contentMap = new Map(allContent.map((c) => [c.contentType, c]));
 
     // Avatar
@@ -630,6 +639,18 @@ export class AgentTemplateRepository extends BaseRepository {
           assignedToolDefaultPermissionsByTemplateId = maps.assignedToolDefaultPermissionsByTemplateId;
         }
 
+        // Batch-fetch marketing content to avoid N+1 queries during list hydration
+        const marketingContentByTemplateId = new Map<string, MarketingContentModel[]>();
+        for (const id of templateIds) marketingContentByTemplateId.set(id, []);
+        if (templateIds.length > 0) {
+          const allContent = await this.marketingContentRepo.findByEntities('agent_template', templateIds);
+          for (const c of allContent || []) {
+            const id = String(c.entityId || '');
+            const existing = marketingContentByTemplateId.get(id);
+            if (existing) existing.push(c);
+          }
+        }
+
         return Promise.all(
           templates.map((t) => {
             const id = String(t.id);
@@ -638,11 +659,69 @@ export class AgentTemplateRepository extends BaseRepository {
               ...t,
               assignedToolSlugs: assignedToolSlugsByTemplateId.get(id) ?? [],
               ...(defaultPerms && Object.keys(defaultPerms).length > 0 ? { assignedToolDefaultPermissions: defaultPerms } : {}),
-            } as AgentTemplateModel & Record<string, unknown>);
+            } as AgentTemplateModel & Record<string, unknown>, marketingContentByTemplateId.get(id) ?? []);
           })
         );
       },
       'findAll',
+      'AgentTemplate'
+    );
+  }
+
+  /**
+   * Batch fetch templates by id (single template query + batch junction + batch marketing content).
+   * Note: the returned array is not guaranteed to preserve the input ordering.
+   */
+  async findByIds(ids: string[]): Promise<AgentTemplateModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const cleanIds = (ids || []).map((x) => String(x)).filter((x) => x.trim().length > 0);
+        if (cleanIds.length === 0) return [];
+
+        const connection = this.getConnection();
+        const rows = await connection.query<Record<string, unknown>>('SELECT * FROM agent_templates WHERE id = ANY($1)', [cleanIds]);
+        const templates = fromDatabaseArray(AgentTemplateEntity, rows) as Array<AgentTemplateModel & Record<string, unknown>>;
+
+        const templateIds = templates.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+        if (templateIds.length === 0) return [];
+
+        // Batch load assigned tool slugs + default permissions
+        const toolResults = await connection.query<{ agent_template_id: string; slug: string; default_permission: string | null }>(
+          `SELECT attt.agent_template_id, tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
+           FROM agent_template_tool_templates attt
+           JOIN tool_templates tt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = ANY($1)
+           ORDER BY attt.agent_template_id, tt.name`,
+          [templateIds]
+        );
+        const maps = this.buildToolAssignmentMapsFromBatchRows(toolResults || []);
+
+        // Batch load marketing content
+        const marketingContentByTemplateId = new Map<string, MarketingContentModel[]>();
+        for (const id of templateIds) marketingContentByTemplateId.set(id, []);
+        const allContent = await this.marketingContentRepo.findByEntities('agent_template', templateIds);
+        for (const c of allContent || []) {
+          const id = String(c.entityId || '');
+          const existing = marketingContentByTemplateId.get(id);
+          if (existing) existing.push(c);
+        }
+
+        return Promise.all(
+          templates.map((t) => {
+            const id = String(t.id);
+            const defaultPerms = maps.assignedToolDefaultPermissionsByTemplateId.get(id);
+            return this.toPublicModel(
+              {
+                ...t,
+                assignedToolSlugs: maps.assignedToolSlugsByTemplateId.get(id) ?? [],
+                ...(defaultPerms && Object.keys(defaultPerms).length > 0 ? { assignedToolDefaultPermissions: defaultPerms } : {}),
+              } as AgentTemplateModel & Record<string, unknown>,
+              marketingContentByTemplateId.get(id) ?? []
+            );
+          })
+        );
+      },
+      'findByIds',
       'AgentTemplate'
     );
   }
@@ -911,7 +990,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY usage_count DESC',
+          'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY created_at DESC',
           [category]
         );
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
@@ -1024,7 +1103,7 @@ export class AgentTemplateRepository extends BaseRepository {
             ) AS relevance
            FROM agent_templates
            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-           ORDER BY relevance DESC, usage_count DESC, created_at DESC`;
+           ORDER BY relevance DESC, created_at DESC`;
 
         const result = await connection.query<Record<string, unknown>>(sql, params);
 

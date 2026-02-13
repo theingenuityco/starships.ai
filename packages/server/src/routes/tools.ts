@@ -7,7 +7,7 @@ import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from
 import { AgentRepository, ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
-import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
@@ -16,12 +16,17 @@ import type {
   AuthUser,
   CreateToolRequest,
   CreateToolTemplateRequest,
+  ToolTemplateModel,
   ToolModel,
   UpdateToolRequest,
   WalletModel,
 } from '@starships/protocol';
 
 const router: Router = Router();
+
+type ConnectionLike = {
+  query: <T = Array<Record<string, unknown>>>(sql: string, params?: unknown[]) => Promise<T[]>;
+};
 
 // Zod schemas for validation
 
@@ -195,11 +200,161 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
     if (!queryValidation) return;
 
     const toolTemplateRepository = new ToolTemplateRepository();
-    const templates = await toolTemplateRepository.search({
-      category: queryValidation.category,
-      query: queryValidation.query,
-      requiresApiKey: queryValidation.requiresApiKey,
-    });
+    const connection = ((toolTemplateRepository as any).getConnection?.() ?? null) as ConnectionLike | null;
+    const windowDays = 30; // popularity window for listing (avoid `usage_count`)
+
+    const page = queryValidation.page ?? 1;
+    const limit = queryValidation.limit ?? 50;
+    const offset = (page - 1) * limit;
+
+    const q = String(queryValidation.query || '').trim();
+
+    let templates: ToolTemplateModel[] = [];
+    let total = 0;
+
+    function isStarshipsOnlyConnectorToolTemplate(t: ToolTemplateModel): boolean {
+      const raw = (t as unknown as { requiredConnectorProviders?: unknown })?.requiredConnectorProviders;
+      if (!Array.isArray(raw)) return false;
+      const normalized = raw
+        .map((p) => (typeof p === 'string' ? p.trim().toLowerCase() : ''))
+        .filter((p) => p.length > 0);
+      return normalized.length === 1 && normalized[0] === 'starships';
+    }
+
+    if (q) {
+      // Search mode: keep deterministic created_at ordering from repository search.
+      const base = await toolTemplateRepository.search({
+        category: queryValidation.category,
+        query: q,
+        requiresApiKey: queryValidation.requiresApiKey,
+      });
+      total = base.length;
+      templates = base.slice(offset, offset + limit);
+    } else if (!connection?.query) {
+      const base = await toolTemplateRepository.search({
+        category: queryValidation.category,
+        query: undefined,
+        requiresApiKey: queryValidation.requiresApiKey,
+      });
+      total = base.length;
+      templates = base.slice(offset, offset + limit);
+    } else {
+      // Build WHERE clauses twice:
+      // - Count query uses $1.. placeholders
+      // - Popularity query reserves $1 for windowDays, so filters start at $2
+      const whereCount: string[] = [];
+      const countParams: unknown[] = [];
+      let ci = 1;
+
+      if (queryValidation.category) {
+        whereCount.push(`tt.category = $${ci++}`);
+        countParams.push(queryValidation.category);
+      }
+      if (queryValidation.requiresApiKey !== undefined) {
+        whereCount.push(`tt.requires_api_key = $${ci++}`);
+        countParams.push(queryValidation.requiresApiKey);
+      }
+
+      const whereCountSql = whereCount.length ? `WHERE ${whereCount.join(' AND ')}` : '';
+      const countRows = await connection.query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM tool_templates tt ${whereCountSql}`, countParams);
+      total = countRows?.[0]?.n ?? 0;
+
+      const where: string[] = [];
+      const params: unknown[] = [windowDays];
+      let i = 2;
+
+      if (queryValidation.category) {
+        where.push(`tt.category = $${i++}`);
+        params.push(queryValidation.category);
+      }
+      if (queryValidation.requiresApiKey !== undefined) {
+        where.push(`tt.requires_api_key = $${i++}`);
+        params.push(queryValidation.requiresApiKey);
+      }
+
+      params.push(limit);
+      const pLimit = `$${i++}`;
+      params.push(offset);
+      const pOffset = `$${i++}`;
+
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      const rows = await connection.query<Record<string, unknown>>(
+        `
+          WITH tool_calls AS (
+            SELECT
+              (tc -> 'function' ->> 'name') AS tool_slug,
+              m.conversation_id AS conversation_id
+            FROM messages m
+            JOIN LATERAL jsonb_array_elements(m.tool_calls) tc ON TRUE
+            WHERE m.role = 'assistant'
+              AND m.tool_calls IS NOT NULL
+              AND jsonb_typeof(m.tool_calls) = 'array'
+              AND m.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+          ),
+          tool_usage AS (
+            SELECT
+              tool_slug,
+              COUNT(*)::int AS call_count,
+              COUNT(DISTINCT conversation_id)::int AS conversation_count
+            FROM tool_calls
+            WHERE tool_slug IS NOT NULL AND tool_slug <> ''
+            GROUP BY tool_slug
+          ),
+          tool_tokens AS (
+            SELECT
+              tc.tool_slug AS tool_slug,
+              COALESCE(SUM(u.total_tokens), 0)::bigint AS token_count
+            FROM (SELECT DISTINCT tool_slug, conversation_id FROM tool_calls WHERE tool_slug IS NOT NULL AND tool_slug <> '') tc
+            JOIN usage u ON u.conversation_id = tc.conversation_id
+            WHERE u.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+            GROUP BY tc.tool_slug
+          )
+          SELECT tt.*
+          FROM tool_templates tt
+          LEFT JOIN tool_usage tu ON tu.tool_slug = tt.slug
+          LEFT JOIN tool_tokens tok ON tok.tool_slug = tt.slug
+          ${whereSql}
+          ORDER BY
+            -- Keep "starships"-only connector-based tools at the end, regardless of popularity.
+            CASE
+              WHEN tt.required_connector_providers IS NOT NULL
+                AND array_length(tt.required_connector_providers, 1) = 1
+                AND lower(trim(tt.required_connector_providers[1])) = 'starships'
+              THEN 1
+              ELSE 0
+            END ASC,
+            COALESCE(tu.conversation_count, 0) DESC,
+            COALESCE(tok.token_count, 0) DESC,
+            COALESCE(tu.call_count, 0) DESC,
+            tt.created_at DESC
+          LIMIT ${pLimit}
+          OFFSET ${pOffset}
+        `,
+        params
+      );
+
+      // Reuse repository entity mapping to keep API shape consistent.
+      // `search()` already maps DB->model for us; mimic by using `fromDatabaseArray` is internal to repo,
+      // so instead call findById for the ordered ids (bounded by limit).
+      const ids = (rows || [])
+        .map((r: Record<string, unknown>) => (typeof r?.id === 'string' ? String(r.id).trim() : ''))
+        .filter((x: string) => x.length > 0);
+      const fetched = await toolTemplateRepository.findByIds(ids);
+      const byId = new Map<string, ToolTemplateModel>();
+      for (const t of fetched || []) {
+        if (t?.id) byId.set(String(t.id), t);
+      }
+      templates = ids.map((id) => byId.get(id)).filter((t): t is ToolTemplateModel => !!t);
+    }
+
+    // If we couldn't run DB popularity sort, keep existing order but still push starships-only to the end.
+    if (!q && !connection?.query && Array.isArray(templates) && templates.length > 1) {
+      const nonStarshipsOnly: ToolTemplateModel[] = [];
+      const starshipsOnly: ToolTemplateModel[] = [];
+      for (const t of templates) (isStarshipsOnlyConnectorToolTemplate(t) ? starshipsOnly : nonStarshipsOnly).push(t);
+      templates = nonStarshipsOnly.concat(starshipsOnly);
+    }
 
     // Public template routes should not expose executable blueprints
     const sanitized = templates.map((t) => {
@@ -208,7 +363,7 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
       return rest;
     });
 
-    sendSuccess(res, sanitized);
+    sendSuccess(res, sanitized, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     console.error('[TOOLS] Error fetching tool templates:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch tool templates');
@@ -292,6 +447,21 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
+    // Optional pagination/search for clients that want server-driven pagination.
+    // Back-compat: if no `page` and no `limit` are provided, return the full list as before.
+    const queryValidation = validateData(
+      z.object({
+        page: z.coerce.number().int().min(1).optional(),
+        limit: z.coerce.number().int().min(1).max(200).optional(),
+        search: z.string().optional(),
+        order: z.enum(['ASC', 'DESC']).optional(),
+      }),
+      req.query,
+      res,
+      'query parameters'
+    );
+    if (!queryValidation) return;
+
     const userId = req.user?.id as string | undefined;
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
@@ -304,7 +474,42 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     const toolRepository = new ToolRepository();
     const tools = await toolRepository.findByStarship(paramValidation.starshipId);
 
-    sendSuccess(res, tools);
+    const wantsPagination = queryValidation.page !== undefined || queryValidation.limit !== undefined || (queryValidation.search ?? '').trim().length > 0;
+    if (!wantsPagination) {
+      sendSuccess(res, tools);
+      return;
+    }
+
+    const page = Number.isFinite(queryValidation.page as any) ? Math.max(1, Math.floor(Number(queryValidation.page))) : 1;
+    const limit = Number.isFinite(queryValidation.limit as any) ? Math.max(1, Math.floor(Number(queryValidation.limit))) : 50;
+    const offset = (page - 1) * limit;
+    const q = String(queryValidation.search || '').trim().toLowerCase();
+    const order = queryValidation.order ?? 'DESC';
+
+    const filtered = q
+      ? (tools || []).filter((t: any) => {
+          const name = String(t?.name || '').toLowerCase();
+          const slug = String(t?.slug || '').toLowerCase();
+          const desc = String(t?.description || '').toLowerCase();
+          return name.includes(q) || slug.includes(q) || desc.includes(q);
+        })
+      : tools || [];
+
+    // Sort tools by most recently updated (or created), then by name for stability.
+    const sorted = [...filtered].sort((a: any, b: any) => {
+      const aTsRaw = (a?.updatedAt || a?.createdAt) as unknown;
+      const bTsRaw = (b?.updatedAt || b?.createdAt) as unknown;
+      const aTs = typeof aTsRaw === 'string' ? new Date(aTsRaw).getTime() : 0;
+      const bTs = typeof bTsRaw === 'string' ? new Date(bTsRaw).getTime() : 0;
+      if (aTs !== bTs) return order === 'ASC' ? aTs - bTs : bTs - aTs;
+      const aName = String(a?.name || a?.slug || '');
+      const bName = String(b?.name || b?.slug || '');
+      return aName.localeCompare(bName);
+    });
+
+    const total = sorted.length;
+    const pageItems = sorted.slice(offset, offset + limit);
+    sendSuccess(res, pageItems, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     console.error('[TOOLS] Error fetching starship tools:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship tools');

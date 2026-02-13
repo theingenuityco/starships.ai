@@ -13,6 +13,8 @@ export interface ConnectorSuggestionCardProps {
   compactCard?: boolean
   /** Override connect button label (e.g. "Connect" instead of "Connect Gmail") */
   connectButtonLabel?: string
+  /** Disable entrance animations for connector cards (useful in wizard step 3). */
+  animateCards?: boolean
   className?: string
 }
 
@@ -22,7 +24,7 @@ export interface ConnectorSuggestionCardProps {
  * Renders one or more connector cards (from the Connectors page UI) inline as a widget.
  * Intended for chat rendering via `render_widget`.
  */
-export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = true, hideDisconnect = false, compactCard = false, connectButtonLabel, className }: ConnectorSuggestionCardProps): React.JSX.Element {
+export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = true, hideDisconnect = false, compactCard = false, connectButtonLabel, animateCards = true, className }: ConnectorSuggestionCardProps): React.JSX.Element {
   const normalized = Array.isArray(providers) ? providers.map(p => String(p ?? '').trim()).filter(Boolean) : []
 
   if (!starshipId || normalized.length === 0) {
@@ -41,7 +43,11 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         hideSearch={hideSearch}
         hideDisconnect={hideDisconnect}
         maxColumns={2}
-        hideCardDescription={compactCard}
+        // Widget cards should match Explore listing, including description.
+        hideCardDescription={false}
+        cardVariant="explore"
+        density={compactCard ? 'compact' : 'default'}
+        animateCards={animateCards}
         connectButtonLabel={connectButtonLabel}
       />
     </div>

@@ -662,7 +662,7 @@ export default function MembersPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
                   <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto custom-scrollbar">
-                    <TabsTrigger value="all">
+                    <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
                         {!isInitialLoading ? (
@@ -675,7 +675,7 @@ export default function MembersPage() {
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="humans">
+                    <TabsTrigger value="humans" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Humans</span>
                         {!isInitialLoading ? (
@@ -688,7 +688,7 @@ export default function MembersPage() {
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="agents">
+                    <TabsTrigger value="agents" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
                         {!isInitialLoading ? (

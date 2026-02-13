@@ -620,7 +620,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
                   <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
-                    <TabsTrigger value="all">
+                    <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
                         {typeof allTabTotalForBadges === 'number' ? (
@@ -630,7 +630,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="agents">
+                    <TabsTrigger value="agents" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
                         {typeof agentsPagination?.total === 'number' ? (
@@ -640,7 +640,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="automations">
+                    <TabsTrigger value="automations" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Automations</span>
                         {typeof toolsPagination?.total === 'number' ? (
@@ -651,7 +651,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       </span>
                     </TabsTrigger>
                     {canManageConnectors ? (
-                      <TabsTrigger value="connectors">
+                      <TabsTrigger value="connectors" className="flex-1 sm:flex-none min-w-0 justify-center">
                         <span className="inline-flex items-center gap-1.5">
                           <span>Connectors</span>
                           {typeof connectorCatalogTotalVisible === 'number' ? (

@@ -175,21 +175,19 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isConnectorsRoute: false,
         isInstalledRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
       }
     }
     return {
-      isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isInstalledRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isInstalledRoute, isSchedulesRoute, isMembersRoute } = routeChecks
+  const { isInstalledRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -260,8 +258,6 @@ export function Navigation(props: NavigationProps) {
   }, [streamChunks, notifList])
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
-  const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
-
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
   // Handle logo/name click - memoized
@@ -312,16 +308,6 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(canManageConnectors && starshipSlug
-        ? [
-            {
-              href: `/ship/${starshipSlug}/connectors`,
-              label: 'Connectors',
-              icon: 'plug',
-              isActive: isConnectorsRoute,
-            },
-          ]
-        : []),
       ...(isAuthenticated && starshipSlug
         ? [
             {
@@ -346,10 +332,8 @@ export function Navigation(props: NavigationProps) {
     [
       isAuthenticated,
       starshipSlug,
-      canManageConnectors,
       pathname,
       isSchedulesRoute,
-      isConnectorsRoute,
       isInstalledRoute,
       isMembersRoute,
       isInstanceAdmin,

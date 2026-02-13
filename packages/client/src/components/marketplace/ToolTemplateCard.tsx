@@ -292,7 +292,7 @@ function ToolTemplateCardImpl(props: ToolTemplateCardProps) {
             })()
 
             if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && targetShipSlugOrId) {
-              router.push(`/ship/${encodeURIComponent(targetShipSlugOrId)}/tools`)
+              router.push(`/ship/${encodeURIComponent(targetShipSlugOrId)}/installed`)
             }
           } finally {
             setIsInstalling(false)

@@ -386,7 +386,7 @@ export function Navigation(props: NavigationProps) {
         {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
         <div
-          className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
+          className="flex flex-col transition-all duration-300 ease-in-out"
           style={{
             width: isExpanded ? '15rem' : '3.25rem',
             height: '100%',

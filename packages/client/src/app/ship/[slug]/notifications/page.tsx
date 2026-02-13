@@ -231,7 +231,7 @@ export default function NotificationsPage() {
           <div className="pt-4 pb-8">
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
               <div className="flex justify-start">
-                <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto custom-scrollbar">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="mentions">Mentions</TabsTrigger>
                   <TabsTrigger value="dms">Direct messages</TabsTrigger>

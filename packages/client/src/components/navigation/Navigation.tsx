@@ -435,18 +435,7 @@ export function Navigation(props: NavigationProps) {
                   </span>
                 </button>
               )}
-              {isMobile && isExpanded && onClose ? (
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Close sidebar"
-              >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            ) : (
-              isExpanded &&
-              !isMobile && (
+              {isExpanded && !isMobile && (
                 <button
                   type="button"
                   onClick={() => {
@@ -459,8 +448,7 @@ export function Navigation(props: NavigationProps) {
                 >
                   <Icon name="sidebar" className="w-4 h-4" />
                 </button>
-              )
-            )}
+              )}
             </div>
           </div>
 

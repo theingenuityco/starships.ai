@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __STARSHIPS_SENTRY_CLIENT_INIT__: boolean | undefined
 }
 

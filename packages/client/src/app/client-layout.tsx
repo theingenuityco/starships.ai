@@ -218,8 +218,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <NotificationSoundBootstrap />
           <EmailChangeToastHandler />
           <div className="relative h-[100dvh] overflow-hidden bg-card">
-            <div className="flex h-full w-full min-h-0 p-3 md:p-4">
-              <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+            <div className="flex h-full w-full min-h-0 p-0 md:p-4">
+              <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
                 <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
               </div>
             </div>
@@ -248,8 +248,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </div>
 
           {/* Main Content Area - takes remaining space */}
-          <div className="flex-1 min-h-0 p-3 md:p-4">
-            <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+          <div className="flex-1 min-h-0 p-0 md:p-4">
+            <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
               <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
             </div>
           </div>
@@ -301,8 +301,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           )}
 
           {/* Main Content Area - padded "pane" with rounded edges */}
-          <div className="flex-1 min-h-0 p-3 md:p-4">
-            <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+          <div className="flex-1 min-h-0 p-0 md:p-4">
+            <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
               <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
             </div>
           </div>

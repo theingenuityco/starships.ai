@@ -144,9 +144,18 @@ export function getMarkdownComponents({
     p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
 
     a: ({ href, children }: any) => (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80 inline-flex items-center gap-1">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline hover:text-primary/80 [overflow-wrap:anywhere]"
+      >
         {children}
-        {enableLinkPreview && <Icon name="external-link" className="w-3 h-3" />}
+        {enableLinkPreview && (
+          <span className="inline-block align-text-bottom ml-1">
+            <Icon name="external-link" className="w-3 h-3" />
+          </span>
+        )}
       </a>
     ),
 
@@ -190,7 +199,7 @@ export function getMarkdownComponents({
       }
 
       return (
-        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono [overflow-wrap:anywhere]" {...props}>
           {children}
         </code>
       )

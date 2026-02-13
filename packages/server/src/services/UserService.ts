@@ -28,6 +28,7 @@ import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
 import { logger } from '@/utils/logger';
+import { StarshipService } from '@/services/StarshipService';
 
 export interface UserOptions {
   includePassword?: boolean;
@@ -396,6 +397,34 @@ export class UserService {
         // Verify the email (OAuth providers verify emails)
         await this.userRepository.update(user.id, { emailVerified: true });
         user.emailVerified = true;
+      }
+    }
+
+    // For brand-new OAuth signups, create a default starship immediately.
+    // Invite-joiners will still be able to join the invited starship; onboarding is handled client-side.
+    if (isNewUser) {
+      try {
+        const ship = await StarshipService.createDefaultStarship(user.id);
+        try {
+          await StarshipService.createInitialAgents(user.id, ship.id);
+        } catch {
+          // Best-effort: agents can be added later from marketplace.
+        }
+      } catch (error) {
+        // Compensating action: remove the new user so retry doesn't strand them without a workspace.
+        try {
+          await this.deleteUser(user.id);
+        } catch {
+          // Ignore cleanup errors; surface original failure.
+        }
+        logger.error('[OAUTH] Failed to create default starship for new OAuth user', {
+          userId: user.id,
+          email: user.email,
+          provider: profile.provider,
+          operation: 'create_default_starship',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
       }
     }
 

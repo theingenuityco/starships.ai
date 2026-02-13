@@ -84,8 +84,20 @@ function LoginContent() {
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
       } else if (starships && starships.length > 0) {
-        const primary = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
-        router.push(`/ship/${(primary ?? starships[0]).slug}`)
+        const uid = user?.id
+        const selected = selectedStarshipId ? starships.find(s => s.id === selectedStarshipId) : null
+        const wizardComplete = Boolean(user?.wizardOnboardingCompleted)
+
+        // If wizard is incomplete and the user belongs to a non-owned starship (invite joiner),
+        // prefer landing them there to avoid forcing onboarding for their default-owned starship.
+        const preferred =
+          !wizardComplete && uid
+            ? (selected && selected.ownerId !== uid ? selected : starships.find(s => s.ownerId !== uid) ?? null)
+            : null
+
+        const fallback = pickPrimaryStarshipForUser(starships, uid, selectedStarshipId) ?? starships[0]
+        const landing = preferred ?? fallback
+        router.push(`/ship/${landing.slug}`)
       } else {
         router.push('/account')
       }

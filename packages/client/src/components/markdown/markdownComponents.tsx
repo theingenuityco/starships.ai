@@ -199,7 +199,10 @@ export function getMarkdownComponents({
       }
 
       return (
-        <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono [overflow-wrap:anywhere]" {...props}>
+        <code
+          className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono whitespace-pre-wrap break-all [overflow-wrap:anywhere]"
+          {...props}
+        >
           {children}
         </code>
       )

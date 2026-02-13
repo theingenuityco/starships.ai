@@ -3038,7 +3038,7 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
                   <div className="min-w-0 text-sm font-bold font-mono text-foreground">
                     <HoverProfilePopover
                       trigger={
@@ -3054,7 +3054,9 @@ const MemoizedMessageBubble = memo(
                       side="right"
                     />
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  <div className="ml-auto flex-shrink-0">
+                    <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  </div>
                 </div>
               )}
               {isEditing ? (
@@ -3323,7 +3325,7 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
                   <div className="min-w-0 text-sm font-bold text-foreground">
                     <HoverProfilePopover
                       trigger={
@@ -3339,7 +3341,9 @@ const MemoizedMessageBubble = memo(
                       side="right"
                     />
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  <div className="ml-auto flex-shrink-0">
+                    <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  </div>
                 </div>
               )}
               <ConversationMessageContent

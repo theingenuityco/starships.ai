@@ -203,6 +203,75 @@ export async function fetchPublicToolTemplates(args?: {
   }
 }
 
+function normalizeSlugKey(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+function stripGeneratedSuffix(slug: string): string {
+  const s = String(slug || '').trim()
+  if (!s) return ''
+  const m = s.match(/^(.*)-([a-z0-9]{4,8})$/i)
+  if (!m) return s
+  const base = String(m[1] || '').trim()
+  const suffix = String(m[2] || '').trim()
+  // Avoid stripping legitimate English segments (e.g. "-docs") by requiring a digit.
+  if (!base) return s
+  if (!/[0-9]/.test(suffix)) return s
+  return base
+}
+
+function slugKeys(slug: string): string[] {
+  const full = normalizeSlugKey(slug)
+  if (!full) return []
+  const stripped = normalizeSlugKey(stripGeneratedSuffix(full))
+  return stripped && stripped !== full ? [full, stripped] : [full]
+}
+
+/**
+ * Fetches just enough pages of tool templates to cover a given set of slugs.
+ * This avoids the "some tools show only slugs" issue caused by default API pagination.
+ */
+export async function fetchPublicToolTemplatesForSlugs(args: {
+  slugs: string[]
+  revalidateSeconds?: number
+  limit?: number
+  maxPages?: number
+}): Promise<ToolTemplateModel[]> {
+  const wanted = new Set<string>()
+  for (const s of args.slugs ?? []) {
+    for (const k of slugKeys(String(s ?? ''))) wanted.add(k)
+  }
+  if (wanted.size === 0) return []
+
+  const foundByKey = new Map<string, ToolTemplateModel>()
+  const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit!)) : 120
+  const maxPages = Number.isFinite(args.maxPages) ? Math.max(1, Math.floor(args.maxPages!)) : 25
+
+  let page = 1
+  for (let i = 0; i < maxPages; i++) {
+    const { items, pagination } = await fetchPublicToolTemplatesPage({ page, limit, revalidateSeconds: args.revalidateSeconds })
+    for (const t of items ?? []) {
+      const templateKeys = slugKeys(String((t as any)?.slug ?? ''))
+      for (const k of templateKeys) {
+        if (wanted.has(k) && !foundByKey.has(k)) foundByKey.set(k, t)
+      }
+    }
+
+    const remaining = Array.from(wanted).some(k => !foundByKey.has(k))
+    if (!remaining) break
+    if (!pagination?.has_next) break
+    page++
+  }
+
+  // Deduplicate templates (multiple keys can map to the same template).
+  const unique = new Map<string, ToolTemplateModel>()
+  for (const tpl of foundByKey.values()) {
+    const slug = normalizeSlugKey((tpl as any)?.slug)
+    unique.set(slug || `${unique.size}`, tpl)
+  }
+  return Array.from(unique.values())
+}
+
 export async function fetchPublicToolTemplatesPage(args: {
   page: number
   limit: number

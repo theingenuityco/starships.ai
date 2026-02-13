@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 
-import { fetchPublicAgentTemplateBySlug, fetchPublicConnectorCatalog, fetchPublicToolTemplates } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplateBySlug, fetchPublicConnectorCatalog, fetchPublicToolTemplatesForSlugs } from '@/lib/server/public-templates'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
@@ -96,6 +96,29 @@ function titleCase(input: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function stripGeneratedSuffix(slug: string): string {
+  const s = String(slug || '').trim()
+  if (!s) return ''
+  const m = s.match(/^(.*)-([a-z0-9]{4,8})$/i)
+  if (!m) return s
+  const base = String(m[1] || '').trim()
+  const suffix = String(m[2] || '').trim()
+  if (!base) return s
+  if (!/[0-9]/.test(suffix)) return s
+  return base
+}
+
+function humanizeToolSlug(slug: string): string {
+  const base = stripGeneratedSuffix(slug)
+  const clean = String(base || '').trim()
+  if (!clean) return 'Tool'
+  return clean
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map(w => (w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(' ')
+}
+
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
   return await fetchPublicAgentTemplateBySlug({ slug, revalidateSeconds: revalidate })
 }
@@ -148,7 +171,8 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
   const template = await getTemplateBySlug(s)
   if (!template) notFound()
 
-  const toolTemplates = await fetchPublicToolTemplates({ revalidateSeconds: revalidate })
+  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s2 => typeof s2 === 'string' && s2.trim().length > 0) : []
+  const toolTemplates = await fetchPublicToolTemplatesForSlugs({ slugs: toolSlugs, revalidateSeconds: revalidate })
   const connectorCatalog = await fetchPublicConnectorCatalog({ revalidateSeconds: revalidate })
   const toolInfoBySlug = new Map<string, ToolTemplateModel>()
   for (const t of toolTemplates) {
@@ -173,7 +197,6 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
     if (key) connectorInfoByProvider.set(key, c)
   }
 
-  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s2 => typeof s2 === 'string' && s2.trim().length > 0) : []
   const shareUrl = `https://starships.ai/explore/agents/${encodeURIComponent(template.slug)}`
 
   // Profile image URLs from template (API routes)
@@ -249,7 +272,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
       )
       return {
         slug: slugv,
-        name: info.name?.trim() || String(slugv),
+        name: info.name?.trim() || humanizeToolSlug(String(slugv)),
         requiresApiKey,
         requiresConfig,
         connectors,
@@ -260,7 +283,7 @@ export default async function ExploreAgentDetailsPage(props: PageProps) {
   const capabilityItems = toolSlugs
     .map(slugv => {
       const info = toolInfoBySlug.get(String(slugv).trim().toLowerCase())
-      const title = info?.name?.trim() || String(slugv)
+      const title = info?.name?.trim() || humanizeToolSlug(String(slugv))
       const desc = info?.description?.trim() || ''
       const templateDefault = (template.assignedToolDefaultPermissions?.[String(slugv)] ?? undefined) as CapabilityPermission | undefined
       const permission = templateDefault ?? inferCapabilityPermission(info)

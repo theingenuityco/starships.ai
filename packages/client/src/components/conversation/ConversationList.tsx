@@ -645,7 +645,7 @@ export const ConversationList = memo(function ConversationList({
   if (compact) {
     if (agentsLoading || membersLoading) {
       return (
-        <div className="space-y-1">
+        <div className="space-y-0">
           {[1, 2, 3].map(i => (
             <Skeleton key={i} className="h-8 w-full rounded-lg" />
           ))}
@@ -715,7 +715,7 @@ export const ConversationList = memo(function ConversationList({
             {isChannelsExpanded ? (
               <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
-                  <div className="space-y-1">
+                  <div className="space-y-0">
                     {[1, 2].map(i => (
                       <Skeleton key={i} className="h-8 w-full rounded-lg" />
                     ))}
@@ -723,7 +723,7 @@ export const ConversationList = memo(function ConversationList({
                 ) : channels.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0">
                     {channelsForDisplay.map(ch => {
                       const isActive = currentChannelSlug
                         ? String(ch.slug || '')
@@ -923,7 +923,7 @@ export const ConversationList = memo(function ConversationList({
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-0">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}

@@ -200,7 +200,7 @@ export default function NotificationsPage() {
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 py-2">
+        <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">

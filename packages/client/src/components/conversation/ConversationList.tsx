@@ -78,8 +78,8 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
 
   return (
     <div className="relative">
-      <Avatar className="h-3.5 w-3.5 rounded-full ring-1 ring-border/40">
-        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={14} rounded />
+      <Avatar className="h-[18px] w-[18px] rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={18} rounded />
       </Avatar>
       <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
     </div>
@@ -91,9 +91,9 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   const hasPresence = typeof online === 'boolean'
   return (
     <div className="relative">
-      <Avatar className="h-3.5 w-3.5 rounded-full ring-1 ring-border/40">
+      <Avatar className="h-[18px] w-[18px] rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
-        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[9px] font-semibold">{fallback}</AvatarFallback>
+        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
@@ -349,8 +349,8 @@ export const ConversationList = memo(function ConversationList({
         <div
           className="flex-shrink-0"
           style={{
-            width: '1rem',
-            height: '1rem',
+            width: '1.25rem',
+            height: '1.25rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -992,13 +992,32 @@ export const ConversationList = memo(function ConversationList({
             aria-label="Resize channels and direct messages panels"
             onPointerDown={handleDividerPointerDown}
             className={cn(
-              'mx-1 my-0.5 h-2 rounded-md',
+              'mx-1 my-0.5 h-2 rounded-md relative flex items-center justify-center group',
               isChannelsExpanded && isDirectMessagesExpanded ? 'cursor-row-resize hover:bg-muted/60' : 'cursor-default opacity-50',
               'transition-colors'
             )}
             style={{ touchAction: 'none' }}
           >
-            <div className="h-px w-full bg-border/60" aria-hidden />
+            {/* Base divider line */}
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-border/60" aria-hidden />
+            {/* Drag indicator handle */}
+            <div
+              className={cn(
+                'pointer-events-none inline-flex items-center gap-1 px-2 py-0.5 rounded-full',
+                isChannelsExpanded && isDirectMessagesExpanded ? 'bg-background/70 ring-1 ring-border/40' : 'bg-transparent',
+                isChannelsExpanded && isDirectMessagesExpanded
+                  ? isDraggingPanels
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                  : 'opacity-0',
+                'transition-opacity duration-150'
+              )}
+              aria-hidden
+            >
+              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
+              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
+              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
+            </div>
           </div>
 
           {/* Direct messages panel */}

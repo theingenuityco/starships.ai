@@ -312,7 +312,7 @@ export default function OnboardingPage() {
             <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
             <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
           </header>
-          <main className="flex flex-1 flex-col items-center justify-center px-4 py-10 relative z-10">
+          <main className="flex flex-1 flex-col items-center justify-start px-4 pt-14 pb-24 relative z-10">
             <div className={`w-full mx-auto min-w-0 ${CONTENT_MAX_W}`}>
               <h1 className="text-3xl font-bold tracking-tight">You&apos;ve joined {starshipDisplayName}</h1>
               <p className="mt-2 text-sm text-muted-foreground">You&apos;re all set. Go to the workspace to collaborate and use agents.</p>
@@ -339,7 +339,7 @@ export default function OnboardingPage() {
           <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none text-foreground`}>starships.ai</span>
         </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center px-4 py-16 relative z-10">
+        <main className="flex flex-1 flex-col items-center justify-start px-4 pt-14 pb-28 relative z-10">
           <div className="w-full flex justify-center">
             <div className={`w-full min-w-0 ${CONTENT_MAX_W}`}>
               <p className="text-xs text-muted-foreground mb-1">
@@ -425,7 +425,7 @@ export default function OnboardingPage() {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {connectorProviders.length > 0
                         ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
-                        : 'No connectors required by your agents. You can connect apps anytime from your workspace.'}
+                        : 'No connectors required by your agents. Here are a few popular connectors to get you started.'}
                     </p>
                   </div>
                   {primaryStarship?.id && (
@@ -444,7 +444,19 @@ export default function OnboardingPage() {
                           connectButtonLabel="Connect"
                           matchAgentCardStyle
                         />
-                      ) : null}
+                      ) : (
+                        <StarshipConnectorsPanel
+                          starshipId={primaryStarship.id}
+                          hideSearch
+                          hideDisconnect={false}
+                          hideReconnect
+                          maxColumns={2}
+                          hideCardDescription
+                          connectButtonLabel="Connect"
+                          matchAgentCardStyle
+                          maxItems={3}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

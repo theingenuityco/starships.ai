@@ -214,11 +214,9 @@ export function useLogin() {
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
-        if (!(user?.wizardOnboardingCompleted ?? false)) {
-          router.push('/onboarding')
-        } else {
-          router.push(addWelcome(`/ship/${starship.slug}`))
-        }
+        // Always route into the starship; onboarding is enforced by ClientLayout only
+        // when the user is navigating to their OWN starship.
+        router.push(addWelcome(`/ship/${starship.slug}`))
       } else {
         router.push('/account')
       }
@@ -286,11 +284,9 @@ export function useRegister() {
       if (redirectTarget) {
         router.push(redirectTarget)
       } else if (starship?.slug) {
-        if (!(user?.wizardOnboardingCompleted ?? false)) {
-          router.push('/onboarding')
-        } else {
-          router.push(`/ship/${starship.slug}`)
-        }
+        // Always route into the starship; onboarding is enforced by ClientLayout only
+        // when the user is navigating to their OWN starship.
+        router.push(`/ship/${starship.slug}`)
       }
 
       queryClient.invalidateQueries()
@@ -353,11 +349,9 @@ export function useOAuthLogin() {
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
-        if (!(user?.wizardOnboardingCompleted ?? false)) {
-          router.push('/onboarding')
-        } else {
-          router.push(addWelcome(`/ship/${starship.slug}`))
-        }
+        // Always route into the starship; onboarding is enforced by ClientLayout only
+        // when the user is navigating to their OWN starship.
+        router.push(addWelcome(`/ship/${starship.slug}`))
       } else {
         router.push('/account')
       }

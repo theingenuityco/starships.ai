@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { isIndexingEnabled } from '@/lib/indexing';
 
 export function proxy(_req: NextRequest) {
+  void _req;
   if (isIndexingEnabled()) return NextResponse.next();
 
   const res = NextResponse.next();

@@ -23,4 +23,4 @@ export interface DirectMessage {
   updatedAt: string;
 }
 
-export interface DirectMessageModel extends DirectMessage {}
+export type DirectMessageModel = DirectMessage;

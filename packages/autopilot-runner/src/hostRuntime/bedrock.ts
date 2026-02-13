@@ -105,7 +105,6 @@ export async function invokeBedrock(
   // when assistant history existed; however, this can prevent thinking entirely in normal chats.
   // We now allow thinking even with assistant history, and rely on runtime validation to confirm
   // whether Bedrock accepts it for this model/profile.
-  const hasAssistantHistory = Array.isArray(rawMessages) && rawMessages.some((m) => m?.role === 'assistant');
 
   for (const m of rawMessages) {
     if (m.role === 'system') {
@@ -131,12 +130,14 @@ export async function invokeBedrock(
     // Preserve provider-native reasoning blocks (Bedrock ContentBlock.reasoningContent) when present.
     // This is required for multi-turn "thinking" replay when Bedrock provides signatures.
     try {
-      const rdRaw =
-        Array.isArray((m as any)?.reasoningDetails) && (m as any).reasoningDetails.length > 0
-          ? ((m as any).reasoningDetails as unknown[])
-          : Array.isArray((m as any)?.reasoning_details) && (m as any).reasoning_details.length > 0
-            ? ((m as any).reasoning_details as unknown[])
-            : [];
+      const mRec = m as unknown as Record<string, unknown>;
+      const reasoningDetails = mRec.reasoningDetails;
+      const reasoningDetailsAlt = mRec.reasoning_details;
+      const rdRaw = Array.isArray(reasoningDetails) && reasoningDetails.length > 0
+        ? (reasoningDetails as unknown[])
+        : Array.isArray(reasoningDetailsAlt) && reasoningDetailsAlt.length > 0
+          ? (reasoningDetailsAlt as unknown[])
+          : [];
       if (rdRaw.length > 0) {
         for (const d of rdRaw) {
           if (!d || typeof d !== 'object') continue;
@@ -384,9 +385,6 @@ export async function invokeBedrock(
       // Usage and finish_reason are delivered late in the stream (messageStop/metadata).
       let bedrockStopReason: string | undefined;
       let bedrockUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
-      let loggedReasoningShape = false;
-      let reasoningContentEvents = 0;
-      let reasoningContentHadSignature = 0;
 
       const coerceToText = (v: unknown): string => {
         try {
@@ -459,8 +457,6 @@ export async function invokeBedrock(
             } catch {
               eventHasSignature = false;
             }
-            reasoningContentEvents += 1;
-            if (eventHasSignature) reasoningContentHadSignature += 1;
 
             try {
               if (typeof rc === 'string') {

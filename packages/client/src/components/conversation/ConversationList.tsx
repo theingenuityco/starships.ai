@@ -545,7 +545,7 @@ export const ConversationList = memo(function ConversationList({
     } catch {
       setChannelsPanelRatio(0.5)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [splitStorageKey])
 
   const handleDividerPointerDown = useCallback(

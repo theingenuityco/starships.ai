@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth, AUTH_QUERY_KEYS } from '@/hooks/useAuth'
 import { useAcceptStarshipInvite } from '@/hooks/useStarshipInvites'
 import { STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
-import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
+import type { StarshipModel } from '@starships/protocol'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -27,7 +27,6 @@ export default function AcceptInvitePage() {
 
   const { isAuthenticated, isLoading, user, userEmail } = useAuth()
   const acceptInvite = useAcceptStarshipInvite(user?.id)
-  const completeWizard = useCompleteWizardOnboarding()
 
   const [attempted, setAttempted] = useState(false)
   const [preview, setPreview] = useState<InvitePreviewResponse | null>(null)
@@ -102,19 +101,26 @@ export default function AcceptInvitePage() {
     void acceptInvite
       .mutateAsync(inviteToken)
       .then(async starship => {
-        // Ensure starships list is updated before navigation so no code sees "0 starships" and creates a default.
+        // Ensure starships cache is updated before navigation (owned + member list uses this key).
         if (user?.id) {
-          await queryClient.refetchQueries({ queryKey: STARSHIP_QUERY_KEYS.byOwner(user.id) })
+          // Optimistically add the new membership to the cached list so /ship layouts relying on the list
+          // don't race against an async refetch.
+          queryClient.setQueryData(STARSHIP_QUERY_KEYS.byOwner(user.id), (old: StarshipModel[] | undefined) => {
+            const list = Array.isArray(old) ? old : []
+            if (list.some(s => s?.id === starship.id)) return list
+            return [starship, ...list]
+          })
+          // Also prime the slug cache for pages that load by slug.
+          queryClient.setQueryData([...STARSHIP_QUERY_KEYS.all, 'slug', starship.slug] as const, starship)
+          // Still refetch in the background to ensure roles/metadata are accurate.
+          queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.byOwner(user.id) })
         }
-        // Mark wizard complete so client-layout does not redirect back to /onboarding.
-        await completeWizard.mutateAsync()
-        await queryClient.refetchQueries({ queryKey: AUTH_QUERY_KEYS.me() })
         router.replace(`/ship/${encodeURIComponent(starship.slug)}`)
       })
       .catch(() => {
         // errors are surfaced via toast; keep page visible for retry
       })
-  }, [inviteToken, previewLoading, previewError, preview, user?.id, userEmail, isAuthenticated, attempted, acceptInvite, completeWizard, queryClient, router])
+  }, [inviteToken, previewLoading, previewError, preview, user?.id, userEmail, isAuthenticated, attempted, acceptInvite, queryClient, router])
 
   const canRetry = Boolean(inviteToken) && isAuthenticated && !acceptInvite.isPending
 

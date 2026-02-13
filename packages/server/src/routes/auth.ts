@@ -13,7 +13,7 @@ import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema, Id
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
-import type { UserModel } from '@starships/protocol';
+import type { UserModel, StarshipModel } from '@starships/protocol';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -37,6 +37,25 @@ function isValidRedirectUrl(url: string): boolean {
   if (/^(javascript|data):/i.test(url)) return false;
   if (url.includes('@')) return false;
   return true;
+}
+
+function pickLandingStarship(
+  accessible: StarshipModel[],
+  userId: string,
+  preferMemberFirst: boolean
+): { id: string; slug: string; name: string } | null {
+  const list = Array.isArray(accessible) ? accessible : [];
+  if (list.length === 0) return null;
+
+  // If the user hasn't completed onboarding yet and they belong to a non-owned starship
+  // (e.g. came in via invite), prefer landing them there to avoid forcing onboarding for
+  // their default-owned starship. Onboarding is triggered when they later visit their OWN ship.
+  const memberFirst =
+    preferMemberFirst
+      ? list.find((s) => s.status === 'active' && s.ownerId !== userId) || list.find((s) => s.ownerId !== userId) || null
+      : null;
+  const ship = memberFirst || list.find((s) => s.status === 'active') || list[0] || null;
+  return ship ? { id: ship.id, slug: ship.slug, name: ship.name } : null;
 }
 
 // Zod schemas for validation
@@ -157,14 +176,14 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       return sendSuccess(res, response, 200);
     }
 
-    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
-    // only get the starship they were invited to; creation happens on /profile when needed.
+    // Get user's starships for redirect (owned + member).
+    // Default starships are created at signup (password + OAuth), not on login.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
-      if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
+      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
+      firstStarship = pickLandingStarship(accessible, user.id, preferMemberFirst);
     } catch (error) {
       logger.error('[AUTH] Failed to fetch starships for user', {
         userId: user.id,
@@ -855,14 +874,14 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
-    // only get the starship they were invited to; creation happens on /profile when needed.
+    // Get user's starships for redirect (owned + member).
+    // Default starships are created at signup (password + OAuth), not on login.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
-      if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
+      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
+      firstStarship = pickLandingStarship(accessible, user.id, preferMemberFirst);
     } catch (error) {
       logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {
         userId: user.id,

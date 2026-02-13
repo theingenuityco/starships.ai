@@ -6,7 +6,6 @@ import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
-import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
@@ -394,58 +393,31 @@ export function Navigation(props: NavigationProps) {
               title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
-              {/* Match the nav icon column width so the logo aligns with item icons */}
-              <div className="relative flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
-                <div
-                  className={[
-                    'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-100 group-hover/navigation:opacity-0' : 'opacity-100',
-                  ].join(' ')}
-                >
-                  <StarshipsLogo
-                    width={22}
-                    height={22}
-                    className=""
-                    gradientId="nav-gradient"
-                    animationDelay={1}
-                    repeatDelay={20}
-                    triggerAnimation={animationTrigger}
-                    idleLoop={false}
-                    playOnMountOnce={false}
-                  />
+              {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
+              {!isExpanded ? (
+                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/40">
+                  <Icon name="sidebar" className="h-4 w-4" aria-hidden />
+                  {unreadTotal > 0 ? (
+                    <span
+                      className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
+                      aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                      title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                    />
+                  ) : null}
                 </div>
-                <div
-                  className={[
-                    'absolute inset-0 flex items-center justify-center transition-opacity duration-150 ease-out',
-                    !isExpanded && !isCollapsing ? 'opacity-0 group-hover/navigation:opacity-100' : 'opacity-0',
-                  ].join(' ')}
-                  aria-hidden
-                >
-                  <Icon name="sidebar" className="w-4 h-4" />
-                </div>
-                {/* When collapsed, show unread badge on the logo area (hide bell button). */}
-                {!isExpanded && unreadTotal > 0 ? (
-                  <span
-                    // Match bell badge position (bell badge is anchored to a 16px icon centered in a 24px button)
-                    className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
-                    aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
-                    title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
-                  />
-                ) : null}
-              </div>
-              {isExpanded && (
+              ) : null}
+              {isExpanded ? (
                 <motion.span
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                   className="block flex-1 min-w-0 text-sm font-medium tracking-tight leading-snug truncate"
-                  style={{ marginLeft: '0.375rem' }}
                   title={starshipData?.name || 'Starships.ai'}
                 >
                   {starshipData?.name || 'Starships.ai'}
                 </motion.span>
-              )}
+              ) : null}
             </div>
             {/* Right-side actions: notifications (icon only) + close/collapse */}
             <div className="flex items-center gap-0.5">

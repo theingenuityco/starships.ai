@@ -4,8 +4,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import Icon from '@/components/primitives/Icon'
 import { useNotificationsList } from '@/hooks/useNotifications'
+import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
 function getInitials(name: string): string {
@@ -96,6 +97,24 @@ export function StarshipRail({
   const items = useMemo(() => (Array.isArray(starships) ? starships : []), [starships])
   const pathname = usePathname()
   const router = useRouter()
+  const { user } = useAuth()
+  const [logoTrigger, setLogoTrigger] = useState(0)
+
+  const ownedTargetSlug = useMemo(() => {
+    const uid = typeof user?.id === 'string' ? user.id : ''
+    const owned = uid ? items.find(s => String((s as any)?.ownerId || '') === uid) : null
+    return (owned?.slug || activeSlug || items[0]?.slug || '').trim() || null
+  }, [activeSlug, items, user?.id])
+
+  const handleTopLogoClick = useCallback(() => {
+    // Keep the logo animated even if idleLoop is disabled in the future.
+    setLogoTrigger(v => v + 1)
+    if (ownedTargetSlug) {
+      router.push(`/ship/${encodeURIComponent(ownedTargetSlug)}`)
+      return
+    }
+    router.push('/')
+  }, [ownedTargetSlug, router])
 
   const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
@@ -104,11 +123,35 @@ export function StarshipRail({
       className="flex h-full w-14 flex-col items-center gap-2 bg-card py-3"
       aria-label="Starship switcher"
     >
-      {/* Top spacer (aligns visually with sidebar header) */}
-      <div className="h-1" />
+      {/* Top logo */}
+      <Tooltip delayDuration={250}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={handleTopLogoClick}
+            className="relative mt-2 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Home"
+            title="Home"
+          >
+            <StarshipsLogo
+              width={28}
+              height={28}
+              className="text-current"
+              gradientId="rail-top-gradient"
+              triggerAnimation={logoTrigger}
+              activeStroke="currentColor"
+              idleLoop={false}
+              playOnMountOnce={false}
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
+          Starships.ai
+        </TooltipContent>
+      </Tooltip>
 
       {/* Add vertical padding so corner badges/indicators never clip at scroll edges. */}
-      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 py-2 custom-scrollbar">
+      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pt-0 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />

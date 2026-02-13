@@ -2225,8 +2225,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Consolidated focus management - handles all focus scenarios (requires tiptap)
     useEffect(() => {
+      // On small-screen devices, avoid auto-focusing the composer (it triggers the on-screen keyboard).
+      const isSmallScreen = () => (typeof window !== 'undefined' ? window.innerWidth < 768 : false)
       const shouldFocus = () => {
         if (disabled || isStreamingEffective || sending) return false
+        if (isSmallScreen()) return false
         return true
       }
       const wasStreaming = prevIsStreamingRef.current
@@ -2431,9 +2434,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
             // Desktop: keep the rounded composer card.
             'relative transition-all overflow-visible bg-card shadow-sm',
-            // Mobile: full border but square corners so it reads as a native input bar.
-            'border border-border/80 sm:rounded-2xl rounded-none',
-            'focus-within:border-primary/70',
+            // Mobile: only a top border (flush to screen edges). Desktop: full border + rounded card.
+            'border-t border-border/40 border-x-0 border-b-0 sm:border sm:border-border/40 sm:rounded-2xl rounded-none',
             disabled && 'opacity-50'
           )}
         >

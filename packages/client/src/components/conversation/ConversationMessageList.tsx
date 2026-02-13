@@ -3038,23 +3038,25 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                  <div className="min-w-0 text-sm font-bold font-mono text-foreground">
+                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
+                  <div className="min-w-0 text-sm font-bold font-mono text-foreground leading-none">
                     <HoverProfilePopover
                       trigger={
                         userProfileHref ? (
-                          <Link href={userProfileHref} className="block max-w-full truncate hover:underline underline-offset-2">
+                          <Link href={userProfileHref} className="block max-w-full truncate hover:underline underline-offset-2 leading-none">
                             {authorLabel}
                           </Link>
                         ) : (
-                          <span className="block max-w-full truncate">{authorLabel}</span>
+                          <span className="block max-w-full truncate leading-none">{authorLabel}</span>
                         )
                       }
                       content={userHoverCard}
                       side="right"
                     />
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  <div className="ml-auto flex-shrink-0">
+                    <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  </div>
                 </div>
               )}
               {isEditing ? (
@@ -3323,23 +3325,25 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0 flex min-w-0 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                  <div className="min-w-0 text-sm font-bold text-foreground">
+                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
+                  <div className="min-w-0 text-sm font-bold text-foreground leading-none">
                     <HoverProfilePopover
                       trigger={
                         assistantProfileHref ? (
-                          <Link href={assistantProfileHref} className="block max-w-full truncate font-mono hover:underline underline-offset-2">
+                          <Link href={assistantProfileHref} className="block max-w-full truncate font-mono hover:underline underline-offset-2 leading-none">
                             {assistantDisplayName}
                           </Link>
                         ) : (
-                          <span className="block max-w-full truncate font-mono">{assistantDisplayName}</span>
+                          <span className="block max-w-full truncate font-mono leading-none">{assistantDisplayName}</span>
                         )
                       }
                       content={assistantHoverCard}
                       side="right"
                     />
                   </div>
-                  <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  <div className="ml-auto flex-shrink-0">
+                    <MessageTimestamp value={messageTimestamp} isEdited={showEditedLabel} />
+                  </div>
                 </div>
               )}
               <ConversationMessageContent

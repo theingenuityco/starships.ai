@@ -89,6 +89,15 @@ export const metadata: Metadata = {
   },
 }
 
+// Prevent iOS Safari "focus zoom" by disallowing page scaling.
+// Note: This disables pinch-to-zoom (accessibility trade-off) per product request.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+} as const
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>

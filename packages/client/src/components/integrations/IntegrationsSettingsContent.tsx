@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -165,9 +167,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [SECTION_PREVIEW_LIMIT, agents.length, agentsPagination?.total])
 
   const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = (agents || [])
-      .map(a => String(a?.avatarAttachmentId || '').trim())
-      .filter(Boolean)
+    const ids = (agents || []).map(a => String(a?.avatarAttachmentId || '').trim()).filter(Boolean)
     return Array.from(new Set(ids))
   }, [agents])
 
@@ -353,6 +353,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const isInitialAutomationsLoading = !q && Boolean(toolsQuery.isLoading)
   const isSearchingAutomations = Boolean(q && (toolsQuery.isLoading || (toolsQuery.isFetching && !toolsQuery.isFetchingNextPage)))
 
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number | null) => (typeof n === 'number' ? `${label} (${n})` : label)
+    const opts = [
+      { value: 'all', label: withCount('All', allTabTotalForBadges) },
+      { value: 'agents', label: withCount('Agents', agentsTotalForBadges) },
+      { value: 'automations', label: withCount('Automations', automationsTotalForBadges) },
+      ...(canManageConnectors ? [{ value: 'connectors', label: withCount('Connectors', connectorsTotalForBadges) }] : []),
+    ]
+    return opts
+  }, [agentsTotalForBadges, allTabTotalForBadges, automationsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
+
   const renderRowSkeleton = useCallback((key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -476,13 +487,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && agentsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => agentsQuery.fetchNextPage()}
-              disabled={agentsQuery.isFetchingNextPage}
-              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
-            >
+            <Button size="sm" variant="outline" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
             </Button>
           </div>
@@ -567,13 +572,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && toolsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => toolsQuery.fetchNextPage()}
-              disabled={toolsQuery.isFetchingNextPage}
-              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
-            >
+            <Button size="sm" variant="outline" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more automations'}
             </Button>
           </div>
@@ -583,21 +582,30 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }
 
   return (
-    <div className="relative flex flex-col h-full min-w-0">
+    <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 py-2">
+        <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="download" weight="bold" className="h-4 w-4" />
+                <div className="flex min-w-0 w-full gap-2 items-center">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="mx-2" />
                   </span>
-                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Installed</h3>
-                </div>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        <Icon name="download" weight="bold" className="h-4 w-4" />
+                      </span>
+                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Installed</h3>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">Agents, automations, and connectors installed in this starship.</span>
+                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground" title="Agents, automations, and connectors installed in this starship.">
+                        Agents, automations, and connectors installed in this starship.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -605,14 +613,14 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs value={tabFromUrl} onValueChange={value => setTab(toIntegrationsTab(value))}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
-                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
-                    <TabsTrigger value="all">
+                  <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
+                    <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
                         {typeof allTabTotalForBadges === 'number' ? (
@@ -622,7 +630,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="agents">
+                    <TabsTrigger value="agents" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
                         {typeof agentsPagination?.total === 'number' ? (
@@ -632,7 +640,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="automations">
+                    <TabsTrigger value="automations" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Automations</span>
                         {typeof toolsPagination?.total === 'number' ? (
@@ -643,7 +651,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       </span>
                     </TabsTrigger>
                     {canManageConnectors ? (
-                      <TabsTrigger value="connectors">
+                      <TabsTrigger value="connectors" className="flex-1 sm:flex-none min-w-0 justify-center">
                         <span className="inline-flex items-center gap-1.5">
                           <span>Connectors</span>
                           {typeof connectorCatalogTotalVisible === 'number' ? (
@@ -797,7 +805,16 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
           )}
         </div>
       </div>
+
+      <MobileBottomFilterBar
+        filterValue={tabFromUrl}
+        onFilterChange={v => setTab(toIntegrationsTab(v))}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        searchPlaceholder="Search installed"
+      />
     </div>
   )
 }
-

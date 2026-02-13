@@ -664,6 +664,8 @@ export function ConversationInterface({
 
   // Focus after conversation becomes ready
   useEffect(() => {
+    // On small screens, avoid auto-focusing the input (prevents mobile keyboard pop).
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return
     if (currentConversationId) {
       const t = setTimeout(() => {
         messageInputRef.current?.focusInput?.()
@@ -859,6 +861,8 @@ export function ConversationInterface({
 
     // Focus input when streaming transitions from true -> false
     useEffect(() => {
+      // On small screens, avoid auto-focusing the input (prevents mobile keyboard pop).
+      if (typeof window !== 'undefined' && window.innerWidth < 768) return
       const was = prevStreamingRef.current
       let t: number | null = null
       if (was && !uiStreaming) {

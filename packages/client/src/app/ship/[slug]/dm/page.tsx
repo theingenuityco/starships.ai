@@ -26,7 +26,7 @@ export default function DraftDmPage() {
   if (!starship?.id) return null
 
   return (
-    <div className="h-screen w-full">
+    <div className="h-full w-full min-h-0">
       <ConversationInterface
         starshipId={starship.id}
         conversationId={null}

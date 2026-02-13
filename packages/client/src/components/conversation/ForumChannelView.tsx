@@ -73,8 +73,8 @@ export function ForumChannelView(props: {
         conversationId={props.channelConversationId}
         starshipId={props.starshipId}
         titlePrefix={
-          <span className="relative inline-flex items-center justify-center h-5 w-5">
-            <Icon name="hash" className="h-5 w-5" />
+          <span className="relative inline-flex items-center justify-center h-4 w-4">
+            <Icon name="hash" className="h-4 w-4" />
             {props.channelIsPrivate ? (
               <span className="absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-foreground" title="Private channel" aria-label="Private channel">
                 <Icon name="lock" weight="fill" label="Private channel" className="h-2 w-2" />

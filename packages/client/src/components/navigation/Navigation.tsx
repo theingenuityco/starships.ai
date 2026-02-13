@@ -387,7 +387,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
+          <div className="pl-2 pr-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
               className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={handleHeaderClick}
@@ -502,7 +502,7 @@ export function Navigation(props: NavigationProps) {
               paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
             }}
           >
-            <div className="flex flex-col space-y-0 w-full px-2">
+            <div className="flex flex-col space-y-0 w-full pl-2 pr-1.5">
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
               <div className="mt-5 mb-2 border-t border-border/60" />
@@ -511,7 +511,7 @@ export function Navigation(props: NavigationProps) {
 
           {/* Channels + Direct messages */}
           {isAuthenticated && starshipSlug && starshipData?.id && (
-            <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col px-2' : 'hidden'}>
+            <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col pl-2 pr-1.5' : 'hidden'}>
               {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
               <div className="flex-1 min-h-0 overflow-hidden pb-2">
                 <ConversationList
@@ -528,10 +528,10 @@ export function Navigation(props: NavigationProps) {
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
           {/* Divider before footer controls (match menu/channels divider) */}
-          <div className="mx-2 my-0 border-t border-border/60" />
+          <div className="ml-2 mr-1.5 my-0 border-t border-border/60" />
 
           {/* Bottom controls */}
-          <div className="px-2 pt-2 flex-shrink-0">
+          <div className="pl-2 pr-1.5 pt-2 flex-shrink-0">
             <div className="flex flex-col gap-1">
               {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (

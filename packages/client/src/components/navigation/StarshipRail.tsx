@@ -101,7 +101,7 @@ export function StarshipRail({
 
   return (
     <div
-      className="flex h-full w-14 flex-col items-center gap-2 border-r border-border/60 bg-card py-3"
+      className="flex h-full w-14 flex-col items-center gap-2 bg-card py-3"
       aria-label="Starship switcher"
     >
       {/* Top spacer (aligns visually with sidebar header) */}

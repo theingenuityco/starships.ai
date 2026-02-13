@@ -477,7 +477,8 @@ export function Navigation(props: NavigationProps) {
             <div className="flex flex-col space-y-0 w-full pl-2 pr-1.5">
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
-              <div className="mt-3 mb-1 border-t border-border/60" />
+              <div className="h-2" aria-hidden />
+              <div className="mb-1 border-t border-border/60" />
             </div>
           </div>
 

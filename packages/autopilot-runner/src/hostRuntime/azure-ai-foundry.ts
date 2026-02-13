@@ -808,7 +808,8 @@ export async function invokeAzureAiFoundry(
           if (name) out.name = name;
           const toolCalls = (m as { tool_calls?: unknown }).tool_calls;
           if (Array.isArray(toolCalls)) out.tool_calls = toolCalls;
-          const toolCallId = typeof (m as { tool_call_id?: unknown }).tool_call_id === 'string' ? (m as any).tool_call_id : undefined;
+          const toolCallIdRaw = (m as { tool_call_id?: unknown }).tool_call_id;
+          const toolCallId = typeof toolCallIdRaw === 'string' ? toolCallIdRaw : undefined;
           if (toolCallId) out.tool_call_id = toolCallId;
           return out;
         })

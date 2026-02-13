@@ -13,6 +13,7 @@
 import { ServiceFactory } from './ServiceFactory';
 import { logger } from '@starships/models';
 import { InvalidTokenError, EmailVerificationSendError, ConflictError } from '../errors';
+import { StarshipService } from './StarshipService';
 
 export interface RegisterUserData {
   email: string;
@@ -82,10 +83,48 @@ export class RegistrationOrchestrator {
       emailVerified: false,
     });
 
+    // Create a default starship immediately for ALL new signups (password + invite flows).
+    // This avoids "0 starships" states and ensures new users always have a workspace.
+    try {
+      await StarshipService.createDefaultStarship(user.id);
+    } catch (error) {
+      // Compensating action: if we can't create a default starship, delete the user
+      // so a retry doesn't leave an orphaned account with no workspace.
+      try {
+        await userService.deleteUser(user.id);
+      } catch {
+        // Ignore cleanup errors; surface original failure.
+      }
+      logger.error('[RegistrationOrchestrator] Failed to create default starship for new user', {
+        userId: user.id,
+        operation: 'create_default_starship',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+
     // Send email verification
     try {
       await userService.sendEmailVerification(user.id, user.email!);
     } catch (error) {
+      // Compensating action: if we can't send the verification email, remove the newly-created
+      // account + default starship so the user can retry registration cleanly.
+      try {
+        const starshipService = new StarshipService();
+        const owned = await starshipService.getStarshipsByOwner(user.id);
+        await Promise.all(
+          owned.map(async (s) => {
+            try {
+              await starshipService.deleteStarship(s.id);
+            } catch {
+              // Ignore cleanup errors; best-effort.
+            }
+          })
+        );
+        await userService.deleteUser(user.id);
+      } catch {
+        // Ignore cleanup errors; surface original failure.
+      }
       logger.error('[RegistrationOrchestrator] Failed to send verification email', {
         userId: user.id,
         operation: 'email_verification',

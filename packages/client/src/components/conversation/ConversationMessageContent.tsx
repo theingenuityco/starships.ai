@@ -158,7 +158,7 @@ function useSlabTypewriterText({
     setDisplayedLength(fullText.length)
     displayedLengthRef.current = fullText.length
     targetLengthRef.current = fullText.length
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [hydrateFromExistingOnMount, isStreaming, fullText, resetKey])
 
   useEffect(() => {

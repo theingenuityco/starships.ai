@@ -590,7 +590,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2" />
+                    <MobileNavToggleButton className="mx-2" />
                   </span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     <div className="flex items-baseline gap-2 min-w-0 w-full">
@@ -600,8 +600,13 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Installed</h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span className="font-medium leading-snug text-muted-foreground">Agents, automations, and connectors installed in this starship.</span>
+                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span
+                        className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
+                        title="Agents, automations, and connectors installed in this starship."
+                      >
+                        Agents, automations, and connectors installed in this starship.
+                      </span>
                     </div>
                   </div>
                 </div>

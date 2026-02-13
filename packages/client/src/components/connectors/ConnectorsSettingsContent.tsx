@@ -150,7 +150,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2" />
+                    <MobileNavToggleButton className="mx-2" />
                   </span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1.5">
                     <div className="flex items-baseline gap-2 min-w-0 w-full">
@@ -160,8 +160,13 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                       <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Connectors</h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span className="font-medium leading-snug text-muted-foreground">Connect services and apps to give your starship access to the tools and data it needs.</span>
+                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span
+                        className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
+                        title="Connect services and apps to give your starship access to the tools and data it needs."
+                      >
+                        Connect services and apps to give your starship access to the tools and data it needs.
+                      </span>
                     </div>
                   </div>
                 </div>

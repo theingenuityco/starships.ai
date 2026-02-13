@@ -24,6 +24,15 @@ interface NavigationProps {
   onClose?: () => void
 }
 
+function starshipMonogram(name: string): string {
+  const cleaned = String(name || '').trim()
+  if (!cleaned) return 'S'
+  const parts = cleaned.split(/\s+/).filter(Boolean)
+  const first = parts[0]?.[0] ?? 'S'
+  const second = parts.length > 1 ? parts[1]?.[0] : undefined
+  return (first + (second ?? '')).toUpperCase()
+}
+
 // (All items are composed into a single NavigationSection below)
 
 export function Navigation(props: NavigationProps) {
@@ -407,16 +416,25 @@ export function Navigation(props: NavigationProps) {
                 </div>
               ) : null}
               {isExpanded ? (
-                <motion.span
+                <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="block flex-1 min-w-0 text-[13px] font-medium tracking-tight leading-snug truncate"
+                  className="flex flex-1 min-w-0 items-center gap-1.5"
                   title={starshipData?.name || 'Starships.ai'}
                 >
-                  {starshipData?.name || 'Starships.ai'}
-                </motion.span>
+                  <span
+                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted/60 px-1 text-[10px] font-semibold tracking-wide text-muted-foreground"
+                    aria-label={`Starship monogram ${starshipMonogram(starshipData?.name || 'Starships.ai')}`}
+                    title={starshipMonogram(starshipData?.name || 'Starships.ai')}
+                  >
+                    {starshipMonogram(starshipData?.name || 'Starships.ai')}
+                  </span>
+                  <span className="block min-w-0 flex-1 text-[13px] font-medium tracking-tight leading-snug truncate">
+                    {starshipData?.name || 'Starships.ai'}
+                  </span>
+                </motion.div>
               ) : null}
             </div>
             {/* Right-side actions: notifications (icon only) + close/collapse */}

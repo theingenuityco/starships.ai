@@ -543,6 +543,26 @@ export function ConversationMessageContent({
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
+  // On small screens, we don't rely on hover to reveal message actions (copy / reactions / etc.).
+  // Instead, we reveal them via press-and-hold to avoid accidental mobile keyboard pop and because "hover" isn't a real affordance.
+  const isSmallScreen = () => (typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
+  const contentChunkRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!mobileActionsOpen) return
+    const onDocPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      const root = contentChunkRef.current
+      if (root && target && root.contains(target)) return
+      setMobileActionsOpen(false)
+    }
+    document.addEventListener('pointerdown', onDocPointerDown, { capture: true })
+    return () => document.removeEventListener('pointerdown', onDocPointerDown, { capture: true } as any)
+  }, [mobileActionsOpen])
+
   // Mention token display resolution (keeps DB content parseable while rendering readable @names).
   const sid = typeof starshipId === 'string' ? starshipId : ''
   const { data: starshipAgents = [] } = useStarshipAgents(sid, Boolean(sid))
@@ -1138,11 +1158,55 @@ export function ConversationMessageContent({
       >
         {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
         {hasCopyableContent ? (
-          <div className="relative w-full group/content-chunk">
+          <div
+            ref={contentChunkRef}
+            className="relative w-full group/content-chunk"
+            onPointerDown={e => {
+              // Only enable long-press reveal on small-screen touch devices.
+              if (!isSmallScreen()) return
+              if (e.pointerType !== 'touch') return
+              longPressTriggeredRef.current = false
+              if (longPressTimerRef.current) {
+                window.clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+              }
+              longPressTimerRef.current = window.setTimeout(() => {
+                longPressTimerRef.current = null
+                longPressTriggeredRef.current = true
+                setMobileActionsOpen(true)
+              }, 420)
+            }}
+            onPointerUp={() => {
+              if (longPressTimerRef.current) {
+                window.clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+              }
+            }}
+            onPointerCancel={() => {
+              if (longPressTimerRef.current) {
+                window.clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+              }
+            }}
+            onClickCapture={e => {
+              // If the long-press just fired, swallow the click that follows on mobile Safari/Chrome.
+              if (!longPressTriggeredRef.current) return
+              longPressTriggeredRef.current = false
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+          >
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
             {(enableCopy || extraActions || extraActionsAfterCopy) && (
-              <div className="pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
+              <div
+                className={cn(
+                  'pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 transition-opacity',
+                  // Desktop/tablet: reveal on hover/focus.
+                  // Mobile: don't reveal on hover (no real hover); reveal via long-press instead.
+                  mobileActionsOpen ? 'opacity-100' : 'opacity-0 md:group-hover/content-chunk:opacity-100 md:group-focus-within/content-chunk:opacity-100'
+                )}
+              >
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   {extraActions}
                   {enableCopy && (

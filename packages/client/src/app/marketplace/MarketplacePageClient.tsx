@@ -29,6 +29,15 @@ type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
 
 const MAX_LISTING_RESULTS = 9
 
+const INTERNAL_STARSHIPS_CONNECTOR_PROVIDER = 'starships'
+
+function excludeInternalStarshipsConnectorFromTotal(total: number): number {
+  // Public Explore/Marketplace hides the internal Starships connector from listings.
+  // Keep tab counts consistent with what users can actually see.
+  const n = typeof total === 'number' && Number.isFinite(total) ? total : 0
+  return Math.max(0, n - 1)
+}
+
 function isMarketplaceTab(value: string): value is MarketplaceTab {
   return (MARKETPLACE_TABS as readonly string[]).includes(value)
 }
@@ -169,7 +178,10 @@ export default function MarketplacePageClient(props: {
     // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
     const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : (initialTotals?.agents ?? agentsMatchingSearch.length)
     const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : (initialTotals?.tools ?? toolsMatchingSearch.length)
-    const connectors = shouldUseServerSearch ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length) : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+    const connectorsRaw = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
+      : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+    const connectors = excludeInternalStarshipsConnectorFromTotal(connectorsRaw)
     return {
       all: agents + tools + connectors,
       agents,
@@ -206,6 +218,10 @@ export default function MarketplacePageClient(props: {
     const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.limit))
     const start = pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0
     const end = pagination.total > 0 ? Math.min(pagination.total, pagination.page * pagination.limit) : 0
+    const totalForDisplay =
+      tab === 'connectors' ? excludeInternalStarshipsConnectorFromTotal(pagination.total) : pagination.total
+    const startForDisplay = totalForDisplay > 0 ? Math.min(start, totalForDisplay) : 0
+    const endForDisplay = totalForDisplay > 0 ? Math.min(end, totalForDisplay) : 0
 
     const buildPageItems = (current: number, total: number): Array<number | 'ellipsis'> => {
       if (total <= 1) return [1]
@@ -248,9 +264,9 @@ export default function MarketplacePageClient(props: {
     return (
       <nav aria-label="Explore pagination" className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-muted-foreground tabular-nums">
-          {pagination.total > 0 ? (
+          {totalForDisplay > 0 && startForDisplay > 0 && endForDisplay >= startForDisplay ? (
             <>
-              Showing {start}–{end} of {pagination.total}
+              Showing {startForDisplay}–{endForDisplay} of {totalForDisplay}
             </>
           ) : (
             <>No results</>

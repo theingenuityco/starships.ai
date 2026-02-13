@@ -54,6 +54,12 @@ const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] gr
 const INTEGRATION_OUTLINE_BUTTON_CLASS = 'h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
 const SEARCH_DEBOUNCE_MS = 400
 
+function excludeInternalStarshipsConnectorFromTotal(total: number | null): number | null {
+  if (typeof total !== 'number' || !Number.isFinite(total)) return null
+  // Installed hides the built-in Starships connector; keep badge totals consistent.
+  return Math.max(0, total - 1)
+}
+
 export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsContentProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -259,6 +265,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return null
   }, [connectorCatalogTotalQuery.data])
 
+  const connectorCatalogTotalVisible = useMemo<number | null>(() => {
+    return excludeInternalStarshipsConnectorFromTotal(connectorCatalogTotal)
+  }, [connectorCatalogTotal])
+
   const agentsTotalForBadges = useMemo<number | null>(() => {
     if (typeof agentsPagination?.total === 'number') return agentsPagination.total
     if (!agentsQuery.isLoading) return agents.length
@@ -273,11 +283,11 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const connectorsTotalForBadges = useMemo<number | null>(() => {
     if (!canManageConnectors) return 0
-    if (typeof connectorCatalogTotal === 'number') return connectorCatalogTotal
+    if (typeof connectorCatalogTotalVisible === 'number') return connectorCatalogTotalVisible
     if (typeof catalogTotal === 'number') return catalogTotal
     if (typeof totalConnectors === 'number') return totalConnectors
     return null
-  }, [canManageConnectors, catalogTotal, connectorCatalogTotal, totalConnectors])
+  }, [canManageConnectors, catalogTotal, connectorCatalogTotalVisible, totalConnectors])
 
   const allTabTotalForBadges = useMemo<number | null>(() => {
     if (typeof agentsTotalForBadges !== 'number') return null
@@ -332,10 +342,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (!baseShowConnectors) return false
     if (!isAllTab || !isSearchActive) return true
     // Prefer server total when available; otherwise keep visible until the panel reports a total.
-    if (typeof connectorCatalogTotal === 'number') return connectorCatalogTotal > 0
+    if (typeof connectorCatalogTotalVisible === 'number') return connectorCatalogTotalVisible > 0
     if (typeof catalogTotal === 'number') return catalogTotal > 0
     return true
-  }, [baseShowConnectors, catalogTotal, connectorCatalogTotal, isAllTab, isSearchActive])
+  }, [baseShowConnectors, catalogTotal, connectorCatalogTotalVisible, isAllTab, isSearchActive])
 
   const q = debouncedQuery.trim()
   const isInitialAgentsLoading = !q && Boolean(agentsQuery.isLoading)
@@ -636,9 +646,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                       <TabsTrigger value="connectors">
                         <span className="inline-flex items-center gap-1.5">
                           <span>Connectors</span>
-                          {typeof connectorCatalogTotal === 'number' ? (
+                          {typeof connectorCatalogTotalVisible === 'number' ? (
                             <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                              {connectorCatalogTotal}
+                              {connectorCatalogTotalVisible}
                             </Badge>
                           ) : typeof catalogTotal === 'number' ? (
                             <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
@@ -744,8 +754,8 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Connectors</h3>
-                      {typeof connectorCatalogTotal === 'number' ? (
-                        <span className="text-xs text-muted-foreground tabular-nums">({connectorCatalogTotal})</span>
+                      {typeof connectorCatalogTotalVisible === 'number' ? (
+                        <span className="text-xs text-muted-foreground tabular-nums">({connectorCatalogTotalVisible})</span>
                       ) : typeof catalogTotal === 'number' ? (
                         <span className="text-xs text-muted-foreground tabular-nums">({catalogTotal})</span>
                       ) : typeof totalConnectors === 'number' ? (

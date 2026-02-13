@@ -601,10 +601,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     </div>
 
                     <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span
-                        className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
-                        title="Agents, automations, and connectors installed in this starship."
-                      >
+                      <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground" title="Agents, automations, and connectors installed in this starship.">
                         Agents, automations, and connectors installed in this starship.
                       </span>
                     </div>

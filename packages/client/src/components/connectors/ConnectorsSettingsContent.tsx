@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 interface ConnectorsSettingsContentProps {
   slug: string
@@ -125,6 +126,9 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                  </span>
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     <Icon name="plug" weight="bold" className="h-5 w-5" />
                   </span>

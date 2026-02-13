@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -590,6 +591,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                  </span>
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     <Icon name="download" weight="bold" className="h-4 w-4" />
                   </span>

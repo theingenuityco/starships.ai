@@ -128,9 +128,13 @@ export function PublicHeader(): React.JSX.Element {
 
         {/* Mobile menu toggle */}
         <div className="sm:hidden relative">
-          <button
-            aria-label="Open menu"
+          <Icon
+            name={mobileMenuOpen ? 'x' : 'menu'}
+            role="button"
+            tabIndex={0}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
+            title={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             onClick={() => {
               setMobileMenuOpen(v => {
                 const next = !v
@@ -138,10 +142,18 @@ export function PublicHeader(): React.JSX.Element {
                 return next
               })
             }}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card/60 backdrop-blur hover:bg-accent text-foreground"
-          >
-            <Icon name={mobileMenuOpen ? 'x' : 'menu'} className="w-4 h-4" />
-          </button>
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setMobileMenuOpen(v => {
+                  const next = !v
+                  track({ type: 'public_header_mobile_menu_toggled', fromPath: pathname ?? '', isOpen: next })
+                  return next
+                })
+              }
+            }}
+            className="h-5 w-5 text-muted-foreground cursor-pointer select-none transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          />
 
           {mobileMenuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg p-1 z-[60]">

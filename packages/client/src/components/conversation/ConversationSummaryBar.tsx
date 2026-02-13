@@ -612,7 +612,7 @@ export function ConversationSummaryBar({
                 {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2" />
+                    <MobileNavToggleButton className="mx-2" />
                   </span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
@@ -816,7 +816,7 @@ export function ConversationSummaryBar({
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
               <div className="flex min-w-0 w-full gap-2 items-center">
                 <span className="flex-shrink-0 self-center md:hidden">
-                  <MobileNavToggleButton className="-ml-2" />
+                  <MobileNavToggleButton className="mx-2" />
                 </span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}

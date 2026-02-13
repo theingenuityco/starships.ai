@@ -63,17 +63,17 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
     router.replace(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery])
-  
+
   // Get agent info from URL params
   const agentId = searchParams?.get('agentId') || ''
   const agentSlug = searchParams?.get('agentSlug') || ''
   const agentName = searchParams?.get('agentName') || ''
   const agentRole = searchParams?.get('agentRole') || ''
   const [showDeploymentModal, setShowDeploymentModal] = useState(false)
-  
+
   // Fetch agent details if agentId is provided (for avatar)
   const { data: agent } = useAgent(agentId, !!agentId)
-  
+
   // Show modal when agent params are present
   useEffect(() => {
     if (agentId && agentSlug && agentName && agentRole) {
@@ -93,7 +93,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
       router.replace(`/ship/${slug}`)
     }
   }, [authLoading, isInstanceAdmin, router, slug, starship?.id, starship?.ownerId, starshipLoading, user?.id])
-  
+
   // Clean up URL params when modal closes
   const handleModalClose = (open: boolean) => {
     setShowDeploymentModal(open)
@@ -161,9 +161,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span className="font-medium leading-snug text-muted-foreground">
-                        Connect services and apps to give your starship access to the tools and data it needs.
-                      </span>
+                      <span className="font-medium leading-snug text-muted-foreground">Connect services and apps to give your starship access to the tools and data it needs.</span>
                     </div>
                   </div>
                 </div>
@@ -176,10 +174,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
           <div className="pt-4 pb-8 hidden md:block">
-            <Tabs
-              value={viewFromUrl}
-              onValueChange={value => setView(value)}
-            >
+            <Tabs value={viewFromUrl} onValueChange={value => setView(value)}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
                   <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
@@ -187,10 +182,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
                         {typeof totalCount === 'number' ? (
-                          <Badge
-                            variant={viewFromUrl === 'all' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={viewFromUrl === 'all' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {totalCount}
                           </Badge>
                         ) : null}
@@ -200,10 +192,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                       <span className="inline-flex items-center gap-1.5">
                         <span>Connected</span>
                         {typeof connectedCount === 'number' ? (
-                          <Badge
-                            variant={viewFromUrl === 'connected' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={viewFromUrl === 'connected' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {connectedCount}
                           </Badge>
                         ) : null}
@@ -213,10 +202,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                       <span className="inline-flex items-center gap-1.5">
                         <span>Unconnected</span>
                         {typeof unconnectedCount === 'number' ? (
-                          <Badge
-                            variant={viewFromUrl === 'unconnected' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={viewFromUrl === 'unconnected' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {unconnectedCount}
                           </Badge>
                         ) : null}
@@ -248,14 +234,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
               <AlertDescription>Starship not found. Please check the URL and try again.</AlertDescription>
             </Alert>
           ) : starship.id ? (
-            <StarshipConnectorsPanel
-              starshipId={starship.id}
-              maxColumns={2}
-              onStatsChange={handleStatsChange}
-              statusFilter={viewFromUrl}
-              catalogQuery={debouncedQuery}
-              layout="list"
-            />
+            <StarshipConnectorsPanel starshipId={starship.id} maxColumns={2} onStatsChange={handleStatsChange} statusFilter={viewFromUrl} catalogQuery={debouncedQuery} layout="list" />
           ) : null}
         </div>
       </div>

@@ -88,15 +88,7 @@ export function PublicHeader(): React.JSX.Element {
           title="Go to home"
         >
           <span className="flex items-center gap-2">
-            <StarshipsLogo
-              width={36}
-              height={36}
-              className="text-foreground"
-              idleLoop={false}
-              playOnMountOnce={false}
-              triggerAnimation={logoTrigger}
-              onEntryAnimationComplete={runPendingLogoAction}
-            />
+            <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} onEntryAnimationComplete={runPendingLogoAction} />
             <span
               className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none transition-all duration-200 ease-out ${
                 brandCollapsed ? 'opacity-0 -translate-x-1 max-w-0 w-0 overflow-hidden' : 'opacity-100 translate-x-0 max-w-[260px] w-auto'

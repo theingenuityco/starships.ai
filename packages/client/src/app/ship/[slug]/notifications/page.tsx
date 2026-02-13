@@ -47,12 +47,11 @@ function getDmPeerKey(item: DirectMessageListItem): string | null {
   return null
 }
 
-function getConversationLabel(args: {
-  starshipSlug: string
-  conversationId: string
-  channelByConversationId: Map<string, any>
-  dmByConversationId: Map<string, DirectMessageListItem>
-}): { primary: string; secondary?: string; href: string } {
+function getConversationLabel(args: { starshipSlug: string; conversationId: string; channelByConversationId: Map<string, any>; dmByConversationId: Map<string, DirectMessageListItem> }): {
+  primary: string
+  secondary?: string
+  href: string
+} {
   const shipSlug = String(args.starshipSlug || '').trim()
   const shipBase = shipSlug ? `/ship/${encodeURIComponent(shipSlug)}` : ''
 
@@ -86,10 +85,7 @@ function getConversationLabel(args: {
   return { primary: 'a conversation', secondary: cid ? `Conversation ${cid}` : undefined, href: `${shipBase}/conversations/${encodeURIComponent(cid)}` }
 }
 
-function getNotificationSentence(args: {
-  type: string
-  locationLabel: string
-}): { title: string; iconName: 'tag' | 'chat' | 'smiley' | 'bell' } {
+function getNotificationSentence(args: { type: string; locationLabel: string }): { title: string; iconName: 'tag' | 'chat' | 'smiley' | 'bell' } {
   const t = String(args.type || '')
   if (t === 'mention') return { title: `You were mentioned in ${args.locationLabel}`, iconName: 'tag' }
   if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
@@ -172,32 +168,15 @@ export default function NotificationsPage() {
     const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
     const timeAgo = safeDistanceToNow(n.createdAt)
     return (
-      <div
-        key={n.id}
-        className={cn(
-          'rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3',
-          isUnread && 'ring-1 ring-border'
-        )}
-      >
-        <Link
-          href={location.href}
-          className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')}
-          aria-label={sentence.title}
-        >
+      <div key={n.id} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3', isUnread && 'ring-1 ring-border')}>
+        <Link href={location.href} className={cn('min-w-0 flex-1 group outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md')} aria-label={sentence.title}>
           <div className="flex items-start gap-3">
-            <span
-              className={cn(
-                'mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border',
-                isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground'
-              )}
-            >
+            <span className={cn('mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border', isUnread ? 'bg-muted/40 text-foreground' : 'bg-muted/10 text-muted-foreground')}>
               <Icon name={sentence.iconName} weight={isUnread ? 'bold' : 'regular'} className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>
-                  {sentence.title}
-                </span>
+                <span className={cn('text-sm font-medium truncate', isUnread ? 'text-foreground' : 'text-muted-foreground', 'group-hover:text-foreground')}>{sentence.title}</span>
                 {isUnread ? <span className="inline-block w-2 h-2 rounded-full bg-destructive" aria-label="Unread" /> : null}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -243,7 +222,6 @@ export default function NotificationsPage() {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -255,10 +233,18 @@ export default function NotificationsPage() {
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
               <div className="flex justify-start">
                 <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto custom-scrollbar">
-                  <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">All</TabsTrigger>
-                  <TabsTrigger value="mentions" className="flex-1 sm:flex-none min-w-0 justify-center">Mentions</TabsTrigger>
-                  <TabsTrigger value="dms" className="flex-1 sm:flex-none min-w-0 justify-center">Direct messages</TabsTrigger>
-                  <TabsTrigger value="reactions" className="flex-1 sm:flex-none min-w-0 justify-center">Reactions</TabsTrigger>
+                  <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger value="mentions" className="flex-1 sm:flex-none min-w-0 justify-center">
+                    Mentions
+                  </TabsTrigger>
+                  <TabsTrigger value="dms" className="flex-1 sm:flex-none min-w-0 justify-center">
+                    Direct messages
+                  </TabsTrigger>
+                  <TabsTrigger value="reactions" className="flex-1 sm:flex-none min-w-0 justify-center">
+                    Reactions
+                  </TabsTrigger>
                 </TabsList>
               </div>
             </Tabs>
@@ -317,12 +303,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <MobileBottomFilterBar
-        filterValue={filter}
-        onFilterChange={v => setFilter(v as Filter)}
-        filterOptions={mobileFilterOptions}
-        filterPlaceholder="Filter"
-      />
+      <MobileBottomFilterBar filterValue={filter} onFilterChange={v => setFilter(v as Filter)} filterOptions={mobileFilterOptions} filterPlaceholder="Filter" />
     </div>
   )
 }

@@ -129,14 +129,14 @@ export function MobileBottomFilterBar(props: {
                   <button
                     type="button"
                     className={cn(
-                      // Match conversation input send button treatment (rounded, sized, primary).
-                      'h-8 w-8 rounded-full shrink-0 transition-all inline-flex items-center justify-center',
-                      'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
+                      // Match ConversationMessageInput attachment button styling.
+                      'p-1.5 rounded-lg transition-colors',
+                      'hover:bg-muted text-muted-foreground hover:text-foreground'
                     )}
                     aria-label={filterPlaceholder}
                     title={filterPlaceholder}
                   >
-                    <Icon name="filter" className="h-4 w-4" />
+                    <Icon name="filter" className="h-5 w-5" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent

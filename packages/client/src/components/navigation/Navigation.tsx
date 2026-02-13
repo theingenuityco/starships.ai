@@ -386,7 +386,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-2 pt-2 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
+          <div className="pl-2 pr-2 pt-4 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
               className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/40 transition-colors"
               onClick={handleHeaderClick}

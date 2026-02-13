@@ -87,14 +87,13 @@ export function MobileBottomFilterBar(props: {
         className
       )}
     >
-      <div className="px-0 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
+      <div className="px-0 pt-0 pb-[env(safe-area-inset-bottom)]">
         <div className={cn('mx-auto w-full', maxWidthClassName)}>
           <div
             className={cn(
               // Mirror `ConversationMessageInput` mobile composer container.
               // Mobile: only a top border (flush to screen edges).
-              'relative bg-card shadow-sm border-t border-border/80 border-x-0 border-b-0 rounded-none',
-              'focus-within:border-primary/70'
+              'relative bg-card shadow-sm border-t border-border/80 border-x-0 border-b-0 rounded-none'
             )}
           >
             <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">

@@ -101,16 +101,21 @@ export function MobileBottomFilterBar(props: {
               {/* Search */}
               {showSearch ? (
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Icon name="search" className="h-5 w-5 text-muted-foreground" />
+                  {/* Match conversation composer icon affordances */}
+                  <span className="p-1.5 rounded-lg text-muted-foreground pointer-events-none" aria-hidden="true">
+                    <Icon name="search" className="h-5 w-5" />
+                  </span>
                   <Input
                     value={searchValue}
                     onChange={e => onSearchChange?.(e.target.value)}
                     placeholder={searchPlaceholder}
                     className={cn(
                       // Make the input feel like the conversation composer: borderless, transparent, no shadow.
-                      'h-7 px-0 py-0 text-[13px] bg-transparent border-0 shadow-none',
-                      'focus-visible:ring-0 focus-visible:ring-offset-0',
-                      'placeholder:text-muted-foreground'
+                      // Match `ConversationMessageInput` text styling (`text-sm leading-relaxed`).
+                      'h-7 px-0 py-0 text-sm leading-relaxed text-foreground bg-transparent border-0 shadow-none',
+                      'focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+                      // Match TipTap placeholder styling: muted foreground @ 70% opacity.
+                      'placeholder:text-muted-foreground placeholder:opacity-70'
                     )}
                     aria-label={searchPlaceholder}
                   />

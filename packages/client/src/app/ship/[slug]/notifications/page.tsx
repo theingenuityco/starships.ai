@@ -14,6 +14,7 @@ import { useStarshipChannels, useStarshipDirectMessages } from '@/hooks/useConve
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { DirectMessageListItem } from '@/hooks/useConversations'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 type Filter = 'all' | 'mentions' | 'dms' | 'reactions'
 
@@ -117,6 +118,28 @@ export default function NotificationsPage() {
 
   const unreadItems = useMemo(() => filtered.filter(n => !n.readAt), [filtered])
   const readItems = useMemo(() => filtered.filter(n => Boolean(n.readAt)), [filtered])
+
+  const filterCounts = useMemo(() => {
+    const list = Array.isArray(notifications) ? notifications : []
+    const counts: Record<Filter, number> = { all: list.length, mentions: 0, dms: 0, reactions: 0 }
+    for (const n of list as any[]) {
+      const t = String((n as any)?.type || '')
+      if (t === 'mention') counts.mentions += 1
+      else if (t === 'dm') counts.dms += 1
+      else if (t === 'reaction') counts.reactions += 1
+    }
+    return counts
+  }, [notifications])
+
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number) => `${label} (${n})`
+    return [
+      { value: 'all', label: withCount('All', filterCounts.all) },
+      { value: 'mentions', label: withCount('Mentions', filterCounts.mentions) },
+      { value: 'dms', label: withCount('Direct messages', filterCounts.dms) },
+      { value: 'reactions', label: withCount('Reactions', filterCounts.reactions) },
+    ]
+  }, [filterCounts])
 
   const channelByConversationId = useMemo(() => {
     const map = new Map<string, any>()
@@ -226,9 +249,9 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-28 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>
               <div className="flex justify-start">
                 <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto custom-scrollbar">
@@ -293,6 +316,13 @@ export default function NotificationsPage() {
           ) : null}
         </div>
       </div>
+
+      <MobileBottomFilterBar
+        filterValue={filter}
+        onFilterChange={v => setFilter(v as Filter)}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+      />
     </div>
   )
 }

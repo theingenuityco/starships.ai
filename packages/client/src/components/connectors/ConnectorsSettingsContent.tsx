@@ -14,6 +14,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 interface ConnectorsSettingsContentProps {
   slug: string
@@ -118,6 +119,28 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
   const connectedCount = typeof connectorStats?.connected === 'number' ? connectorStats.connected : null
   const unconnectedCount = typeof totalCount === 'number' && typeof connectedCount === 'number' ? Math.max(0, totalCount - connectedCount) : null
 
+  const setView = useCallback(
+    (raw: string) => {
+      if (typeof window === 'undefined') return
+      const nextView = (raw === 'connected' || raw === 'unconnected' || raw === 'all' ? raw : 'all') as ConnectorView
+      const params = new URLSearchParams(window.location.search)
+      if (nextView === 'all') params.delete('view')
+      else params.set('view', nextView)
+      const next = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
+      router.replace(next)
+    },
+    [router]
+  )
+
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number | null) => (typeof n === 'number' ? `${label} (${n})` : label)
+    return [
+      { value: 'all', label: withCount('All', totalCount) },
+      { value: 'connected', label: withCount('Connected', connectedCount) },
+      { value: 'unconnected', label: withCount('Unconnected', unconnectedCount) },
+    ]
+  }, [connectedCount, totalCount, unconnectedCount])
+
   return (
     <div className="relative flex flex-col h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -150,20 +173,12 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-28 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs
               value={viewFromUrl}
-              onValueChange={value => {
-                if (typeof window === 'undefined') return
-                const nextView = (value === 'connected' || value === 'unconnected' || value === 'all' ? value : 'all') as ConnectorView
-                const params = new URLSearchParams(window.location.search)
-                if (nextView === 'all') params.delete('view')
-                else params.set('view', nextView)
-                const next = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
-                router.replace(next)
-              }}
+              onValueChange={value => setView(value)}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
@@ -244,6 +259,16 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
           ) : null}
         </div>
       </div>
+
+      <MobileBottomFilterBar
+        filterValue={viewFromUrl}
+        onFilterChange={setView}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+        searchValue={searchValue}
+        onSearchChange={setSearchValue}
+        searchPlaceholder="Search connectors"
+      />
 
       {/* Agent Deployment Modal */}
       {agentId && agentSlug && agentName && agentRole && (

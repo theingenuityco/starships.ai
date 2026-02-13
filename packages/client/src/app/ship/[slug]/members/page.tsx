@@ -31,6 +31,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 type Filter = 'all' | 'humans' | 'agents'
 
@@ -591,6 +592,15 @@ export default function MembersPage() {
   const humansTabCount = humansCount + invitesCount
   const allTabCount = humansTabCount + agentsCount
 
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number) => `${label} (${n})`
+    return [
+      { value: 'all', label: withCount('All', allTabCount) },
+      { value: 'humans', label: withCount('Humans', humansTabCount) },
+      { value: 'agents', label: withCount('Agents', agentsCount) },
+    ]
+  }, [agentsCount, allTabCount, humansTabCount])
+
   const renderMemberCardSkeleton = (key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -650,9 +660,9 @@ export default function MembersPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-28 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs
               value={filter}
               onValueChange={value => {
@@ -823,6 +833,18 @@ export default function MembersPage() {
           )}
         </div>
       </div>
+
+      <MobileBottomFilterBar
+        filterValue={filter}
+        onFilterChange={v => {
+          if (isFilterValue(v)) setFilter(v)
+        }}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+        searchValue={searchText}
+        onSearchChange={setSearchText}
+        searchPlaceholder="Search members"
+      />
 
       <Dialog
         open={inviteOpen}

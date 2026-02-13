@@ -603,11 +603,11 @@ export function ConversationSummaryBar({
 
     return (
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-3">
+        <div className="px-4 py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 {/* Title - exact match */}
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
                   {titlePrefix ? (
@@ -621,7 +621,7 @@ export function ConversationSummaryBar({
                   {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                 </div>
                 {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                   {isDraftHeader ? (
                     <>
                       {hasDraftParticipants ? (
@@ -797,11 +797,11 @@ export function ConversationSummaryBar({
       }
       className="sticky top-0 z-10 border-b border-border/60 bg-card"
     >
-      <div className="px-4 pt-3.5 pb-3">
+        <div className="px-4 py-2">
         <div className="w-full">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title */}
               <div className="flex items-baseline gap-2 min-w-0 w-full">
                 {titlePrefix ? (
@@ -814,7 +814,7 @@ export function ConversationSummaryBar({
               </div>
 
               {/* Agents + updated row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                 {effectiveParticipantItems.length > 0 ? (
                   <>
                     {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}

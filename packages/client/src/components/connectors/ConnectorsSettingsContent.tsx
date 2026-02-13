@@ -137,8 +137,8 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
                       <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Connectors</h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                      <span className="font-medium leading-none text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span className="font-medium leading-snug text-muted-foreground">
                         Connect services and apps to give your starship access to the tools and data it needs.
                       </span>
                     </div>

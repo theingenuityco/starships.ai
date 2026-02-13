@@ -203,8 +203,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <NotificationSoundBootstrap />
           <EmailChangeToastHandler />
-          <div className="relative h-[100dvh] overflow-hidden bg-background">
-            <main className="relative h-full w-full overflow-auto">{children}</main>
+          <div className="relative h-[100dvh] overflow-hidden bg-card">
+            <div className="flex h-full w-full min-h-0 p-3 md:p-4">
+              <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+                <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
+              </div>
+            </div>
           </div>
         </StarTheme>
       )
@@ -214,7 +218,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
-        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+        <div className="relative h-[100dvh] flex overflow-hidden bg-card">
           {/* Rail only (no sidebar panel) */}
           <div className="flex-shrink-0 relative z-50">
             <aside className="relative h-full">
@@ -230,7 +234,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </div>
 
           {/* Main Content Area - takes remaining space */}
-          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+          <div className="flex-1 min-h-0 p-3 md:p-4">
+            <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+              <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
+            </div>
+          </div>
         </div>
       </StarTheme>
     )
@@ -245,7 +253,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
-        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+        <div className="relative h-[100dvh] flex overflow-hidden bg-card">
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <>
@@ -278,8 +286,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </motion.button>
           )}
 
-          {/* Main Content Area - takes remaining space */}
-          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+          {/* Main Content Area - padded "pane" with rounded edges */}
+          <div className="flex-1 min-h-0 p-3 md:p-4">
+            <div className="h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+              <main className="h-full w-full overflow-auto custom-scrollbar">{children}</main>
+            </div>
+          </div>
         </div>
       </StarTheme>
     </JwtAuthGate>

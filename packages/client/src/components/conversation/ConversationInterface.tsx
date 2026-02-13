@@ -898,7 +898,7 @@ export function ConversationInterface({
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center">
+      <div className="flex flex-col h-full items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Icon name="sparkles" className="w-8 h-8 text-primary animate-pulse" />
@@ -912,7 +912,7 @@ export function ConversationInterface({
   // Show auth required state
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center">
+      <div className="flex flex-col h-full items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Icon name="user" className="w-8 h-8 text-muted-foreground" />

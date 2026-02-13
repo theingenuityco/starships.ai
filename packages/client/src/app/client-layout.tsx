@@ -231,7 +231,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <div className="relative h-[100dvh] overflow-hidden bg-card">
             <div className="flex h-full w-full min-h-0 p-0 md:p-4">
               <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[var(--mobile-bottom-filter-bar-height,0px)] md:pb-0">
+                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">
                   {children}
                 </main>
               </div>
@@ -263,7 +263,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           {/* Main Content Area - takes remaining space */}
           <div className="flex-1 min-h-0 min-w-0 p-0 md:p-4">
             <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-              <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[var(--mobile-bottom-filter-bar-height,0px)] md:pb-0">
+              <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">
                 {children}
               </main>
             </div>
@@ -312,7 +312,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             {/* Main Content Area - padded "pane" with rounded edges */}
             <div className="flex-1 min-h-0 min-w-0 p-0 md:p-4">
               <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[var(--mobile-bottom-filter-bar-height,0px)] md:pb-0">
+                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">
                   {children}
                 </main>
               </div>

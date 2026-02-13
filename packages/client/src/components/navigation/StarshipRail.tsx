@@ -146,7 +146,21 @@ export function StarshipRail({
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-          Starships.ai
+          <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
+            <div className="mt-0.5">
+              <StarshipsLogo
+                width={22}
+                height={22}
+                className="text-muted-foreground"
+                gradientId="rail-tooltip-gradient"
+                activeStroke="currentColor"
+                idleLoop={false}
+                playOnMountOnce={false}
+              />
+            </div>
+            <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Starships.ai</div>
+            <div className="col-span-2 text-xs text-muted-foreground">Go to your default channel</div>
+          </div>
         </TooltipContent>
       </Tooltip>
 

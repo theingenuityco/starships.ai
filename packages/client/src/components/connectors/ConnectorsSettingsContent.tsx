@@ -125,20 +125,24 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
+                <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                    <MobileNavToggleButton className="-ml-2" />
                   </span>
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="plug" weight="bold" className="h-5 w-5" />
-                  </span>
-                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Connectors</h3>
-                </div>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1.5">
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        <Icon name="plug" weight="bold" className="h-5 w-5" />
+                      </span>
+                      <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">Connectors</h3>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">
-                    Connect services and apps to give your starship access to the tools and data it needs.
-                  </span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                      <span className="font-medium leading-none text-muted-foreground">
+                        Connect services and apps to give your starship access to the tools and data it needs.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

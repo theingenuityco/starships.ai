@@ -609,23 +609,26 @@ export function ConversationSummaryBar({
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                {/* Title - exact match */}
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
+                {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
+                <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                    <MobileNavToggleButton className="-ml-2" />
                   </span>
-                  {titlePrefix ? (
-                    <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                      {titlePrefix}
-                    </span>
-                  ) : null}
-                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                    <span className="opacity-50">{effectiveFallbackTitle}</span>
-                  </h3>
-                  {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
-                </div>
-                {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                    {/* Title - exact match */}
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      {titlePrefix ? (
+                        <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                          {titlePrefix}
+                        </span>
+                      ) : null}
+                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                        <span className="opacity-50">{effectiveFallbackTitle}</span>
+                      </h3>
+                      {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                    </div>
+                    {/* Agents + updated row - exact structural match with same classes */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                   {isDraftHeader ? (
                     <>
                       {hasDraftParticipants ? (
@@ -739,9 +742,11 @@ export function ConversationSummaryBar({
                       ) : null}
                     </>
                   )}
-                </div>
+                    </div>
 
-                {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
+                    {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
+                  </div>
+                </div>
               </div>
 
               {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
@@ -806,22 +811,25 @@ export function ConversationSummaryBar({
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              {/* Title */}
-              <div className="flex items-baseline gap-2 min-w-0 w-full">
+              {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
+              <div className="flex min-w-0 w-full gap-2 items-center">
                 <span className="flex-shrink-0 self-center md:hidden">
-                  <MobileNavToggleButton className="-ml-2 mr-1" />
+                  <MobileNavToggleButton className="-ml-2" />
                 </span>
-                {titlePrefix ? (
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    {titlePrefix}
-                  </span>
-                ) : null}
-                <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
-                {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
-              </div>
+                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                  {/* Title */}
+                  <div className="flex items-baseline gap-2 min-w-0 w-full">
+                    {titlePrefix ? (
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        {titlePrefix}
+                      </span>
+                    ) : null}
+                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
+                    {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                  </div>
 
-              {/* Agents + updated row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                  {/* Agents + updated row */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                 {effectiveParticipantItems.length > 0 ? (
                   <>
                     {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
@@ -926,9 +934,11 @@ export function ConversationSummaryBar({
                     ) : null}
                   </>
                 )}
-              </div>
+                  </div>
 
-              {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
+                  {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
+                </div>
+              </div>
             </div>
 
             {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}

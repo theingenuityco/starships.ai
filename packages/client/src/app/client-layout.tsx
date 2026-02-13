@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { MobileNavProvider } from '@/components/navigation/MobileNavContext'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -267,46 +268,41 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
-        <div className="relative h-[100dvh] flex overflow-hidden bg-card">
-          {/* Sidebar Navigation - conditionally rendered */}
-          {!shouldHideNavigation && (
-            <>
-              {/* Desktop: always visible */}
-              {!isMobile && (
-                <div className="flex-shrink-0 relative z-50">
-                  <aside className="relative h-full">
-                    <Navigation isMobile={false} isOpen={true} />
-                  </aside>
-                </div>
-              )}
+        <MobileNavProvider
+          value={{
+            isMobile,
+            isOpen: showMobileMenu,
+            open: () => setShowMobileMenu(true),
+            close: () => setShowMobileMenu(false),
+            toggle: () => setShowMobileMenu(v => !v),
+          }}
+        >
+          <div className="relative h-[100dvh] flex overflow-hidden bg-card">
+            {/* Sidebar Navigation - conditionally rendered */}
+            {!shouldHideNavigation && (
+              <>
+                {/* Desktop: always visible */}
+                {!isMobile && (
+                  <div className="flex-shrink-0 relative z-50">
+                    <aside className="relative h-full">
+                      <Navigation isMobile={false} isOpen={true} />
+                    </aside>
+                  </div>
+                )}
 
-              {/* Mobile: overlay navigation */}
-              {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
-            </>
-          )}
+                {/* Mobile: overlay navigation */}
+                {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
+              </>
+            )}
 
-          {/* Mobile Toggle Button - only show when menu is closed */}
-          {isMobile && !shouldHideNavigation && !showMobileMenu && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              onClick={() => setShowMobileMenu(true)}
-              className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-              aria-label="Open navigation menu"
-              style={{ zIndex: 999 }}
-            >
-              <Icon name="sidebar" className="w-5 h-5" />
-            </motion.button>
-          )}
-
-          {/* Main Content Area - padded "pane" with rounded edges */}
-          <div className="flex-1 min-h-0 min-w-0 p-0 md:p-4">
-            <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-              <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">{children}</main>
+            {/* Main Content Area - padded "pane" with rounded edges */}
+            <div className="flex-1 min-h-0 min-w-0 p-0 md:p-4">
+              <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
+                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">{children}</main>
+              </div>
             </div>
           </div>
-        </div>
+        </MobileNavProvider>
       </StarTheme>
     </JwtAuthGate>
   )

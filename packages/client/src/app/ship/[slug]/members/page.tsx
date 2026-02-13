@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 type Filter = 'all' | 'humans' | 'agents'
 
@@ -624,6 +625,9 @@ export default function MembersPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                  </span>
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     <Icon name="users" weight="bold" className="h-4 w-4" />
                   </span>

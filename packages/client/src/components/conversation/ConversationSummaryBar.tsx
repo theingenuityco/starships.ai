@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -610,6 +611,9 @@ export function ConversationSummaryBar({
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 {/* Title - exact match */}
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="-ml-2 mr-1" />
+                  </span>
                   {titlePrefix ? (
                     <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                       {titlePrefix}
@@ -804,6 +808,9 @@ export function ConversationSummaryBar({
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title */}
               <div className="flex items-baseline gap-2 min-w-0 w-full">
+                <span className="flex-shrink-0 self-center md:hidden">
+                  <MobileNavToggleButton className="-ml-2 mr-1" />
+                </span>
                 {titlePrefix ? (
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     {titlePrefix}

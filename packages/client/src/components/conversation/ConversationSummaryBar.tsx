@@ -29,6 +29,11 @@ interface ConversationSummaryBarProps {
   maxTokens?: number | null
   /** Optional prefix shown before the title (e.g. "#" for channels). */
   titlePrefix?: ReactNode
+  /**
+   * Optional mobile-only left slot (replaces the hamburger/menu toggle).
+   * Useful for "Back" when a thread is open on small screens.
+   */
+  mobileLeftSlot?: ReactNode
   /** Optional right-side content aligned to the title row (far right of the title container). */
   titleRightSlot?: ReactNode
   /** Optional right-side content (e.g. controls). */
@@ -94,6 +99,7 @@ export function ConversationSummaryBar({
   modelId: _modelId,
   maxTokens: _maxTokens,
   titlePrefix,
+  mobileLeftSlot,
   titleRightSlot,
   rightSlot,
   thirdLineSlot,
@@ -612,7 +618,7 @@ export function ConversationSummaryBar({
                 {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="mx-2" />
+                    {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
                   </span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
@@ -816,7 +822,7 @@ export function ConversationSummaryBar({
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
               <div className="flex min-w-0 w-full gap-2 items-center">
                 <span className="flex-shrink-0 self-center md:hidden">
-                  <MobileNavToggleButton className="mx-2" />
+                  {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
                 </span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}

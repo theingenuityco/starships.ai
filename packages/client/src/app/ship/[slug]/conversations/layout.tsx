@@ -12,6 +12,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import api from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 function sanitizeThreadTitleSnippetFromMessageContent(input: string, maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }): string {
   // Thread titles are plain text snippets. Do not carry mention tokens into the title:
@@ -619,7 +620,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       }}
     >
       <div
-        className="flex-1 min-w-0 h-full"
+        className={cn('flex-1 min-w-0 h-full', isThreadPaneOpen && 'hidden md:block')}
         style={{
           ['--conversation-right-gutter' as any]: isThreadPaneOpen ? '16px' : '52px',
         }}
@@ -721,16 +722,23 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         </aside>
       </>
 
-      {/* Thread in-flow pane (mobile) */}
+      {/* Thread full-screen overlay (mobile) */}
       <aside
-        className={`md:hidden flex-shrink-0 bg-background min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${isThreadPaneOpen ? 'border-t border-border opacity-100 pointer-events-auto' : 'border-t-0 opacity-0 pointer-events-none'}`}
+        className={cn(
+          'md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden',
+          isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
         style={{
-          height: isThreadPaneOpen ? '45vh' : '0px',
-          willChange: 'height, opacity',
+          transition: 'opacity 200ms ease-out',
+          willChange: 'opacity',
         }}
         aria-hidden={!isThreadPaneOpen}
       >
-        {isThreadPaneMounted ? <ThreadPane {...threadPaneSharedProps} /> : <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>}
+        {isThreadPaneMounted ? (
+          <ThreadPane {...threadPaneSharedProps} className="h-full w-full" />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
+        )}
       </aside>
 
       {/* Hide children since ConversationInterface now handles everything */}

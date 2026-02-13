@@ -510,7 +510,7 @@ export function Navigation(props: NavigationProps) {
           <div className="ml-2 mr-1.5 my-0 h-px bg-border/60" />
 
           {/* Bottom controls */}
-          <div className="pl-2 pr-1.5 pt-2 pb-3 flex-shrink-0">
+          <div className="pl-2 pr-1.5 pt-2 pb-2 flex-shrink-0">
             <div className="flex flex-col gap-1">
               {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (

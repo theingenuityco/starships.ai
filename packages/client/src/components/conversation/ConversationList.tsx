@@ -993,7 +993,7 @@ export const ConversationList = memo(function ConversationList({
             onPointerDown={handleDividerPointerDown}
             className={cn(
               'mx-1 my-0.5 h-2 rounded-md relative flex items-center justify-center group',
-              isChannelsExpanded && isDirectMessagesExpanded ? 'cursor-row-resize hover:bg-muted/60' : 'cursor-default opacity-50',
+              isChannelsExpanded && isDirectMessagesExpanded ? 'cursor-row-resize' : 'cursor-default opacity-50',
               'transition-colors'
             )}
             style={{ touchAction: 'none' }}
@@ -1003,8 +1003,7 @@ export const ConversationList = memo(function ConversationList({
             {/* Drag indicator handle */}
             <div
               className={cn(
-                'pointer-events-none inline-flex items-center gap-1 px-2 py-0.5 rounded-full',
-                isChannelsExpanded && isDirectMessagesExpanded ? 'bg-background/70 ring-1 ring-border/40' : 'bg-transparent',
+                'pointer-events-none inline-flex items-center gap-1',
                 isChannelsExpanded && isDirectMessagesExpanded
                   ? isDraggingPanels
                     ? 'opacity-100'
@@ -1014,9 +1013,9 @@ export const ConversationList = memo(function ConversationList({
               )}
               aria-hidden
             >
-              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
-              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
-              <span className={cn('h-1 w-1 rounded-full', isDraggingPanels ? 'bg-foreground/70' : 'bg-muted-foreground/60')} />
+              <span className="h-1 w-1 rounded-full bg-border/60" />
+              <span className="h-1 w-1 rounded-full bg-border/60" />
+              <span className="h-1 w-1 rounded-full bg-border/60" />
             </div>
           </div>
 

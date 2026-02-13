@@ -159,7 +159,7 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
-                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
+                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
                     <TabsTrigger value="all">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>

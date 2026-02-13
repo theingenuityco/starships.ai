@@ -615,7 +615,7 @@ export function ConversationSummaryBar({
                       {titlePrefix}
                     </span>
                   ) : null}
-                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
+                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
                     <span className="opacity-50">{effectiveFallbackTitle}</span>
                   </h3>
                   {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
@@ -809,7 +809,7 @@ export function ConversationSummaryBar({
                     {titlePrefix}
                   </span>
                 ) : null}
-                <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
+                <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
                 {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
               </div>
 

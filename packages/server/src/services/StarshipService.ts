@@ -406,15 +406,6 @@ export class StarshipService {
       initialCredits: 200, // 200 welcome credits for new users
     });
 
-    // Ensure baseline tools exist and are allowed at the starship level.
-    // `createStarship()` already attempts this, but we run it again here to make the
-    // provisioning intent explicit for default starships.
-    try {
-      await starshipService.ensureBaselineStarshipToolsAllowed(starship.id);
-    } catch (err) {
-      console.error('[STARSHIP-SERVICE] Failed to ensure baseline tools for default starship:', starship.id, err);
-    }
-
     // Deploy Aria + her tools/permissions. Best-effort: the starship should still exist even if
     // the template/tooling layer is temporarily unavailable.
     try {

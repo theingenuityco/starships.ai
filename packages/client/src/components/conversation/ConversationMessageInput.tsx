@@ -2432,7 +2432,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Desktop: keep the rounded composer card.
             'relative transition-all overflow-visible bg-card shadow-sm',
             // Mobile: only a top border (flush to screen edges). Desktop: full border + rounded card.
-            'border-t border-border/80 border-x-0 border-b-0 sm:border sm:border-border/80 sm:rounded-2xl rounded-none',
+            'border-t border-border/40 border-x-0 border-b-0 sm:border sm:border-border/40 sm:rounded-2xl rounded-none',
             disabled && 'opacity-50'
           )}
         >

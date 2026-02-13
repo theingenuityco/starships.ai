@@ -478,7 +478,7 @@ export function Navigation(props: NavigationProps) {
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
               <div className="h-2" aria-hidden />
-              <div className="mb-1 border-t border-border/60" />
+              <div className="mb-1 h-px bg-border/60" />
             </div>
           </div>
 
@@ -501,7 +501,7 @@ export function Navigation(props: NavigationProps) {
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
           {/* Divider before footer controls (match menu/channels divider) */}
-          <div className="ml-2 mr-1.5 my-0 border-t border-border/60" />
+          <div className="ml-2 mr-1.5 my-0 h-px bg-border/60" />
 
           {/* Bottom controls */}
           <div className="pl-2 pr-1.5 pt-2 flex-shrink-0">

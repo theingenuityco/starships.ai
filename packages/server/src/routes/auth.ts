@@ -157,13 +157,19 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       return sendSuccess(res, response, 200);
     }
 
-    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
-    // only get the starship they were invited to; creation happens on /profile when needed.
+    // Get user's starships for redirect (owned + member).
+    // Default starships are created at signup (password + OAuth), not on login.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
+      // If the user hasn't completed onboarding yet and they belong to a non-owned starship
+      // (e.g. came in via invite), prefer landing them there to avoid forcing onboarding for
+      // their default-owned starship. Onboarding is triggered when they later visit their OWN ship.
+      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
+      const memberShip =
+        preferMemberFirst ? accessible.find((s) => s.status === 'active' && s.ownerId !== user.id) || accessible.find((s) => s.ownerId !== user.id) : null;
+      const ship = memberShip || accessible.find((s) => s.status === 'active') || accessible[0] || null;
       if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
     } catch (error) {
       logger.error('[AUTH] Failed to fetch starships for user', {
@@ -855,13 +861,18 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // Get user's starships for redirect (owned + member). Do NOT create here so invite-joiners
-    // only get the starship they were invited to; creation happens on /profile when needed.
+    // Get user's starships for redirect (owned + member).
+    // Default starships are created at signup (password + OAuth), not on login.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
+      // Same landing preference as password login: if wizard isn't complete and the user
+      // has a non-owned starship, prefer that to avoid forcing onboarding immediately.
+      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
+      const memberShip =
+        preferMemberFirst ? accessible.find((s) => s.status === 'active' && s.ownerId !== user.id) || accessible.find((s) => s.ownerId !== user.id) : null;
+      const ship = memberShip || accessible.find((s) => s.status === 'active') || accessible[0] || null;
       if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
     } catch (error) {
       logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {

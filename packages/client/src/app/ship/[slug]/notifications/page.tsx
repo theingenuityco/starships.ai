@@ -219,7 +219,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="relative flex flex-col h-full min-w-0">
+    <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
         <div className="px-4 py-2">
           <div className="w-full">
@@ -249,7 +249,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-[calc(var(--mobile-bottom-filter-bar-height,7rem)+1rem)] md:pb-8">
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
           <div className="pt-4 pb-8 hidden md:block">
             <Tabs value={filter} onValueChange={value => setFilter(value as Filter)}>

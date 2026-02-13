@@ -9,7 +9,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -506,6 +506,104 @@ export const ConversationList = memo(function ConversationList({
   const canSaveChannelEdit =
     Boolean(editChannel?.conversationId) && !updateChannel.isPending && !isEditChannelNameEmpty && isEditChannelNameTrimmed && !isEditChannelNameTooLong
 
+  // Compact sidebar panels: resizable Channels/DM split (VS Code-style).
+  // Keep logic simple + reliable: treat the split as a flex-basis ratio and clamp by min pixel heights.
+  const panelContainerRef = useRef<HTMLDivElement | null>(null)
+  const [isDraggingPanels, setIsDraggingPanels] = useState(false)
+  const draggingRef = useRef(false)
+  const dragBoundsRef = useRef<null | { top: number; height: number; minRatio: number; maxRatio: number }>(null)
+
+  const splitStorageKey = useMemo(() => `sidebarPanels:channelsRatio:${String(starshipId || '').trim() || 'unknown'}`, [starshipId])
+  const storageKeyRef = useRef(splitStorageKey)
+  useEffect(() => {
+    storageKeyRef.current = splitStorageKey
+  }, [splitStorageKey])
+
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+
+  const [channelsPanelRatio, setChannelsPanelRatio] = useState<number>(0.5)
+  const channelsPanelRatioRef = useRef(channelsPanelRatio)
+  useEffect(() => {
+    channelsPanelRatioRef.current = channelsPanelRatio
+  }, [channelsPanelRatio])
+
+  // Load persisted ratio (per starship).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(splitStorageKey)
+      const n = raw ? Number(raw) : NaN
+      if (Number.isFinite(n)) setChannelsPanelRatio(clamp(n, 0.1, 0.9))
+      else setChannelsPanelRatio(0.5)
+    } catch {
+      setChannelsPanelRatio(0.5)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitStorageKey])
+
+  const handleDividerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isChannelsExpanded || !isDirectMessagesExpanded) return
+      const el = panelContainerRef.current
+      if (!el) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const rect = el.getBoundingClientRect()
+      const height = rect.height
+      if (!Number.isFinite(height) || height <= 0) return
+
+      const minPanelPx = 120 // includes header + a usable scroll region
+      const minRatio = clamp(minPanelPx / height, 0.05, 0.45)
+      const maxRatio = clamp(1 - minPanelPx / height, 0.55, 0.95)
+
+      draggingRef.current = true
+      setIsDraggingPanels(true)
+      dragBoundsRef.current = { top: rect.top, height, minRatio, maxRatio }
+
+      try {
+        ;(e.currentTarget as any).setPointerCapture?.(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+    },
+    [isChannelsExpanded, isDirectMessagesExpanded]
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const onMove = (e: PointerEvent) => {
+      if (!draggingRef.current) return
+      const b = dragBoundsRef.current
+      if (!b) return
+
+      const raw = (e.clientY - b.top) / b.height
+      const next = clamp(raw, b.minRatio, b.maxRatio)
+      setChannelsPanelRatio(next)
+    }
+
+    const onUp = () => {
+      if (!draggingRef.current) return
+      draggingRef.current = false
+      dragBoundsRef.current = null
+      setIsDraggingPanels(false)
+      try {
+        window.localStorage.setItem(storageKeyRef.current, String(channelsPanelRatioRef.current))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+  }, [])
+
   const editChannelDialog = (
     <Dialog
       open={Boolean(editChannel)}
@@ -661,21 +759,27 @@ export const ConversationList = memo(function ConversationList({
       )
     }
 
-    // Sidebar layout rule:
-    // - Channels + Direct messages should each grow naturally with content.
-    // - Each section should STOP growing once it reaches 50% of the available sidebar height.
-    // - If a section doesn't have enough content to reach 50%, it should NOT stretch.
-    // - When content exceeds 50%, the section should scroll internally.
-
     return (
       <>
         <div
-          className="flex flex-col h-full min-h-0"
-          // Reserve space for the divider gap so 50% + 50% doesn't overflow.
-          style={{ ['--sidebar-half-h' as any]: 'calc((100% - 1.75rem) / 2)' }}
+          ref={panelContainerRef}
+          className={cn('flex flex-col h-full min-h-0', isDraggingPanels ? 'select-none' : '')}
         >
-          {/* Channels - content-sized so Direct messages starts right below */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
+          {/* Channels panel */}
+          <div
+            className="flex flex-col min-h-0 rounded-lg overflow-hidden"
+            style={
+              isChannelsExpanded && isDirectMessagesExpanded
+                ? {
+                    flex: '0 0 auto',
+                    flexBasis: `${Math.round(channelsPanelRatio * 1000) / 10}%`,
+                    minHeight: 120,
+                  }
+                : isChannelsExpanded && !isDirectMessagesExpanded
+                  ? { flex: '1 1 auto' }
+                  : undefined
+            }
+          >
             <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"
@@ -881,11 +985,35 @@ export const ConversationList = memo(function ConversationList({
             ) : null}
           </div>
 
-          {/* Separator between Channels and Direct messages (keep this in navigation). */}
-          <div className="my-1.5 mx-1 border-t border-border/60" role="separator" aria-hidden />
+          {/* Resizable divider (VS Code-style splitter) */}
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize channels and direct messages panels"
+            onPointerDown={handleDividerPointerDown}
+            className={cn(
+              'mx-1 my-0.5 h-2 rounded-md',
+              isChannelsExpanded && isDirectMessagesExpanded ? 'cursor-row-resize hover:bg-muted/60' : 'cursor-default opacity-50',
+              'transition-colors'
+            )}
+            style={{ touchAction: 'none' }}
+          >
+            <div className="h-px w-full bg-border/60" aria-hidden />
+          </div>
 
-          {/* Direct messages - content-sized; capped at 50% height like Channels */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
+          {/* Direct messages panel */}
+          <div
+            className="flex flex-col min-h-0 rounded-lg overflow-hidden"
+            style={
+              isChannelsExpanded && isDirectMessagesExpanded
+                ? { flex: '1 1 auto', minHeight: 120 }
+                : !isChannelsExpanded && isDirectMessagesExpanded
+                  ? { flex: '1 1 auto' }
+                  : !isDirectMessagesExpanded && isChannelsExpanded
+                    ? undefined
+                    : undefined
+            }
+          >
             <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"

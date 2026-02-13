@@ -120,7 +120,7 @@ export function StarshipRail({
 
   return (
     <div
-      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card py-3"
+      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card pt-4 pb-3"
       aria-label="Starship switcher"
     >
       {/* Top logo */}
@@ -129,7 +129,7 @@ export function StarshipRail({
           <button
             type="button"
             onClick={handleTopLogoClick}
-            className="relative mt-2 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="relative mt-0 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Home"
             title="Home"
           >

@@ -424,7 +424,41 @@ export class UserService {
     }
 
     // Link OAuth account using business logic
-    await this.linkOAuthAccount(user.id, profile);
+    try {
+      await this.linkOAuthAccount(user.id, profile);
+    } catch (error) {
+      // If this was a brand-new OAuth signup, treat OAuth linking as part of the same "create user" unit
+      // and roll back the user + default starship to avoid locking them out with no auth method wired.
+      if (isNewUser) {
+        try {
+          const starshipService = new StarshipService();
+          const owned = await starshipService.getStarshipsByOwner(user.id);
+          await Promise.all(
+            owned.map(async (s) => {
+              try {
+                await starshipService.deleteStarship(s.id);
+              } catch {
+                // Ignore cleanup errors; best-effort.
+              }
+            })
+          );
+          await this.deleteUser(user.id);
+        } catch {
+          // Ignore cleanup errors; surface original failure.
+        }
+      }
+
+      logger.error('[OAUTH] Failed to link OAuth account for user', {
+        userId: user.id,
+        email: user.email,
+        provider: profile.provider,
+        operation: 'link_oauth_account',
+        isNewUser,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      throw error;
+    }
 
     return { user };
   }

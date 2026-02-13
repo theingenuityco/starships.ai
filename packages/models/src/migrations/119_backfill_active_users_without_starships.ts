@@ -134,7 +134,7 @@ function getOwnerLabel(displayName: string | null, email: string | null): string
  * Migration 119: Backfill default starships for active users who have zero accessible starships.
  *
  * Definition:
- * - "Active user" = users.last_login_at IS NOT NULL
+ * - "Active user" = users.last_login_at IS NOT NULL OR users.email_verified = true
  * - "Zero accessible starships" = user owns 0 starships AND is a member of 0 starships
  *
  * Why:
@@ -165,7 +165,7 @@ export async function up(client: Client): Promise<void> {
       `
       SELECT u.id, u.display_name, u.email
         FROM users u
-       WHERE u.last_login_at IS NOT NULL
+       WHERE (u.last_login_at IS NOT NULL OR u.email_verified = true)
          AND NOT EXISTS (SELECT 1 FROM starships s WHERE s.owner_id = u.id)
          AND NOT EXISTS (SELECT 1 FROM starship_members sm WHERE sm.user_id = u.id)
       `
@@ -213,7 +213,7 @@ export async function up(client: Client): Promise<void> {
           ''::text,
           'scout',
           5,
-          1,
+          3,
           'active',
           NOW(),
           NOW()

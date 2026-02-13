@@ -6,6 +6,7 @@ import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from 
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
 import { SubscriptionPlanCatalogService } from './SubscriptionPlanCatalogService';
+import { logger } from '@/utils/logger';
 
 export interface CreateStarshipData {
   ownerId: string;
@@ -110,7 +111,11 @@ export class StarshipService {
       // Optional: silent success
     } catch (err) {
       // Log and continue - starship creation should not fail due to wallet issues
-      console.error('[STARSHIP-SERVICE] Failed to create wallet for starship:', starship.id, err);
+      logger.error('[StarshipService] Failed to create wallet for starship', {
+        starshipId: starship.id,
+        operation: 'create_wallet',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // Ensure every starship has a default public channel (e.g. #lobby).
@@ -118,7 +123,11 @@ export class StarshipService {
     try {
       await ensureDefaultChannelForStarship({ starshipId: starship.id, createdByUserId: data.ownerId });
     } catch (err) {
-      console.error('[STARSHIP-SERVICE] Failed to create default channel for starship; rolling back:', starship.id, err);
+      logger.error('[StarshipService] Failed to create default channel for starship; rolling back', {
+        starshipId: starship.id,
+        operation: 'create_default_channel',
+        error: err instanceof Error ? err.message : String(err),
+      });
       try {
         await this.starshipRepository.delete(starship.id);
       } catch {
@@ -132,7 +141,11 @@ export class StarshipService {
     try {
       await this.ensureBaselineStarshipToolsAllowed(starship.id);
     } catch (err) {
-      console.error('[STARSHIP-SERVICE] Failed to ensure required tools for starship:', starship.id, err);
+      logger.error('[StarshipService] Failed to ensure required tools for starship', {
+        starshipId: starship.id,
+        operation: 'ensure_baseline_tools',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return starship;
@@ -265,7 +278,10 @@ export class StarshipService {
    */
   async getStarshipMemories(starshipId: string): Promise<unknown[]> {
     // TODO: Implement memory management when the feature is needed
-    console.warn(`Memory management not yet implemented for starship ${starshipId}`);
+    logger.warn('[StarshipService] Memory management not yet implemented for starship', {
+      starshipId,
+      operation: 'get_starship_memories',
+    });
     return [];
   }
 
@@ -274,7 +290,10 @@ export class StarshipService {
    */
   async getMemoryCount(starshipId: string): Promise<number> {
     // TODO: Implement memory management when the feature is needed
-    console.warn(`Memory management not yet implemented for starship ${starshipId}`);
+    logger.warn('[StarshipService] Memory management not yet implemented for starship', {
+      starshipId,
+      operation: 'get_memory_count',
+    });
     return 0;
   }
 
@@ -283,7 +302,11 @@ export class StarshipService {
    */
   async removeMemory(starshipId: string, memoryId: string): Promise<boolean> {
     // TODO: Implement memory management when the feature is needed
-    console.warn(`Memory management not yet implemented for starship ${starshipId} memory ${memoryId}`);
+    logger.warn('[StarshipService] Memory management not yet implemented for starship', {
+      starshipId,
+      memoryId,
+      operation: 'remove_memory',
+    });
     return false;
   }
 
@@ -341,7 +364,12 @@ export class StarshipService {
 
       return await this.starshipMemberRepository.isMember(userId, starshipId);
     } catch (error) {
-      console.error('[STARSHIP-SERVICE] Error checking collaborator access:', error);
+      logger.error('[StarshipService] Error checking collaborator access', {
+        userId,
+        starshipId,
+        operation: 'has_collaborator_access',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }
@@ -359,7 +387,12 @@ export class StarshipService {
       if (!starship || !user) return false;
       return starship.ownerId === userId || Boolean((user as AuthUser).isInstanceAdmin);
     } catch (error) {
-      console.error('[STARSHIP-SERVICE] Error checking owner access:', error);
+      logger.error('[StarshipService] Error checking owner access', {
+        userId,
+        starshipId,
+        operation: 'has_owner_access',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }
@@ -411,7 +444,12 @@ export class StarshipService {
     try {
       await StarshipService.createInitialAgents(userId, starship.id);
     } catch (err) {
-      console.error('[STARSHIP-SERVICE] Failed to create initial agents for default starship:', starship.id, err);
+      logger.error('[StarshipService] Failed to create initial agents for default starship', {
+        starshipId: starship.id,
+        userId,
+        operation: 'create_initial_agents_default_starship',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     return starship;
@@ -439,15 +477,29 @@ export class StarshipService {
           }
           if (aria) created['Aria'] = aria;
         } catch (err) {
-          console.error('[STARSHIP-SERVICE] Failed to create Aria agent:', err);
+          logger.error('[StarshipService] Failed to create Aria agent', {
+            starshipId,
+            userId,
+            operation: 'create_aria_agent',
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       } else {
-        console.warn('[STARSHIP-SERVICE] Aria template not found - skipping Aria creation');
+        logger.warn('[StarshipService] Aria template not found - skipping Aria creation', {
+          starshipId,
+          userId,
+          operation: 'create_initial_agents',
+        });
       }
 
       return created;
     } catch (error) {
-      console.error('[STARSHIP-SERVICE] Failed to create initial agents:', error);
+      logger.error('[StarshipService] Failed to create initial agents', {
+        starshipId,
+        userId,
+        operation: 'create_initial_agents',
+        error: error instanceof Error ? error.message : String(error),
+      });
       return created;
     }
   }

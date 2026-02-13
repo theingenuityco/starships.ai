@@ -203,7 +203,7 @@ export default function NotificationsPage() {
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
                   <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="bell" weight="bold" className="h-5 w-5" />
+                    <Icon name="bell" weight="bold" className="h-4 w-4" />
                   </span>
                   <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Notifications</h3>
                 </div>

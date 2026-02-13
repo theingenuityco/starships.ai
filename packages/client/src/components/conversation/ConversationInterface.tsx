@@ -960,8 +960,8 @@ export function ConversationInterface({
                 starshipId={starshipId}
                 titlePrefix={
                   isChannelConversation ? (
-                    <span className="relative inline-flex items-center justify-center h-5 w-5">
-                      <Icon name="hash" weight="bold" className="h-5 w-5" />
+                    <span className="relative inline-flex items-center justify-center h-4 w-4">
+                      <Icon name="hash" weight="bold" className="h-4 w-4" />
                       {isCurrentChannelPrivate ? (
                         <span
                           className="absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-foreground"

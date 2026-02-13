@@ -442,7 +442,10 @@ export function Navigation(props: NavigationProps) {
               {isAuthenticated && starshipSlug && isExpanded && (
                 <button
                   type="button"
-                  onClick={() => router.push(`/ship/${starshipSlug}/notifications`)}
+                  onClick={() => {
+                    router.push(`/ship/${starshipSlug}/notifications`)
+                    if (isMobile && onClose) onClose()
+                  }}
                   className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                   aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                   title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
@@ -497,6 +500,7 @@ export function Navigation(props: NavigationProps) {
                   starshipId={starshipData.id}
                   starshipSlug={activeStarshipSlug || undefined}
                   compact={true}
+                  onNavigate={handleConversationSelect}
                   onConversationSelect={handleConversationSelect}
                 />
               </div>

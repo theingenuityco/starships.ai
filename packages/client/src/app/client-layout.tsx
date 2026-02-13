@@ -144,6 +144,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
 
+  // Close the mobile navigation menu on route changes.
+  // This prevents cases where a click triggers a redirect but the overlay stays open.
+  useEffect(() => {
+    if (!isMobile) return
+    setShowMobileMenu(false)
+  }, [pathname, isMobile])
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)

@@ -425,7 +425,7 @@ export default function OnboardingPage() {
                     <p className="mt-2 text-sm text-muted-foreground">
                       {connectorProviders.length > 0
                         ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
-                        : 'No connectors required by your agents. You can connect apps anytime from your workspace.'}
+                        : 'No connectors required by your agents. Here are a few popular connectors to get you started.'}
                     </p>
                   </div>
                   {primaryStarship?.id && (
@@ -444,7 +444,19 @@ export default function OnboardingPage() {
                           connectButtonLabel="Connect"
                           matchAgentCardStyle
                         />
-                      ) : null}
+                      ) : (
+                        <StarshipConnectorsPanel
+                          starshipId={primaryStarship.id}
+                          hideSearch
+                          hideDisconnect={false}
+                          hideReconnect
+                          maxColumns={2}
+                          hideCardDescription
+                          connectButtonLabel="Connect"
+                          matchAgentCardStyle
+                          maxItems={3}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

@@ -636,8 +636,8 @@ export default function MembersPage() {
                       <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Members</h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                      <span className="font-medium leading-none text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span className="font-medium leading-snug text-muted-foreground">
                         Invite collaborators, manage roles, and deploy agents to your starship.
                       </span>
                     </div>

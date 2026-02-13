@@ -78,8 +78,8 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
 
   return (
     <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
+      <Avatar className="h-3.5 w-3.5 rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={14} rounded />
       </Avatar>
       <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
     </div>
@@ -91,9 +91,9 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   const hasPresence = typeof online === 'boolean'
   return (
     <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+      <Avatar className="h-3.5 w-3.5 rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
-        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[9px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
       {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
@@ -330,7 +330,7 @@ export const ConversationList = memo(function ConversationList({
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasUnread || hasNotifBadge
@@ -342,15 +342,15 @@ export const ConversationList = memo(function ConversationList({
           justifyContent: 'flex-start',
           transition: 'background-color 0.15s ease',
           cursor: 'pointer',
-          minHeight: '32px',
+          minHeight: '28px',
         }}
         onClick={() => handleDmTargetClick(t)}
       >
         <div
           className="flex-shrink-0"
           style={{
-            width: '1.25rem',
-            height: '1.25rem',
+            width: '1rem',
+            height: '1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -362,7 +362,7 @@ export const ConversationList = memo(function ConversationList({
         </div>
         <span
           className={cn(
-            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1',
             // Color is controlled by the row container (matches `NavigationItem`); keep only weight here.
             isActive ? 'font-medium' : hasUnread || hasNotifBadge ? 'font-bold' : 'font-medium'
           )}
@@ -370,7 +370,7 @@ export const ConversationList = memo(function ConversationList({
           {label}
         </span>
         {notifCount > 0 ? (
-          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+          <span className="ml-1 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold">
             {notifCount > 99 ? '99+' : String(notifCount)}
           </span>
         ) : null}
@@ -676,10 +676,10 @@ export const ConversationList = memo(function ConversationList({
         >
           {/* Channels - content-sized so Direct messages starts right below */}
           <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
-            <div className="w-full flex items-center justify-between h-8 pr-2">
+            <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsChannelsExpanded(v => !v)}
                 aria-expanded={isChannelsExpanded}
@@ -688,8 +688,8 @@ export const ConversationList = memo(function ConversationList({
                 <div
                   className="flex-shrink-0"
                   style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
+                    width: '1rem',
+                    height: '1rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -697,7 +697,7 @@ export const ConversationList = memo(function ConversationList({
                     marginRight: '0.25rem',
                   }}
                 >
-                  <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                  <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
               </button>
@@ -705,10 +705,10 @@ export const ConversationList = memo(function ConversationList({
               <button
                 type="button"
                 onClick={() => setIsCreateChannelOpen(true)}
-                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                 aria-label="Create channel"
               >
-                <Icon name="plus" className="w-4 h-4" />
+                <Icon name="plus" className="w-3 h-3" />
               </button>
             </div>
 
@@ -747,7 +747,7 @@ export const ConversationList = memo(function ConversationList({
                         <div key={ch.conversationId}>
                           <div
                             className={cn(
-                              'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
                                 : hasUnread || hasNotifBadge
@@ -758,15 +758,15 @@ export const ConversationList = memo(function ConversationList({
                               justifyContent: 'flex-start',
                               transition: 'background-color 0.15s ease',
                               cursor: 'pointer',
-                              minHeight: '32px',
+                              minHeight: '28px',
                             }}
                             onClick={() => handleChannelClick(String(ch.slug))}
                           >
                             <div
                               className="flex-shrink-0 relative"
                               style={{
-                                width: '1.25rem',
-                                height: '1.25rem',
+                                width: '1rem',
+                                height: '1rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -777,7 +777,7 @@ export const ConversationList = memo(function ConversationList({
                               <Icon
                                 name="hash"
                                 weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
-                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
+                                className={cn('h-3 w-3', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
                               {ch.isPrivate ? (
                                 <span
@@ -798,7 +798,7 @@ export const ConversationList = memo(function ConversationList({
                             </div>
                             <div
                               className={cn(
-                                'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1.5 flex items-center gap-1',
+                                'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1 flex items-center gap-1',
                                 isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
@@ -806,7 +806,7 @@ export const ConversationList = memo(function ConversationList({
                             </div>
                             <div className="ml-1 flex items-center justify-end gap-1">
                               {notifCount > 0 ? (
-                                <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                <span className="inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold">
                                   {notifCount > 99 ? '99+' : String(notifCount)}
                                 </span>
                               ) : null}
@@ -829,7 +829,7 @@ export const ConversationList = memo(function ConversationList({
                                         e.stopPropagation()
                                       }}
                                     >
-                                      <Icon name="dots-vertical" className="w-4 h-4" />
+                                      <Icon name="dots-vertical" className="w-3.5 h-3.5" />
                                     </button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent
@@ -882,14 +882,14 @@ export const ConversationList = memo(function ConversationList({
           </div>
 
           {/* Separator between Channels and Direct messages (keep this in navigation). */}
-          <div className="my-3 mx-1 border-t border-border/60" role="separator" aria-hidden />
+          <div className="my-1.5 mx-1 border-t border-border/60" role="separator" aria-hidden />
 
           {/* Direct messages - content-sized; capped at 50% height like Channels */}
           <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
-            <div className="w-full flex items-center justify-between h-8 pr-2">
+            <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsDirectMessagesExpanded(v => !v)}
                 aria-expanded={isDirectMessagesExpanded}
@@ -898,8 +898,8 @@ export const ConversationList = memo(function ConversationList({
                 <div
                   className="flex-shrink-0"
                   style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
+                    width: '1rem',
+                    height: '1rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -907,12 +907,12 @@ export const ConversationList = memo(function ConversationList({
                     marginRight: '0.25rem',
                   }}
                 >
-                  <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                  <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide">Direct messages</span>
               </button>
               {/* spacer to align with Channels "+" column */}
-              <div className="w-6 h-6" />
+              <div className="w-5 h-5" />
             </div>
 
             {isDirectMessagesExpanded ? (

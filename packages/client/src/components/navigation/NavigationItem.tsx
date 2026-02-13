@@ -65,8 +65,8 @@ export function NavigationItem({
       <div
         className="flex-shrink-0"
         style={{
-          width: '1.25rem',
-          height: '1.25rem',
+          width: '1rem',
+          height: '1rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -74,7 +74,7 @@ export function NavigationItem({
           pointerEvents: 'none',
         }}
       >
-        <Icon name={icon} weight={hasBadge ? 'bold' : 'regular'} className="w-4 h-4" />
+        <Icon name={icon} weight={hasBadge ? 'bold' : 'regular'} className="w-3 h-3" />
       </div>
     )
   }, [icon, hasBadge])
@@ -82,7 +82,7 @@ export function NavigationItem({
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
+      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1 ${
         special
           ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
           : isActive
@@ -95,14 +95,14 @@ export function NavigationItem({
         justifyContent: 'flex-start',
         transition: 'background-color 0.15s ease',
         cursor: 'pointer',
-        minHeight: '32px',
+        minHeight: '28px',
       }}
     >
       {StableIcon}
       {hasBadge ? (
         expanded ? (
           <span
-            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold"
+            className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold"
             aria-label={badgeLabel}
             title={badgeLabel}
           >
@@ -123,7 +123,7 @@ export function NavigationItem({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className={cn('whitespace-nowrap pointer-events-none ml-1.5', hasBadge ? 'font-bold' : 'font-medium')}
+            className={cn('whitespace-nowrap pointer-events-none ml-1', hasBadge ? 'font-bold' : 'font-medium')}
           >
             {label}
           </motion.span>

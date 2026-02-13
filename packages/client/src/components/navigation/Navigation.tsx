@@ -379,16 +379,16 @@ export function Navigation(props: NavigationProps) {
         <div
           className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
           style={{
-            width: isExpanded ? '16rem' : '3.5rem',
+            width: isExpanded ? '14rem' : '3.25rem',
             height: '100%',
             willChange: 'width',
             contain: 'layout style paint',
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
+          <div className="pl-2 pr-2 pt-2 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
-              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
+              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/40 transition-colors"
               onClick={handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
@@ -412,7 +412,7 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="block flex-1 min-w-0 text-sm font-medium tracking-tight leading-snug truncate"
+                  className="block flex-1 min-w-0 text-[13px] font-medium tracking-tight leading-snug truncate"
                   title={starshipData?.name || 'Starships.ai'}
                 >
                   {starshipData?.name || 'Starships.ai'}
@@ -439,7 +439,7 @@ export function Navigation(props: NavigationProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                 aria-label="Close sidebar"
               >
                 <Icon name="x" className="w-5 h-5" />
@@ -477,7 +477,7 @@ export function Navigation(props: NavigationProps) {
             <div className="flex flex-col space-y-0 w-full pl-2 pr-1.5">
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
-              <div className="mt-5 mb-2 border-t border-border/60" />
+              <div className="mt-3 mb-1 border-t border-border/60" />
             </div>
           </div>
 

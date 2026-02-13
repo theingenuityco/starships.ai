@@ -37,6 +37,8 @@ interface ConversationListProps {
   starshipSlug?: string
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
+  /** Called whenever the list triggers navigation (channels/DMs). Useful for closing mobile nav overlays. */
+  onNavigate?: () => void
   compact?: boolean
 }
 
@@ -109,6 +111,7 @@ export const ConversationList = memo(function ConversationList({
   starshipSlug,
   onConversationDelete,
   onConversationSelect,
+  onNavigate,
   compact = false,
 }: ConversationListProps) {
   const router = useRouter()
@@ -332,7 +335,7 @@ export const ConversationList = memo(function ConversationList({
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
+          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasUnread || hasNotifBadge
@@ -384,6 +387,7 @@ export const ConversationList = memo(function ConversationList({
     if (!slug) return
     router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
     onConversationSelect?.(channelSlug)
+    onNavigate?.()
   }
 
   const existingDmConversationIdByAgentId = useMemo(() => {
@@ -420,6 +424,7 @@ export const ConversationList = memo(function ConversationList({
     const href = dmHrefForTarget(t)
     if (!href) return
     router.push(href)
+    onNavigate?.()
 
     // Keep the parent callback behavior for consumers that care about "selection",
     // even though canonical navigation is now by peer key (not conversationId).
@@ -819,7 +824,7 @@ export const ConversationList = memo(function ConversationList({
                 >
                   <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Channels</span>
               </button>
 
               <button
@@ -867,7 +872,7 @@ export const ConversationList = memo(function ConversationList({
                         <div key={ch.conversationId}>
                           <div
                             className={cn(
-                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
+                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
                                 : hasUnread || hasNotifBadge
@@ -1071,7 +1076,7 @@ export const ConversationList = memo(function ConversationList({
                 >
                   <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Direct messages</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Direct messages</span>
               </button>
               {/* spacer to align with Channels "+" column */}
               <div className="w-5 h-5" />

@@ -82,7 +82,7 @@ export function NavigationItem({
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1 ${
+      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1 ${
         special
           ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
           : isActive

@@ -28,13 +28,13 @@ export function PresenceIndicator({
   // - no pulsing animation
   // Presets (kept intentionally small across the UI).
   const sizePx = size === 'md' ? 10 : size === 'sm' ? 8 : size === 'xs' ? 6 : 5
-  // Use a high z-index so avatar rings/shadows don't cover it.
+  // Keep this above the avatar, but below dropdowns/menus/popovers.
   // Default placement is slightly outside the corner. Some containers (e.g. participant popovers)
   // have `overflow-x-hidden` and will clip an outset dot, so allow an inset placement.
   const pos =
     placement === 'inset'
-      ? 'absolute bottom-0 right-0 -translate-x-0.5 -translate-y-0.5 z-50 pointer-events-none'
-      : 'absolute bottom-0 right-0 translate-x-[16%] translate-y-[16%] z-50 pointer-events-none'
+      ? 'absolute bottom-0 right-0 -translate-x-0.5 -translate-y-0.5 z-10 pointer-events-none'
+      : 'absolute bottom-0 right-0 translate-x-[16%] translate-y-[16%] z-10 pointer-events-none'
   const color = kind === 'busy' ? 'bg-amber-500 dark:bg-amber-400' : kind === 'offline' ? 'bg-border dark:bg-muted-foreground' : 'bg-emerald-500 dark:bg-emerald-400'
 
   return (

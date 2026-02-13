@@ -93,21 +93,20 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             variant="ghost"
             size="sm"
             aria-label="Open user menu"
-            className="h-7 w-full justify-start gap-1.5 rounded-lg px-1 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            className="h-9 w-full justify-start gap-2 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60"
           >
-            <UserProfile mode="collapsed" centerInContainer collapsedSize="sm" />
+            <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[12.5px] font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</span>
-              <span className="flex items-center gap-1 text-[10px] leading-tight text-muted-foreground min-w-0">
-                <StarshipsLogo width={11} height={11} className="flex-shrink-0" idleLoop={false} />
+              <span className="block text-sm font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</span>
+              <span className="flex items-center text-xs leading-tight text-muted-foreground min-w-0">
                 <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
               </span>
             </span>
             <Icon name="chevron-up" className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         ) : (
-          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-8 w-8`}>
-            <UserProfile mode="collapsed" centerInContainer collapsedSize="sm" />
+          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-9 w-9`}>
+            <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -124,8 +123,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             </Avatar>
             <div className="min-w-0">
               <div className="text-sm font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground leading-tight min-w-0">
-                <StarshipsLogo width={14} height={14} className="flex-shrink-0" idleLoop={false} />
+              <div className="flex items-center text-[13px] text-muted-foreground leading-tight min-w-0">
                 <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
               </div>
             </div>

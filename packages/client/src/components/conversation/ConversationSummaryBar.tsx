@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -28,6 +29,11 @@ interface ConversationSummaryBarProps {
   maxTokens?: number | null
   /** Optional prefix shown before the title (e.g. "#" for channels). */
   titlePrefix?: ReactNode
+  /**
+   * Optional mobile-only left slot (replaces the hamburger/menu toggle).
+   * Useful for "Back" when a thread is open on small screens.
+   */
+  mobileLeftSlot?: ReactNode
   /** Optional right-side content aligned to the title row (far right of the title container). */
   titleRightSlot?: ReactNode
   /** Optional right-side content (e.g. controls). */
@@ -93,6 +99,7 @@ export function ConversationSummaryBar({
   modelId: _modelId,
   maxTokens: _maxTokens,
   titlePrefix,
+  mobileLeftSlot,
   titleRightSlot,
   rightSlot,
   thirdLineSlot,
@@ -603,28 +610,237 @@ export function ConversationSummaryBar({
 
     return (
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 py-2">
+        <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                {/* Title - exact match */}
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
-                  {titlePrefix ? (
-                    <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                      {titlePrefix}
-                    </span>
-                  ) : null}
-                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                    <span className="opacity-50">{effectiveFallbackTitle}</span>
-                  </h3>
-                  {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
+                <div className="flex min-w-0 w-full gap-2 items-center">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
+                  </span>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                    {/* Title - exact match */}
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      {titlePrefix ? (
+                        <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                          {titlePrefix}
+                        </span>
+                      ) : null}
+                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                        <span className="opacity-50">{effectiveFallbackTitle}</span>
+                      </h3>
+                      {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                    </div>
+                    {/* Agents + updated row - exact structural match with same classes */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                      {isDraftHeader ? (
+                        <>
+                          {hasDraftParticipants ? (
+                            <Popover
+                              open={participantsOpen}
+                              onOpenChange={next => {
+                                clearParticipantsHoverTimers()
+                                setParticipantsOpen(next)
+                              }}
+                            >
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  ref={participantsTriggerRef}
+                                  className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  aria-label={`Participants: ${participantsLabel}`}
+                                  title={participantsLabel}
+                                  onPointerEnter={openParticipantsPopover}
+                                  onPointerLeave={handleParticipantsTriggerPointerLeave}
+                                  onFocus={() => {
+                                    clearParticipantsHoverTimers()
+                                    setParticipantsOpen(true)
+                                  }}
+                                >
+                                  <div className="flex items-center -space-x-1.5">
+                                    {effectiveParticipantItems.slice(0, 3).map(p => {
+                                      if (p.kind === 'agent') {
+                                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                        return (
+                                          <div key={p.key} className="relative h-5 w-5">
+                                            <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                              <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                                            </div>
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <div key={p.key} className="relative h-5 w-5">
+                                          <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
+                                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                          </Avatar>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                  {effectiveParticipantItems.length > 3 ? (
+                                    <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
+                                  ) : null}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                ref={participantsContentRef}
+                                side="bottom"
+                                align="start"
+                                sideOffset={8}
+                                className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                                onOpenAutoFocus={e => e.preventDefault()}
+                                onCloseAutoFocus={e => e.preventDefault()}
+                                onPointerEnter={openParticipantsPopover}
+                                onPointerLeave={handleParticipantsContentPointerLeave}
+                              >
+                                <ParticipantsPopup />
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                              <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                                <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
+                                  <div className="h-4 w-4 rounded-full bg-muted/30" />
+                                </Avatar>
+                                <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                              </div>
+                            </div>
+                          )}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
+                          </span>
+                          {showTokens ? (
+                            <>
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
+                              </span>
+                            </>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          {/* Agent placeholder - matches exact structure */}
+                          <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                            <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                              <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                            </div>
+                          </div>
+                          {/* Separator and updated text - exact match */}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
+                          </span>
+                          {showTokens ? (
+                            <>
+                              {/* Token indicator placeholder (reserved space) */}
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
+                              </span>
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+
+                    {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
+                  </div>
                 </div>
-                {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  {isDraftHeader ? (
-                    <>
-                      {hasDraftParticipants ? (
+              </div>
+
+              {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Prefer DM agent label for user↔agent DMs so the header always includes role.
+  // Conversation titles are persisted and may be name-only (e.g. "Echo") depending on creation path.
+  const title = (() => {
+    const dm: any = (dmItem as any)?.dm
+    const dmAgent: any = (dmItem as any)?.agent
+    if (dm?.dmType === 'user_agent' && dmAgent) {
+      const label = formatAgentDisplayName(dmAgent)
+      if (label && label.trim().length > 0) return label
+    }
+    return normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
+  })()
+  const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
+
+  // Format dates
+  const formatDate = (date: Date) => {
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const formatUSD2 = (v: number) => {
+    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
+    return `$${v.toFixed(2)}`
+  }
+
+  return (
+    <motion.div
+      key={animationKey}
+      initial={isInitialMountRef.current || renderedPlaceholderForConversationRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={
+        isInitialMountRef.current || renderedPlaceholderForConversationRef.current
+          ? { duration: 0 }
+          : {
+              duration: 0.5,
+              delay: 0.1,
+              ease: [0.25, 0.46, 0.45, 0.94],
+            }
+      }
+      className="sticky top-0 z-10 border-b border-border/60 bg-card"
+    >
+      <div className="px-4 pt-3.5 pb-2 md:py-2">
+        <div className="w-full">
+          <div className="flex items-center justify-between gap-4">
+            {/* Title and metadata (stacked) */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+              {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
+              <div className="flex min-w-0 w-full gap-2 items-center">
+                <span className="flex-shrink-0 self-center md:hidden">
+                  {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
+                </span>
+                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                  {/* Title */}
+                  <div className="flex items-baseline gap-2 min-w-0 w-full">
+                    {titlePrefix ? (
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        {titlePrefix}
+                      </span>
+                    ) : null}
+                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
+                    {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                  </div>
+
+                  {/* Agents + updated row */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                    {effectiveParticipantItems.length > 0 ? (
+                      <>
+                        {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
                         <Popover
                           open={participantsOpen}
                           onOpenChange={next => {
@@ -685,243 +901,52 @@ export function ConversationSummaryBar({
                             <ParticipantsPopup />
                           </PopoverContent>
                         </Popover>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                          <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                            <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
-                              <div className="h-4 w-4 rounded-full bg-muted/30" />
-                            </Avatar>
-                            <span className="truncate font-medium leading-none opacity-70">Draft</span>
-                          </div>
-                        </div>
-                      )}
-                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
-                      </span>
-                      {showTokens ? (
-                        <>
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
-                          </span>
-                        </>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      {/* Agent placeholder - matches exact structure */}
-                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                            <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
-                          </Avatar>
-                          <span className="truncate font-medium leading-none opacity-50">Loading...</span>
-                        </div>
-                      </div>
-                      {/* Separator and updated text - exact match */}
-                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
-                      </span>
-                      {showTokens ? (
-                        <>
-                          {/* Token indicator placeholder (reserved space) */}
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
-                          </span>
-                        </>
-                      ) : null}
-                    </>
-                  )}
+
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
+                        </span>
+
+                        {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
+                        {showTokens && showCost ? (
+                          <>
+                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span
+                                className="inline-flex items-center text-[11px] text-muted-foreground"
+                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                              >
+                                {showCost ? formatUSD2(totalCost) : null}
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
+                        {showTokens && showCost ? (
+                          <>
+                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span
+                                className="inline-flex items-center text-[11px] text-muted-foreground"
+                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                              >
+                                {showCost ? formatUSD2(totalCost) : null}
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+
+                  {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
                 </div>
-
-                {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
               </div>
-
-              {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Prefer DM agent label for user↔agent DMs so the header always includes role.
-  // Conversation titles are persisted and may be name-only (e.g. "Echo") depending on creation path.
-  const title = (() => {
-    const dm: any = (dmItem as any)?.dm
-    const dmAgent: any = (dmItem as any)?.agent
-    if (dm?.dmType === 'user_agent' && dmAgent) {
-      const label = formatAgentDisplayName(dmAgent)
-      if (label && label.trim().length > 0) return label
-    }
-    return normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
-  })()
-  const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
-
-  // Format dates
-  const formatDate = (date: Date) => {
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatUSD2 = (v: number) => {
-    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
-    return `$${v.toFixed(2)}`
-  }
-
-  return (
-    <motion.div
-      key={animationKey}
-      initial={isInitialMountRef.current || renderedPlaceholderForConversationRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={
-        isInitialMountRef.current || renderedPlaceholderForConversationRef.current
-          ? { duration: 0 }
-          : {
-              duration: 0.5,
-              delay: 0.1,
-              ease: [0.25, 0.46, 0.45, 0.94],
-            }
-      }
-      className="sticky top-0 z-10 border-b border-border/60 bg-card"
-    >
-        <div className="px-4 py-2">
-        <div className="w-full">
-          <div className="flex items-center justify-between gap-4">
-            {/* Title and metadata (stacked) */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              {/* Title */}
-              <div className="flex items-baseline gap-2 min-w-0 w-full">
-                {titlePrefix ? (
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    {titlePrefix}
-                  </span>
-                ) : null}
-                <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
-                {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
-              </div>
-
-              {/* Agents + updated row */}
-              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                {effectiveParticipantItems.length > 0 ? (
-                  <>
-                    {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
-                    <Popover
-                      open={participantsOpen}
-                      onOpenChange={next => {
-                        clearParticipantsHoverTimers()
-                        setParticipantsOpen(next)
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          ref={participantsTriggerRef}
-                          className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                          aria-label={`Participants: ${participantsLabel}`}
-                          title={participantsLabel}
-                          onPointerEnter={openParticipantsPopover}
-                          onPointerLeave={handleParticipantsTriggerPointerLeave}
-                          onFocus={() => {
-                            clearParticipantsHoverTimers()
-                            setParticipantsOpen(true)
-                          }}
-                        >
-                          <div className="flex items-center -space-x-1.5">
-                            {effectiveParticipantItems.slice(0, 3).map(p => {
-                              if (p.kind === 'agent') {
-                                const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                                return (
-                                  <div key={p.key} className="relative h-5 w-5">
-                                    <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
-                                    </div>
-                                  </div>
-                                )
-                              }
-                              return (
-                                <div key={p.key} className="relative h-5 w-5">
-                                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                  </Avatar>
-                                </div>
-                              )
-                            })}
-                          </div>
-                          {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        ref={participantsContentRef}
-                        side="bottom"
-                        align="start"
-                        sideOffset={8}
-                        className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
-                        onOpenAutoFocus={e => e.preventDefault()}
-                        onCloseAutoFocus={e => e.preventDefault()}
-                        onPointerEnter={openParticipantsPopover}
-                        onPointerLeave={handleParticipantsContentPointerLeave}
-                      >
-                        <ParticipantsPopup />
-                      </PopoverContent>
-                    </Popover>
-
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                    </span>
-
-                    {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
-                    {showTokens && showCost ? (
-                      <>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span
-                            className="inline-flex items-center text-[11px] text-muted-foreground"
-                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                          >
-                            {showCost ? formatUSD2(totalCost) : null}
-                          </span>
-                        </span>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                    {showTokens && showCost ? (
-                      <>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span
-                            className="inline-flex items-center text-[11px] text-muted-foreground"
-                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                          >
-                            {showCost ? formatUSD2(totalCost) : null}
-                          </span>
-                        </span>
-                      </>
-                    ) : null}
-                  </>
-                )}
-              </div>
-
-              {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
             </div>
 
             {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}

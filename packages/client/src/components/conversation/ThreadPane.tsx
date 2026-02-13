@@ -199,6 +199,20 @@ export function ThreadPane(props: {
           conversationId={effectiveConversationId}
           starshipId={starshipId}
           modelId={(selectedAgent as any)?.model ?? null}
+          mobileLeftSlot={
+            <button
+              type="button"
+              className={cn(
+                'mx-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+              )}
+              onClick={onClose}
+              aria-label="Back to conversation"
+              title="Back"
+            >
+              <Icon name="arrow-left" className="h-5 w-5" />
+            </button>
+          }
           maxTokens={
             typeof (selectedAgent as any)?.maxTokens === 'number'
               ? (selectedAgent as any).maxTokens

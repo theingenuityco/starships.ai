@@ -261,7 +261,7 @@ export default function DmPeerPage() {
     (agentsLoading || stillResolvingAgents)
   ) {
     return (
-      <div className="h-screen w-full flex items-center justify-center">
+      <div className="h-full w-full min-h-0 flex items-center justify-center">
         <LoadingSpinner size="lg">Loading direct message…</LoadingSpinner>
       </div>
     )
@@ -270,7 +270,7 @@ export default function DmPeerPage() {
   // If we're still resolving whether this DM already exists, don't show a misleading draft UI.
   if (starshipId && dmTarget && !resolved.conversationId && !resolved.draftOverride) {
     return (
-      <div className="h-screen w-full flex items-center justify-center">
+      <div className="h-full w-full min-h-0 flex items-center justify-center">
         <LoadingSpinner size="lg">Loading direct message…</LoadingSpinner>
       </div>
     )
@@ -279,7 +279,7 @@ export default function DmPeerPage() {
   if (!starshipId) return null
 
   return (
-    <div className="h-screen w-full">
+    <div className="h-full w-full min-h-0">
       <ConversationInterface
         starshipId={starshipId}
         conversationId={resolved.conversationId}

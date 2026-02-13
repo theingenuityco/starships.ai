@@ -24,6 +24,15 @@ interface NavigationProps {
   onClose?: () => void
 }
 
+function starshipMonogram(name: string): string {
+  const cleaned = String(name || '').trim()
+  if (!cleaned) return 'S'
+  const parts = cleaned.split(/\s+/).filter(Boolean)
+  const first = parts[0]?.[0] ?? 'S'
+  const second = parts.length > 1 ? parts[1]?.[0] : undefined
+  return (first + (second ?? '')).toUpperCase()
+}
+
 // (All items are composed into a single NavigationSection below)
 
 export function Navigation(props: NavigationProps) {
@@ -377,9 +386,9 @@ export function Navigation(props: NavigationProps) {
         {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
         <div
-          className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
+          className="flex flex-col transition-all duration-300 ease-in-out"
           style={{
-            width: isExpanded ? '14rem' : '3.25rem',
+            width: isExpanded ? '15rem' : '3.25rem',
             height: '100%',
             willChange: 'width',
             contain: 'layout style paint',
@@ -407,16 +416,25 @@ export function Navigation(props: NavigationProps) {
                 </div>
               ) : null}
               {isExpanded ? (
-                <motion.span
+                <motion.div
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="block flex-1 min-w-0 text-[13px] font-medium tracking-tight leading-snug truncate"
+                  className="flex flex-1 min-w-0 items-center gap-1.5"
                   title={starshipData?.name || 'Starships.ai'}
                 >
-                  {starshipData?.name || 'Starships.ai'}
-                </motion.span>
+                  <span
+                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted/60 px-1 text-[10px] font-semibold tracking-wide text-muted-foreground"
+                    aria-label={`Starship monogram ${starshipMonogram(starshipData?.name || 'Starships.ai')}`}
+                    title={starshipMonogram(starshipData?.name || 'Starships.ai')}
+                  >
+                    {starshipMonogram(starshipData?.name || 'Starships.ai')}
+                  </span>
+                  <span className="block min-w-0 flex-1 text-[13px] font-medium tracking-tight leading-snug truncate">
+                    {starshipData?.name || 'Starships.ai'}
+                  </span>
+                </motion.div>
               ) : null}
             </div>
             {/* Right-side actions: notifications (icon only) + close/collapse */}
@@ -424,7 +442,10 @@ export function Navigation(props: NavigationProps) {
               {isAuthenticated && starshipSlug && isExpanded && (
                 <button
                   type="button"
-                  onClick={() => router.push(`/ship/${starshipSlug}/notifications`)}
+                  onClick={() => {
+                    router.push(`/ship/${starshipSlug}/notifications`)
+                    if (isMobile && onClose) onClose()
+                  }}
                   className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                   aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                   title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
@@ -435,18 +456,7 @@ export function Navigation(props: NavigationProps) {
                   </span>
                 </button>
               )}
-              {isMobile && isExpanded && onClose ? (
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                aria-label="Close sidebar"
-              >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            ) : (
-              isExpanded &&
-              !isMobile && (
+              {isExpanded && !isMobile && (
                 <button
                   type="button"
                   onClick={() => {
@@ -459,8 +469,7 @@ export function Navigation(props: NavigationProps) {
                 >
                   <Icon name="sidebar" className="w-4 h-4" />
                 </button>
-              )
-            )}
+              )}
             </div>
           </div>
 
@@ -491,6 +500,7 @@ export function Navigation(props: NavigationProps) {
                   starshipId={starshipData.id}
                   starshipSlug={activeStarshipSlug || undefined}
                   compact={true}
+                  onNavigate={handleConversationSelect}
                   onConversationSelect={handleConversationSelect}
                 />
               </div>
@@ -504,7 +514,7 @@ export function Navigation(props: NavigationProps) {
           <div className="ml-2 mr-1.5 my-0 h-px bg-border/60" />
 
           {/* Bottom controls */}
-          <div className="pl-2 pr-1.5 pt-2 pb-3 flex-shrink-0">
+          <div className="pl-2 pr-1.5 pt-2 pb-4 flex-shrink-0">
             <div className="flex flex-col gap-1">
               {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (

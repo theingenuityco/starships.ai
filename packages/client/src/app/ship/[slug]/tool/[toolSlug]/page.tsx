@@ -39,6 +39,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
     if (!conversationId) return
+    // On small screens, avoid auto-focusing the input (prevents mobile keyboard pop).
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return
     const t = setTimeout(() => {
       try {
         messageInputRef.current?.focusInput?.()

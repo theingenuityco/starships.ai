@@ -30,6 +30,8 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
 type Filter = 'all' | 'humans' | 'agents'
 
@@ -211,7 +213,7 @@ export default function MembersPage() {
     const displayName = typeof m.displayName === 'string' ? m.displayName.trim() : ''
     const email = typeof m.email === 'string' ? m.email.trim() : ''
     const userHoverTitle = isAuthedUser ? 'You' : label.primary
-    const userHoverSub = isAuthedUser ? (displayName || email || '') : email && email !== label.primary ? email : ''
+    const userHoverSub = isAuthedUser ? displayName || email || '' : email && email !== label.primary ? email : ''
     const userHoverCard = (
       <UserProfileHoverCardContent
         title={userHoverTitle}
@@ -237,13 +239,7 @@ export default function MembersPage() {
           <div className="flex items-start gap-3">
             <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
-                <AgentAvatar
-                  seed={label.primary}
-                  imageUrl={avatarUrl}
-                  fill
-                  instanceId={userId ? `member-u-${userId}` : `member-u-${label.primary}`}
-                  rounded
-                />
+                <AgentAvatar seed={label.primary} imageUrl={avatarUrl} fill instanceId={userId ? `member-u-${userId}` : `member-u-${label.primary}`} rounded />
               </span>
               <PresenceIndicator
                 kind={isOnline ? 'online' : 'offline'}
@@ -258,10 +254,7 @@ export default function MembersPage() {
               <div className="flex items-center gap-2">
                 <HoverProfilePopover
                   trigger={
-                    <button
-                      type="button"
-                      className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}
-                    >
+                    <button type="button" className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}>
                       {label.primary}
                     </button>
                   }
@@ -290,13 +283,7 @@ export default function MembersPage() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-                aria-label="More options"
-              >
+              <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground" aria-label="More options">
                 <Icon name="dots-vertical" className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -354,13 +341,7 @@ export default function MembersPage() {
         <div className="flex items-center gap-1 self-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-                aria-label="More options"
-              >
+              <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground" aria-label="More options">
                 <Icon name="dots-vertical" className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -392,7 +373,7 @@ export default function MembersPage() {
     const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
     const key = a.id || agentSlug || label.primary
     const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
-    const avatarUrl = avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null : null
+    const avatarUrl = avatarAttachmentId ? (agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null) : null
     const toolsCount = Array.isArray((a as any)?.assignedToolSlugs) ? ((a as any).assignedToolSlugs as unknown[]).length : undefined
     const modelIdRaw = (a as any)?.model
     const modelId = typeof modelIdRaw === 'string' ? modelIdRaw : undefined
@@ -424,13 +405,7 @@ export default function MembersPage() {
           <div className="flex items-start gap-3">
             <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
-                <AgentAvatar
-                  seed={label.primary}
-                  imageUrl={avatarUrl}
-                  fill
-                  instanceId={a.id ? `member-a-${a.id}` : `member-a-${label.primary}`}
-                  rounded
-                />
+                <AgentAvatar seed={label.primary} imageUrl={avatarUrl} fill instanceId={a.id ? `member-a-${a.id}` : `member-a-${label.primary}`} rounded />
               </span>
               <PresenceIndicator kind="online" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
             </div>
@@ -479,13 +454,7 @@ export default function MembersPage() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
-                aria-label="More options"
-              >
+              <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground" aria-label="More options">
                 <Icon name="dots-vertical" className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -541,10 +510,7 @@ export default function MembersPage() {
   const isSearching = Boolean(
     q &&
       // New query keys for search can report isLoading=true; treat that as "searching" not "initial loading".
-      (humansQuery.isLoading ||
-        agentsQuery.isLoading ||
-        (humansQuery.isFetching && !isLoadingMoreHumans) ||
-        (agentsQuery.isFetching && !isLoadingMoreAgents))
+      (humansQuery.isLoading || agentsQuery.isLoading || (humansQuery.isFetching && !isLoadingMoreHumans) || (agentsQuery.isFetching && !isLoadingMoreAgents))
   )
 
   const humansCount = humans.length
@@ -590,6 +556,15 @@ export default function MembersPage() {
   const humansTabCount = humansCount + invitesCount
   const allTabCount = humansTabCount + agentsCount
 
+  const mobileFilterOptions = useMemo(() => {
+    const withCount = (label: string, n: number) => `${label} (${n})`
+    return [
+      { value: 'all', label: withCount('All', allTabCount) },
+      { value: 'humans', label: withCount('Humans', humansTabCount) },
+      { value: 'agents', label: withCount('Agents', agentsCount) },
+    ]
+  }, [agentsCount, allTabCount, humansTabCount])
+
   const renderMemberCardSkeleton = (key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -617,34 +592,43 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="relative flex flex-col h-full min-w-0">
+    <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 py-2">
+        <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                <div className="flex items-baseline gap-2 min-w-0 w-full">
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                    <Icon name="users" weight="bold" className="h-4 w-4" />
+                <div className="flex min-w-0 w-full gap-2 items-center">
+                  <span className="flex-shrink-0 self-center md:hidden">
+                    <MobileNavToggleButton className="mx-2" />
                   </span>
-                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Members</h3>
-                </div>
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
+                        <Icon name="users" weight="bold" className="h-4 w-4" />
+                      </span>
+                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Members</h3>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  <span className="font-medium leading-none text-muted-foreground">
-                    Invite collaborators, manage roles, and deploy agents to your starship.
-                  </span>
+                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                      <span
+                        className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
+                        title="Invite collaborators, manage roles, and deploy agents to your starship."
+                      >
+                        Invite collaborators, manage roles, and deploy agents to your starship.
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-6" style={{ paddingBottom: 32 }}>
+      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8">
+          <div className="pt-4 pb-8 hidden md:block">
             <Tabs
               value={filter}
               onValueChange={value => {
@@ -653,41 +637,32 @@ export default function MembersPage() {
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex justify-start">
-                  <TabsList className="w-full sm:w-auto flex-nowrap justify-start gap-1 overflow-x-auto custom-scrollbar">
-                    <TabsTrigger value="all">
+                  <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto custom-scrollbar">
+                    <TabsTrigger value="all" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>All</span>
                         {!isInitialLoading ? (
-                          <Badge
-                            variant={filter === 'all' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={filter === 'all' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {allTabCount}
                           </Badge>
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="humans">
+                    <TabsTrigger value="humans" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Humans</span>
                         {!isInitialLoading ? (
-                          <Badge
-                            variant={filter === 'humans' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={filter === 'humans' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {humansTabCount}
                           </Badge>
                         ) : null}
                       </span>
                     </TabsTrigger>
-                    <TabsTrigger value="agents">
+                    <TabsTrigger value="agents" className="flex-1 sm:flex-none min-w-0 justify-center">
                       <span className="inline-flex items-center gap-1.5">
                         <span>Agents</span>
                         {!isInitialLoading ? (
-                          <Badge
-                            variant={filter === 'agents' ? 'default' : 'secondary'}
-                            className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums"
-                          >
+                          <Badge variant={filter === 'agents' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
                             {agentsCount}
                           </Badge>
                         ) : null}
@@ -700,7 +675,7 @@ export default function MembersPage() {
                     <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
                     <Input
                       value={searchText}
-                      onChange={(e) => setSearchText(e.target.value)}
+                      onChange={e => setSearchText(e.target.value)}
                       placeholder="Search members"
                       className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
                       aria-label="Search members"
@@ -727,9 +702,7 @@ export default function MembersPage() {
                       </Button>
                     ) : null}
                   </div>
-                  <div className="space-y-2">
-                    {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`human-skel-${i}`))}
-                  </div>
+                  <div className="space-y-2">{Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`human-skel-${i}`))}</div>
                 </div>
               ) : null}
 
@@ -747,9 +720,7 @@ export default function MembersPage() {
                       </Link>
                     </Button>
                   </div>
-                  <div className="space-y-2">
-                    {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`agent-skel-${i}`))}
-                  </div>
+                  <div className="space-y-2">{Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => renderMemberCardSkeleton(`agent-skel-${i}`))}</div>
                 </div>
               ) : null}
             </div>
@@ -816,6 +787,18 @@ export default function MembersPage() {
         </div>
       </div>
 
+      <MobileBottomFilterBar
+        filterValue={filter}
+        onFilterChange={v => {
+          if (isFilterValue(v)) setFilter(v)
+        }}
+        filterOptions={mobileFilterOptions}
+        filterPlaceholder="Filter"
+        searchValue={searchText}
+        onSearchChange={setSearchText}
+        searchPlaceholder="Search members"
+      />
+
       <Dialog
         open={inviteOpen}
         onOpenChange={open => {
@@ -837,22 +820,14 @@ export default function MembersPage() {
           <div className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email</Label>
-              <Input
-                id="invite-email"
-                value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
-                placeholder="teammate@example.com"
-                disabled={createInvite.isPending}
-              />
+              <Input id="invite-email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="teammate@example.com" disabled={createInvite.isPending} />
             </div>
             {lastInviteUrl ? (
               <div className="max-w-full overflow-hidden rounded-lg border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm">
                 <div className="flex items-start gap-2">
                   <Icon name="check-circle" className="h-4 w-4 text-emerald-700 dark:text-emerald-400 mt-0.5" />
                   <div className="min-w-0 flex-1 space-y-2">
-                    <p className="font-medium text-emerald-800 dark:text-emerald-300">
-                      We have sent them an invite. You can also use this invite link:
-                    </p>
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">We have sent them an invite. You can also use this invite link:</p>
                     <div className="relative min-w-0">
                       <Button
                         type="button"
@@ -871,9 +846,7 @@ export default function MembersPage() {
                       >
                         <Icon name="copy" className="h-4 w-4" />
                       </Button>
-                      <code className="block min-w-0 break-all rounded-md border border-border/60 bg-card/60 px-2 py-2 pr-9 text-[12px]">
-                        {lastInviteUrl}
-                      </code>
+                      <code className="block min-w-0 break-all rounded-md border border-border/60 bg-card/60 px-2 py-2 pr-9 text-[12px]">{lastInviteUrl}</code>
                     </div>
                   </div>
                 </div>
@@ -918,11 +891,11 @@ export default function MembersPage() {
                   ? 'Kick agent'
                   : confirmAction?.kind === 'revokeInvite'
                     ? 'Revoke invitation'
-                  : confirmAction?.kind === 'deleteAgent'
-                    ? 'Delete agent'
-                    : confirmAction?.kind === 'unpublishAgent'
-                      ? 'Unpublish agent'
-                      : 'Confirm'}
+                    : confirmAction?.kind === 'deleteAgent'
+                      ? 'Delete agent'
+                      : confirmAction?.kind === 'unpublishAgent'
+                        ? 'Unpublish agent'
+                        : 'Confirm'}
             </DialogTitle>
             <DialogDescription>
               {confirmAction?.kind === 'kickHuman'
@@ -931,11 +904,11 @@ export default function MembersPage() {
                   ? 'This will remove the agent from this starship.'
                   : confirmAction?.kind === 'revokeInvite'
                     ? 'This will revoke the invite so it can no longer be used.'
-                  : confirmAction?.kind === 'deleteAgent'
-                    ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
-                    : confirmAction?.kind === 'unpublishAgent'
-                      ? 'This will remove the agent from Explore (it will stay deployed in your starship).'
-                      : ''}
+                    : confirmAction?.kind === 'deleteAgent'
+                      ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
+                      : confirmAction?.kind === 'unpublishAgent'
+                        ? 'This will remove the agent from Explore (it will stay deployed in your starship).'
+                        : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -952,9 +925,9 @@ export default function MembersPage() {
                         ? `Kick ${confirmAction.label}`
                         : confirmAction.kind === 'revokeInvite'
                           ? `Revoke invitation for ${confirmAction.label}`
-                        : confirmAction.kind === 'deleteAgent'
-                          ? `Delete ${confirmAction.label}`
-                          : `Unpublish ${confirmAction.label}`}
+                          : confirmAction.kind === 'deleteAgent'
+                            ? `Delete ${confirmAction.label}`
+                            : `Unpublish ${confirmAction.label}`}
                   </p>
                 </div>
               </div>
@@ -1061,4 +1034,3 @@ export default function MembersPage() {
     </div>
   )
 }
-

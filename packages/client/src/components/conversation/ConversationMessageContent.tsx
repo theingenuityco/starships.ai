@@ -1130,7 +1130,12 @@ export function ConversationMessageContent({
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
-      <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
+      <div
+        className={cn(
+          resolvedContentClass,
+          'dark:prose-invert max-w-none w-full [overflow-wrap:anywhere] message-content ph-mask-chat-message'
+        )}
+      >
         {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
         {hasCopyableContent ? (
           <div className="relative w-full group/content-chunk">

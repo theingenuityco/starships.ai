@@ -898,7 +898,7 @@ export function ConversationInterface({
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center">
+      <div className="flex flex-col h-full items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Icon name="sparkles" className="w-8 h-8 text-primary animate-pulse" />
@@ -912,7 +912,7 @@ export function ConversationInterface({
   // Show auth required state
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center">
+      <div className="flex flex-col h-full items-center justify-center">
         <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Icon name="user" className="w-8 h-8 text-muted-foreground" />
@@ -960,8 +960,8 @@ export function ConversationInterface({
                 starshipId={starshipId}
                 titlePrefix={
                   isChannelConversation ? (
-                    <span className="relative inline-flex items-center justify-center h-5 w-5">
-                      <Icon name="hash" weight="bold" className="h-5 w-5" />
+                    <span className="relative inline-flex items-center justify-center h-4 w-4">
+                      <Icon name="hash" weight="bold" className="h-4 w-4" />
                       {isCurrentChannelPrivate ? (
                         <span
                           className="absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-foreground"

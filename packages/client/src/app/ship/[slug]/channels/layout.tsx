@@ -591,7 +591,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   return (
     <div
       ref={rootRef}
-      className="relative h-screen w-full flex flex-col md:flex-row min-w-0 overflow-x-hidden"
+      className="relative h-full w-full flex flex-col md:flex-row min-w-0 overflow-x-hidden"
       style={{
         ['--thread-pane-width' as any]: `${threadPaneWidthPx}px`,
       }}

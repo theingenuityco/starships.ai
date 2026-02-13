@@ -9,7 +9,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { memo, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -42,6 +42,8 @@ interface ConversationListProps {
 
 const CHANNEL_NAME_MAX = 100
 const CHANNEL_SLUG_MAX = 100
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 function toChannelSlug(input: string): string {
   const s = String(input || '')
@@ -78,10 +80,10 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
 
   return (
     <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
+      <Avatar className="h-[18px] w-[18px] rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={18} rounded />
       </Avatar>
-      <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
+      <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xxs" />
     </div>
   )
 }
@@ -91,11 +93,11 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
   const hasPresence = typeof online === 'boolean'
   return (
     <div className="relative">
-      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+      <Avatar className="h-[18px] w-[18px] rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
-      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
+      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xxs" /> : null}
     </div>
   )
 }
@@ -330,7 +332,7 @@ export const ConversationList = memo(function ConversationList({
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasUnread || hasNotifBadge
@@ -342,7 +344,7 @@ export const ConversationList = memo(function ConversationList({
           justifyContent: 'flex-start',
           transition: 'background-color 0.15s ease',
           cursor: 'pointer',
-          minHeight: '32px',
+          minHeight: '28px',
         }}
         onClick={() => handleDmTargetClick(t)}
       >
@@ -362,7 +364,7 @@ export const ConversationList = memo(function ConversationList({
         </div>
         <span
           className={cn(
-            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1.5',
+            'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1',
             // Color is controlled by the row container (matches `NavigationItem`); keep only weight here.
             isActive ? 'font-medium' : hasUnread || hasNotifBadge ? 'font-bold' : 'font-medium'
           )}
@@ -370,7 +372,7 @@ export const ConversationList = memo(function ConversationList({
           {label}
         </span>
         {notifCount > 0 ? (
-          <span className="ml-1 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+          <span className="ml-1 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold">
             {notifCount > 99 ? '99+' : String(notifCount)}
           </span>
         ) : null}
@@ -505,6 +507,118 @@ export const ConversationList = memo(function ConversationList({
   const isEditChannelNameTooLong = editChannelNameLength > CHANNEL_NAME_MAX
   const canSaveChannelEdit =
     Boolean(editChannel?.conversationId) && !updateChannel.isPending && !isEditChannelNameEmpty && isEditChannelNameTrimmed && !isEditChannelNameTooLong
+
+  // Compact sidebar panels: resizable Channels/DM split (VS Code-style).
+  // Keep logic simple + reliable: treat the split as a flex-basis ratio and clamp by min pixel heights.
+  const panelContainerRef = useRef<HTMLDivElement | null>(null)
+  const [isDraggingPanels, setIsDraggingPanels] = useState(false)
+  const draggingRef = useRef(false)
+  const dragBoundsRef = useRef<null | { top: number; height: number; minRatio: number; maxRatio: number }>(null)
+  const dragListenersCleanupRef = useRef<null | (() => void)>(null)
+  useEffect(() => {
+    return () => {
+      dragListenersCleanupRef.current?.()
+      dragListenersCleanupRef.current = null
+    }
+  }, [])
+
+  const splitStorageKey = useMemo(() => `sidebarPanels:channelsRatio:${String(starshipId || '').trim() || 'unknown'}`, [starshipId])
+  const storageKeyRef = useRef(splitStorageKey)
+  useEffect(() => {
+    storageKeyRef.current = splitStorageKey
+  }, [splitStorageKey])
+
+  const [channelsPanelRatio, setChannelsPanelRatio] = useState<number>(0.5)
+  const channelsPanelRatioRef = useRef(channelsPanelRatio)
+  useEffect(() => {
+    channelsPanelRatioRef.current = channelsPanelRatio
+  }, [channelsPanelRatio])
+
+  // Load persisted ratio (per starship).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(splitStorageKey)
+      const n = raw ? Number(raw) : NaN
+      if (Number.isFinite(n)) setChannelsPanelRatio(clamp(n, 0.1, 0.9))
+      else setChannelsPanelRatio(0.5)
+    } catch {
+      setChannelsPanelRatio(0.5)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitStorageKey])
+
+  const handleDividerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isChannelsExpanded || !isDirectMessagesExpanded) return
+      const el = panelContainerRef.current
+      if (!el) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const rect = el.getBoundingClientRect()
+      const height = rect.height
+      if (!Number.isFinite(height) || height <= 0) return
+
+      const minPanelPx = 120 // includes header + a usable scroll region
+      const minRatio = clamp(minPanelPx / height, 0.05, 0.45)
+      const maxRatio = clamp(1 - minPanelPx / height, 0.55, 0.95)
+
+      draggingRef.current = true
+      setIsDraggingPanels(true)
+      dragBoundsRef.current = { top: rect.top, height, minRatio, maxRatio }
+
+      try {
+        ;(e.currentTarget as any).setPointerCapture?.(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+
+      // Attach listeners only during active drags to avoid a permanent global pointermove handler.
+      if (typeof window === 'undefined') return
+      dragListenersCleanupRef.current?.()
+
+      const onMove = (ev: PointerEvent) => {
+        if (!draggingRef.current) return
+        const b = dragBoundsRef.current
+        if (!b) return
+
+        const raw = (ev.clientY - b.top) / b.height
+        const next = clamp(raw, b.minRatio, b.maxRatio)
+        setChannelsPanelRatio(next)
+      }
+
+      function cleanup() {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        dragListenersCleanupRef.current = null
+      }
+
+      function onUp() {
+        if (!draggingRef.current) {
+          cleanup()
+          return
+        }
+        draggingRef.current = false
+        dragBoundsRef.current = null
+        setIsDraggingPanels(false)
+        try {
+          window.localStorage.setItem(storageKeyRef.current, String(channelsPanelRatioRef.current))
+        } catch {
+          /* ignore */
+        }
+        cleanup()
+      }
+
+      dragListenersCleanupRef.current = cleanup
+      window.addEventListener('pointermove', onMove, { passive: true })
+      window.addEventListener('pointerup', onUp, { passive: true })
+      window.addEventListener('pointercancel', onUp, { passive: true })
+    },
+    [isChannelsExpanded, isDirectMessagesExpanded]
+  )
 
   const editChannelDialog = (
     <Dialog
@@ -645,7 +759,7 @@ export const ConversationList = memo(function ConversationList({
   if (compact) {
     if (agentsLoading || membersLoading) {
       return (
-        <div className="space-y-1">
+        <div className="space-y-0">
           {[1, 2, 3].map(i => (
             <Skeleton key={i} className="h-8 w-full rounded-lg" />
           ))}
@@ -661,25 +775,31 @@ export const ConversationList = memo(function ConversationList({
       )
     }
 
-    // Sidebar layout rule:
-    // - Channels + Direct messages should each grow naturally with content.
-    // - Each section should STOP growing once it reaches 50% of the available sidebar height.
-    // - If a section doesn't have enough content to reach 50%, it should NOT stretch.
-    // - When content exceeds 50%, the section should scroll internally.
-
     return (
       <>
         <div
-          className="flex flex-col h-full min-h-0"
-          // Reserve space for the divider gap so 50% + 50% doesn't overflow.
-          style={{ ['--sidebar-half-h' as any]: 'calc((100% - 1.75rem) / 2)' }}
+          ref={panelContainerRef}
+          className={cn('flex flex-col h-full min-h-0', isDraggingPanels ? 'select-none' : '')}
         >
-          {/* Channels - content-sized so Direct messages starts right below */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
-            <div className="w-full flex items-center justify-between h-8 pr-2">
+          {/* Channels panel */}
+          <div
+            className="flex flex-col min-h-0 rounded-lg overflow-hidden"
+            style={
+              isChannelsExpanded && isDirectMessagesExpanded
+                ? {
+                    flex: '0 0 auto',
+                    flexBasis: `${Math.round(channelsPanelRatio * 1000) / 10}%`,
+                    minHeight: 120,
+                  }
+                : isChannelsExpanded && !isDirectMessagesExpanded
+                  ? { flex: '1 1 auto' }
+                  : undefined
+            }
+          >
+            <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsChannelsExpanded(v => !v)}
                 aria-expanded={isChannelsExpanded}
@@ -688,8 +808,8 @@ export const ConversationList = memo(function ConversationList({
                 <div
                   className="flex-shrink-0"
                   style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
+                    width: '1rem',
+                    height: '1rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -697,7 +817,7 @@ export const ConversationList = memo(function ConversationList({
                     marginRight: '0.25rem',
                   }}
                 >
-                  <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                  <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
               </button>
@@ -705,17 +825,17 @@ export const ConversationList = memo(function ConversationList({
               <button
                 type="button"
                 onClick={() => setIsCreateChannelOpen(true)}
-                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                 aria-label="Create channel"
               >
-                <Icon name="plus" className="w-4 h-4" />
+                <Icon name="plus" className="w-3 h-3" />
               </button>
             </div>
 
             {isChannelsExpanded ? (
               <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
-                  <div className="space-y-1">
+                  <div className="space-y-0">
                     {[1, 2].map(i => (
                       <Skeleton key={i} className="h-8 w-full rounded-lg" />
                     ))}
@@ -723,7 +843,7 @@ export const ConversationList = memo(function ConversationList({
                 ) : channels.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0">
                     {channelsForDisplay.map(ch => {
                       const isActive = currentChannelSlug
                         ? String(ch.slug || '')
@@ -747,7 +867,7 @@ export const ConversationList = memo(function ConversationList({
                         <div key={ch.conversationId}>
                           <div
                             className={cn(
-                              'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
                                 : hasUnread || hasNotifBadge
@@ -758,15 +878,15 @@ export const ConversationList = memo(function ConversationList({
                               justifyContent: 'flex-start',
                               transition: 'background-color 0.15s ease',
                               cursor: 'pointer',
-                              minHeight: '32px',
+                              minHeight: '28px',
                             }}
                             onClick={() => handleChannelClick(String(ch.slug))}
                           >
                             <div
                               className="flex-shrink-0 relative"
                               style={{
-                                width: '1.25rem',
-                                height: '1.25rem',
+                                width: '1rem',
+                                height: '1rem',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -777,7 +897,7 @@ export const ConversationList = memo(function ConversationList({
                               <Icon
                                 name="hash"
                                 weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
-                                className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
+                                className={cn('h-3 w-3', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
                               />
                               {ch.isPrivate ? (
                                 <span
@@ -798,7 +918,7 @@ export const ConversationList = memo(function ConversationList({
                             </div>
                             <div
                               className={cn(
-                                'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1.5 flex items-center gap-1',
+                                'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1 flex items-center gap-1',
                                 isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
@@ -806,7 +926,7 @@ export const ConversationList = memo(function ConversationList({
                             </div>
                             <div className="ml-1 flex items-center justify-end gap-1">
                               {notifCount > 0 ? (
-                                <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold">
+                                <span className="inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold">
                                   {notifCount > 99 ? '99+' : String(notifCount)}
                                 </span>
                               ) : null}
@@ -829,7 +949,7 @@ export const ConversationList = memo(function ConversationList({
                                         e.stopPropagation()
                                       }}
                                     >
-                                      <Icon name="dots-vertical" className="w-4 h-4" />
+                                      <Icon name="dots-vertical" className="w-3.5 h-3.5" />
                                     </button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent
@@ -881,15 +1001,57 @@ export const ConversationList = memo(function ConversationList({
             ) : null}
           </div>
 
-          {/* Separator between Channels and Direct messages (keep this in navigation). */}
-          <div className="my-3 mx-1 border-t border-border/60" role="separator" aria-hidden />
+          {/* Resizable divider (VS Code-style splitter) */}
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize channels and direct messages panels"
+            onPointerDown={handleDividerPointerDown}
+            className={cn(
+              'mx-1 my-0.5 h-2 rounded-md relative flex items-center justify-center group',
+              isChannelsExpanded && isDirectMessagesExpanded ? 'cursor-row-resize' : 'cursor-default opacity-50',
+              'transition-colors'
+            )}
+            style={{ touchAction: 'none' }}
+          >
+            {/* Base divider line */}
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-border/60" aria-hidden />
+            {/* Drag indicator handle */}
+            <div
+              className={cn(
+                'pointer-events-none inline-flex items-center gap-1',
+                isChannelsExpanded && isDirectMessagesExpanded
+                  ? isDraggingPanels
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                  : 'opacity-0',
+                'transition-opacity duration-150'
+              )}
+              aria-hidden
+            >
+              <span className="h-1 w-1 rounded-full bg-border/60" />
+              <span className="h-1 w-1 rounded-full bg-border/60" />
+              <span className="h-1 w-1 rounded-full bg-border/60" />
+            </div>
+          </div>
 
-          {/* Direct messages - content-sized; capped at 50% height like Channels */}
-          <div className="flex flex-col flex-none min-h-0 rounded-lg overflow-hidden" style={{ maxHeight: 'var(--sidebar-half-h)' }}>
-            <div className="w-full flex items-center justify-between h-8 pr-2">
+          {/* Direct messages panel */}
+          <div
+            className="flex flex-col min-h-0 rounded-lg overflow-hidden"
+            style={
+              isChannelsExpanded && isDirectMessagesExpanded
+                ? { flex: '1 1 auto', minHeight: 120 }
+                : !isChannelsExpanded && isDirectMessagesExpanded
+                  ? { flex: '1 1 auto' }
+                  : !isDirectMessagesExpanded && isChannelsExpanded
+                    ? { flex: '0 0 auto', height: 24 }
+                    : { flex: '0 0 auto', height: 24 }
+            }
+          >
+            <div className="w-full flex items-center justify-between h-6 pr-2">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsDirectMessagesExpanded(v => !v)}
                 aria-expanded={isDirectMessagesExpanded}
@@ -898,8 +1060,8 @@ export const ConversationList = memo(function ConversationList({
                 <div
                   className="flex-shrink-0"
                   style={{
-                    width: '1.25rem',
-                    height: '1.25rem',
+                    width: '1rem',
+                    height: '1rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -907,12 +1069,12 @@ export const ConversationList = memo(function ConversationList({
                     marginRight: '0.25rem',
                   }}
                 >
-                  <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                  <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
                 <span className="text-[11px] font-semibold uppercase tracking-wide">Direct messages</span>
               </button>
               {/* spacer to align with Channels "+" column */}
-              <div className="w-6 h-6" />
+              <div className="w-5 h-5" />
             </div>
 
             {isDirectMessagesExpanded ? (
@@ -923,7 +1085,7 @@ export const ConversationList = memo(function ConversationList({
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-0">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}

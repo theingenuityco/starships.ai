@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
-import { useConnectorCatalog, useStarshipConnectors } from '@/hooks/useConnectors'
+import { useConnectorCatalog, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { useExploreSearch } from '@/hooks/useExploreSearch'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
@@ -62,7 +62,10 @@ export default function MarketplacePageClient(props: {
   const { userId, isAuthenticated } = useAuth()
   const { primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
   const starshipId = String(primaryStarship?.id || '')
+  const primaryStarshipSlug = String((primaryStarship as any)?.slug || '')
   const { data: starshipConnectors = [] } = useStarshipConnectors(starshipId, Boolean(isAuthenticated && starshipId))
+  const startOAuth = useStartOAuthConnector(starshipId)
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null)
   const connectedProviderSet = useMemo(() => {
     return new Set(
       (starshipConnectors ?? [])
@@ -375,6 +378,9 @@ export default function MarketplacePageClient(props: {
       const name = String(c?.name || '').trim() || titleCase(provider) || 'Connector'
       const description = String(c?.description || '').trim()
       const isConnected = !!provider && connectedProviderSet.has(provider)
+      const authType = (c as any)?.auth?.type as string | undefined
+      const isOauthConnectable = authType === 'oauth2'
+      const shouldDisableConnect = !provider || isConnected || connectingProvider === provider || startOAuth.isPending
 
       return (
         <motion.div key={provider || `${name}-${idx}`} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
@@ -412,16 +418,63 @@ export default function MarketplacePageClient(props: {
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={!provider}
-                      onClick={e => {
+                      disabled={shouldDisableConnect}
+                      onClick={async e => {
                         e.preventDefault()
                         e.stopPropagation()
                         if (!provider) return
-                        router.push(`/connectors/${encodeURIComponent(provider)}/install`)
+                        if (!isAuthenticated) {
+                          const qs = searchParams?.toString() || ''
+                          const returnUrl = `${pathname}${qs ? `?${qs}` : ''}`
+                          router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`)
+                          return
+                        }
+
+                        // Authenticated but no starship yet — send them to account to create/select.
+                        if (!starshipId) {
+                          router.push('/account')
+                          return
+                        }
+
+                        const goToConnectorSettings = () => {
+                          if (primaryStarshipSlug) {
+                            router.push(`/ship/${encodeURIComponent(primaryStarshipSlug)}/installed?tab=connectors&q=${encodeURIComponent(name)}`)
+                          } else {
+                            router.push('/account')
+                          }
+                        }
+
+                        if (!isOauthConnectable) {
+                          // API key / basic auth connectors require additional UI; use the in-app connectors settings flow.
+                          goToConnectorSettings()
+                          return
+                        }
+
+                        try {
+                          setConnectingProvider(provider)
+                          const qs = searchParams?.toString() || ''
+                          const returnUrl = `${pathname}${qs ? `?${qs}` : ''}`
+                          const authorizationUrl = await startOAuth.mutateAsync({ provider: provider as any, returnUrl } as any)
+                          if (authorizationUrl) {
+                            window.location.href = authorizationUrl
+                          }
+                        } catch (err: any) {
+                          const code = err?.response?.data?.error?.code
+                          const details = err?.response?.data?.error?.details
+
+                          // Some OAuth connectors require metadata before we can start (tenant domain, etc).
+                          // Fall back to the full connectors settings flow which can prompt for it.
+                          if (code === 'MISSING_REQUIRED_FIELD' && details?.kind === 'connector_oauth_pre_metadata') {
+                            goToConnectorSettings()
+                            return
+                          }
+                        } finally {
+                          setConnectingProvider(prev => (prev === provider ? null : prev))
+                        }
                       }}
                       className="h-7 px-2 shrink-0 text-primary hover:text-primary text-xs"
                     >
-                      Connect
+                      {connectingProvider === provider ? 'Connecting…' : 'Connect'}
                     </Button>
                   )}
                 </div>
@@ -431,7 +484,7 @@ export default function MarketplacePageClient(props: {
         </motion.div>
       )
     },
-    [connectedProviderSet, router]
+    [connectedProviderSet, connectingProvider, isAuthenticated, pathname, primaryStarshipSlug, router, searchParams, startOAuth, starshipId]
   )
 
   return (

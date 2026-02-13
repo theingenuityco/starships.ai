@@ -2225,8 +2225,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Consolidated focus management - handles all focus scenarios (requires tiptap)
     useEffect(() => {
+      // On small-screen devices, avoid auto-focusing the composer (it triggers the on-screen keyboard).
+      const isSmallScreen = () => (typeof window !== 'undefined' ? window.innerWidth < 768 : false)
       const shouldFocus = () => {
         if (disabled || isStreamingEffective || sending) return false
+        if (isSmallScreen()) return false
         return true
       }
       const wasStreaming = prevIsStreamingRef.current

@@ -93,7 +93,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             variant="ghost"
             size="sm"
             aria-label="Open user menu"
-            className="h-7 w-full justify-start gap-1.5 rounded-lg px-1 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            className="h-9 w-full justify-start gap-2 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60"
           >
             <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             <span className="min-w-0 flex-1 text-left">
@@ -105,7 +105,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             <Icon name="chevron-up" className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         ) : (
-          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-8 w-8`}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-9 w-9`}>
             <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
           </Button>
         )}

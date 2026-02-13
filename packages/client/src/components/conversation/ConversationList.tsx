@@ -332,7 +332,7 @@ export const ConversationList = memo(function ConversationList({
       <div
         key={t.key}
         className={cn(
-          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
+          'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasUnread || hasNotifBadge
@@ -819,7 +819,7 @@ export const ConversationList = memo(function ConversationList({
                 >
                   <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Channels</span>
               </button>
 
               <button
@@ -867,7 +867,7 @@ export const ConversationList = memo(function ConversationList({
                         <div key={ch.conversationId}>
                           <div
                             className={cn(
-                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-[12.5px] px-1',
+                              'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
                                 : hasUnread || hasNotifBadge
@@ -1071,7 +1071,7 @@ export const ConversationList = memo(function ConversationList({
                 >
                   <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-3 h-3" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Direct messages</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Direct messages</span>
               </button>
               {/* spacer to align with Channels "+" column */}
               <div className="w-5 h-5" />

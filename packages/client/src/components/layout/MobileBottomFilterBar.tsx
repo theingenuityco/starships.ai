@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Icon from '@/components/primitives/Icon'
 import { Input } from '@/components/ui/input'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
 type FilterOption = { value: string; label: string }
@@ -139,14 +139,33 @@ export function MobileBottomFilterBar(props: {
                     <Icon name="filter" className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="top" sideOffset={12} className="w-56">
-                  <DropdownMenuRadioGroup value={filterValue} onValueChange={onFilterChange}>
-                    {filterOptions.map(opt => (
-                      <DropdownMenuRadioItem key={opt.value} value={opt.value} className="cursor-pointer">
-                        {opt.label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
+                <DropdownMenuContent
+                  align="end"
+                  side="top"
+                  sideOffset={12}
+                  // Match other app dropdown/popover surfaces (see UserProfileMenu).
+                  className={cn(
+                    // Keep menu tight to content; avoid an oversized panel on mobile.
+                    'w-auto min-w-[10rem] max-w-[min(70vw,18rem)]',
+                    'rounded-lg bg-card !border-0 ring-1 ring-border/60 dark:ring-border shadow-md'
+                  )}
+                >
+                  {filterOptions.map(opt => {
+                    const isActive = String(opt.value) === String(filterValue)
+                    return (
+                      <DropdownMenuItem
+                        key={opt.value}
+                        className={cn(
+                          'cursor-pointer justify-end',
+                          // Match navigation-style selection (no bullet indicator).
+                          isActive ? 'text-primary bg-primary/10 focus:bg-primary/10 focus:text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                        )}
+                        onSelect={() => onFilterChange(opt.value)}
+                      >
+                        <span className="w-full text-right truncate">{opt.label}</span>
+                      </DropdownMenuItem>
+                    )
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

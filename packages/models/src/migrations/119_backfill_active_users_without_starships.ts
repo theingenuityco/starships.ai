@@ -428,6 +428,7 @@ export async function up(client: Client): Promise<void> {
 }
 
 export async function down(_client: Client): Promise<void> {
+  void _client;
   // Data backfill migrations are not safely reversible.
   // Intentionally a no-op.
 }

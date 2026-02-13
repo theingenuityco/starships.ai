@@ -171,15 +171,37 @@ export function FaviconThemeSync() {
 
   const { data: starshipFromPath } = useStarshipBySlug(pathStarshipSlug || '', Boolean(isAuthenticated && pathStarshipSlug))
   const { data: userStarships } = useUserStarships(user?.id || '', Boolean(isAuthenticated && user?.id))
+  const validSelectedStarshipId = useMemo(() => {
+    const sid = String(selectedStarshipId || '').trim()
+    if (!sid) return null
+    const list = Array.isArray(userStarships) ? userStarships : []
+    return list.some(s => String((s as any)?.id || '') === sid) ? sid : null
+  }, [selectedStarshipId, userStarships])
   const primaryStarship = useMemo(
     () => pickPrimaryStarshipForUser(userStarships ?? [], user?.id, selectedStarshipId),
     [userStarships, user?.id, selectedStarshipId]
   )
 
+  // If the stored selection points to a starship the user no longer has access to,
+  // clear it so we don't keep hitting starship-scoped endpoints with a stale ID.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    if (!Array.isArray(userStarships)) return
+    if (!selectedStarshipId) return
+    if (validSelectedStarshipId) return
+    try {
+      if (typeof window !== 'undefined') window.localStorage.removeItem('selectedStarshipId')
+    } catch {
+      /* ignore */
+    }
+    setSelectedStarshipId(null)
+  }, [isAuthenticated, selectedStarshipId, userStarships, validSelectedStarshipId])
+
   const starshipId = useMemo(() => {
     const byPath = starshipFromPath?.id ? String(starshipFromPath.id) : null
-    return byPath || selectedStarshipId || (primaryStarship?.id ? String(primaryStarship.id) : null)
-  }, [primaryStarship?.id, selectedStarshipId, starshipFromPath?.id])
+    const primary = primaryStarship?.id ? String(primaryStarship.id) : null
+    return byPath || primary || validSelectedStarshipId
+  }, [primaryStarship?.id, starshipFromPath?.id, validSelectedStarshipId])
 
   // Prefer live unread counts if an SSE notifications stream is already mounted (e.g. ConversationList).
   const streamKey = useMemo(() => (starshipId ? NOTIFICATION_QUERY_KEYS.stream(starshipId) : null), [starshipId])

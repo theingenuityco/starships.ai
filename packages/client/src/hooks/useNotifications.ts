@@ -39,6 +39,20 @@ type StreamChunk =
 const playedNotificationIdsByStarship = new Map<string, Set<string>>()
 const MAX_TRACKED_STARSHIPS = 10
 const MAX_TRACKED_IDS_PER_STARSHIP = 500
+
+function getHttpStatus(error: unknown): number | null {
+  const anyErr = error as any
+  const status = anyErr?.response?.status ?? anyErr?.status ?? null
+  return typeof status === 'number' ? status : null
+}
+
+function shouldRetry(error: unknown, failureCount: number): boolean {
+  const status = getHttpStatus(error)
+  // Don't hammer starship-scoped endpoints for non-existent / unauthorized starships.
+  if (status === 404 || status === 403) return false
+  // Otherwise, keep retries conservative.
+  return failureCount < 2
+}
 function shouldPlayForNotification(n: NotificationModel): boolean {
   const typ = String((n as any)?.type || '')
   // Current UI treats only these as unread-notification types.
@@ -583,9 +597,28 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
   return useQuery({
     queryKey: starshipId ? NOTIFICATION_QUERY_KEYS.byStarship(starshipId) : (['__noop__'] as const),
     enabled: Boolean(starshipId && enabled),
+    retry: (failureCount, error) => shouldRetry(error, failureCount),
     queryFn: async (): Promise<{ notifications: NotificationModel[]; unread: UnreadSummary }> => {
       const sid = String(starshipId || '')
-      const resp = await api.get(`/api/v1/starships/${sid}/notifications`, { params: { limit: 50 } })
+      let resp: any
+      try {
+        resp = await api.get(`/api/v1/starships/${sid}/notifications`, { params: { limit: 50 } })
+      } catch (e) {
+        // If the starship no longer exists (stale selection), treat as "no notifications"
+        // rather than spamming errors/retries in the UI.
+        if (getHttpStatus(e) === 404) {
+          return {
+            notifications: [],
+            unread: {
+              totalUnread: 0,
+              dmUnreadByConversationId: {},
+              mentionUnreadByConversationId: {},
+              reactionUnreadByConversationId: {},
+            },
+          }
+        }
+        throw e
+      }
       const data = (resp as any).data?.data as any
       return {
         notifications: (data?.notifications as NotificationModel[]) ?? [],
@@ -608,9 +641,18 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
   return useQuery({
     queryKey: starshipId ? [...NOTIFICATION_QUERY_KEYS.byStarship(starshipId), 'unread', stableIds.join('|')] : (['__noop__'] as const),
     enabled: Boolean(starshipId && enabled && stableIds.length > 0),
+    retry: (failureCount, error) => shouldRetry(error, failureCount),
     queryFn: async (): Promise<{ unreadByConversationId: Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }> }> => {
       const sid = String(starshipId || '')
-      const resp = await api.post(`/api/v1/starships/${sid}/unread`, { conversationIds: stableIds })
+      let resp: any
+      try {
+        resp = await api.post(`/api/v1/starships/${sid}/unread`, { conversationIds: stableIds })
+      } catch (e) {
+        if (getHttpStatus(e) === 404) {
+          return { unreadByConversationId: {} }
+        }
+        throw e
+      }
       const data = (resp as any).data?.data as any
       return { unreadByConversationId: (data?.unreadByConversationId as any) ?? {} }
     },

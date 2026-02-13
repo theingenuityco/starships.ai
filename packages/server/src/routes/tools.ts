@@ -340,8 +340,12 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
       const ids = (rows || [])
         .map((r: Record<string, unknown>) => (typeof r?.id === 'string' ? String(r.id).trim() : ''))
         .filter((x: string) => x.length > 0);
-      const fetched = await Promise.all(ids.map((id: string) => toolTemplateRepository.findById(id)));
-      templates = fetched.filter((t): t is ToolTemplateModel => !!t);
+      const fetched = await toolTemplateRepository.findByIds(ids);
+      const byId = new Map<string, ToolTemplateModel>();
+      for (const t of fetched || []) {
+        if (t?.id) byId.set(String(t.id), t);
+      }
+      templates = ids.map((id) => byId.get(id)).filter((t): t is ToolTemplateModel => !!t);
     }
 
     // If we couldn't run DB popularity sort, keep existing order but still push starships-only to the end.

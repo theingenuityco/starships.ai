@@ -14,6 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentTemplatePreviewCard } from '@/components/marketplace/AgentTemplatePreviewCard'
+import { StarshipMonogram, StarshipPickerIcon } from '@/components/marketplace/StarshipIdentity'
+import { WizardStepper } from '@/components/marketplace/WizardStepper'
 import { cn } from '@/lib/utils'
 import { useStarshipConnectors } from '@/hooks/useConnectors'
 import { useRequiredConnectors, useToolTemplates } from '@/hooks/useTemplates'
@@ -39,8 +41,6 @@ interface AgentDeploymentWizardModalProps {
   starshipName?: string
 }
 
-const TOTAL_STEPS = 4
-
 type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
   { id: 1, label: 'Starship', subtitle: 'Select a starship' },
@@ -63,39 +63,6 @@ function connectorsStepTitle(agentName: string, count: number): string {
   return `${agentName} requires these ${n} apps to be connected`
 }
 
-function getStarshipInitials(input: { name?: string; slug?: string; id?: string } | null | undefined): string {
-  const label = String(input?.name || input?.slug || input?.id || '').trim()
-  if (!label) return 'S'
-  const parts = label.split(/\s+/).filter(Boolean)
-  const first = parts[0]?.[0] ?? 'S'
-  const second = parts.length > 1 ? parts[1]?.[0] : undefined
-  return (first + (second ?? '')).toUpperCase()
-}
-
-function StarshipMonogram({ starship, disabled }: { starship: { name?: string; slug?: string; id?: string }; disabled?: boolean }) {
-  const initials = getStarshipInitials(starship)
-  return (
-    <div
-      className={cn(
-        'h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center text-[12px] font-semibold tabular-nums',
-        disabled ? 'border-border/60 bg-muted/20 text-muted-foreground' : 'border-primary/25 bg-primary/10 text-primary'
-      )}
-      aria-hidden
-    >
-      {initials}
-    </div>
-  )
-}
-
-function StarshipPickerIcon({ starship, disabled }: { starship: { name?: string; slug?: string; id?: string }; disabled?: boolean }) {
-  const initials = getStarshipInitials(starship)
-  return (
-    <div className={cn('flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 ring-1 ring-border/40 flex-shrink-0', disabled && 'opacity-60')}>
-      <span className="text-sm font-semibold text-primary tabular-nums">{initials}</span>
-    </div>
-  )
-}
-
 function StarshipRightSlot({ children }: { children: React.ReactNode }) {
   // Fixed accessory width so the right side matches the left logo column visually.
   // Monogram is 2rem (w-8) so we reserve w-8 on the right.
@@ -107,65 +74,6 @@ function stepTitle(step: WizardStep): string {
   if (step === 2) return 'Automations & permissions'
   if (step === 3) return 'Connectors'
   return 'Review & install'
-}
-
-function WizardStepper({ currentStep }: { currentStep: WizardStep }) {
-  const progressValue = TOTAL_STEPS <= 1 ? 0 : ((currentStep - 1) / (TOTAL_STEPS - 1)) * 100
-  const n = WIZARD_STEPS.length
-  const lastIndex = Math.max(0, n - 1)
-
-  return (
-    <div className="relative pt-1">
-      {/* Track line */}
-      <div className="absolute left-[16px] right-[16px] top-[16px] h-px bg-border/60 z-0" aria-hidden />
-      {/* Progress line */}
-      <div className="absolute left-[16px] right-[16px] top-[16px] h-px z-0" aria-hidden>
-        <div className="h-full bg-primary/50 origin-left" style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressValue / 100))})` }} />
-      </div>
-
-      {/* Absolute-position the nodes so dot centers are truly equidistant. */}
-      <ol className="relative min-h-[62px] z-10">
-        {WIZARD_STEPS.map((s, index) => {
-          const isCompleted = currentStep > s.id
-          const isActive = currentStep === s.id
-          const pct = lastIndex === 0 ? 0 : (index / lastIndex) * 100
-          const isFirst = index === 0
-          const isLast = index === lastIndex
-          const transform = isFirst ? 'translateX(0)' : isLast ? 'translateX(-100%)' : 'translateX(-50%)'
-          const alignment = isFirst ? 'items-start text-left' : isLast ? 'items-end text-right' : 'items-center text-center'
-          return (
-            <li
-              key={s.id}
-              className={cn('absolute top-0 flex flex-col', alignment)}
-              style={{ left: `${pct}%`, transform }}
-              aria-current={isActive ? 'step' : undefined}
-            >
-              {/* Halo masks the line behind the node (prevents visual overlap). */}
-              <div className="relative z-10 rounded-full bg-card p-[2px]" aria-hidden>
-                <div
-                  className={cn(
-                    'h-7 w-7 rounded-full border flex items-center justify-center shadow-sm',
-                    isCompleted
-                      ? 'border-emerald-500/40 bg-emerald-500 text-white'
-                      : isActive
-                        ? 'border-primary/50 bg-primary/10 text-primary'
-                        : 'border-border/60 bg-background text-muted-foreground'
-                  )}
-                >
-                  {isCompleted ? <Icon name="check" className="h-4 w-4" /> : <span className="text-xs font-semibold tabular-nums">{s.id}</span>}
-                </div>
-              </div>
-
-              <div className="mt-2 min-w-0 w-36 sm:w-44">
-                <div className={cn('text-xs font-semibold leading-tight truncate', isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{s.subtitle}</div>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-    </div>
-  )
 }
 
 export function AgentDeploymentWizardModal({
@@ -197,12 +105,12 @@ export function AgentDeploymentWizardModal({
   const shouldFetchConnectors = isOpen && step >= 3
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, shouldFetchTools && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, shouldFetchConnectors && !!templateId)
-  const selectedStarshipId = String((selectedStarship as any)?.id || '')
+  const selectedStarshipId = String(selectedStarship?.id || '')
   const { data: selectedStarshipConnectors = [] } = useStarshipConnectors(selectedStarshipId, Boolean(shouldFetchConnectors && selectedStarshipId))
 
   const visibleRequiredConnectors = useMemo(() => {
     return (requiredConnectors ?? []).filter(c => {
-      const provider = String((c as any)?.provider || '').trim()
+      const provider = String(c?.provider || '').trim()
       if (!provider) return false
       // Ignore the built-in Starships connector requirement.
       return provider.toLowerCase() !== 'starships'
@@ -210,12 +118,12 @@ export function AgentDeploymentWizardModal({
   }, [requiredConnectors])
 
   const connectedRequiredConnectorsCount = useMemo(() => {
-    const requiredProviders = new Set(visibleRequiredConnectors.map(c => String((c as any)?.provider || '').trim().toLowerCase()).filter(Boolean))
+    const requiredProviders = new Set(visibleRequiredConnectors.map(c => String(c?.provider || '').trim().toLowerCase()).filter(Boolean))
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
-      const provider = String((c as any)?.provider || '').trim().toLowerCase()
+      const provider = String(c?.provider || '').trim().toLowerCase()
       if (!provider || provider === 'starships') return false
-      const status = String((c as any)?.status || '').trim()
+      const status = String(c?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
     }).length
   }, [visibleRequiredConnectors, selectedStarshipConnectors])
@@ -326,7 +234,7 @@ export function AgentDeploymentWizardModal({
               <DialogTitle>Install agent</DialogTitle>
 
               <div>
-                <WizardStepper currentStep={step} />
+                <WizardStepper currentStep={step} steps={WIZARD_STEPS} />
               </div>
             </DialogHeader>
 

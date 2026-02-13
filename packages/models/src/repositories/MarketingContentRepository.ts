@@ -39,6 +39,31 @@ export class MarketingContentRepository extends BaseRepository {
   }
 
   /**
+   * Find all active marketing content for a set of entities (batch).
+   *
+   * Useful for list endpoints to avoid N+1 queries when hydrating public models.
+   */
+  async findByEntities(entityType: MarketingContentEntityType, entityIds: string[]): Promise<MarketingContentModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const ids = (entityIds || []).map((id) => String(id)).filter((id) => id.trim().length > 0);
+        if (ids.length === 0) return [];
+
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM marketing_content
+           WHERE entity_type = $1 AND entity_id = ANY($2) AND is_active = true
+           ORDER BY entity_id, content_type, created_at DESC`,
+          [entityType, ids]
+        );
+        return fromDatabaseArray(MarketingContentEntity, result) as MarketingContentModel[];
+      },
+      'findByEntities',
+      'MarketingContent'
+    );
+  }
+
+  /**
    * Find specific content type for an entity
    */
   async findByEntityAndType(

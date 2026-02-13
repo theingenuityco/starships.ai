@@ -61,13 +61,13 @@ export default function MarketplacePageClient(props: {
   // Authenticated users: show connector connection state on listing cards.
   const { userId, isAuthenticated } = useAuth()
   const { primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
-  const starshipId = String((primaryStarship as any)?.id || '')
+  const starshipId = String(primaryStarship?.id || '')
   const { data: starshipConnectors = [] } = useStarshipConnectors(starshipId, Boolean(isAuthenticated && starshipId))
   const connectedProviderSet = useMemo(() => {
     return new Set(
       (starshipConnectors ?? [])
-        .filter(c => String((c as any)?.status || '').trim() === 'connected')
-        .map(c => String((c as any)?.provider || '').trim())
+        .filter(c => String(c?.status || '').trim() === 'connected')
+        .map(c => String(c?.provider || '').trim())
         .filter(Boolean)
     )
   }, [starshipConnectors])
@@ -159,7 +159,7 @@ export default function MarketplacePageClient(props: {
 
   // Hide the internal Starships connector from public Explore listings.
   const connectorsVisibleFiltered = useMemo(() => {
-    return (connectorsVisible ?? []).filter(c => String((c as any)?.provider || '').trim().toLowerCase() !== 'starships')
+    return (connectorsVisible ?? []).filter(c => String(c?.provider || '').trim().toLowerCase() !== 'starships')
   }, [connectorsVisible])
 
   const countsByTab = useMemo(() => {
@@ -371,9 +371,9 @@ export default function MarketplacePageClient(props: {
 
   const renderConnectorCard = useCallback(
     (c: ConnectorCatalogItem, idx: number) => {
-      const provider = String((c as any)?.provider || '').trim()
-      const name = String((c as any)?.name || '').trim() || titleCase(provider) || 'Connector'
-      const description = String((c as any)?.description || '').trim()
+      const provider = String(c?.provider || '').trim()
+      const name = String(c?.name || '').trim() || titleCase(provider) || 'Connector'
+      const description = String(c?.description || '').trim()
       const isConnected = !!provider && connectedProviderSet.has(provider)
 
       return (
@@ -576,7 +576,7 @@ export default function MarketplacePageClient(props: {
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
                               <motion.div
-                                key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
+                                key={template.id || `${idx}`}
                                 initial={{ opacity: 0, y: 14 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: idx * 0.04 }}
@@ -642,7 +642,7 @@ export default function MarketplacePageClient(props: {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
                           <motion.div
-                            key={(template as any)?.id ?? (template as any)?.slug ?? `${idx}`}
+                            key={template.id || `${idx}`}
                             initial={{ opacity: 0, y: 14 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.04 }}

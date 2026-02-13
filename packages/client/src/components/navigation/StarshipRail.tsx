@@ -37,7 +37,7 @@ function StarshipRailItem({
           type="button"
           onClick={() => onSelect(starship)}
           className={[
-            'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
+            'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
             'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
             isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
           ].join(' ')}
@@ -61,7 +61,7 @@ function StarshipRailItem({
             />
           ) : null}
 
-          <span className="text-xs font-semibold">{getInitials(starship.name)}</span>
+          <span className="text-[11px] font-semibold">{getInitials(starship.name)}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
@@ -120,7 +120,7 @@ export function StarshipRail({
 
   return (
     <div
-      className="flex h-full w-14 flex-col items-center gap-1.5 bg-card pt-5 pb-3"
+      className="flex h-full w-[52px] flex-col items-center gap-1.5 bg-card pt-5 pb-3"
       aria-label="Starship switcher"
     >
       {/* Top logo */}
@@ -134,8 +134,8 @@ export function StarshipRail({
             title="Home"
           >
             <StarshipsLogo
-              width={28}
-              height={28}
+              width={24}
+              height={24}
               className="text-current"
               gradientId="rail-top-gradient"
               triggerAnimation={logoTrigger}
@@ -179,7 +179,7 @@ export function StarshipRail({
               type="button"
               onClick={() => router.push('/explore')}
               className={[
-                'relative flex h-10 w-10 items-center justify-center rounded-2xl border transition-all',
+                'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
                 'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
                 isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
               ].join(' ')}
@@ -193,7 +193,7 @@ export function StarshipRail({
                   isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0',
                 ].join(' ')}
               />
-              <Icon name="store" className="h-5 w-5" />
+              <Icon name="store" className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">

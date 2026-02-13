@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 
 export type PresenceIndicatorKind = 'online' | 'busy' | 'offline'
-export type PresenceIndicatorSize = 'xs' | 'sm' | 'md'
+export type PresenceIndicatorSize = 'xxs' | 'xs' | 'sm' | 'md'
 export type PresenceIndicatorPlacement = 'outset' | 'inset'
 
 export function PresenceIndicator({
@@ -27,7 +27,7 @@ export function PresenceIndicator({
   // - offline: gray
   // - no pulsing animation
   // Presets (kept intentionally small across the UI).
-  const sizePx = size === 'md' ? 10 : size === 'sm' ? 8 : 6
+  const sizePx = size === 'md' ? 10 : size === 'sm' ? 8 : size === 'xs' ? 6 : 5
   // Use a high z-index so avatar rings/shadows don't cover it.
   // Default placement is slightly outside the corner. Some containers (e.g. participant popovers)
   // have `overflow-x-hidden` and will clip an outset dot, so allow an inset placement.

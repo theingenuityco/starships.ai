@@ -81,7 +81,7 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
       <Avatar className="h-[18px] w-[18px] rounded-full ring-1 ring-border/40">
         <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={18} rounded />
       </Avatar>
-      <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
+      <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xxs" />
     </div>
   )
 }
@@ -95,7 +95,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
-      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
+      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xxs" /> : null}
     </div>
   )
 }

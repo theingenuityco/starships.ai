@@ -629,119 +629,121 @@ export function ConversationSummaryBar({
                     </div>
                     {/* Agents + updated row - exact structural match with same classes */}
                     <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                  {isDraftHeader ? (
-                    <>
-                      {hasDraftParticipants ? (
-                        <Popover
-                          open={participantsOpen}
-                          onOpenChange={next => {
-                            clearParticipantsHoverTimers()
-                            setParticipantsOpen(next)
-                          }}
-                        >
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              ref={participantsTriggerRef}
-                              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                              aria-label={`Participants: ${participantsLabel}`}
-                              title={participantsLabel}
-                              onPointerEnter={openParticipantsPopover}
-                              onPointerLeave={handleParticipantsTriggerPointerLeave}
-                              onFocus={() => {
+                      {isDraftHeader ? (
+                        <>
+                          {hasDraftParticipants ? (
+                            <Popover
+                              open={participantsOpen}
+                              onOpenChange={next => {
                                 clearParticipantsHoverTimers()
-                                setParticipantsOpen(true)
+                                setParticipantsOpen(next)
                               }}
                             >
-                              <div className="flex items-center -space-x-1.5">
-                                {effectiveParticipantItems.slice(0, 3).map(p => {
-                                  if (p.kind === 'agent') {
-                                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                                    return (
-                                      <div key={p.key} className="relative h-5 w-5">
-                                        <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  ref={participantsTriggerRef}
+                                  className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                  aria-label={`Participants: ${participantsLabel}`}
+                                  title={participantsLabel}
+                                  onPointerEnter={openParticipantsPopover}
+                                  onPointerLeave={handleParticipantsTriggerPointerLeave}
+                                  onFocus={() => {
+                                    clearParticipantsHoverTimers()
+                                    setParticipantsOpen(true)
+                                  }}
+                                >
+                                  <div className="flex items-center -space-x-1.5">
+                                    {effectiveParticipantItems.slice(0, 3).map(p => {
+                                      if (p.kind === 'agent') {
+                                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                        return (
+                                          <div key={p.key} className="relative h-5 w-5">
+                                            <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                              <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                                            </div>
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <div key={p.key} className="relative h-5 w-5">
+                                          <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
+                                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                          </Avatar>
                                         </div>
-                                      </div>
-                                    )
-                                  }
-                                  return (
-                                    <div key={p.key} className="relative h-5 w-5">
-                                      <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                      </Avatar>
-                                    </div>
-                                  )
-                                })}
+                                      )
+                                    })}
+                                  </div>
+                                  {effectiveParticipantItems.length > 3 ? (
+                                    <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
+                                  ) : null}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                ref={participantsContentRef}
+                                side="bottom"
+                                align="start"
+                                sideOffset={8}
+                                className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                                onOpenAutoFocus={e => e.preventDefault()}
+                                onCloseAutoFocus={e => e.preventDefault()}
+                                onPointerEnter={openParticipantsPopover}
+                                onPointerLeave={handleParticipantsContentPointerLeave}
+                              >
+                                <ParticipantsPopup />
+                              </PopoverContent>
+                            </Popover>
+                          ) : (
+                            <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                              <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                                <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
+                                  <div className="h-4 w-4 rounded-full bg-muted/30" />
+                                </Avatar>
+                                <span className="truncate font-medium leading-none opacity-70">Draft</span>
                               </div>
-                              {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            ref={participantsContentRef}
-                            side="bottom"
-                            align="start"
-                            sideOffset={8}
-                            className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
-                            onOpenAutoFocus={e => e.preventDefault()}
-                            onCloseAutoFocus={e => e.preventDefault()}
-                            onPointerEnter={openParticipantsPopover}
-                            onPointerLeave={handleParticipantsContentPointerLeave}
-                          >
-                            <ParticipantsPopup />
-                          </PopoverContent>
-                        </Popover>
+                            </div>
+                          )}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
+                          </span>
+                          {showTokens ? (
+                            <>
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
+                              </span>
+                            </>
+                          ) : null}
+                        </>
                       ) : (
-                        <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                          <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                            <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
-                              <div className="h-4 w-4 rounded-full bg-muted/30" />
-                            </Avatar>
-                            <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                        <>
+                          {/* Agent placeholder - matches exact structure */}
+                          <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                            <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                              <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                                <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                            </div>
                           </div>
-                        </div>
+                          {/* Separator and updated text - exact match */}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
+                          </span>
+                          {showTokens ? (
+                            <>
+                              {/* Token indicator placeholder (reserved space) */}
+                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
+                              </span>
+                            </>
+                          ) : null}
+                        </>
                       )}
-                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
-                      </span>
-                      {showTokens ? (
-                        <>
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
-                          </span>
-                        </>
-                      ) : null}
-                    </>
-                  ) : (
-                    <>
-                      {/* Agent placeholder - matches exact structure */}
-                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                            <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
-                          </Avatar>
-                          <span className="truncate font-medium leading-none opacity-50">Loading...</span>
-                        </div>
-                      </div>
-                      {/* Separator and updated text - exact match */}
-                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
-                      </span>
-                      {showTokens ? (
-                        <>
-                          {/* Token indicator placeholder (reserved space) */}
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
-                          </span>
-                        </>
-                      ) : null}
-                    </>
-                  )}
                     </div>
 
                     {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
@@ -806,7 +808,7 @@ export function ConversationSummaryBar({
       }
       className="sticky top-0 z-10 border-b border-border/60 bg-card"
     >
-        <div className="px-4 py-2">
+      <div className="px-4 py-2">
         <div className="w-full">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
@@ -830,110 +832,110 @@ export function ConversationSummaryBar({
 
                   {/* Agents + updated row */}
                   <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                {effectiveParticipantItems.length > 0 ? (
-                  <>
-                    {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
-                    <Popover
-                      open={participantsOpen}
-                      onOpenChange={next => {
-                        clearParticipantsHoverTimers()
-                        setParticipantsOpen(next)
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          ref={participantsTriggerRef}
-                          className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                          aria-label={`Participants: ${participantsLabel}`}
-                          title={participantsLabel}
-                          onPointerEnter={openParticipantsPopover}
-                          onPointerLeave={handleParticipantsTriggerPointerLeave}
-                          onFocus={() => {
+                    {effectiveParticipantItems.length > 0 ? (
+                      <>
+                        {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
+                        <Popover
+                          open={participantsOpen}
+                          onOpenChange={next => {
                             clearParticipantsHoverTimers()
-                            setParticipantsOpen(true)
+                            setParticipantsOpen(next)
                           }}
                         >
-                          <div className="flex items-center -space-x-1.5">
-                            {effectiveParticipantItems.slice(0, 3).map(p => {
-                              if (p.kind === 'agent') {
-                                const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                                return (
-                                  <div key={p.key} className="relative h-5 w-5">
-                                    <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              ref={participantsTriggerRef}
+                              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              aria-label={`Participants: ${participantsLabel}`}
+                              title={participantsLabel}
+                              onPointerEnter={openParticipantsPopover}
+                              onPointerLeave={handleParticipantsTriggerPointerLeave}
+                              onFocus={() => {
+                                clearParticipantsHoverTimers()
+                                setParticipantsOpen(true)
+                              }}
+                            >
+                              <div className="flex items-center -space-x-1.5">
+                                {effectiveParticipantItems.slice(0, 3).map(p => {
+                                  if (p.kind === 'agent') {
+                                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                    return (
+                                      <div key={p.key} className="relative h-5 w-5">
+                                        <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <div key={p.key} className="relative h-5 w-5">
+                                      <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
+                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                      </Avatar>
                                     </div>
-                                  </div>
-                                )
-                              }
-                              return (
-                                <div key={p.key} className="relative h-5 w-5">
-                                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                  </Avatar>
-                                </div>
-                              )
-                            })}
-                          </div>
-                          {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        ref={participantsContentRef}
-                        side="bottom"
-                        align="start"
-                        sideOffset={8}
-                        className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
-                        onOpenAutoFocus={e => e.preventDefault()}
-                        onCloseAutoFocus={e => e.preventDefault()}
-                        onPointerEnter={openParticipantsPopover}
-                        onPointerLeave={handleParticipantsContentPointerLeave}
-                      >
-                        <ParticipantsPopup />
-                      </PopoverContent>
-                    </Popover>
+                                  )
+                                })}
+                              </div>
+                              {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            ref={participantsContentRef}
+                            side="bottom"
+                            align="start"
+                            sideOffset={8}
+                            className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                            onOpenAutoFocus={e => e.preventDefault()}
+                            onCloseAutoFocus={e => e.preventDefault()}
+                            onPointerEnter={openParticipantsPopover}
+                            onPointerLeave={handleParticipantsContentPointerLeave}
+                          >
+                            <ParticipantsPopup />
+                          </PopoverContent>
+                        </Popover>
 
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                    </span>
-
-                    {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
-                    {showTokens && showCost ? (
-                      <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span
-                            className="inline-flex items-center text-[11px] text-muted-foreground"
-                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                          >
-                            {showCost ? formatUSD2(totalCost) : null}
-                          </span>
+                          <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                         </span>
+
+                        {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
+                        {showTokens && showCost ? (
+                          <>
+                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span
+                                className="inline-flex items-center text-[11px] text-muted-foreground"
+                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                              >
+                                {showCost ? formatUSD2(totalCost) : null}
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
                       </>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                    {showTokens && showCost ? (
+                    ) : (
                       <>
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span
-                            className="inline-flex items-center text-[11px] text-muted-foreground"
-                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                          >
-                            {showCost ? formatUSD2(totalCost) : null}
-                          </span>
-                        </span>
+                        <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
+                        {showTokens && showCost ? (
+                          <>
+                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                              <span
+                                className="inline-flex items-center text-[11px] text-muted-foreground"
+                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                              >
+                                {showCost ? formatUSD2(totalCost) : null}
+                              </span>
+                            </span>
+                          </>
+                        ) : null}
                       </>
-                    ) : null}
-                  </>
-                )}
+                    )}
                   </div>
 
                   {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}

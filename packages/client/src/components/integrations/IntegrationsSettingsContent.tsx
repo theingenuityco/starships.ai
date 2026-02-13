@@ -167,9 +167,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [SECTION_PREVIEW_LIMIT, agents.length, agentsPagination?.total])
 
   const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = (agents || [])
-      .map(a => String(a?.avatarAttachmentId || '').trim())
-      .filter(Boolean)
+    const ids = (agents || []).map(a => String(a?.avatarAttachmentId || '').trim()).filter(Boolean)
     return Array.from(new Set(ids))
   }, [agents])
 
@@ -489,13 +487,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && agentsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => agentsQuery.fetchNextPage()}
-              disabled={agentsQuery.isFetchingNextPage}
-              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
-            >
+            <Button size="sm" variant="outline" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
             </Button>
           </div>
@@ -580,13 +572,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         })}
         {!isAllTab && toolsQuery.hasNextPage ? (
           <div className="flex justify-center pt-4">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => toolsQuery.fetchNextPage()}
-              disabled={toolsQuery.isFetchingNextPage}
-              className={INTEGRATION_OUTLINE_BUTTON_CLASS}
-            >
+            <Button size="sm" variant="outline" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
               {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more automations'}
             </Button>
           </div>
@@ -830,4 +816,3 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     </div>
   )
 }
-

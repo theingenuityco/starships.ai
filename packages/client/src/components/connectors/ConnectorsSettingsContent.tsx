@@ -109,12 +109,6 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
     }
   }
 
-  // If we already know this user can't manage connectors, don't render the page (avoid UI flash).
-  if (!authLoading && !starshipLoading && user?.id && starship?.id) {
-    const canManage = Boolean(isInstanceAdmin === true || String(starship.ownerId) === String(user.id))
-    if (!canManage) return null
-  }
-
   const totalCount = typeof connectorStats?.total === 'number' ? connectorStats.total : null
   const connectedCount = typeof connectorStats?.connected === 'number' ? connectorStats.connected : null
   const unconnectedCount = typeof totalCount === 'number' && typeof connectedCount === 'number' ? Math.max(0, totalCount - connectedCount) : null
@@ -140,6 +134,13 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
       { value: 'unconnected', label: withCount('Unconnected', unconnectedCount) },
     ]
   }, [connectedCount, totalCount, unconnectedCount])
+
+  // If we already know this user can't manage connectors, don't render the page (avoid UI flash).
+  // IMPORTANT: keep this after hooks so hook ordering is unconditional.
+  if (!authLoading && !starshipLoading && user?.id && starship?.id) {
+    const canManage = Boolean(isInstanceAdmin === true || String(starship.ownerId) === String(user.id))
+    if (!canManage) return null
+  }
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">

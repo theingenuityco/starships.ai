@@ -286,29 +286,8 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 // ============================================================================
 // USER STARSHIPS ENDPOINTS
 // ============================================================================
-
-// POST /users/me/ensure-default-starship - Ensure user has at least one starship (create default if none).
-// Used when user has no starships (e.g. new signup); invite-joiners never need this.
-router.post('/users/me/ensure-default-starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-    const userId = req.user!.id;
-    const starshipService = new StarshipService();
-    const accessible = await starshipService.getStarshipsForUser(userId);
-    let ship = accessible.find((s) => s.status === 'active') || accessible[0] || null;
-    if (!ship) {
-      ship = await StarshipService.createDefaultStarship(userId);
-      try {
-        await StarshipService.createInitialAgents(userId, ship.id);
-      } catch (agentError) {
-        // Log but still return the new starship; agents can be added later from marketplace
-      }
-    }
-    sendSuccess(res, { starship: ship }, 200);
-  } catch (error) {
-    handleError(error, res, 'ensure default starship');
-  }
-});
+// NOTE: Default starships are created at signup (password + OAuth). We no longer
+// expose an on-demand "ensure default starship" endpoint.
 
 // GET /users/:id/starships - Get user's starships (OpenAPI pattern)
 router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

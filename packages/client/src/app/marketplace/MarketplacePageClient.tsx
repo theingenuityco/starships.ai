@@ -504,10 +504,10 @@ export default function MarketplacePageClient(props: {
   )
 
   return (
-    <>
-      {/* Pseudo hero background (full-width, starts at very top edge) */}
+    <div className="relative">
+      {/* Pseudo hero background (clipped by the rounded main pane wrapper) */}
       <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[620px] overflow-hidden"
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[620px] overflow-hidden"
         aria-hidden
         style={{
           backgroundImage: [
@@ -764,6 +764,6 @@ export default function MarketplacePageClient(props: {
         <div suppressHydrationWarning className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent" aria-hidden />
         <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={false} />
       </div>
-    </>
+    </div>
   )
 }

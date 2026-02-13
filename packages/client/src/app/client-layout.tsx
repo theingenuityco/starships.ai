@@ -55,7 +55,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
-  const isMarketplace = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
+  const isExploreRoute = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/'))
+  const isMarketplaceRoute = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
+  const isMarketplace = isExploreRoute || isMarketplaceRoute
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
   const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
@@ -199,6 +201,18 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   if (isMarketplace) {
     // Unauthenticated users: simple public view without nav
     if (!isAuthenticated) {
+      // Explore pages handle their own public layout (header/hero/footer). Avoid wrapping them
+      // in the "inner container" chrome unless authenticated.
+      if (isExploreRoute) {
+        return (
+          <StarTheme>
+            <NotificationSoundBootstrap />
+            <EmailChangeToastHandler />
+            <div className="min-h-[100dvh] w-full bg-background">{children}</div>
+          </StarTheme>
+        )
+      }
+
       return (
         <StarTheme>
           <NotificationSoundBootstrap />

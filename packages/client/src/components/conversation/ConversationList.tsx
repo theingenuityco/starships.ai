@@ -43,6 +43,8 @@ interface ConversationListProps {
 const CHANNEL_NAME_MAX = 100
 const CHANNEL_SLUG_MAX = 100
 
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+
 function toChannelSlug(input: string): string {
   const s = String(input || '')
     .trim()
@@ -512,14 +514,19 @@ export const ConversationList = memo(function ConversationList({
   const [isDraggingPanels, setIsDraggingPanels] = useState(false)
   const draggingRef = useRef(false)
   const dragBoundsRef = useRef<null | { top: number; height: number; minRatio: number; maxRatio: number }>(null)
+  const dragListenersCleanupRef = useRef<null | (() => void)>(null)
+  useEffect(() => {
+    return () => {
+      dragListenersCleanupRef.current?.()
+      dragListenersCleanupRef.current = null
+    }
+  }, [])
 
   const splitStorageKey = useMemo(() => `sidebarPanels:channelsRatio:${String(starshipId || '').trim() || 'unknown'}`, [starshipId])
   const storageKeyRef = useRef(splitStorageKey)
   useEffect(() => {
     storageKeyRef.current = splitStorageKey
   }, [splitStorageKey])
-
-  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
   const [channelsPanelRatio, setChannelsPanelRatio] = useState<number>(0.5)
   const channelsPanelRatioRef = useRef(channelsPanelRatio)
@@ -567,42 +574,51 @@ export const ConversationList = memo(function ConversationList({
       } catch {
         /* ignore */
       }
+
+      // Attach listeners only during active drags to avoid a permanent global pointermove handler.
+      if (typeof window === 'undefined') return
+      dragListenersCleanupRef.current?.()
+
+      const onMove = (ev: PointerEvent) => {
+        if (!draggingRef.current) return
+        const b = dragBoundsRef.current
+        if (!b) return
+
+        const raw = (ev.clientY - b.top) / b.height
+        const next = clamp(raw, b.minRatio, b.maxRatio)
+        setChannelsPanelRatio(next)
+      }
+
+      function cleanup() {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        dragListenersCleanupRef.current = null
+      }
+
+      function onUp() {
+        if (!draggingRef.current) {
+          cleanup()
+          return
+        }
+        draggingRef.current = false
+        dragBoundsRef.current = null
+        setIsDraggingPanels(false)
+        try {
+          window.localStorage.setItem(storageKeyRef.current, String(channelsPanelRatioRef.current))
+        } catch {
+          /* ignore */
+        }
+        cleanup()
+      }
+
+      dragListenersCleanupRef.current = cleanup
+      window.addEventListener('pointermove', onMove, { passive: true })
+      window.addEventListener('pointerup', onUp, { passive: true })
+      window.addEventListener('pointercancel', onUp, { passive: true })
     },
     [isChannelsExpanded, isDirectMessagesExpanded]
   )
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const onMove = (e: PointerEvent) => {
-      if (!draggingRef.current) return
-      const b = dragBoundsRef.current
-      if (!b) return
-
-      const raw = (e.clientY - b.top) / b.height
-      const next = clamp(raw, b.minRatio, b.maxRatio)
-      setChannelsPanelRatio(next)
-    }
-
-    const onUp = () => {
-      if (!draggingRef.current) return
-      draggingRef.current = false
-      dragBoundsRef.current = null
-      setIsDraggingPanels(false)
-      try {
-        window.localStorage.setItem(storageKeyRef.current, String(channelsPanelRatioRef.current))
-      } catch {
-        /* ignore */
-      }
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-  }, [])
 
   const editChannelDialog = (
     <Dialog
@@ -1028,8 +1044,8 @@ export const ConversationList = memo(function ConversationList({
                 : !isChannelsExpanded && isDirectMessagesExpanded
                   ? { flex: '1 1 auto' }
                   : !isDirectMessagesExpanded && isChannelsExpanded
-                    ? undefined
-                    : undefined
+                    ? { flex: '0 0 auto', height: 24 }
+                    : { flex: '0 0 auto', height: 24 }
             }
           >
             <div className="w-full flex items-center justify-between h-6 pr-2">

@@ -6,7 +6,7 @@ import Icon from '@/components/primitives/Icon'
 import { useNotificationsList } from '@/hooks/useNotifications'
 import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
-import { useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
 function getInitials(name: string): string {
@@ -18,15 +18,16 @@ function getInitials(name: string): string {
   return (first + (second ?? '')).toUpperCase()
 }
 
-function StarshipRailItem({
-  starship,
-  isActive,
-  onSelect,
-}: {
-  starship: StarshipModel
-  isActive: boolean
-  onSelect: (starship: StarshipModel) => void
-}) {
+const StarshipRailItem = memo(
+  function StarshipRailItem({
+    starship,
+    isActive,
+    onSelect,
+  }: {
+    starship: StarshipModel
+    isActive: boolean
+    onSelect: (starship: StarshipModel) => void
+  }) {
   const { data } = useNotificationsList(starship.id, Boolean(starship?.id))
   const hasUnread = Boolean((data as any)?.unread?.totalUnread && (data as any).unread.totalUnread > 0)
 
@@ -82,7 +83,15 @@ function StarshipRailItem({
       </TooltipContent>
     </Tooltip>
   )
-}
+  },
+  (prev, next) =>
+    prev.isActive === next.isActive &&
+    prev.onSelect === next.onSelect &&
+    prev.starship?.id === next.starship?.id &&
+    prev.starship?.slug === next.starship?.slug &&
+    prev.starship?.name === next.starship?.name
+)
+StarshipRailItem.displayName = 'StarshipRailItem'
 
 export function StarshipRail({
   starships,
@@ -101,6 +110,7 @@ export function StarshipRail({
   const [logoTrigger, setLogoTrigger] = useState(0)
 
   const ownedTargetSlug = useMemo(() => {
+    // Preferred destination is an owned starship, but non-owners should still get a sane default.
     const uid = typeof user?.id === 'string' ? user.id : ''
     const owned = uid ? items.find(s => String((s as any)?.ownerId || '') === uid) : null
     return (owned?.slug || activeSlug || items[0]?.slug || '').trim() || null

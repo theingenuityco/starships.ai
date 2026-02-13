@@ -1332,7 +1332,7 @@ export function AgentDocumentEditor({
                       if (!changelog.trim()) {
                         if (!fullAgent?.publishedTemplateId) {
                           // First-time publish
-                          setChangelog('Initial publication of this agent to the marketplace.')
+                          setChangelog('Initial publication of this agent to Explore.')
                         } else if (publishedChangeDetails.length > 0) {
                           // Re-publish with detected changes – summarize the changed fields
                           const summary = publishedChangeDetails.join(', ').toLowerCase()

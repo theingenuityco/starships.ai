@@ -8,10 +8,10 @@ import { AgentTemplateDetailsModalContent } from '@/components/marketplace/Agent
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
+import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
@@ -33,7 +33,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
-  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
+  const { deployStarships, primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -110,7 +110,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       onOpenChange(false)
 
       // Marketplace UX: after deploy, take the user to the agent's chat. Refetch agents so DM page finds the new agent.
-      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+      if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
         if (agentId) {
           await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
@@ -128,8 +128,8 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   if (!template) return null
   const avatarUrl = template.avatarUrl
 
-  // Match Marketplace card CTA semantics
-  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  // Match marketplace agent CTA semantics
+  const deployLabel = isAlreadyDeployed ? 'Installed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Installing…' : 'Install'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
 
@@ -184,17 +184,16 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         </div>
       </DialogContent>
 
-      <DeploymentConfirmationModal
+      <AgentDeploymentWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
         onConfirm={handleConfirmDeploy}
         isProcessing={isDeploying}
-        type="agent"
         template={template}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
-        ownedStarships={ownedStarships}
+        ownedStarships={deployStarships}
       />
     </Dialog>
   )

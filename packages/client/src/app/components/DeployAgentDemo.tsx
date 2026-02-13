@@ -12,7 +12,7 @@ export default function DeployAgentDemo() {
   const router = useRouter()
   const { data: agentTemplates = [], isLoading } = useAgentTemplates()
 
-  const goToMarketplace = () => router.push('/marketplace')
+  const goToMarketplace = () => router.push('/explore')
 
   const normalize = (s: unknown) => String(s ?? '').trim().toLowerCase()
 
@@ -116,7 +116,7 @@ export default function DeployAgentDemo() {
                       type="button"
                       onClick={goToMarketplace}
                       className="group flex-1 basis-0 min-w-0 w-full max-w-[92px] sm:max-w-[104px] md:max-w-[112px] rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} in Marketplace`}
+                      aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} in Explore`}
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">

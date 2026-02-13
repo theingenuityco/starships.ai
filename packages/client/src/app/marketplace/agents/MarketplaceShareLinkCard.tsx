@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
-import { toast } from 'sonner'
 
 export function MarketplaceShareLinkCard({ shareUrl, compact = false }: { shareUrl: string; compact?: boolean }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'shared'>('idle')
@@ -55,13 +54,11 @@ export function MarketplaceShareLinkCard({ shareUrl, compact = false }: { shareU
       // Non-deprecated fallback: prompt user to copy manually.
       // (Avoids `document.execCommand('copy')`, which is deprecated/unreliable.)
       window.prompt('Copy this link:', normalized)
-      toast.message('Copy the link from the prompt')
       return
     }
 
     setStatus('copied')
     window.setTimeout(() => setStatus('idle'), 1500)
-    toast.success('Link copied')
   }
 
   if (compact) {

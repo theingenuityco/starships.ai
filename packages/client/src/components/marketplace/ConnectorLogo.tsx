@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { getConnectorLogoSrc } from '@/utils/connectorLogos'
 
-export function ConnectorLogo({
+function ConnectorLogoImpl({
   provider,
   className,
 }: {
@@ -25,4 +25,6 @@ export function ConnectorLogo({
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt="" className={className ?? 'h-5 w-5'} onError={() => setFailed(true)} />
 }
+
+export const ConnectorLogo = memo(ConnectorLogoImpl)
 

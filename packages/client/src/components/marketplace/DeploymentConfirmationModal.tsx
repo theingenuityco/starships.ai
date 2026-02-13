@@ -247,24 +247,7 @@ export function DeploymentConfirmationModal({
                   ) : (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-3">
                       <p className="text-sm text-muted-foreground">
-                        Connect these in Settings → Connectors
-                        {(selectedStarship?.slug ?? starshipSlug) ? (
-                          <>
-                            {' '}
-                            <a
-                              href={`/ship/${selectedStarship?.slug ?? starshipSlug}/connectors`}
-                              className="font-medium text-primary hover:underline"
-                              onClick={e => {
-                                e.preventDefault()
-                                onOpenChange(false)
-                                const slug = selectedStarship?.slug ?? starshipSlug
-                                if (slug) window.location.href = `/ship/${slug}/connectors`
-                              }}
-                            >
-                              Open Connectors
-                            </a>
-                          </>
-                        ) : null}
+                        Connect these in Settings.
                       </p>
                     </div>
                   )}

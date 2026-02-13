@@ -95,8 +95,8 @@ export function Navigation(props: NavigationProps) {
     }
   }, [isMobile])
 
-  // When Marketplace is selected, collapse the sidebar to give more space for browsing (icons-only rail).
-  const isMarketplaceRoute = pathname === '/marketplace' || pathname.startsWith('/marketplace/')
+  // When Explore is selected, collapse the sidebar to give more space for browsing (icons-only rail).
+  const isMarketplaceRoute = pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/')
   useEffect(() => {
     if (!isMobile && isMarketplaceRoute) {
       collapseSidebar()
@@ -175,19 +175,19 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isConnectorsRoute: false,
+        isInstalledRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
       }
     }
     return {
-      isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
+      isInstalledRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isSchedulesRoute, isMembersRoute } = routeChecks
+  const { isInstalledRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -258,8 +258,6 @@ export function Navigation(props: NavigationProps) {
   }, [streamChunks, notifList])
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
-  const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
-
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
   // Handle logo/name click - memoized
@@ -300,13 +298,13 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(canManageConnectors && starshipSlug
+      ...(isAuthenticated && starshipSlug
         ? [
             {
-              href: `/ship/${starshipSlug}/connectors`,
-              label: 'Connectors',
-              icon: 'plug',
-              isActive: isConnectorsRoute,
+              href: `/ship/${starshipSlug}/installed`,
+              label: 'Installed',
+              icon: 'download',
+              isActive: isInstalledRoute,
             },
           ]
         : []),
@@ -331,7 +329,15 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, canManageConnectors, pathname, isSchedulesRoute, isConnectorsRoute, isMembersRoute, isInstanceAdmin]
+    [
+      isAuthenticated,
+      starshipSlug,
+      pathname,
+      isSchedulesRoute,
+      isInstalledRoute,
+      isMembersRoute,
+      isInstanceAdmin,
+    ]
   )
 
   const handleSidebarBackgroundClick = useCallback(

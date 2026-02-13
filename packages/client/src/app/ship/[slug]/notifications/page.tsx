@@ -244,7 +244,7 @@ export default function NotificationsPage() {
                   <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Unread</h3>
-                      <span className="text-sm text-muted-foreground tabular-nums">{unreadItems.length}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">({unreadItems.length})</span>
                     </div>
                     <Button
                       size="sm"
@@ -267,7 +267,7 @@ export default function NotificationsPage() {
                   <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
                     <div className="min-w-0 flex items-baseline gap-3">
                       <h3 className="text-lg font-semibold leading-tight text-foreground">Read</h3>
-                      <span className="text-sm text-muted-foreground tabular-nums">{readItems.length}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">({readItems.length})</span>
                     </div>
                   </div>
                   <div className="space-y-2">{readItems.map(renderRow)}</div>

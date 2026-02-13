@@ -132,7 +132,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return
     if (isWizardComplete) {
-      router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/marketplace')
+      router.replace(primaryStarship?.slug ? `/ship/${primaryStarship.slug}` : '/explore')
       return
     }
     if (!hasStarship && !starshipsLoading) {
@@ -246,7 +246,7 @@ export default function OnboardingPage() {
     if (primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}`)
     } else {
-      router.push('/marketplace')
+      router.push('/explore')
     }
   }, [completeWizard, queryClient, primaryStarship?.slug, router])
 
@@ -400,12 +400,12 @@ export default function OnboardingPage() {
                 <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 20rem), 560px)' }}>
                   <div className="shrink-0">
                     <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">You can add more from the marketplace later.</p>
+                    <p className="mt-2 text-sm text-muted-foreground">You can add more from Explore later.</p>
                   </div>
                   {templatesLoading ? (
                     <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
                   ) : allTemplates.length === 0 ? (
-                    <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from the marketplace later.</p>
+                    <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from Explore later.</p>
                   ) : (
                     <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">

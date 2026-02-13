@@ -22,7 +22,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
   title: 'Starships.ai | Hire your AI staff, brief them in plain language',
-  description: 'Starships.ai is a workspace to assemble AI staff, connect tools, set guardrails, and collaborate to get real work done. Start from Marketplace templates and deploy in minutes.',
+  description: 'Starships.ai is a workspace to assemble AI staff, connect tools, set guardrails, and collaborate to get real work done. Start from Explore templates and deploy in minutes.',
   applicationName: 'Starships.ai',
   authors: [{ name: 'Starships.ai' }],
   creator: 'Starships.ai',
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Starships.ai',
     title: 'Starships.ai | Hire your AI staff, brief them in plain language',
-    description: 'Assemble AI staff, connect tools, set guardrails, and collaborate in one workspace. Start from Marketplace templates and deploy in minutes.',
+    description: 'Assemble AI staff, connect tools, set guardrails, and collaborate in one workspace. Start from Explore templates and deploy in minutes.',
     url: 'https://starships.ai',
     locale: 'en_US',
     images: [
@@ -76,7 +76,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Starships.ai | Hire your AI staff, brief them in plain language',
-    description: 'Assemble AI staff, connect tools, set guardrails, and collaborate in one workspace. Start from Marketplace templates and deploy in minutes.',
+    description: 'Assemble AI staff, connect tools, set guardrails, and collaborate in one workspace. Start from Explore templates and deploy in minutes.',
     images: ['/static-assets/og.jpg'],
   },
   icons: {

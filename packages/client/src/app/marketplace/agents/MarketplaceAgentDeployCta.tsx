@@ -8,9 +8,9 @@ import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protoc
 
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents, AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { useOwnedStarshipsForDeploy } from '@/hooks/useStarships'
+import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { AgentDeploymentWizardModal } from '@/components/marketplace/AgentDeploymentWizardModal'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { track } from '@/lib/analytics'
@@ -24,7 +24,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   const queryClient = useQueryClient()
 
   const { userId, isAuthenticated } = useAuth()
-  const { ownedStarships, primaryStarship } = useOwnedStarshipsForDeploy(userId || '', { enabled: !!userId })
+  const { deployStarships, primaryStarship } = useStarshipsForDeploySelection(userId || '', { enabled: !!userId })
 
   const templateId = template?.id ?? ''
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
@@ -43,7 +43,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   const [isDeploying, setIsDeploying] = useState(false)
   const createAgentMutation = useCreateAgentFromTemplate()
 
-  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  const deployLabel = isAlreadyDeployed ? 'Installed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Installing…' : 'Install'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
 
@@ -104,7 +104,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
 
       // Marketplace UX: after deploy, take the user to the agent's chat.
       // Refetch agents for this starship so the DM page finds the new agent when it mounts (avoids bounce to lobby).
-      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+      if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
         if (agentId) {
           await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
@@ -124,7 +124,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
       {isAlreadyDeployed && primaryStarship?.slug ? (
         <Button
           size="sm"
-          className="h-10 gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="h-9 gap-2 rounded-lg px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={() =>
             router.push(deployedAgent?.id ? `/ship/${encodeURIComponent(primaryStarship.slug)}/dm/${encodeURIComponent(`a:${deployedAgent.id}`)}` : `/ship/${encodeURIComponent(primaryStarship.slug)}`)
           }
@@ -133,23 +133,22 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
           Start chat
         </Button>
       ) : (
-        <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">
+        <Button size="sm" onClick={handleDeployClick} disabled={deployDisabled} className="h-9 rounded-lg px-3 text-xs font-semibold">
           <Icon name={deployIconName} className="w-4 h-4 mr-2" />
           {deployLabel}
         </Button>
       )}
 
-      <DeploymentConfirmationModal
+      <AgentDeploymentWizardModal
         isOpen={showConfirmationModal}
         onOpenChange={setShowConfirmationModal}
         onConfirm={handleConfirmDeploy}
         isProcessing={isDeploying}
-        type="agent"
         template={template}
-        starshipName={primaryStarship?.name || 'Unknown Starship'}
         starshipId={primaryStarship?.id}
         starshipSlug={primaryStarship?.slug}
-        ownedStarships={ownedStarships}
+        starshipName={primaryStarship?.name || 'Unknown Starship'}
+        ownedStarships={deployStarships}
       />
     </>
   )

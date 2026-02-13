@@ -6,18 +6,30 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { track } from '@/lib/analytics'
 
-export function PublicFooter(props: { fromPath?: string }) {
+export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolean; topDividerVariant?: 'theme' | 'landingDark' }) {
   const fromPath = props.fromPath ?? '/'
+  const showTopDivider = props.showTopDivider ?? true
+  const topDividerVariant = props.topDividerVariant ?? 'theme'
+
+  const topDividerClassName =
+    topDividerVariant === 'landingDark'
+      ? 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent'
+      : 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent'
 
   return (
-    <footer className="py-16 px-4 relative">
+    <footer className="py-16 relative">
       {/* Gradient horizontal line */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-      <div className="max-w-6xl mx-auto relative">
+      {showTopDivider ? (
+        <div
+          suppressHydrationWarning
+          className={topDividerClassName}
+        />
+      ) : null}
+      <div className="w-full relative px-4 sm:px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="mb-6 md:mb-0 text-center md:text-left">
-            <p className="text-muted-foreground mb-2">© 2026 Starships.ai - Where Ideas meet Intelligence</p>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">© 2026 Starships.ai - Where Ideas meet Intelligence</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               🪐 Manifested by{' '}
               <a
                 href="https://theingenuity.co"

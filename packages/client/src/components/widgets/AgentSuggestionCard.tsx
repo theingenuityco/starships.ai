@@ -87,7 +87,7 @@ export function AgentSuggestionCard({ starshipId, templateSlugs, className, maxC
             key={template.id}
             template={template}
             targetStarshipId={starshipId}
-            onClick={t => router.push(`/marketplace/agents/${encodeURIComponent(t.slug)}`)}
+            onClick={t => router.push(`/explore/agents/${encodeURIComponent(t.slug)}`)}
           />
         ))}
       </div>

@@ -13,6 +13,7 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -567,8 +568,11 @@ export function ConversationMessageList({
   const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
   const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
+  const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
+  const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
-  const presence = useStarshipPresence(String(starshipId || ''), Boolean(starshipId))
+  const sid = typeof starshipId === 'string' ? starshipId : ''
+  const presence = useStarshipPresence(sid, Boolean(sid))
   const isConversationBusy = !isTerminalTurnStatus && (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') && (isResponding || isAssistantStreaming || isAwaitingToolResults)
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
@@ -593,6 +597,10 @@ export function ConversationMessageList({
   }
   const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
   const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
+  // Fallback agent directory for cases where the conversation agent list is not yet hydrated
+  // (e.g. brand-new channel, first message triggers a turn via @mention before any assistant message is persisted).
+  const { data: starshipAgentsRaw = [] } = useStarshipAgents(sid, Boolean(sid))
+  const starshipAgents = useMemo(() => (Array.isArray(starshipAgentsRaw) ? (starshipAgentsRaw as any[]) : []), [starshipAgentsRaw])
 
   // For user↔user DMs, derive the peer user from the DM list (same source as ConversationSummaryBar).
   const { data: dmListData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId && conversationId))
@@ -666,8 +674,16 @@ export function ConversationMessageList({
       if (!id) continue
       m.set(id, a)
     }
+    // Only fill missing ids from the starship-wide agent list to avoid overriding
+    // any per-conversation agent data (ordering, overrides, etc).
+    for (const a of starshipAgents as any[]) {
+      const id = typeof a?.id === 'string' ? String(a.id).trim() : ''
+      if (!id) continue
+      if (m.has(id)) continue
+      m.set(id, a as any)
+    }
     return m
-  }, [conversationAgents])
+  }, [conversationAgents, starshipAgents])
 
   const agentDisplayNameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -681,10 +697,30 @@ export function ConversationMessageList({
     return m
   }, [conversationAgents])
 
+  const agentIdsInUse = useMemo(() => {
+    const ids = new Set<string>()
+    for (const a of conversationAgents) {
+      const id = typeof a?.id === 'string' ? a.id.trim() : ''
+      if (id) ids.add(id)
+    }
+    if (turnAgentId) ids.add(turnAgentId)
+    for (const msg of Array.isArray(messages) ? (messages as any[]) : []) {
+      if (!msg || String(msg?.role ?? '') !== 'assistant') continue
+      const id = typeof msg?.agentId === 'string' ? String(msg.agentId).trim() : ''
+      if (id) ids.add(id)
+    }
+    return Array.from(ids)
+  }, [conversationAgents, messages, turnAgentId])
+
   const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
+    const ids: string[] = []
+    for (const id of agentIdsInUse) {
+      const agent = agentById.get(id) as any
+      const aid = typeof agent?.avatarAttachmentId === 'string' ? String(agent.avatarAttachmentId).trim() : ''
+      if (aid) ids.push(aid)
+    }
     return Array.from(new Set(ids))
-  }, [conversationAgents])
+  }, [agentById, agentIdsInUse])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
   const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 
@@ -1341,8 +1377,6 @@ export function ConversationMessageList({
     })
   }, [isHydratingInitialMessages, renderMessages])
 
-  const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
-  const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const gapLoaderPresentation = useMemo(() => {
     if (!activeTurnId) return null
 

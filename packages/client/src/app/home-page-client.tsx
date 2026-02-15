@@ -19,7 +19,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
   const initialToolTemplates = props.initialToolTemplates ?? []
 
   return (
-    <StarTheme theme="dark">
+    <StarTheme theme="light">
       <div className="min-h-[100dvh] bg-background relative">
         <StarryBackground />
         {/* Bottom glow for the whole landing page (decorative background, never above content) */}
@@ -57,7 +57,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
             <FinalCTA />
 
             {/* Footer */}
-            <PublicFooter fromPath="/" topDividerVariant="landingDark" />
+            <PublicFooter fromPath="/" />
           </div>
         </div>
       </div>

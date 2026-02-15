@@ -3,7 +3,6 @@
 import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
-import { getHeadlineVariant } from '@/lib/flags'
 import { useAuth } from '@/hooks/useAuth'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
@@ -97,34 +96,25 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div className="w-full min-w-0">
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
-            {(() => {
-              const v = getHeadlineVariant()
-              if (v === 'B') return 'Hire your AI staff, brief in plain language'
-              if (v === 'C') return 'Turn prompts into workflows'
-              return (
-                <>
-                  <span className="warp-word" data-text="ai">
-                    <span className="warp-letter">A</span>
-                    <span className="warp-letter">I</span>
-                  </span>{' '}
-                  <span className="warp-word" data-text="employees">
-                    <span className="warp-letter">e</span>
-                    <span className="warp-letter">m</span>
-                    <span className="warp-letter">p</span>
-                    <span className="warp-letter">l</span>
-                    <span className="warp-letter">o</span>
-                    <span className="warp-letter">y</span>
-                    <span className="warp-letter">e</span>
-                    <span className="warp-letter">e</span>
-                    <span className="warp-letter">s</span>
-                  </span>{' '}
-                  to manage your work
-                </>
-              )
-            })()}
+            Team chat,
+            <br className="hidden md:block" />
+            powered by{' '}
+            <span className="warp-word" data-text="ai">
+              <span className="warp-letter">A</span>
+              <span className="warp-letter">I</span>
+            </span>{' '}
+            <span className="warp-word" data-text="agents">
+              <span className="warp-letter">a</span>
+              <span className="warp-letter">g</span>
+              <span className="warp-letter">e</span>
+              <span className="warp-letter">n</span>
+              <span className="warp-letter">t</span>
+              <span className="warp-letter">s</span>
+            </span>
+            .
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
-            Sort your inbox, run your socials, manage products — and much more.
+            Chat with your team, delegate work to agents, and ship faster across your tools.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
@@ -190,10 +180,14 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           font-size: 1em;
           font-weight: inherit;
           line-height: inherit;
+          --warp-delay: 0ms;
           animation:
-            warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both,
+            warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) var(--warp-delay) both,
+            /* Keep these independent of per-letter entry delay */
             gradient-shift 8s ease-in-out 1.2s infinite,
-            warp-blur 3.6s ease-in-out 1.3s infinite;
+            warp-blur 3.6s ease-in-out 1.3s infinite,
+            /* Continuous subtle warping after entry finishes */
+            warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
           will-change: transform, opacity, filter, background-position;
           background: linear-gradient(120deg, rgba(168, 85, 247, 0.95) 0%, rgba(139, 92, 246, 0.9) 35%, rgba(124, 58, 237, 0.9) 70%, rgba(168, 85, 247, 0.95) 100%);
           background-size: 250% 250%;
@@ -204,31 +198,31 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
         }
 
         .warp-letter:nth-child(1) {
-          animation-delay: 0ms;
+          --warp-delay: 0ms;
         }
         .warp-letter:nth-child(2) {
-          animation-delay: 60ms;
+          --warp-delay: 60ms;
         }
         .warp-letter:nth-child(3) {
-          animation-delay: 120ms;
+          --warp-delay: 120ms;
         }
         .warp-letter:nth-child(4) {
-          animation-delay: 180ms;
+          --warp-delay: 180ms;
         }
         .warp-letter:nth-child(5) {
-          animation-delay: 240ms;
+          --warp-delay: 240ms;
         }
         .warp-letter:nth-child(6) {
-          animation-delay: 300ms;
+          --warp-delay: 300ms;
         }
         .warp-letter:nth-child(7) {
-          animation-delay: 360ms;
+          --warp-delay: 360ms;
         }
         .warp-letter:nth-child(8) {
-          animation-delay: 420ms;
+          --warp-delay: 420ms;
         }
         .warp-letter:nth-child(9) {
-          animation-delay: 480ms;
+          --warp-delay: 480ms;
         }
 
         @keyframes warp-letter-in {
@@ -269,6 +263,23 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           }
           100% {
             background-position: 0% 50%;
+          }
+        }
+
+        /* Gentle continuous "warp" motion once letters are in */
+        @keyframes warp-wobble {
+          0%,
+          100% {
+            transform: translateY(0) scaleX(1) skewX(0deg);
+          }
+          25% {
+            transform: translateY(-1px) scaleX(0.985) skewX(1.2deg);
+          }
+          50% {
+            transform: translateY(0.5px) scaleX(1.015) skewX(-1.2deg);
+          }
+          75% {
+            transform: translateY(-0.5px) scaleX(0.995) skewX(0.6deg);
           }
         }
 

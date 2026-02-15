@@ -222,6 +222,9 @@ export function useNotificationsStream(
     return null
   }, [chunks.length, starshipId])
 
+  // Used by UIs that need stable first-paint ordering (e.g. sidebar sorting).
+  const isReady = Boolean(snapshot)
+
   const pageInfo = useMemo(() => {
     // Last-write-wins from snapshot + load-older pages.
     let hasMoreBefore = Boolean(snapshot?.hasMoreBefore)
@@ -581,6 +584,7 @@ export function useNotificationsStream(
   return {
     notifications,
     unread,
+    isReady,
     isLoading: q.isLoading,
     isFetching: q.fetchStatus === 'fetching',
     isError: q.isError,

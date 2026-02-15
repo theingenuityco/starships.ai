@@ -723,9 +723,7 @@ export function ConversationMessageList({
       const version = typeof (agent as any)?.version === 'string' ? String((agent as any).version).trim() : undefined
       const category = typeof (agent as any)?.category === 'string' ? String((agent as any).category).trim() : undefined
       const publicationStatus = typeof (agent as any)?.publicationStatus === 'string' ? String((agent as any).publicationStatus).trim() : undefined
-      const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs)
-        ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean)
-        : undefined
+      const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs) ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean) : undefined
       const createdAt = typeof (agent as any)?.createdAt === 'string' ? String((agent as any).createdAt).trim() : undefined
       const updatedAt = typeof (agent as any)?.updatedAt === 'string' ? String((agent as any).updatedAt).trim() : undefined
 
@@ -1275,6 +1273,83 @@ export function ConversationMessageList({
     return [pinned, ...withoutPinned]
   }, [displayMessages, pinnedFirstMessage])
 
+  // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
+  // NOTE: use `displayMessages` (stream-derived) rather than `renderMessages` (can include pinned message).
+  const hasStreamSnapshot = Boolean((stream as any)?.hasSnapshot)
+  const isHydratingInitialMessages = Boolean(
+    !messagesOverride && stream && !hasStreamSnapshot && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
+  )
+
+  // User message "enter" animation:
+  // animate only messages that are newly appended (not initial hydration, not history loads),
+  // and keep a stable key across temp-user -> persisted replacement via `clientMessageId`.
+  const USER_ENTER_ANIM_MS = 140
+  const enterSeenKeysRef = useRef<Set<string>>(new Set())
+  const enterInitializedRef = useRef(false)
+  const [enteringUserMessageKeys, setEnteringUserMessageKeys] = useState<Record<string, true>>({})
+  useEffect(() => {
+    // Don't animate the initial load (or re-hydration).
+    if (isHydratingInitialMessages) return
+    const nowMs = Date.now()
+
+    const keyOf = (m: any): string => {
+      const clientId = typeof m?.clientMessageId === 'string' ? String(m.clientMessageId).trim() : ''
+      if (clientId) return `c:${clientId}`
+      const id = typeof m?.id === 'string' ? String(m.id).trim() : String(m?.id ?? '').trim()
+      return `id:${id}`
+    }
+
+    // First non-hydrating render: seed the "seen" set without animating.
+    if (!enterInitializedRef.current) {
+      const seed = new Set<string>()
+      for (const m of renderMessages as any[]) seed.add(keyOf(m))
+      enterSeenKeysRef.current = seed
+      enterInitializedRef.current = true
+      return
+    }
+
+    const newlyEntering: string[] = []
+    for (const m of renderMessages as any[]) {
+      if (!m || String(m.role ?? '') !== 'user') continue
+      const k = keyOf(m)
+      if (enterSeenKeysRef.current.has(k)) continue
+
+      // Heuristic: only animate truly "new" messages (avoid animating loaded history).
+      const createdAt = typeof m?.createdAt === 'string' ? Date.parse(m.createdAt) : NaN
+      const isRecent = Number.isFinite(createdAt) ? nowMs - createdAt <= 30_000 : false
+      const isExplicitTemp = typeof m?.id === 'string' && String(m.id).startsWith('temp-user-')
+      const isSending = Boolean((m as any)?.sending)
+      if (!(isRecent || isExplicitTemp || isSending)) {
+        enterSeenKeysRef.current.add(k)
+        continue
+      }
+
+      enterSeenKeysRef.current.add(k)
+      newlyEntering.push(k)
+    }
+
+    if (newlyEntering.length === 0) return
+    setEnteringUserMessageKeys(prev => {
+      const next = { ...prev }
+      for (const k of newlyEntering) next[k] = true
+      return next
+    })
+    const t = window.setTimeout(() => {
+      setEnteringUserMessageKeys(prev => {
+        let changed = false
+        const next = { ...prev }
+        for (const k of newlyEntering) {
+          if (next[k]) {
+            delete next[k]
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    }, USER_ENTER_ANIM_MS + 40)
+    return () => window.clearTimeout(t)
+  }, [isHydratingInitialMessages, renderMessages])
+
   const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
   const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const gapLoaderPresentation = useMemo(() => {
@@ -1354,12 +1429,8 @@ export function ConversationMessageList({
       activeTurnId: String(activeTurnId ?? ''),
       shouldOverrideFromGap,
       gapStrategy: (gapLoaderPresentation as any)?.strategy,
-      base: base
-        ? { displayName: (base as any).displayName, role: (base as any).role, avatarUrl: (base as any).avatarUrl, modelId: (base as any).modelId }
-        : null,
-      final: final
-        ? { displayName: (final as any).displayName, role: (final as any).role, avatarUrl: (final as any).avatarUrl, modelId: (final as any).modelId }
-        : null,
+      base: base ? { displayName: (base as any).displayName, role: (base as any).role, avatarUrl: (base as any).avatarUrl, modelId: (base as any).modelId } : null,
+      final: final ? { displayName: (final as any).displayName, role: (final as any).role, avatarUrl: (final as any).avatarUrl, modelId: (final as any).modelId } : null,
     })
     if (streamingIdentityLoggedRef.current === key) return
     streamingIdentityLoggedRef.current = key
@@ -1673,25 +1744,6 @@ export function ConversationMessageList({
   if (!conversationId && !messagesOverride && !pinnedFirstMessage) {
     return <EmptyState />
   }
-
-  // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
-  // On first paint, `renderMessages` can be empty while the stream query is loading; at that moment
-  // `hasMoreBefore` is also not yet meaningful, which makes the hero incorrectly render.
-  //
-  // NOTE: `renderMessages` may include `pinnedFirstMessage` (thread context) even when the thread's
-  // own stream messages haven't hydrated yet. Use `displayMessages` (stream-derived) to decide whether
-  // the timeline is actually hydrated, otherwise we can briefly render ONLY the pinned message.
-  // IMPORTANT:
-  // The streamed conversation query keeps an SSE connection open; TanStack Query can report `isFetching=true`
-  // for the lifetime of that connection. If we treat `isFetching && messages.length===0` as "still loading",
-  // an empty-but-valid channel will look stuck in a loading state forever.
-  //
-  // Instead, key off whether we have received at least one snapshot event. A snapshot can legitimately contain
-  // zero messages (new channel), which should show the empty hero state.
-  const hasStreamSnapshot = Boolean((stream as any)?.hasSnapshot)
-  const isHydratingInitialMessages = Boolean(
-    !messagesOverride && stream && !hasStreamSnapshot && (Boolean((stream as any)?.isLoading) || Boolean((stream as any)?.isFetching)) && displayMessages.length === 0
-  )
 
   // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
@@ -2044,6 +2096,17 @@ export function ConversationMessageList({
                           isUserOnline={presence.isUserOnline}
                           isConversationBusy={isConversationBusy}
                           presenceRevision={presence.dataUpdatedAt}
+                          animateUserEnter={Boolean(
+                            message.role === 'user' &&
+                              enteringUserMessageKeys[
+                                (() => {
+                                  const clientId = typeof (message as any)?.clientMessageId === 'string' ? String((message as any).clientMessageId).trim() : ''
+                                  if (clientId) return `c:${clientId}`
+                                  const id = typeof (message as any)?.id === 'string' ? String((message as any).id).trim() : String((message as any)?.id ?? '').trim()
+                                  return `id:${id}`
+                                })()
+                              ]
+                          )}
                         />
                         {(() => {
                           const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -2284,6 +2347,8 @@ interface ConversationMessageBubbleProps {
    * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
    */
   presenceRevision?: number
+  /** When true, apply the quick enter animation to user messages. */
+  animateUserEnter?: boolean
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -2347,9 +2412,7 @@ function MessageDateDivider({ label }: { label: string }) {
   return (
     <div className="my-4 flex items-center gap-3">
       <div className="h-px flex-1 bg-border/60" />
-      <div className="rounded-full border border-border/60 bg-muted/40 px-3 py-0.5 text-xs font-medium text-muted-foreground">
-        {label}
-      </div>
+      <div className="rounded-full border border-border/60 bg-muted/40 px-3 py-0.5 text-xs font-medium text-muted-foreground">{label}</div>
       <div className="h-px flex-1 bg-border/60" />
     </div>
   )
@@ -2621,6 +2684,7 @@ const MemoizedMessageBubble = memo(
     isConversationBusy = false,
     activeThreadConversationId,
     presenceRevision,
+    animateUserEnter = false,
   }: ConversationMessageBubbleProps) {
     void presenceRevision
     const isHero = sizeVariant === 'hero'
@@ -2790,12 +2854,12 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-      const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-4') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-8')
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-4') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-8')
         // Always use the compact bubble padding (no "normal" padding mode).
         const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
-          <div className="flex justify-end">
+          <div className={cn('flex justify-end', animateUserEnter && 'ss-user-message-enter')}>
             <div className={cn('flex items-end w-full max-w-full', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
                 <div
@@ -2909,21 +2973,11 @@ const MemoizedMessageBubble = memo(
       const userHoverDetail = (userNameOverride ?? messageUserName ?? directoryUserName ?? '').trim()
       const userHoverTitle = isAuthedUserMessage ? 'You' : userDisplayName
       const emailForHover = (effectiveUserEmail || fromDirectory?.email || '').trim()
-      const userHoverSub =
-        (userHoverDetail && userHoverDetail !== userDisplayName ? userHoverDetail : '') ||
-        (emailForHover && emailForHover !== userDisplayName ? emailForHover : '')
+      const userHoverSub = (userHoverDetail && userHoverDetail !== userDisplayName ? userHoverDetail : '') || (emailForHover && emailForHover !== userDisplayName ? emailForHover : '')
       const userIdShort = messageUserId ? `#${messageUserId.slice(0, 6)}` : ''
       const userPresenceLabel = showUserPresenceDot ? (showUserOnline ? 'Online' : 'Offline') : 'Unknown'
       const userRoleRaw = typeof fromDirectory?.role === 'string' ? fromDirectory.role : ''
-      const userRoleLabel = userRoleRaw
-        ? userRoleRaw === 'owner'
-          ? 'Owner'
-          : userRoleRaw === 'admin'
-            ? 'Admin'
-            : userRoleRaw === 'collaborator'
-              ? 'Collaborator'
-              : userRoleRaw
-        : ''
+      const userRoleLabel = userRoleRaw ? (userRoleRaw === 'owner' ? 'Owner' : userRoleRaw === 'admin' ? 'Admin' : userRoleRaw === 'collaborator' ? 'Collaborator' : userRoleRaw) : ''
       const userHoverCard = (
         <UserProfileHoverCardContent
           title={userHoverTitle}
@@ -3419,6 +3473,7 @@ const MemoizedMessageBubble = memo(
     if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
     if (String(prevProps.activeThreadConversationId ?? '') !== String(nextProps.activeThreadConversationId ?? '')) return false
     if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
+    if (Boolean(prevProps.animateUserEnter) !== Boolean(nextProps.animateUserEnter)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
       const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }

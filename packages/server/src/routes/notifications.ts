@@ -344,15 +344,35 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
     const lastAt = last?.created_at ? new Date(String(last.created_at)).toISOString() : null;
 
     const readRepo = new ConversationReadStateRepository();
-    const state = await readRepo.upsert({
-      conversationId: params.conversationId,
-      userId: authUserId,
-      lastReadMessageId: lastId,
-      lastReadAt: lastAt,
-    });
-
     const notifRepo = new NotificationRepository();
-    await notifRepo.markRead({ starshipId, userId: authUserId, conversationId: params.conversationId });
+    const existing = await readRepo.get(params.conversationId, authUserId);
+    const existingLastReadAt = existing?.lastReadAt ? String(existing.lastReadAt) : null;
+    const existingLastReadMessageId = existing?.lastReadMessageId ? String(existing.lastReadMessageId) : null;
+
+    const hasUnreadMessages = Boolean(lastAt && (!existingLastReadAt || Date.parse(lastAt) > Date.parse(existingLastReadAt)));
+
+    // Mark any unread notifications as read (mentions/reactions/DM notifications).
+    const notifResult = await notifRepo.markRead({ starshipId, userId: authUserId, conversationId: params.conversationId });
+
+    // Only bump the persisted per-user "activity" timestamp when something actually changed:
+    // - unread messages were present (Slack-style unread highlight), or
+    // - unread notifications existed (badge counts).
+    const shouldTouchReadState = hasUnreadMessages || (notifResult?.updated ?? 0) > 0;
+
+    const nextLastReadAt = hasUnreadMessages
+      ? lastAt
+      : existingLastReadAt ?? (shouldTouchReadState ? new Date().toISOString() : null);
+    const nextLastReadMessageId = hasUnreadMessages ? lastId : existingLastReadMessageId;
+
+    const state = shouldTouchReadState
+      ? await readRepo.upsert({
+          conversationId: params.conversationId,
+          userId: authUserId,
+          lastReadMessageId: nextLastReadMessageId,
+          lastReadAt: nextLastReadAt,
+        })
+      : existing;
+
     const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authUserId });
     try {
       const bus = NotificationStreamBus.getInstance();
@@ -405,6 +425,7 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       conversation_id: string;
       last_message_at: string | null;
       last_read_at: string | null;
+      last_activity_at: string | null;
     }>(
       `
       WITH scoped AS (
@@ -441,7 +462,8 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       SELECT
         s.conversation_id,
         lm.last_message_at,
-        rs.last_read_at
+        rs.last_read_at,
+        rs.updated_at AS last_activity_at
       FROM scoped s
       LEFT JOIN last_msg lm ON lm.conversation_id = s.conversation_id
       LEFT JOIN conversation_read_states rs
@@ -451,13 +473,17 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       [params.starshipId, authUserId, ids]
     );
 
-    const unreadByConversationId: Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }> = {};
+    const unreadByConversationId: Record<
+      string,
+      { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }
+    > = {};
     for (const r of rows) {
       const cid = String(r.conversation_id || '');
       const lastMessageAt = r.last_message_at ? new Date(String(r.last_message_at)).toISOString() : null;
       const lastReadAt = r.last_read_at ? new Date(String(r.last_read_at)).toISOString() : null;
+      const lastActivityAt = r.last_activity_at ? new Date(String(r.last_activity_at)).toISOString() : null;
       const hasUnread = Boolean(lastMessageAt && (!lastReadAt || Date.parse(lastMessageAt) > Date.parse(lastReadAt)));
-      if (cid) unreadByConversationId[cid] = { hasUnread, lastMessageAt, lastReadAt };
+      if (cid) unreadByConversationId[cid] = { hasUnread, lastMessageAt, lastReadAt, lastActivityAt };
     }
 
     sendSuccess(res, { unreadByConversationId }, 200);

@@ -182,7 +182,23 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
     return Array.from(new Set(ids))
   }, [channelsData, directMessagesData?.directMessages])
   const { data: unreadMapData } = useUnreadByConversationIds(starshipId, conversationIdsForUnread, true)
-  const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as Record<string, { hasUnread: boolean }> | undefined
+  const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as
+    | Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }>
+    | undefined
+
+  const toEpochMs = useCallback((v: unknown): number => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string') {
+      const t = Date.parse(v)
+      return Number.isFinite(t) ? t : 0
+    }
+    try {
+      const t = (v as any) instanceof Date ? (v as Date).getTime() : 0
+      return Number.isFinite(t) ? t : 0
+    } catch {
+      return 0
+    }
+  }, [])
 
   const createChannel = useCreateChannel()
   const updateChannel = useUpdateChannel()
@@ -422,6 +438,92 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
       t.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(t.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(t.user.userId)) || '')
     if (existingConversationId) onConversationSelect?.(existingConversationId)
   }
+
+  const channelsForCompactSidebar = useMemo(() => {
+    const list = [...channels]
+    list.sort((a, b) => {
+      const aCid = String((a as any)?.conversationId || '').trim()
+      const bCid = String((b as any)?.conversationId || '').trim()
+
+      const aUnread = Boolean(aCid && unreadByConversationId?.[aCid]?.hasUnread)
+      const bUnread = Boolean(bCid && unreadByConversationId?.[bCid]?.hasUnread)
+
+      const aMention = Number(notifUnread?.mentionUnreadByConversationId?.[aCid] ?? 0) || 0
+      const aReact = Number((notifUnread as any)?.reactionUnreadByConversationId?.[aCid] ?? 0) || 0
+      const bMention = Number(notifUnread?.mentionUnreadByConversationId?.[bCid] ?? 0) || 0
+      const bReact = Number((notifUnread as any)?.reactionUnreadByConversationId?.[bCid] ?? 0) || 0
+      const aNotif = aMention + aReact
+      const bNotif = bMention + bReact
+
+      const aGroup = aNotif > 0 ? 0 : aUnread ? 1 : 2
+      const bGroup = bNotif > 0 ? 0 : bUnread ? 1 : 2
+      if (aGroup !== bGroup) return aGroup - bGroup
+
+      // Within the "notifications" group, sort by count first.
+      if (aGroup === 0 && aNotif !== bNotif) return bNotif - aNotif
+
+      const aActivity =
+        (aCid ? toEpochMs(unreadByConversationId?.[aCid]?.lastActivityAt) || toEpochMs(unreadByConversationId?.[aCid]?.lastReadAt) : 0) ||
+        toEpochMs((a as any)?.updatedAt) ||
+        toEpochMs((a as any)?.createdAt) ||
+        0
+      const bActivity =
+        (bCid ? toEpochMs(unreadByConversationId?.[bCid]?.lastActivityAt) || toEpochMs(unreadByConversationId?.[bCid]?.lastReadAt) : 0) ||
+        toEpochMs((b as any)?.updatedAt) ||
+        toEpochMs((b as any)?.createdAt) ||
+        0
+      if (aActivity !== bActivity) return bActivity - aActivity
+
+      const aLabel = String((a as any)?.name || (a as any)?.slug || '').toLowerCase()
+      const bLabel = String((b as any)?.name || (b as any)?.slug || '').toLowerCase()
+      return aLabel.localeCompare(bLabel)
+    })
+    return list
+  }, [channels, notifUnread, toEpochMs, unreadByConversationId])
+
+  const dmTargetsForCompactSidebar = useMemo(() => {
+    const list = [...dmTargets]
+    list.sort((a, b) => {
+      const aConversationId =
+        a.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(a.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(a.user.userId)) || '')
+      const bConversationId =
+        b.kind === 'agent' ? String(existingDmConversationIdByAgentId.get(String(b.agent.id)) || '') : String(existingDmConversationIdByPeerUserId.get(String(b.user.userId)) || '')
+
+      const isOpenA = Boolean(aConversationId && activeConversationIdForNotifications && aConversationId === activeConversationIdForNotifications)
+      const isOpenB = Boolean(bConversationId && activeConversationIdForNotifications && bConversationId === activeConversationIdForNotifications)
+
+      const aUnread = Boolean(!isOpenA && aConversationId && unreadByConversationId?.[aConversationId]?.hasUnread)
+      const bUnread = Boolean(!isOpenB && bConversationId && unreadByConversationId?.[bConversationId]?.hasUnread)
+
+      const aDm = Number(!isOpenA && aConversationId ? (notifUnread?.dmUnreadByConversationId?.[aConversationId] ?? 0) : 0) || 0
+      const aReact = Number(!isOpenA && aConversationId ? ((notifUnread as any)?.reactionUnreadByConversationId?.[aConversationId] ?? 0) : 0) || 0
+      const bDm = Number(!isOpenB && bConversationId ? (notifUnread?.dmUnreadByConversationId?.[bConversationId] ?? 0) : 0) || 0
+      const bReact = Number(!isOpenB && bConversationId ? ((notifUnread as any)?.reactionUnreadByConversationId?.[bConversationId] ?? 0) : 0) || 0
+      const aNotif = aDm + aReact
+      const bNotif = bDm + bReact
+
+      const aGroup = aNotif > 0 ? 0 : aUnread ? 1 : 2
+      const bGroup = bNotif > 0 ? 0 : bUnread ? 1 : 2
+      if (aGroup !== bGroup) return aGroup - bGroup
+
+      if (aGroup === 0 && aNotif !== bNotif) return bNotif - aNotif
+
+      const aActivity = aConversationId ? toEpochMs(unreadByConversationId?.[aConversationId]?.lastActivityAt) || toEpochMs(unreadByConversationId?.[aConversationId]?.lastReadAt) : 0
+      const bActivity = bConversationId ? toEpochMs(unreadByConversationId?.[bConversationId]?.lastActivityAt) || toEpochMs(unreadByConversationId?.[bConversationId]?.lastReadAt) : 0
+      if (aActivity !== bActivity) return bActivity - aActivity
+
+      return a.label.toLowerCase().localeCompare(b.label.toLowerCase())
+    })
+    return list
+  }, [
+    activeConversationIdForNotifications,
+    dmTargets,
+    existingDmConversationIdByAgentId,
+    existingDmConversationIdByPeerUserId,
+    notifUnread,
+    toEpochMs,
+    unreadByConversationId,
+  ])
 
   const createChannelDialog = (
     <Dialog open={isCreateChannelOpen} onOpenChange={setIsCreateChannelOpen}>
@@ -815,7 +917,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : (
                   <div className="space-y-0.5">
-                    {channelsForDisplay.map(ch => {
+                    {channelsForCompactSidebar.map(ch => {
                       const isActive = currentChannelSlug
                         ? String(ch.slug || '')
                             .trim()
@@ -1047,13 +1149,13 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
             {isDirectMessagesExpanded ? (
               <div id="sidebar-direct-messages-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
-                {dmTargets.length === 0 ? (
+                {dmTargetsForCompactSidebar.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-0.5">{dmTargetsForCompactSidebar.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}

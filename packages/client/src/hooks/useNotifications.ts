@@ -647,7 +647,12 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
     queryKey: starshipId ? [...NOTIFICATION_QUERY_KEYS.byStarship(starshipId), 'unread', stableIds.join('|')] : (['__noop__'] as const),
     enabled: Boolean(starshipId && enabled && stableIds.length > 0),
     retry: (failureCount, error) => shouldRetry(error, failureCount),
-    queryFn: async (): Promise<{ unreadByConversationId: Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }> }> => {
+    queryFn: async (): Promise<{
+      unreadByConversationId: Record<
+        string,
+        { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }
+      >;
+    }> => {
       const sid = String(starshipId || '')
       try {
         const resp = await api.post(`/api/v1/starships/${sid}/unread`, { conversationIds: stableIds })
@@ -658,7 +663,10 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
         const map = payload?.unreadByConversationId
         const unreadByConversationId =
           map && typeof map === 'object' && !Array.isArray(map)
-            ? (map as Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }>)
+            ? (map as Record<
+                string,
+                { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }
+              >)
             : {}
         return { unreadByConversationId }
       } catch (e) {

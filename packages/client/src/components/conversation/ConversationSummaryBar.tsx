@@ -725,11 +725,17 @@ export function ConversationSummaryBar({
                         <>
                           {/* Agent placeholder - matches exact structure */}
                           <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                            <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                              <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                            <div className="flex items-center -space-x-1.5">
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
                               </Avatar>
-                              <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <span className="sr-only">Loading participants</span>
                             </div>
                           </div>
                           {/* Separator and updated text - exact match */}

@@ -767,7 +767,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   : undefined
             }
           >
-            <div className="w-full flex items-center justify-between h-6 pr-2">
+            <div className="w-full flex items-center justify-between pr-2 py-1">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -1016,7 +1016,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                     : { flex: '0 0 auto', height: 24 }
             }
           >
-            <div className="w-full flex items-center justify-between h-6 pr-2">
+            <div className="w-full flex items-center justify-between pr-2 py-1">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}

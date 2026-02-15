@@ -917,11 +917,11 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
             {isChannelsExpanded ? (
               <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
-                  compactLineSkeletonRows(4)
+                  compactLineSkeletonRows(3)
                 ) : channels.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : !compactSortReady ? (
-                  compactLineSkeletonRows(6)
+                  compactLineSkeletonRows(3)
                 ) : (
                   <div className="space-y-0.5">
                     {channelsForCompactSidebar.map(ch => {
@@ -1161,9 +1161,9 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                     <p className="text-muted-foreground text-xs text-center">Failed to load direct message targets</p>
                   </div>
                 ) : dmSectionLoading ? (
-                  compactLineSkeletonRows(6)
+                  compactLineSkeletonRows(3)
                 ) : !compactSortReady ? (
-                  compactLineSkeletonRows(6)
+                  compactLineSkeletonRows(3)
                 ) : dmTargetsForCompactSidebar.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />

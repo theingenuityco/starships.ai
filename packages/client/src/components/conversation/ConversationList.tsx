@@ -857,19 +857,8 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
   // Compact mode - inline display without header/search
   if (compact) {
-    if (agentsLoading || membersLoading) {
-      return (
-        <div className="space-y-0.5">{compactLineSkeletonRows(6)}</div>
-      )
-    }
-
-    if (agentsError || membersError) {
-      return (
-        <div className="flex flex-col items-center justify-center py-8 px-2">
-          <p className="text-muted-foreground text-xs text-center">Failed to load direct message targets</p>
-        </div>
-      )
-    }
+    const dmSectionLoading = agentsLoading || membersLoading || directMessagesLoading
+    const dmSectionError = Boolean(agentsError || membersError)
 
     return (
       <>
@@ -1167,7 +1156,13 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
             {isDirectMessagesExpanded ? (
               <div id="sidebar-direct-messages-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
-                {!compactSortReady ? (
+                {dmSectionError ? (
+                  <div className="flex flex-col items-center justify-center py-6 px-2">
+                    <p className="text-muted-foreground text-xs text-center">Failed to load direct message targets</p>
+                  </div>
+                ) : dmSectionLoading ? (
+                  compactLineSkeletonRows(6)
+                ) : !compactSortReady ? (
                   compactLineSkeletonRows(6)
                 ) : dmTargetsForCompactSidebar.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">

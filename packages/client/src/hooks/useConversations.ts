@@ -1368,20 +1368,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   const normalizeMessageTimestamps = (input: any): ClientMessage => {
     if (!input || typeof input !== 'object') return input as ClientMessage
-    const createdRaw =
-      input.createdAt ??
-      input.created_at ??
-      input.createdAtMs ??
-      input.created_at_ms ??
-      input.timestamp ??
-      input.time
-    const updatedRaw =
-      input.updatedAt ??
-      input.updated_at ??
-      input.updatedAtMs ??
-      input.updated_at_ms ??
-      input.updated_at ??
-      createdRaw
+    const createdRaw = input.createdAt ?? input.created_at ?? input.createdAtMs ?? input.created_at_ms ?? input.timestamp ?? input.time
+    const updatedRaw = input.updatedAt ?? input.updated_at ?? input.updatedAtMs ?? input.updated_at_ms ?? input.updated_at ?? createdRaw
     const createdAt = toIsoTimestamp(createdRaw)
     const updatedAt = toIsoTimestamp(updatedRaw ?? createdRaw)
     const next = { ...input } as any
@@ -1574,8 +1562,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             if (diff > 10000) continue
           }
 
-          // Replace temp message with persisted message
-          messages[i] = withStreaming(msg, false)
+          // Replace temp message with persisted message.
+          // Preserve any identity fields we stamped onto the temp message in case the server echo is missing them
+          // (this prevents brief "unknown author" grouping flashes in the timeline).
+          const prevTemp = messages[i] as any
+          const merged: any = { ...prevTemp, ...msg, id: msg.id }
+          if (!merged.userId && prevTemp?.userId) merged.userId = prevTemp.userId
+          if (!merged.userName && prevTemp?.userName) merged.userName = prevTemp.userName
+          if (!merged.userAvatar && prevTemp?.userAvatar) merged.userAvatar = prevTemp.userAvatar
+          if (!merged.clientMessageId && prevTemp?.clientMessageId) merged.clientMessageId = prevTemp.clientMessageId
+          messages[i] = withStreaming(merged, false)
           return messages
         }
       }
@@ -1797,8 +1793,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           ...acc,
           turnId: chunk.data.turn.turnId,
           status: chunk.data.turn.status,
-          agentId: typeof (chunk.data.turn as any)?.agentId === 'string' ? String((chunk.data.turn as any).agentId) : acc.agentId ?? null,
-          agentName: typeof (chunk.data.turn as any)?.agentName === 'string' ? String((chunk.data.turn as any).agentName) : acc.agentName ?? null,
+          agentId: typeof (chunk.data.turn as any)?.agentId === 'string' ? String((chunk.data.turn as any).agentId) : (acc.agentId ?? null),
+          agentName: typeof (chunk.data.turn as any)?.agentName === 'string' ? String((chunk.data.turn as any).agentName) : (acc.agentName ?? null),
         }
       return acc
     }
@@ -1807,8 +1803,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         ...acc,
         turnId: chunk.data.turnId,
         status: 'active',
-        agentId: typeof (chunk.data as any)?.agentId === 'string' ? String((chunk.data as any).agentId) : acc.agentId ?? null,
-        agentName: typeof (chunk.data as any)?.agentName === 'string' ? String((chunk.data as any).agentName) : acc.agentName ?? null,
+        agentId: typeof (chunk.data as any)?.agentId === 'string' ? String((chunk.data as any).agentId) : (acc.agentId ?? null),
+        agentName: typeof (chunk.data as any)?.agentName === 'string' ? String((chunk.data as any).agentName) : (acc.agentName ?? null),
       }
     }
     if (chunk.type === 'turn.status') {

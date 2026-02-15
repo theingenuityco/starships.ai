@@ -617,9 +617,7 @@ export function ConversationSummaryBar({
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">
-                    {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
-                  </span>
+                  <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
                     <div className="flex items-baseline gap-2 min-w-0 w-full">
@@ -727,11 +725,17 @@ export function ConversationSummaryBar({
                         <>
                           {/* Agent placeholder - matches exact structure */}
                           <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                            <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                              <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                            <div className="flex items-center -space-x-1.5">
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
                               </Avatar>
-                              <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
+                              </Avatar>
+                              <span className="sr-only">Loading participants</span>
                             </div>
                           </div>
                           {/* Separator and updated text - exact match */}
@@ -821,9 +825,7 @@ export function ConversationSummaryBar({
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
               <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">
-                  {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
-                </span>
+                <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}
                   <div className="flex items-baseline gap-2 min-w-0 w-full">

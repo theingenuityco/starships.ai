@@ -192,6 +192,24 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
   // (After first paint, we still allow live re-sorts as new notifications arrive.)
   const compactSortReady = Boolean((notifStream as any)?.isReady || (notifStream as any)?.isError) && Boolean(unreadByConversationId)
 
+  const compactLineSkeletonRows = useCallback((count: number) => {
+    const widths = ['w-24', 'w-28', 'w-20', 'w-32', 'w-16']
+    return (
+      <div className="space-y-0.5">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="rounded-lg flex items-center border border-transparent w-full h-7 px-1">
+            <div className="flex-shrink-0 w-3 h-3 rounded bg-muted/60" aria-hidden />
+            <div className="flex-1 min-w-0 ml-1">
+              <Skeleton className={cn('h-3 rounded', widths[i % widths.length])} />
+            </div>
+            {/* Optional trailing badge placeholder */}
+            {i % 4 === 0 ? <Skeleton className="ml-2 h-[14px] w-[18px] rounded-full" /> : null}
+          </div>
+        ))}
+      </div>
+    )
+  }, [])
+
   const toEpochMs = useCallback((v: unknown): number => {
     if (typeof v === 'number' && Number.isFinite(v)) return v
     if (typeof v === 'string') {
@@ -841,11 +859,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
   if (compact) {
     if (agentsLoading || membersLoading) {
       return (
-        <div className="space-y-0.5">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-8 w-full rounded-lg" />
-          ))}
-        </div>
+        <div className="space-y-0.5">{compactLineSkeletonRows(6)}</div>
       )
     }
 
@@ -914,19 +928,11 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
             {isChannelsExpanded ? (
               <div id="sidebar-channels-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                 {channelsLoading ? (
-                  <div className="space-y-0.5">
-                    {[1, 2].map(i => (
-                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                    ))}
-                  </div>
+                  compactLineSkeletonRows(4)
                 ) : channels.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
                 ) : !compactSortReady ? (
-                  <div className="space-y-0.5">
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                    ))}
-                  </div>
+                  compactLineSkeletonRows(6)
                 ) : (
                   <div className="space-y-0.5">
                     {channelsForCompactSidebar.map(ch => {
@@ -1161,16 +1167,12 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
             {isDirectMessagesExpanded ? (
               <div id="sidebar-direct-messages-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
-                {dmTargetsForCompactSidebar.length === 0 ? (
+                {!compactSortReady ? (
+                  compactLineSkeletonRows(6)
+                ) : dmTargetsForCompactSidebar.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
-                  </div>
-                ) : !compactSortReady ? (
-                  <div className="space-y-0.5">
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                    ))}
                   </div>
                 ) : (
                   <div className="space-y-0.5">{dmTargetsForCompactSidebar.map(t => renderCompactDmTarget(t))}</div>

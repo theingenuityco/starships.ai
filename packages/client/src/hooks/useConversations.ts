@@ -1574,8 +1574,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             if (diff > 10000) continue
           }
 
-          // Replace temp message with persisted message
-          messages[i] = withStreaming(msg, false)
+          // Replace temp message with persisted message.
+          // Preserve any identity fields we stamped onto the temp message in case the server echo is missing them
+          // (this prevents brief "unknown author" grouping flashes in the timeline).
+          const prevTemp = messages[i] as any
+          const merged: any = { ...prevTemp, ...msg, id: msg.id }
+          if (!merged.userId && prevTemp?.userId) merged.userId = prevTemp.userId
+          if (!merged.userName && prevTemp?.userName) merged.userName = prevTemp.userName
+          if (!merged.userAvatar && prevTemp?.userAvatar) merged.userAvatar = prevTemp.userAvatar
+          messages[i] = withStreaming(merged, false)
           return messages
         }
       }

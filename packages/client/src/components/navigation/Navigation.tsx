@@ -383,7 +383,14 @@ export function Navigation(props: NavigationProps) {
         onClick={handleSidebarBackgroundClick}
       >
         {/* Discord-style starship rail */}
-        {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
+        {isAuthenticated ? (
+          <StarshipRail
+            starships={railStarships}
+            activeSlug={activeStarshipSlug}
+            onSelect={handleStarshipSelect as any}
+            onCreate={() => router.push('/account')}
+          />
+        ) : null}
 
         <div
           className="flex flex-col transition-all duration-300 ease-in-out"

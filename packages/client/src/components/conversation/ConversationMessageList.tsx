@@ -1283,10 +1283,15 @@ export function ConversationMessageList({
   // User message "enter" animation:
   // animate only messages that are newly appended (not initial hydration, not history loads),
   // and keep a stable key across temp-user -> persisted replacement via `clientMessageId`.
-  const USER_ENTER_ANIM_MS = 140
   const enterSeenKeysRef = useRef<Set<string>>(new Set())
   const enterInitializedRef = useRef(false)
   const [enteringUserMessageKeys, setEnteringUserMessageKeys] = useState<Record<string, true>>({})
+  useEffect(() => {
+    // Reset per-conversation so switching conversations doesn't carry old "seen" keys.
+    enterSeenKeysRef.current = new Set()
+    enterInitializedRef.current = false
+    setEnteringUserMessageKeys({})
+  }, [conversationId, messagesOverride, pinnedFirstMessage])
   useEffect(() => {
     // Don't animate the initial load (or re-hydration).
     if (isHydratingInitialMessages) return
@@ -1334,20 +1339,6 @@ export function ConversationMessageList({
       for (const k of newlyEntering) next[k] = true
       return next
     })
-    const t = window.setTimeout(() => {
-      setEnteringUserMessageKeys(prev => {
-        let changed = false
-        const next = { ...prev }
-        for (const k of newlyEntering) {
-          if (next[k]) {
-            delete next[k]
-            changed = true
-          }
-        }
-        return changed ? next : prev
-      })
-    }, USER_ENTER_ANIM_MS + 40)
-    return () => window.clearTimeout(t)
   }, [isHydratingInitialMessages, renderMessages])
 
   const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
@@ -3000,7 +2991,7 @@ const MemoizedMessageBubble = memo(
       const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
 
       return (
-        <div className="flex justify-start w-full">
+        <div className={cn('flex justify-start w-full', animateUserEnter && 'ss-user-message-enter')}>
           <div
             className={cn(
               // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)

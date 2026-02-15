@@ -1034,8 +1034,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const authedUserId = typeof userId === 'string' ? userId.trim() : ''
             const authedUserName = typeof userName === 'string' ? userName.trim() : typeof userEmail === 'string' ? userEmail.trim() : ''
             const authedUserAvatar = typeof userAvatar === 'string' ? userAvatar.trim() : ''
+            const clientMessageId = generateId()
             const tempUser: any = {
               id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              clientMessageId,
               role: 'user',
               content: contentToSend,
               createdAt: now,
@@ -2458,12 +2460,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div
-            className={cn(
-              'flex relative gap-2',
-              minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5'
-            )}
-          >
+          <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -2562,13 +2559,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             {/* Right-side Action Buttons Container */}
             <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
               {/* Secondary actions (mobile: fade back while typing/focused) */}
-              <div
-                className={cn(
-                  'flex items-center gap-2 transition-opacity duration-200',
-                  isMobileComposerEngaged && 'opacity-30',
-                  'sm:opacity-100'
-                )}
-              >
+              <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
                 {/* Web Browsing Toggle Button - Available from the start */}
                 <button
                   onClick={() => {
@@ -2650,12 +2641,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
           {/* Disclaimer: only show when an agent is tagged in the draft */}
           {draftHasAgentMention && (
-            <div
-              className={cn(
-                'border-t border-border/40 text-[11px] leading-snug text-muted-foreground',
-                minimal ? 'px-3 py-1' : 'px-3 py-1.5'
-              )}
-            >
+            <div className={cn('border-t border-border/40 text-[11px] leading-snug text-muted-foreground', minimal ? 'px-3 py-1' : 'px-3 py-1.5')}>
               Agents use AI and may make mistakes. Double-check important details before sending.
             </div>
           )}

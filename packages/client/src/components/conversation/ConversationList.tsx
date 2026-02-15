@@ -144,7 +144,8 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
     return pending || null
   }, [channelsData, currentChannelSlug, currentConversationId, pendingConversationId])
 
-  const { unread: notifUnread } = useNotificationsStream(starshipId, true, { activeConversationId: activeConversationIdForNotifications })
+  const notifStream = useNotificationsStream(starshipId, true, { activeConversationId: activeConversationIdForNotifications })
+  const notifUnread = notifStream.unread
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const { isUserOnline } = useStarshipPresence(starshipId, true)
@@ -185,6 +186,11 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
   const unreadByConversationId = (unreadMapData as any)?.unreadByConversationId as
     | Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }>
     | undefined
+
+  // Prevent a brief "wrong order" flash on reload: wait until both unread state and
+  // initial notification snapshot are ready before rendering the sorted lists.
+  // (After first paint, we still allow live re-sorts as new notifications arrive.)
+  const compactSortReady = Boolean((notifStream as any)?.isReady || (notifStream as any)?.isError) && Boolean(unreadByConversationId)
 
   const toEpochMs = useCallback((v: unknown): number => {
     if (typeof v === 'number' && Number.isFinite(v)) return v
@@ -915,6 +921,12 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   </div>
                 ) : channels.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
+                ) : !compactSortReady ? (
+                  <div className="space-y-0.5">
+                    {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                    ))}
+                  </div>
                 ) : (
                   <div className="space-y-0.5">
                     {channelsForCompactSidebar.map(ch => {
@@ -1153,6 +1165,12 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                  </div>
+                ) : !compactSortReady ? (
+                  <div className="space-y-0.5">
+                    {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                    ))}
                   </div>
                 ) : (
                   <div className="space-y-0.5">{dmTargetsForCompactSidebar.map(t => renderCompactDmTarget(t))}</div>

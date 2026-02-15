@@ -431,7 +431,7 @@ export function Navigation(props: NavigationProps) {
                   >
                     {starshipMonogram(starshipData?.name || 'Starships.ai')}
                   </span>
-                  <span className="block min-w-0 flex-1 text-[13px] font-medium tracking-tight leading-snug truncate">
+                  <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">
                     {starshipData?.name || 'Starships.ai'}
                   </span>
                 </motion.div>

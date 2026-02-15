@@ -222,6 +222,9 @@ export function useNotificationsStream(
     return null
   }, [chunks.length, starshipId])
 
+  // Used by UIs that need stable first-paint ordering (e.g. sidebar sorting).
+  const isReady = Boolean(snapshot)
+
   const pageInfo = useMemo(() => {
     // Last-write-wins from snapshot + load-older pages.
     let hasMoreBefore = Boolean(snapshot?.hasMoreBefore)
@@ -581,6 +584,7 @@ export function useNotificationsStream(
   return {
     notifications,
     unread,
+    isReady,
     isLoading: q.isLoading,
     isFetching: q.fetchStatus === 'fetching',
     isError: q.isError,
@@ -647,7 +651,12 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
     queryKey: starshipId ? [...NOTIFICATION_QUERY_KEYS.byStarship(starshipId), 'unread', stableIds.join('|')] : (['__noop__'] as const),
     enabled: Boolean(starshipId && enabled && stableIds.length > 0),
     retry: (failureCount, error) => shouldRetry(error, failureCount),
-    queryFn: async (): Promise<{ unreadByConversationId: Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }> }> => {
+    queryFn: async (): Promise<{
+      unreadByConversationId: Record<
+        string,
+        { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }
+      >;
+    }> => {
       const sid = String(starshipId || '')
       try {
         const resp = await api.post(`/api/v1/starships/${sid}/unread`, { conversationIds: stableIds })
@@ -658,7 +667,10 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
         const map = payload?.unreadByConversationId
         const unreadByConversationId =
           map && typeof map === 'object' && !Array.isArray(map)
-            ? (map as Record<string, { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null }>)
+            ? (map as Record<
+                string,
+                { hasUnread: boolean; lastMessageAt: string | null; lastReadAt: string | null; lastActivityAt: string | null }
+              >)
             : {}
         return { unreadByConversationId }
       } catch (e) {

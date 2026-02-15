@@ -21,18 +21,7 @@ interface NavigationItemProps {
   onItemClick?: () => void
 }
 
-export function NavigationItem({
-  href,
-  label,
-  icon,
-  isActive,
-  badgeCount,
-  showLabels = false,
-  expanded = false,
-  onClick,
-  special = false,
-  onItemClick,
-}: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, badgeCount, showLabels = false, expanded = false, onClick, special = false, onItemClick }: NavigationItemProps) {
   const router = useRouter()
 
   const hasBadge = typeof badgeCount === 'number' && Number.isFinite(badgeCount) && badgeCount > 0
@@ -109,11 +98,7 @@ export function NavigationItem({
             {badgeCount > 99 ? '99+' : String(badgeCount)}
           </span>
         ) : (
-          <span
-            className="pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm"
-            aria-label={badgeLabel}
-            title={badgeLabel}
-          />
+          <span className="pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm" aria-label={badgeLabel} title={badgeLabel} />
         )
       ) : null}
       <AnimatePresence mode="wait">

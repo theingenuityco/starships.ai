@@ -135,7 +135,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     },
     ref
   ) => {
-    const { userId, isInstanceAdmin } = useAuth()
+    const { userId, userName, userEmail, userAvatar, isInstanceAdmin } = useAuth()
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -1031,6 +1031,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!shouldPersistOnly) {
           try {
             const now = new Date().toISOString()
+            const authedUserId = typeof userId === 'string' ? userId.trim() : ''
+            const authedUserName = typeof userName === 'string' ? userName.trim() : typeof userEmail === 'string' ? userEmail.trim() : ''
+            const authedUserAvatar = typeof userAvatar === 'string' ? userAvatar.trim() : ''
             const tempUser: any = {
               id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               role: 'user',
@@ -1038,6 +1041,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               createdAt: now,
               updatedAt: now,
               messageType: 'user_input',
+              ...(authedUserId ? { userId: authedUserId } : null),
+              ...(authedUserName ? { userName: authedUserName } : null),
+              ...(authedUserAvatar ? { userAvatar: authedUserAvatar } : null),
               ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
             }
             // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.

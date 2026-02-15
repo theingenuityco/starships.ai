@@ -617,9 +617,7 @@ export function ConversationSummaryBar({
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">
-                    {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
-                  </span>
+                  <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
                     <div className="flex items-baseline gap-2 min-w-0 w-full">
@@ -821,9 +819,7 @@ export function ConversationSummaryBar({
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
               <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">
-                  {mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}
-                </span>
+                <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}
                   <div className="flex items-baseline gap-2 min-w-0 w-full">

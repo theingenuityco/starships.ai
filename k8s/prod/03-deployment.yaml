@@ -236,11 +236,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
-            - name: USERBACK_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: USERBACK_TOKEN
             - name: POSTHOG_KEY
               valueFrom:
                 secretKeyRef:

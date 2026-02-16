@@ -7,10 +7,6 @@ export type PublicEnvConfig = {
    */
   GA_MEASUREMENT_ID: string;
   /**
-   * Userback widget token (public).
-   */
-  USERBACK_TOKEN: string;
-  /**
    * PostHog project API key (public).
    * We still recommend reading it server-side and passing it down,
    * but it is not a secret.
@@ -49,7 +45,6 @@ export function getPublicEnvConfig(): PublicEnvConfig {
     PUBLIC_URL: readEnv('PUBLIC_URL'),
     ENABLE_INDEXING: readEnv('ENABLE_INDEXING'),
     GA_MEASUREMENT_ID: readEnv('GA_MEASUREMENT_ID'),
-    USERBACK_TOKEN: readEnv('USERBACK_TOKEN'),
     POSTHOG_KEY: readEnv('POSTHOG_KEY'),
     POSTHOG_HOST: readEnv('POSTHOG_HOST'),
     VAPID_PUBLIC_KEY: readEnv('VAPID_PUBLIC_KEY'),

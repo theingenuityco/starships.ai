@@ -5,7 +5,6 @@ import { SentryWrapper } from '@/components/sentry-wrapper'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { UserbackWrapper } from '@/components/userback-wrapper'
 import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
@@ -18,6 +17,11 @@ import Script from 'next/script'
 import { Toaster as SonnerToaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
+
+// Userback previously forced dynamic rendering via `connection()` inside `UserbackWrapper`.
+// Keep the same runtime rendering behavior after removing Userback to avoid build-time prerender
+// failures from client-only hooks like `useSearchParams()` in global UI handlers.
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
@@ -113,15 +117,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <FaviconThemeSync />
               <AuthUserHtmlClassSync />
-              <UserbackWrapper>
-                <TooltipProvider>
-                  <div className="min-h-[100dvh] bg-background">
-                    <ClientLayout>{children}</ClientLayout>
-                    <Toaster />
-                    <SonnerToaster position="top-center" />
-                  </div>
-                </TooltipProvider>
-              </UserbackWrapper>
+              <TooltipProvider>
+                <div className="min-h-[100dvh] bg-background">
+                  <ClientLayout>{children}</ClientLayout>
+                  <Toaster />
+                  <SonnerToaster position="top-center" />
+                </div>
+              </TooltipProvider>
               <AnalyticsProvider />
             </AuthProvider>
           </QueryProvider>

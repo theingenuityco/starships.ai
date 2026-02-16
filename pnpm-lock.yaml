@@ -281,9 +281,6 @@ importers:
       '@tiptap/suggestion':
         specifier: ^3.7.2
         version: 3.7.2(@tiptap/core@3.7.2(@tiptap/pm@3.7.2))(@tiptap/pm@3.7.2)
-      '@userback/widget':
-        specifier: ^0.3.11
-        version: 0.3.11
       '@xyflow/react':
         specifier: ^12.8.6
         version: 12.8.6(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -5052,9 +5049,6 @@ packages:
     resolution: {integrity: sha512-Yy19y6O2GJq8f7CHf7L0nxL8bf4PZCPaVOCgJrusOeFHY1LvHgYXnmnXg6N5iwAnbgbZCDjo60SiM6IPJi9C5g==}
     peerDependencies:
       react: '>= 16.8.0'
-
-  '@userback/widget@0.3.11':
-    resolution: {integrity: sha512-gVOob+0EFzgpG3pqj9yBmvONo6xjwRhkWyFjDLD8U6YQmbnMpXvHIsvLLReaXfMeVWSWApCVt79jIXmpgoM2CQ==}
 
   '@webassemblyjs/ast@1.14.1':
     resolution: {integrity: sha512-nuBEDgQfm1ccRp/8bCQrx1frohyufl4JlbMMZ4P1wpeOfDhF6FQkxZJ1b/e+PLwr6X1Nhw6OLme5usuBWYBvuQ==}
@@ -16594,8 +16588,6 @@ snapshots:
     dependencies:
       '@use-gesture/core': 10.3.1
       react: 19.2.4
-
-  '@userback/widget@0.3.11': {}
 
   '@webassemblyjs/ast@1.14.1':
     dependencies:

@@ -27,7 +27,9 @@ export default async function ExplorePage(props: PageProps) {
   const searchParams = (await props.searchParams) ?? {}
   const tabRaw = searchParams?.tab
   const tab = typeof tabRaw === 'string' ? tabRaw : Array.isArray(tabRaw) ? tabRaw[0] : ''
-  const t = String(tab || '').trim().toLowerCase()
+  const t = String(tab || '')
+    .trim()
+    .toLowerCase()
 
   // Back-compat: old links used `?tab=...`. Prefer redirecting to the new route segments.
   if (t === 'agents' || t === 'tools' || t === 'connectors') {
@@ -56,4 +58,3 @@ export default async function ExplorePage(props: PageProps) {
     />
   )
 }
-

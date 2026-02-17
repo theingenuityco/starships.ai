@@ -5,22 +5,9 @@ function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
-function firstHeaderValue(value: string | null): string {
-  return String(value || '')
-    .split(',')[0]
-    ?.trim()
-}
-
-function getBaseUrlFromRequest(req: Request): string {
+function getConfiguredBaseUrl(): string {
   const configured = trimTrailingSlashes(String(publicEnvConfig.PUBLIC_URL || '').trim())
-  if (configured) return configured
-
-  const rawHost = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
-  const host = rawHost.startsWith('www.') ? rawHost.slice(4) : rawHost
-  if (!host) return ''
-
-  const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'
-  return trimTrailingSlashes(`${proto}://${host}`)
+  return configured || 'https://starships.ai'
 }
 
 function xmlEscape(value: string): string {
@@ -48,16 +35,15 @@ function toIsoDate(value: Date): string {
  *
  * This endpoint returns a sitemap index pointing to each app's sitemap.
  */
-// Sitemaps are small and correctness matters more than caching.
-// In container/K8s deployments, filesystem-based ISR can be inconsistent across pods/restarts.
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-static'
+export const revalidate = 86400 // 24 hours
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   if (!isIndexingEnabled()) {
     return new Response('Not Found', { status: 404 })
   }
 
-  const publicUrl = getBaseUrlFromRequest(req)
+  const publicUrl = getConfiguredBaseUrl()
   const now = new Date()
 
   // Important: In K8s ingress, `/docs/*` routes to the docs service.
@@ -76,7 +62,7 @@ export async function GET(req: Request) {
   return new Response(body, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'no-store',
+      'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400',
     },
   })
 }

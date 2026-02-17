@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { MobileNavProvider } from '@/components/navigation/MobileNavContext'
+import { Suspense } from 'react'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -194,7 +195,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return (
       <div className="h-full w-full">
         <NotificationSoundBootstrap />
-        <EmailChangeToastHandler />
+        <Suspense fallback={null}>
+          <EmailChangeToastHandler />
+        </Suspense>
         {children}
       </div>
     )
@@ -206,7 +209,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <JwtAuthGate>
         <StarTheme>
           <NotificationSoundBootstrap />
+        <Suspense fallback={null}>
           <EmailChangeToastHandler />
+        </Suspense>
           <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
             <main className="relative min-h-full w-full">{children}</main>
           </div>

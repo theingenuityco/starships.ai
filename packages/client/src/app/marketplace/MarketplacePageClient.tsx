@@ -176,11 +176,28 @@ export default function MarketplacePageClient(props: {
 
   const countsByTab = useMemo(() => {
     // Counts should reflect total available in each tab; the 9-item cap only affects the "All" tab display sections.
-    const agents = shouldUseServerSearch ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length) : (initialTotals?.agents ?? agentsMatchingSearch.length)
-    const tools = shouldUseServerSearch ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length) : (initialTotals?.tools ?? toolsMatchingSearch.length)
+    // IMPORTANT:
+    // Only trust `initialTotals` when the page also shipped server-provided initial lists.
+    // If server rendering failed to fetch (e.g. ISR build can't reach API), the client will
+    // fetch templates successfully — but `initialTotals` would be 0 and we'd incorrectly
+    // render "No results" forever.
+    const agents = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
+      : useServerInitialAgents
+        ? (initialTotals?.agents ?? agentsMatchingSearch.length)
+        : agentsMatchingSearch.length
+
+    const tools = shouldUseServerSearch
+      ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
+      : useServerInitialTools
+        ? (initialTotals?.tools ?? toolsMatchingSearch.length)
+        : toolsMatchingSearch.length
+
     const connectorsRaw = shouldUseServerSearch
       ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
-      : (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+      : useServerInitialConnectors
+        ? (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+        : connectorsMatchingSearch.length
     const connectors = excludeInternalStarshipsConnectorFromTotal(connectorsRaw)
     return {
       all: agents + tools + connectors,
@@ -199,6 +216,9 @@ export default function MarketplacePageClient(props: {
     serverSearch.data?.totals?.tools,
     serverSearch.data?.totals?.connectors,
     shouldUseServerSearch,
+    useServerInitialAgents,
+    useServerInitialTools,
+    useServerInitialConnectors,
   ])
 
   const pagination = props.pagination

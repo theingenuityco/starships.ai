@@ -6,22 +6,9 @@ function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
-function firstHeaderValue(value: string | null): string {
-  return String(value || '')
-    .split(',')[0]
-    ?.trim()
-}
-
-function getBaseUrlFromRequest(req: Request): string {
+function getConfiguredBaseUrl(): string {
   const configured = trimTrailingSlashes(String(publicEnvConfig.PUBLIC_URL || '').trim())
-  if (configured) return configured
-
-  const rawHost = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
-  const host = rawHost.startsWith('www.') ? rawHost.slice(4) : rawHost
-  if (!host) return ''
-
-  const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'
-  return trimTrailingSlashes(`${proto}://${host}`)
+  return configured || 'https://starships.ai'
 }
 
 function xmlEscape(value: string): string {
@@ -52,9 +39,9 @@ function joinUrl(base: string, path: string): string {
   return `${base}${p === '/' ? '' : p}`
 }
 
-// Keep the app sitemap always fresh in container deployments.
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// Sitemaps should be static + cached (refreshed via ISR).
+export const dynamic = 'force-static'
+export const revalidate = 86400 // 24 hours
 
 /**
  * App sitemap (public-facing pages only).
@@ -66,7 +53,7 @@ export async function GET(req: Request) {
     return new Response('Not Found', { status: 404 })
   }
 
-  const base = normalizeSiteUrl(getBaseUrlFromRequest(req))
+  const base = normalizeSiteUrl(getConfiguredBaseUrl())
   const now = new Date()
 
   // Fetch all agent slugs in pages (avoid assuming the list endpoint returns everything).
@@ -76,7 +63,7 @@ export async function GET(req: Request) {
   let agentTotal = 0
 
   for (let page = 1; page <= MAX_AGENT_PAGES; page++) {
-    const bundle = await fetchPublicAgentTemplatesPage({ page, limit: AGENT_PAGE_SIZE, revalidateSeconds: 0 })
+    const bundle = await fetchPublicAgentTemplatesPage({ page, limit: AGENT_PAGE_SIZE, revalidateSeconds: revalidate })
     if (page === 1) agentTotal = bundle.pagination.total
     for (const t of bundle.items) {
       const slug = String(t?.slug || '').trim()
@@ -96,8 +83,8 @@ export async function GET(req: Request) {
   // Keep this bounded so we don't emit enormous sitemaps.
   const LISTING_PAGE_SIZE = 18
   const MAX_LISTING_PAGES = 25
-  const toolsCount = await fetchPublicToolTemplatesPage({ page: 1, limit: 1, revalidateSeconds: 0 })
-  const connectorsCount = await fetchPublicConnectorCatalogPage({ page: 1, limit: 1, revalidateSeconds: 0 })
+  const toolsCount = await fetchPublicToolTemplatesPage({ page: 1, limit: 1, revalidateSeconds: revalidate })
+  const connectorsCount = await fetchPublicConnectorCatalogPage({ page: 1, limit: 1, revalidateSeconds: revalidate })
 
   const toolsTotal = toolsCount.pagination.total
   const connectorsTotal = connectorsCount.pagination.total
@@ -162,7 +149,7 @@ export async function GET(req: Request) {
   return new Response(body, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'no-store',
+      'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400',
     },
   })
 }

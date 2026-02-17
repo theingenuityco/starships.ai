@@ -1,37 +1,24 @@
 import { isIndexingEnabled } from '@/lib/indexing'
-import { getPublicEnvConfig } from '@starships/env/public'
+import { publicEnvConfig } from '@starships/env/public'
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-static'
+export const revalidate = 86400 // 24 hours
 
 function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
-}
-
-function firstHeaderValue(value: string | null): string {
-  return String(value || '')
-    .split(',')[0]
-    ?.trim()
-}
-
-function getBaseUrlFromRequest(req: Request, configuredPublicUrl: string): string {
-  const configured = trimTrailingSlashes(String(configuredPublicUrl || '').trim())
-  if (configured) return configured
-
-  const rawHost = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
-  const host = rawHost.startsWith('www.') ? rawHost.slice(4) : rawHost
-  if (!host) return ''
-
-  const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'
-  return trimTrailingSlashes(`${proto}://${host}`)
 }
 
 function toRobotsTxt(lines: string[]): string {
   return `${lines.join('\n')}\n`
 }
 
-export async function GET(req: Request): Promise<Response> {
-  const { PUBLIC_URL } = getPublicEnvConfig()
-  const publicUrl = getBaseUrlFromRequest(req, PUBLIC_URL)
+function getConfiguredPublicUrl(): string {
+  const configured = trimTrailingSlashes(String(publicEnvConfig.PUBLIC_URL || '').trim())
+  return configured || 'https://starships.ai'
+}
+
+export async function GET(_req: Request): Promise<Response> {
+  const publicUrl = getConfiguredPublicUrl()
   const indexingEnabled = isIndexingEnabled()
 
   // Default OFF for safety; enable explicitly per environment.
@@ -39,8 +26,7 @@ export async function GET(req: Request): Promise<Response> {
     return new Response(toRobotsTxt(['User-agent: *', 'Disallow: /', `Host: ${publicUrl}`]), {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
-        // Avoid CDN/edge caching surprises when toggling indexing.
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400',
       },
     })
   }
@@ -63,8 +49,7 @@ export async function GET(req: Request): Promise<Response> {
     {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
-        // Avoid CDN/edge caching surprises when toggling indexing.
-        'Cache-Control': 'no-store',
+        'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=86400',
       },
     }
   )

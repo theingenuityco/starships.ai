@@ -15,13 +15,9 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
 import { Toaster as SonnerToaster } from 'sonner'
+import { Suspense } from 'react'
 
 const inter = Inter({ subsets: ['latin'] })
-
-// Userback previously forced dynamic rendering via `connection()` inside `UserbackWrapper`.
-// Keep the same runtime rendering behavior after removing Userback to avoid build-time prerender
-// failures from client-only hooks like `useSearchParams()` in global UI handlers.
-export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
@@ -119,12 +115,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <AuthUserHtmlClassSync />
               <TooltipProvider>
                 <div className="min-h-[100dvh] bg-background">
-                  <ClientLayout>{children}</ClientLayout>
+                  <Suspense fallback={<div className="min-h-[100dvh] bg-background" />}>
+                    <ClientLayout>{children}</ClientLayout>
+                  </Suspense>
                   <Toaster />
                   <SonnerToaster position="top-center" />
                 </div>
               </TooltipProvider>
-              <AnalyticsProvider />
+              <Suspense fallback={null}>
+                <AnalyticsProvider />
+              </Suspense>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

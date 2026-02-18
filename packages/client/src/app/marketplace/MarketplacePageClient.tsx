@@ -181,21 +181,24 @@ export default function MarketplacePageClient(props: {
     // If server rendering failed to fetch (e.g. ISR build can't reach API), the client will
     // fetch templates successfully — but `initialTotals` would be 0 and we'd incorrectly
     // render "No results" forever.
+    const shouldTrustInitialTotals =
+      !!initialTotals && (useServerInitialAgents || useServerInitialTools || useServerInitialConnectors)
+
     const agents = shouldUseServerSearch
       ? (serverSearch.data?.totals?.agents ?? agentsMatchingSearch.length)
-      : useServerInitialAgents
+      : shouldTrustInitialTotals
         ? (initialTotals?.agents ?? agentsMatchingSearch.length)
         : agentsMatchingSearch.length
 
     const tools = shouldUseServerSearch
       ? (serverSearch.data?.totals?.tools ?? toolsMatchingSearch.length)
-      : useServerInitialTools
+      : shouldTrustInitialTotals
         ? (initialTotals?.tools ?? toolsMatchingSearch.length)
         : toolsMatchingSearch.length
 
     const connectorsRaw = shouldUseServerSearch
       ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
-      : useServerInitialConnectors
+      : shouldTrustInitialTotals
         ? (initialTotals?.connectors ?? connectorsMatchingSearch.length)
         : connectorsMatchingSearch.length
     const connectors = excludeInternalStarshipsConnectorFromTotal(connectorsRaw)

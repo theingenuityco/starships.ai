@@ -386,6 +386,11 @@ export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
 
 export interface AdminConnectorTemplateListResponse {
   connectors: ConnectorTemplateModel[];
+  /**
+   * Total number of connector templates.
+   * Included to support reliable pagination/hasMore calculations if the UI paginates client-side.
+   */
+  total: number;
 }
 
 export interface AdminConnectorTemplateResponse {
@@ -470,6 +475,11 @@ export interface AdminConnectorTemplateActionsListResponse {
   actions: ConnectorTemplateActionSummary[];
   limit: number;
   offset: number;
+  /**
+   * Total number of matching actions (ignores pagination).
+   * Used for reliable pagination/hasMore calculations.
+   */
+  total: number;
   q?: string;
 }
 

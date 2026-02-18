@@ -1031,6 +1031,26 @@ export class ConversationService {
       }
     }
 
+    // Threads: mark as needing a one-time AI title generation.
+    // We intentionally do NOT infer "placeholder" vs "real" title from the title string.
+    // Instead, we set an explicit state flag at thread creation time and consume it on the
+    // first real user message in that thread.
+    if (conversation.parentConversationId) {
+      try {
+        const updated = await this.conversationRepository.mergeState(conversation.id, {
+          autoTitle: { status: 'pending', kind: 'thread', requestedAt: new Date().toISOString() },
+        });
+        if (updated) conversation = updated;
+      } catch (e) {
+        // Best-effort only: failure to mark pending auto-title must not block thread creation.
+        console.warn('[createConversation] Failed to mark thread autoTitle pending', {
+          error: e instanceof Error ? e.message : String(e),
+          conversationId: conversation.id,
+          parentConversationId: conversation.parentConversationId,
+        });
+      }
+    }
+
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
@@ -2019,18 +2039,28 @@ export class ConversationService {
     try {
       const convo = await this.getConversationById(data.conversationId);
       if (convo) {
-        const t = (convo.title || '').trim().toLowerCase();
-        // Titles that are just placeholders should be replaced by an LLM-generated title
-        // on the first real user message.
-        const needs =
-          !t ||
-          t === 'new conversation' ||
-          t === 'new thread' ||
-          t.startsWith('chat with ') ||
-          t.startsWith('thread:') ||
-          t.startsWith('thread ');
+        const isThread = Boolean(convo.parentConversationId);
 
-        if (needs) {
+        const stateObj: Record<string, unknown> | null =
+          convo.state && typeof convo.state === 'object' && !Array.isArray(convo.state) ? (convo.state as Record<string, unknown>) : null;
+        const autoTitleRaw = stateObj?.autoTitle;
+        const autoTitle: Record<string, unknown> | null =
+          autoTitleRaw && typeof autoTitleRaw === 'object' && !Array.isArray(autoTitleRaw)
+            ? (autoTitleRaw as Record<string, unknown>)
+            : null;
+        const autoTitleStatus = typeof autoTitle?.status === 'string' ? autoTitle.status : '';
+        const autoTitleKind = typeof autoTitle?.kind === 'string' ? autoTitle.kind : '';
+        const threadAutoTitlePending = Boolean(isThread && autoTitleStatus === 'pending' && autoTitleKind === 'thread');
+
+        const isRealUserMessage = data.role === 'user' && data.messageType === 'user_input';
+
+        const rawTitle = (convo.title || '').trim();
+        const t = rawTitle.toLowerCase();
+        const needsConversationTitle = !isThread && (!t || t === 'new conversation' || t.startsWith('chat with '));
+
+        const shouldGenerate = (threadAutoTitlePending && isRealUserMessage) || (needsConversationTitle && isRealUserMessage);
+
+        if (shouldGenerate) {
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
@@ -2038,6 +2068,21 @@ export class ConversationService {
               const raw = gen.trim();
               const normalized = convo.parentConversationId ? ConversationService.ensureThreadTitlePrefix(raw) : raw;
               await this.conversationRepository.update(convo.id, { title: normalized, updatedAt: new Date().toISOString() });
+
+              // Mark thread title generation as consumed so it only runs once.
+              if (threadAutoTitlePending) {
+                try {
+                  await this.conversationRepository.mergeState(convo.id, {
+                    autoTitle: { status: 'generated', kind: 'thread', generatedAt: new Date().toISOString() },
+                  });
+                } catch (e) {
+                  console.warn('[TITLE] Failed to persist autoTitle generated flag', {
+                    error: e instanceof Error ? e.message : String(e),
+                    conversationId: convo.id,
+                  });
+                }
+              }
+
               try {
                 await this.uiActions.publish(convo.id, {
                   action: 'conversation_title_updated',

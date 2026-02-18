@@ -2116,6 +2116,100 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
 });
 
 /**
+ * GET /conversations/:conversationId/agents - Get agents linked to a conversation
+ *
+ * This is a lightweight alternative to hitting `/conversations/:id/messages` just to obtain `agents`.
+ */
+router.get('/conversations/:conversationId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+    const { conversationId } = paramValidation;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+
+    const agents = await conversationService.getConversationAgents(conversationId);
+    sendSuccess(res, { conversationId, agents }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching conversation agents');
+  }
+});
+
+/**
+ * GET /conversations/:conversationId/linked-message - Find the message that links to a child conversation
+ *
+ * Query:
+ * - linkedConversationId: child conversation id
+ */
+router.get('/conversations/:conversationId/linked-message', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+    const { conversationId } = paramValidation;
+
+    const queryValidation = validateData(z.object({ linkedConversationId: IdSchema }), req.query, res, 'linked message query');
+    if (!queryValidation) return;
+    const linkedConversationId = String((queryValidation as any).linkedConversationId);
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+
+    const messageService = new MessageService();
+    const message = await messageService.getLinkingMessage({ conversationId, linkedConversationId });
+    sendSuccess(res, { conversationId, linkedConversationId, message }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching linked message');
+  }
+});
+
+/**
  * GET /conversations/:conversationId/children - Get child conversations for a parent
  *
  * Used by the client to detect pending tool approvals in child conversations after reload,

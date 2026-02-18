@@ -248,6 +248,13 @@ export class MessageService {
   }
 
   /**
+   * Find the message in a parent conversation that links to a child conversation (thread/index post).
+   */
+  async getLinkingMessage(args: { conversationId: string; linkedConversationId: string }): Promise<MessageModel | null> {
+    return this.messageRepository.findLinkingMessage(args);
+  }
+
+  /**
    * Update message
    */
   // Removed duplicate updateMessage method that restricted updates to content only

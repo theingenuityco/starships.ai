@@ -225,7 +225,7 @@ function LinkedConversationCard({
     enabled: Boolean(linkedConversationId),
     queryFn: async () => {
       if (!linkedConversationId) return null
-      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 50 } })
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 10 } })
       return (resp as any)?.data?.data ?? null
     },
     staleTime: 60_000,

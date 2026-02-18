@@ -925,9 +925,9 @@ export function useConversationAgents(conversationId: string | null) {
   return useQuery({
     queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: FetchResponse<ApiResponse<ConversationMessagesResponseData>> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit: 1, page: 1 }, // We only need agents, not all messages
-      })
+      const response: FetchResponse<ApiResponse<{ conversationId: string; agents: AgentModel[] }>> = await api.get(
+        `/api/v1/conversations/${conversationId}/agents`
+      )
       return response.data.data?.agents || []
     },
     enabled: !!conversationId,
@@ -2208,7 +2208,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
       setIsLoadingOlder(true)
       try {
-        const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 100)))
+        const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 30)))
         const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${convId}/messages`, {
           params: {
             limit,

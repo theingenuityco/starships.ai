@@ -58,6 +58,55 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Find the parent-conversation message that links to a child conversation (thread/index post).
+   *
+   * This is used by the client to hydrate "pinned first message" on refresh without fetching
+   * large pages of message history.
+   */
+  async findLinkingMessage(args: { conversationId: string; linkedConversationId: string }): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const conversationId = String(args.conversationId || '').trim();
+        const linkedConversationId = String(args.linkedConversationId || '').trim();
+        if (!conversationId || !linkedConversationId) return null;
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `
+            SELECT
+              m.*,
+              COALESCE(r.reactions, '{}'::jsonb) AS reactions
+            FROM messages m
+            LEFT JOIN (
+              SELECT
+                message_id,
+                jsonb_object_agg(emoji, user_ids) AS reactions
+              FROM (
+                SELECT
+                  message_id,
+                  emoji,
+                  jsonb_agg(user_id ORDER BY created_at ASC) AS user_ids
+                FROM message_reactions
+                GROUP BY message_id, emoji
+              ) per_emoji
+              GROUP BY message_id
+            ) r ON r.message_id = m.id
+            WHERE m.conversation_id = $1
+              AND m.linked_conversation_id = $2
+            ORDER BY m.created_at DESC, m.id DESC
+            LIMIT 1
+          `,
+          [conversationId, linkedConversationId]
+        );
+
+        return result ? fromDatabase(MessageEntity, result) : null;
+      },
+      'findLinkingMessage',
+      'Message'
+    );
+  }
+
   async findByRole(role: 'system' | 'user' | 'assistant', starshipId?: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {

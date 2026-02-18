@@ -370,6 +370,7 @@ router.get('/admin/connector-templates', async (req: Request, res: Response): Pr
 
     const payload: AdminConnectorTemplateListResponse = {
       connectors: templates.map(toTemplateSummary),
+      total: templates.length,
     };
 
     sendSuccess(res, payload);

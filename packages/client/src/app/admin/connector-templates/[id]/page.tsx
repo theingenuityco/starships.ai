@@ -105,13 +105,23 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   // Actions UI state
   const [actionsQuery, setActionsQuery] = useState('')
+  const [actionsLimit, setActionsLimit] = useState<number>(50)
+  const [actionsOffset, setActionsOffset] = useState<number>(0)
   const [selectedActionName, setSelectedActionName] = useState<string | null>(null)
   const [actionDraft, setActionDraft] = useState<Partial<ConnectorEndpointV2> | null>(null)
   const [actionParametersText, setActionParametersText] = useState('')
   const [actionMappingText, setActionMappingText] = useState('')
   const [actionResponseText, setActionResponseText] = useState('')
 
-  const { data: actionsResp } = useAdminConnectorTemplateActions(id, { q: actionsQuery, limit: 50, offset: 0 }, isAuthenticated && isInstanceAdmin)
+  const {
+    data: actionsResp,
+    isLoading: actionsLoading,
+    isFetching: actionsFetching,
+  } = useAdminConnectorTemplateActions(
+    id,
+    { q: actionsQuery, limit: actionsLimit, offset: actionsOffset },
+    isAuthenticated && isInstanceAdmin
+  )
   const { data: selectedAction } = useAdminConnectorTemplateAction(id, selectedActionName, isAuthenticated && isInstanceAdmin && !!selectedActionName)
   const { data: legacyEndpoints } = useAdminConnectorTemplateLegacyEndpoints(id, isAuthenticated && isInstanceAdmin)
 
@@ -172,6 +182,23 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
   const REQUEST_STYLES: RequestStyle[] = ['auto', 'query', 'json', 'form', 'multipart']
+
+  // Reset pagination when filters/page size change.
+  useEffect(() => {
+    setActionsOffset(0)
+  }, [actionsQuery, actionsLimit])
+
+  // If total shrinks (deletes / new filter), keep offset in range.
+  useEffect(() => {
+    if (!actionsResp) return
+    if (actionsResp.total <= 0) {
+      if (actionsOffset !== 0) setActionsOffset(0)
+      return
+    }
+    if (actionsOffset < actionsResp.total) return
+    const lastPageOffset = Math.max(0, Math.floor((actionsResp.total - 1) / actionsLimit) * actionsLimit)
+    if (lastPageOffset !== actionsOffset) setActionsOffset(lastPageOffset)
+  }, [actionsResp, actionsLimit, actionsOffset])
 
   const parseOptionalJsonObject = (label: string, text: string): Record<string, unknown> | undefined => {
     const trimmed = text.trim()
@@ -617,14 +644,76 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Search</label>
-                      <Input value={actionsQuery} onChange={e => setActionsQuery(e.target.value)} placeholder="Search by name, path, description" />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
+                      <div className="space-y-2 lg:col-span-2">
+                        <label className="text-sm font-medium">Search</label>
+                        <Input value={actionsQuery} onChange={e => setActionsQuery(e.target.value)} placeholder="Search by name, path, description" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Page size</label>
+                        <Select value={String(actionsLimit)} onValueChange={v => setActionsLimit(Number(v))}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select page size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[10, 25, 50, 100, 200].map(n => (
+                              <SelectItem key={n} value={String(n)}>
+                                {n}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch h-[65vh] lg:h-[70vh] min-h-0 overflow-hidden">
                       <div className="rounded-md border border-border/60 flex flex-col min-h-0 h-full">
-                        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60">{actionsResp?.actions?.length ? `${actionsResp.actions.length} actions` : 'No actions'}</div>
+                        <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60 flex items-center justify-between gap-2">
+                          <div className="min-w-0 truncate">
+                            {actionsLoading ? (
+                              'Loading actions…'
+                            ) : actionsResp ? (
+                              actionsResp.total > 0 ? (
+                                <>
+                                  Showing{' '}
+                                  <span className="font-mono">
+                                    {Math.min(actionsResp.total, actionsOffset + 1)}-{Math.min(actionsResp.total, actionsOffset + (actionsResp.actions?.length ?? 0))}
+                                  </span>{' '}
+                                  of <span className="font-mono">{actionsResp.total}</span>
+                                </>
+                              ) : (
+                                'No actions'
+                              )
+                            ) : (
+                              'No actions'
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {actionsFetching ? <Icon name="loading" className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => setActionsOffset((prev) => Math.max(0, prev - actionsLimit))}
+                              disabled={actionsLoading || actionsOffset <= 0}
+                            >
+                              <Icon name="chevron-left" className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => setActionsOffset((prev) => prev + actionsLimit)}
+                              disabled={
+                                actionsLoading ||
+                                !actionsResp ||
+                                (actionsOffset + (actionsResp.actions?.length ?? 0) >= actionsResp.total)
+                              }
+                            >
+                              <Icon name="chevron-right" className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
                         <div className="flex-1 min-h-0 overflow-auto divide-y divide-border/60">
                           {(actionsResp?.actions || []).map(a => (
                             <button

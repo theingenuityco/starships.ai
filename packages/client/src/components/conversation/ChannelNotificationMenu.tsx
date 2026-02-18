@@ -121,11 +121,11 @@ export function ChannelNotificationMenu(props: { channelId: string; starshipId: 
           title={`Notifications: ${label}`}
           disabled={mutation.isPending || q.isLoading || !channelId}
         >
-          <span className="relative inline-flex">
+          <span className="relative inline-flex h-4 w-4 items-center justify-center">
             <Icon
               name={iconName}
               weight={iconWeight as any}
-              className={cn('h-4 w-4', level === 'mute' ? 'text-red-500 dark:text-red-400' : null)}
+              className={cn('h-4 w-4', level === 'mute' && 'opacity-70')}
             />
             {hasUnread ? <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden /> : null}
           </span>

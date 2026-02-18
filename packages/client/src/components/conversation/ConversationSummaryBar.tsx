@@ -629,7 +629,6 @@ export function ConversationSummaryBar({
                       <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
                         <span className="opacity-50">{effectiveFallbackTitle}</span>
                       </h3>
-                      {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                     </div>
                     {/* Agents + updated row - exact structural match with same classes */}
                     <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
@@ -759,6 +758,7 @@ export function ConversationSummaryBar({
                     {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
                   </div>
                 </div>
+                  {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
               </div>
 
               {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
@@ -835,7 +835,6 @@ export function ConversationSummaryBar({
                       </span>
                     ) : null}
                     <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
-                    {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                   </div>
 
                   {/* Agents + updated row */}
@@ -948,6 +947,7 @@ export function ConversationSummaryBar({
 
                   {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
                 </div>
+                {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
               </div>
             </div>
 

@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useNotificationsList } from '@/hooks/useNotifications'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -37,8 +38,31 @@ async function updateLevel(channelId: string, level: ChannelNotificationLevel): 
   return next === 'all' || next === 'mentions' || next === 'mute' ? (next as ChannelNotificationLevel) : level
 }
 
-export function ChannelNotificationMenu(props: { channelId: string; className?: string }) {
+function getUnreadForConversation(unread: any, conversationId: string): number {
+  try {
+    const cid = String(conversationId || '').trim()
+    if (!cid) return 0
+    const u = unread && typeof unread === 'object' ? (unread as any) : null
+    const pick = (m: any): number => {
+      if (!m || typeof m !== 'object') return 0
+      const n = Number((m as any)[cid] ?? 0)
+      return Number.isFinite(n) ? n : 0
+    }
+    // Sum across all known notification kinds for this conversationId.
+    return (
+      pick(u.dmUnreadByConversationId) +
+      pick(u.mentionUnreadByConversationId) +
+      pick(u.reactionUnreadByConversationId) +
+      pick(u.channelUnreadByConversationId)
+    )
+  } catch {
+    return 0
+  }
+}
+
+export function ChannelNotificationMenu(props: { channelId: string; starshipId: string; className?: string }) {
   const channelId = String(props.channelId || '').trim()
+  const starshipId = String(props.starshipId || '').trim()
   const qc = useQueryClient()
 
   const q = useQuery({
@@ -66,12 +90,24 @@ export function ChannelNotificationMenu(props: { channelId: string; className?: 
     },
   })
 
+  const iconName = useMemo(() => {
+    if (level === 'all') return 'bell-ringing'
+    if (level === 'mute') return 'bell-slash'
+    return 'bell'
+  }, [level])
   const iconWeight = useMemo(() => (level === 'mute' ? 'regular' : 'bold'), [level])
   const label = useMemo(() => {
     if (level === 'all') return 'All messages'
     if (level === 'mute') return 'Muted'
     return 'Mentions only'
   }, [level])
+
+  const { data: notifList } = useNotificationsList(starshipId, Boolean(starshipId))
+  const unreadForThisChannel = useMemo(() => {
+    const unread = (notifList as any)?.unread ?? null
+    return getUnreadForConversation(unread, channelId)
+  }, [notifList, channelId])
+  const hasUnread = unreadForThisChannel > 0
 
   return (
     <DropdownMenu>
@@ -85,7 +121,14 @@ export function ChannelNotificationMenu(props: { channelId: string; className?: 
           title={`Notifications: ${label}`}
           disabled={mutation.isPending || q.isLoading || !channelId}
         >
-          <Icon name="bell" weight={iconWeight as any} className={cn('h-4 w-4', level === 'mute' && 'opacity-70')} />
+          <span className="relative inline-flex">
+            <Icon
+              name={iconName}
+              weight={iconWeight as any}
+              className={cn('h-4 w-4', level === 'mute' ? 'text-red-500 dark:text-red-400' : null)}
+            />
+            {hasUnread ? <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden /> : null}
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[220px]">

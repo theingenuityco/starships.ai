@@ -73,7 +73,7 @@ export function ForumChannelView(props: {
       <ConversationSummaryBar
         conversationId={props.channelConversationId}
         starshipId={props.starshipId}
-        titleRightSlot={<ChannelNotificationMenu channelId={props.channelConversationId} />}
+        titleRightSlot={<ChannelNotificationMenu channelId={props.channelConversationId} starshipId={props.starshipId} />}
         titlePrefix={
           <span className="relative inline-flex items-center justify-center h-4 w-4">
             <Icon name="hash" className="h-4 w-4" />

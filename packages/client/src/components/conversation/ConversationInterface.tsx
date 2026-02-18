@@ -964,7 +964,9 @@ export function ConversationInterface({
                 conversationId={currentConversationId}
                 starshipId={starshipId}
                 titleRightSlot={
-                  isChannelConversation && currentConversationId ? <ChannelNotificationMenu channelId={currentConversationId} /> : null
+                  isChannelConversation && currentConversationId ? (
+                    <ChannelNotificationMenu channelId={currentConversationId} starshipId={starshipId} />
+                  ) : null
                 }
                 titlePrefix={
                   isChannelConversation ? (

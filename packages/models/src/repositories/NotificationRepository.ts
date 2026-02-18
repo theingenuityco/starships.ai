@@ -63,7 +63,7 @@ export class NotificationRepository extends BaseRepository {
           `
           INSERT INTO notifications (starship_id, user_id, type, conversation_id, message_id)
           VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (user_id, type, message_id) WHERE message_id IS NOT NULL AND type IN ('dm', 'mention') DO NOTHING
+          ON CONFLICT (user_id, type, message_id) WHERE message_id IS NOT NULL AND type IN ('dm', 'mention', 'channel') DO NOTHING
           RETURNING *;
           `,
           [sid, uid, args.type, cid, mid]
@@ -180,13 +180,20 @@ export class NotificationRepository extends BaseRepository {
     dmUnreadByConversationId: Record<string, number>;
     mentionUnreadByConversationId: Record<string, number>;
     reactionUnreadByConversationId: Record<string, number>;
+    channelUnreadByConversationId: Record<string, number>;
   }> {
     return this.executeWithErrorHandling(
       async () => {
         const sid = String(args.starshipId || '').trim();
         const uid = String(args.userId || '').trim();
         if (!sid || !uid)
-          return { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} };
+          return {
+            totalUnread: 0,
+            dmUnreadByConversationId: {},
+            mentionUnreadByConversationId: {},
+            reactionUnreadByConversationId: {},
+            channelUnreadByConversationId: {},
+          };
 
         const conn = this.getConnection();
         const rows = await conn.query<{ type: string; conversation_id: string; n: number }>(
@@ -204,6 +211,7 @@ export class NotificationRepository extends BaseRepository {
         const dmUnreadByConversationId: Record<string, number> = {};
         const mentionUnreadByConversationId: Record<string, number> = {};
         const reactionUnreadByConversationId: Record<string, number> = {};
+        const channelUnreadByConversationId: Record<string, number> = {};
         let totalUnread = 0;
         for (const r of rows) {
           const cid = String(r.conversation_id || '');
@@ -213,8 +221,9 @@ export class NotificationRepository extends BaseRepository {
           if (r.type === 'dm') dmUnreadByConversationId[cid] = (dmUnreadByConversationId[cid] || 0) + n;
           if (r.type === 'mention') mentionUnreadByConversationId[cid] = (mentionUnreadByConversationId[cid] || 0) + n;
           if (r.type === 'reaction') reactionUnreadByConversationId[cid] = (reactionUnreadByConversationId[cid] || 0) + n;
+          if (r.type === 'channel') channelUnreadByConversationId[cid] = (channelUnreadByConversationId[cid] || 0) + n;
         }
-        return { totalUnread, dmUnreadByConversationId, mentionUnreadByConversationId, reactionUnreadByConversationId };
+        return { totalUnread, dmUnreadByConversationId, mentionUnreadByConversationId, reactionUnreadByConversationId, channelUnreadByConversationId };
       },
       'getUnreadCounts',
       'notifications',

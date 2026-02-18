@@ -89,6 +89,7 @@ function getNotificationSentence(args: { type: string; locationLabel: string }):
   const t = String(args.type || '')
   if (t === 'mention') return { title: `You were mentioned in ${args.locationLabel}`, iconName: 'tag' }
   if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
+  if (t === 'channel') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
   if (t === 'reaction') return { title: `Your message got a reaction in ${args.locationLabel}`, iconName: 'smiley' }
   return { title: 'New notification', iconName: 'bell' }
 }

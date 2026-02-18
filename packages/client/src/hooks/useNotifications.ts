@@ -16,6 +16,7 @@ type UnreadSummary = {
   dmUnreadByConversationId: Record<string, number>
   mentionUnreadByConversationId: Record<string, number>
   reactionUnreadByConversationId: Record<string, number>
+  channelUnreadByConversationId: Record<string, number>
 }
 
 export type NotificationsSnapshot = {
@@ -57,7 +58,7 @@ function shouldRetry(error: unknown, failureCount: number): boolean {
 function shouldPlayForNotification(n: NotificationModel): boolean {
   const typ = String((n as any)?.type || '')
   // Current UI treats only these as unread-notification types.
-  return typ === 'dm' || typ === 'mention' || typ === 'reaction'
+  return typ === 'dm' || typ === 'mention' || typ === 'reaction' || typ === 'channel'
 }
 
 function shouldAutoMarkReadForNotification(n: NotificationModel): boolean {
@@ -68,7 +69,7 @@ function shouldAutoMarkReadForNotification(n: NotificationModel): boolean {
   // Reactions are *directed* at the message author and are often what the user
   // is trying to notice while they're in the conversation, so we do not auto-mark
   // them read.
-  return typ === 'dm' || typ === 'mention'
+  return typ === 'dm' || typ === 'mention' || typ === 'channel'
 }
 
 export function useNotificationsStream(
@@ -245,13 +246,21 @@ export function useNotificationsStream(
 
   const unread = useMemo<UnreadSummary>(() => {
     // Start with snapshot unread, then apply state updates + append increments.
-    let base: UnreadSummary = snapshot?.unread ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {}, reactionUnreadByConversationId: {} }
+    let base: UnreadSummary =
+      snapshot?.unread ?? {
+        totalUnread: 0,
+        dmUnreadByConversationId: {},
+        mentionUnreadByConversationId: {},
+        reactionUnreadByConversationId: {},
+        channelUnreadByConversationId: {},
+      }
     // Copy so we can mutate safely
     let cur: UnreadSummary = {
       totalUnread: Number(base.totalUnread ?? 0) || 0,
       dmUnreadByConversationId: { ...(base.dmUnreadByConversationId ?? {}) },
       mentionUnreadByConversationId: { ...(base.mentionUnreadByConversationId ?? {}) },
       reactionUnreadByConversationId: { ...(base.reactionUnreadByConversationId ?? {}) },
+      channelUnreadByConversationId: { ...(base.channelUnreadByConversationId ?? {}) },
     }
     for (const ch of chunks) {
       const c: any = ch as any
@@ -262,17 +271,19 @@ export function useNotificationsStream(
           dmUnreadByConversationId: { ...(u.dmUnreadByConversationId ?? {}) },
           mentionUnreadByConversationId: { ...(u.mentionUnreadByConversationId ?? {}) },
           reactionUnreadByConversationId: { ...(u.reactionUnreadByConversationId ?? {}) },
+          channelUnreadByConversationId: { ...(u.channelUnreadByConversationId ?? {}) },
         }
       }
       if (c?.type === 'notification.append' && c?.data?.notification) {
         const n = c.data.notification as NotificationModel
         const cid = String((n as any).conversationId || '')
         const typ = String((n as any).type || '')
-        if (cid && (typ === 'dm' || typ === 'mention' || typ === 'reaction')) {
+        if (cid && (typ === 'dm' || typ === 'mention' || typ === 'reaction' || typ === 'channel')) {
           cur.totalUnread += 1
           if (typ === 'dm') cur.dmUnreadByConversationId[cid] = (cur.dmUnreadByConversationId[cid] || 0) + 1
           if (typ === 'mention') cur.mentionUnreadByConversationId[cid] = (cur.mentionUnreadByConversationId[cid] || 0) + 1
           if (typ === 'reaction') cur.reactionUnreadByConversationId[cid] = (cur.reactionUnreadByConversationId[cid] || 0) + 1
+          if (typ === 'channel') cur.channelUnreadByConversationId[cid] = (cur.channelUnreadByConversationId[cid] || 0) + 1
         }
       }
     }
@@ -622,6 +633,7 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
               dmUnreadByConversationId: {},
               mentionUnreadByConversationId: {},
               reactionUnreadByConversationId: {},
+              channelUnreadByConversationId: {},
             } as UnreadSummary),
         }
       } catch (e) {
@@ -635,6 +647,7 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
               dmUnreadByConversationId: {},
               mentionUnreadByConversationId: {},
               reactionUnreadByConversationId: {},
+              channelUnreadByConversationId: {},
             },
           }
         }

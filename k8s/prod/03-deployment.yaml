@@ -236,6 +236,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
+            - name: META_PIXEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: META_PIXEL_ID
             - name: POSTHOG_KEY
               valueFrom:
                 secretKeyRef:

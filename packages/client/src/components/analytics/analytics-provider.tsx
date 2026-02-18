@@ -2,6 +2,7 @@ import { GoogleAnalytics } from './google-analytics'
 import { GaPageView } from './ga-pageview'
 import { PostHogProvider } from './posthog-provider'
 import { getPublicEnvConfig } from '@starships/env/public'
+import { MetaPixelProvider } from './meta-pixel-provider'
 
 /**
  * Server Component that reads GA_MEASUREMENT_ID at runtime
@@ -16,6 +17,7 @@ export async function AnalyticsProvider() {
 
   return (
     <>
+      <MetaPixelProvider />
       {measurementId ? (
         <>
           <GoogleAnalytics measurementId={measurementId} />

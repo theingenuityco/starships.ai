@@ -507,6 +507,10 @@ router.get('/admin/connector-templates/:id/actions', async (req: Request, res: R
     }
 
     const actionRepo = new ConnectorTemplateActionRepository();
+    const total = await actionRepo.countActionRowsByTemplateId({
+      templateId: template.id,
+      q: query.q,
+    });
     const rows = await actionRepo.listActionRowsByTemplateId({
       templateId: template.id,
       limit: query.limit,
@@ -532,6 +536,7 @@ router.get('/admin/connector-templates/:id/actions', async (req: Request, res: R
       actions: actions as unknown as AdminConnectorTemplateActionsListResponse['actions'],
       limit: query.limit ?? 50,
       offset: query.offset ?? 0,
+      total,
       q: query.q ?? undefined,
     };
     sendSuccess(res, payload);

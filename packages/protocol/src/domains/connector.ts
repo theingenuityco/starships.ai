@@ -470,6 +470,11 @@ export interface AdminConnectorTemplateActionsListResponse {
   actions: ConnectorTemplateActionSummary[];
   limit: number;
   offset: number;
+  /**
+   * Total number of matching actions (ignores pagination).
+   * Used for reliable pagination/hasMore calculations.
+   */
+  total: number;
   q?: string;
 }
 

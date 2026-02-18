@@ -46,6 +46,45 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
     super('ConnectorTemplateActionRepository');
   }
 
+  async countActionRowsByTemplateId(args: { templateId: string; q?: string }): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const templateId = String(args.templateId || '').trim();
+        if (!templateId) throw new Error('templateId is required');
+
+        const q = (args.q ?? '').trim().toLowerCase();
+
+        const connection = this.getConnection();
+        if (q) {
+          return await connection.queryCount(
+            `
+              SELECT count(*)::text AS count
+              FROM connector_template_actions
+              WHERE template_id = $1
+                AND (
+                  lower(action_name) LIKE $2
+                  OR lower(COALESCE(description, '')) LIKE $2
+                  OR lower(path) LIKE $2
+                )
+            `,
+            [templateId, `%${q}%`]
+          );
+        }
+
+        return await connection.queryCount(
+          `
+            SELECT count(*)::text AS count
+            FROM connector_template_actions
+            WHERE template_id = $1
+          `,
+          [templateId]
+        );
+      },
+      'countActionRowsByTemplateId',
+      'connector_template_actions'
+    );
+  }
+
   async listActionRowsByTemplateIds(templateIds: string[]): Promise<ActionRow[]> {
     return this.executeWithErrorHandling(
       async () => {

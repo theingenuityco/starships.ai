@@ -199,7 +199,7 @@ export function ConversationSummaryBar({
     queryFn: async () => {
       const cid = String(conversationId || '')
       if (!cid) return null
-      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit: 50 } })
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit: 10 } })
       return (resp as any)?.data?.data ?? null
     },
     staleTime: 60_000,

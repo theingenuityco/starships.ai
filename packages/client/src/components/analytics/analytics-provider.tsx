@@ -12,12 +12,13 @@ import { MetaPixelProvider } from './meta-pixel-provider'
  * with different GA_MEASUREMENT_ID values injected at runtime
  */
 export async function AnalyticsProvider() {
-  const { GA_MEASUREMENT_ID } = getPublicEnvConfig()
+  const { GA_MEASUREMENT_ID, META_PIXEL_ID } = getPublicEnvConfig()
   const measurementId = GA_MEASUREMENT_ID
+  const pixelId = META_PIXEL_ID
 
   return (
     <>
-      <MetaPixelProvider />
+      <MetaPixelProvider pixelId={pixelId} />
       {measurementId ? (
         <>
           <GoogleAnalytics measurementId={measurementId} />

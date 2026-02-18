@@ -2,7 +2,6 @@ import { GoogleAnalytics } from './google-analytics'
 import { GaPageView } from './ga-pageview'
 import { PostHogProvider } from './posthog-provider'
 import { getPublicEnvConfig } from '@starships/env/public'
-import { MetaPixelProvider } from './meta-pixel-provider'
 
 /**
  * Server Component that reads GA_MEASUREMENT_ID at runtime
@@ -12,13 +11,11 @@ import { MetaPixelProvider } from './meta-pixel-provider'
  * with different GA_MEASUREMENT_ID values injected at runtime
  */
 export async function AnalyticsProvider() {
-  const { GA_MEASUREMENT_ID, META_PIXEL_ID } = getPublicEnvConfig()
+  const { GA_MEASUREMENT_ID } = getPublicEnvConfig()
   const measurementId = GA_MEASUREMENT_ID
-  const pixelId = META_PIXEL_ID
 
   return (
     <>
-      <MetaPixelProvider pixelId={pixelId} />
       {measurementId ? (
         <>
           <GoogleAnalytics measurementId={measurementId} />

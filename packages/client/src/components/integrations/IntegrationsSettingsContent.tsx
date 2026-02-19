@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
@@ -389,7 +390,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
           </div>
         </div>
         <div className="flex items-center gap-1 self-center">
-          <Skeleton className="h-8 min-w-[130px] rounded-2xl" />
+          <Skeleton className="h-8 w-8 rounded-full" />
         </div>
       </div>
     )
@@ -468,19 +469,37 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               </div>
 
               <div className="flex items-center gap-1 self-center">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={INTEGRATION_CTA_BUTTON_CLASS}
-                  onClick={() => {
-                    if (!agentSlug) return
-                    router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
-                  }}
-                  disabled={!agentSlug}
-                >
-                  <Icon name="chevron-right" className={INTEGRATION_CTA_ICON_CLASS} />
-                  Open
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                      aria-label="More options"
+                    >
+                      <Icon name="dots-vertical" className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {agentSlug ? (
+                      <DropdownMenuItem
+                        onClick={e => {
+                          e.stopPropagation()
+                          router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
+                        }}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground" />
+                        Open
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem disabled className="text-muted-foreground">
+                        No actions
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )
@@ -553,19 +572,37 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
               </div>
 
               <div className="flex items-center gap-1 self-center">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={INTEGRATION_CTA_BUTTON_CLASS}
-                  onClick={() => {
-                    if (!toolSlug) return
-                    router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
-                  }}
-                  disabled={!toolSlug}
-                >
-                  <Icon name="chevron-right" className={INTEGRATION_CTA_ICON_CLASS} />
-                  Open
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                      aria-label="More options"
+                    >
+                      <Icon name="dots-vertical" className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {toolSlug ? (
+                      <DropdownMenuItem
+                        onClick={e => {
+                          e.stopPropagation()
+                          router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
+                        }}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground" />
+                        Open
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem disabled className="text-muted-foreground">
+                        No actions
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           )

@@ -2,6 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
@@ -72,6 +73,7 @@ export function ForumChannelView(props: {
       <ConversationSummaryBar
         conversationId={props.channelConversationId}
         starshipId={props.starshipId}
+        titleRightSlot={<NotificationMenu type="channel" channelId={props.channelConversationId} starshipId={props.starshipId} />}
         titlePrefix={
           <span className="relative inline-flex items-center justify-center h-4 w-4">
             <Icon name="hash" className="h-4 w-4" />

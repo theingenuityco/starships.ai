@@ -89,6 +89,7 @@ function getNotificationSentence(args: { type: string; locationLabel: string }):
   const t = String(args.type || '')
   if (t === 'mention') return { title: `You were mentioned in ${args.locationLabel}`, iconName: 'tag' }
   if (t === 'dm') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
+  if (t === 'channel') return { title: `New message in ${args.locationLabel}`, iconName: 'chat' }
   if (t === 'reaction') return { title: `Your message got a reaction in ${args.locationLabel}`, iconName: 'smiley' }
   return { title: 'New notification', iconName: 'bell' }
 }
@@ -159,12 +160,26 @@ export default function NotificationsPage() {
 
   const renderRow = (n: any) => {
     const isUnread = !n.readAt
-    const location = getConversationLabel({
-      starshipSlug: slug,
-      conversationId: n.conversationId,
-      channelByConversationId,
-      dmByConversationId,
-    })
+    const location = (() => {
+      const cid = typeof n?.conversationId === 'string' ? String(n.conversationId).trim() : ''
+      const parentId = typeof n?.threadParentConversationId === 'string' ? String(n.threadParentConversationId).trim() : ''
+      const parentSlug = typeof n?.threadParentChannelSlug === 'string' ? String(n.threadParentChannelSlug).trim() : ''
+      if (cid && parentId) {
+        const shipSlug = String(slug || '').trim()
+        const shipBase = shipSlug ? `/ship/${encodeURIComponent(shipSlug)}` : ''
+        const href = parentSlug
+          ? `${shipBase}/channels/${encodeURIComponent(parentSlug)}?thread=${encodeURIComponent(cid)}`
+          : `${shipBase}/conversations/${encodeURIComponent(parentId)}?thread=${encodeURIComponent(cid)}`
+        const primary = parentSlug ? `#${parentSlug}` : 'a channel'
+        return { primary, secondary: 'Thread', href }
+      }
+      return getConversationLabel({
+        starshipSlug: slug,
+        conversationId: cid,
+        channelByConversationId,
+        dmByConversationId,
+      })
+    })()
     const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
     const timeAgo = safeDistanceToNow(n.createdAt)
     return (

@@ -1,4 +1,11 @@
-import { ChannelRepository, DirectMessageRepository, MessageMentionRepository, NotificationRepository } from '@starships/models';
+import {
+  ChannelRepository,
+  ConversationNotificationPrefRepository,
+  DirectMessageRepository,
+  MessageMentionRepository,
+  NotificationRepository,
+  getConnection,
+} from '@starships/models';
 import type { MessageModel, MentionTargetType } from '@starships/protocol';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
@@ -37,6 +44,7 @@ function parseMentionTokens(content: string): ParsedMentions {
 
 export class NotificationService {
   private readonly channelRepo = new ChannelRepository();
+  private readonly prefRepo = new ConversationNotificationPrefRepository();
   private readonly dmRepo = new DirectMessageRepository();
   private readonly mentionRepo = new MessageMentionRepository();
   private readonly notificationRepo = new NotificationRepository();
@@ -76,9 +84,68 @@ export class NotificationService {
     ]);
     const isDm = !!dm;
     const isChannel = !!channel;
+    let isThread = false;
+    let parentChannelConversationId = '';
+    let parentChannelIsPrivate = false;
+    let parentChannelSlug = '';
     if (!isDm && !isChannel) {
-      // Out of scope for v1 notifications.
-      return;
+      // Thread notifications:
+      // A thread is a child conversation whose parentConversationId points at a channel conversation.
+      try {
+        const conn = getConnection();
+        const row = await conn.queryOne<{ parent_conversation_id: string | null }>(
+          `SELECT parent_conversation_id FROM conversations WHERE id = $1`,
+          [conversationId]
+        );
+        const parentId = typeof row?.parent_conversation_id === 'string' ? String(row.parent_conversation_id).trim() : '';
+        if (parentId) {
+          const parentChannel = await this.channelRepo.findByConversationId(parentId).catch(() => null);
+          if (parentChannel && String(parentChannel.starshipId) === String(starshipId)) {
+            isThread = true;
+            parentChannelConversationId = parentId;
+            parentChannelIsPrivate = Boolean((parentChannel as any).isPrivate);
+            parentChannelSlug = typeof (parentChannel as any)?.slug === 'string' ? String((parentChannel as any).slug).trim() : '';
+          }
+        }
+      } catch {
+        // best-effort only
+      }
+      if (!isThread) {
+        // Out of scope for v1 notifications.
+        return;
+      }
+    }
+
+    const attachThreadNav = (notification: any) => {
+      if (!isThread || !notification) return;
+      if (!parentChannelConversationId) return;
+      notification.threadParentConversationId = parentChannelConversationId;
+      notification.threadParentChannelSlug = parentChannelSlug || null;
+    };
+
+    // Channel-level preferences:
+    // - default behavior: mentions only (no row)
+    // - all: notify on every message in that channel
+    // - mute: suppress all channel notifications (including mentions + all)
+    const mutedUserIds = new Set<string>();
+    const allUserIds = new Set<string>();
+    if (isChannel || isThread) {
+      try {
+        const [muted, all] = await Promise.all([
+          this.prefRepo.listUserIdsByLevel({ conversationId, level: 'mute' }),
+          this.prefRepo.listUserIdsByLevel({ conversationId, level: 'all' }),
+        ]);
+        for (const uid of muted) {
+          const id = String(uid || '').trim();
+          if (id) mutedUserIds.add(id);
+        }
+        for (const uid of all) {
+          const id = String(uid || '').trim();
+          if (id) allUserIds.add(id);
+        }
+      } catch {
+        // best-effort only
+      }
     }
 
     let { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
@@ -114,6 +181,25 @@ export class NotificationService {
 
       if (userIds.length > 0) userIds = userIds.filter((id) => allowUserIds.has(String(id || '').trim()));
       if (agentIds.length > 0) agentIds = agentIds.filter((id) => allowAgentIds.has(String(id || '').trim()));
+    }
+
+    // Private channel threads: do not notify (or index) mentions to non-members.
+    if (isThread && parentChannelIsPrivate && userIds.length > 0 && parentChannelConversationId) {
+      try {
+        const conn = getConnection();
+        const rows = await conn.query<{ user_id: string }>(
+          // IMPORTANT:
+          // Private channel membership is enforced via `conversation_members` in route auth.
+          // Do NOT use `conversation_participants` here; it may only reflect recent speakers / partial lists.
+          `SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id IS NOT NULL`,
+          [parentChannelConversationId]
+        );
+        const allow = new Set(rows.map((r) => String(r.user_id)).filter(Boolean));
+        userIds = userIds.filter((uid) => allow.has(String(uid || '').trim()));
+      } catch {
+        // Fail closed: if we cannot evaluate membership, suppress mention notifications.
+        userIds = [];
+      }
     }
 
     // 1) Insert mention index rows (users + agents)
@@ -164,6 +250,7 @@ export class NotificationService {
         const notification = it?.r?.notification as any;
         if (uid && created && notification) {
           try {
+            attachThreadNav(notification);
             await this.streamBus.publish(starshipId, uid, { type: 'notification.append', data: { notification } });
             const unread = await this.notificationRepo.getUnreadCounts({ starshipId, userId: uid });
             await this.streamBus.publish(starshipId, uid, { type: 'notification.state', data: { unread } });
@@ -178,6 +265,10 @@ export class NotificationService {
     if (userIds.length > 0) {
       const targets = new Set(userIds.map((x) => String(x).trim()).filter(Boolean));
       if (authorUserId) targets.delete(authorUserId);
+      // Conversation preference: muted means never notify (even on mention).
+      if ((isChannel || isThread) && mutedUserIds.size > 0) {
+        for (const uid of mutedUserIds) targets.delete(uid);
+      }
       const results = await Promise.all(
         Array.from(targets).map((uid) =>
           this.notificationRepo
@@ -197,11 +288,59 @@ export class NotificationService {
         const notification = it?.r?.notification as any;
         if (uid && created && notification) {
           try {
+            attachThreadNav(notification);
             await this.streamBus.publish(starshipId, uid, { type: 'notification.append', data: { notification } });
             const unread = await this.notificationRepo.getUnreadCounts({ starshipId, userId: uid });
             await this.streamBus.publish(starshipId, uid, { type: 'notification.state', data: { unread } });
           } catch {
             /* best-effort */
+          }
+        }
+      }
+    }
+
+    // 4) Conversation "all messages" notifications (users only; opt-in)
+    if ((isChannel || isThread) && allUserIds.size > 0) {
+      const recipients = new Set<string>(Array.from(allUserIds));
+      // Never notify the author when we have a user author.
+      if (authorUserId) recipients.delete(authorUserId);
+      // Muted means never notify.
+      if (mutedUserIds.size > 0) {
+        for (const uid of mutedUserIds) recipients.delete(uid);
+      }
+      // Avoid double-notifying users that were already mentioned in this message.
+      for (const uid of userIds.map((x) => String(x).trim()).filter(Boolean)) {
+        recipients.delete(uid);
+      }
+
+      if (recipients.size > 0) {
+        const results = await Promise.all(
+          Array.from(recipients).map((uid) =>
+            this.notificationRepo
+              .createOrIgnoreByUserTypeMessage({
+                starshipId,
+                userId: uid,
+                type: 'channel',
+                conversationId,
+                messageId,
+              })
+              .then((r) => ({ uid, r }))
+          )
+        ).catch(() => []);
+
+        for (const it of results as any[]) {
+          const uid = String(it?.uid || '');
+          const created = Boolean(it?.r?.created);
+          const notification = it?.r?.notification as any;
+          if (uid && created && notification) {
+            try {
+              attachThreadNav(notification);
+              await this.streamBus.publish(starshipId, uid, { type: 'notification.append', data: { notification } });
+              const unread = await this.notificationRepo.getUnreadCounts({ starshipId, userId: uid });
+              await this.streamBus.publish(starshipId, uid, { type: 'notification.state', data: { unread } });
+            } catch {
+              /* best-effort */
+            }
           }
         }
       }

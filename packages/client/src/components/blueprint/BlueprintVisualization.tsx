@@ -631,19 +631,28 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
   }
 
   // Safely handle edges - may be undefined during streaming
-  const blueprintEdges = blueprint.edges || []
+  const blueprintEdges: BlueprintEdge[] = Array.isArray(blueprint.edges) ? (blueprint.edges as BlueprintEdge[]) : []
 
   // Create a set of valid node IDs for quick lookup
   const validNodeIds = new Set(validNodes.map(node => node.ref))
 
   // Filter edges to only include those with valid IDs and both nodes present (important for streaming)
-  const validEdges = blueprintEdges.filter(
-    edge => edge.ref != null && edge.ref !== '' && edge.from != null && edge.from !== '' && edge.to != null && edge.to !== '' && validNodeIds.has(edge.from) && validNodeIds.has(edge.to)
-  )
+  const validEdges = blueprintEdges.filter((edge: BlueprintEdge) => {
+    return (
+      edge.ref != null &&
+      edge.ref !== '' &&
+      edge.from != null &&
+      edge.from !== '' &&
+      edge.to != null &&
+      edge.to !== '' &&
+      validNodeIds.has(edge.from) &&
+      validNodeIds.has(edge.to)
+    )
+  })
 
   // Build outgoing edges map for conditional nodes
   const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
-  validEdges.forEach(edge => {
+  validEdges.forEach((edge: BlueprintEdge) => {
     if (!outgoingEdgesMap.has(edge.from)) {
       outgoingEdgesMap.set(edge.from, [])
     }
@@ -652,7 +661,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
 
   // Build incoming edges map for target handle distribution
   const incomingEdgesMap = new Map<string, BlueprintEdge[]>()
-  validEdges.forEach(edge => {
+  validEdges.forEach((edge: BlueprintEdge) => {
     if (!incomingEdgesMap.has(edge.to)) {
       incomingEdgesMap.set(edge.to, [])
     }

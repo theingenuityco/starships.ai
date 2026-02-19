@@ -1,4 +1,4 @@
-export type NotificationType = 'dm' | 'mention' | 'reaction';
+export type NotificationType = 'dm' | 'mention' | 'reaction' | 'channel';
 
 export type NotificationModel = {
   id: string;

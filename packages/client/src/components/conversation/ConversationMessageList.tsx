@@ -42,6 +42,7 @@ import { MessageReactions } from './MessageReactions'
 import { MessageReactionAction } from './MessageReactionAction'
 import { HoverProfilePopover } from './HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
+import { useNotificationsList } from '@/hooks/useNotifications'
 
 type TurnUsageForRing = {
   turnId: string
@@ -172,6 +173,7 @@ function LinkedConversationCard({
   message,
   starshipId,
   isUserOnline,
+  notifUnread,
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
@@ -182,6 +184,7 @@ function LinkedConversationCard({
   message: MessageModel
   starshipId?: string
   isUserOnline?: (userId: string) => boolean
+  notifUnread?: any
 }) {
   const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
   const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
@@ -333,6 +336,19 @@ function LinkedConversationCard({
 
   const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
 
+  const badgeCount = useMemo(() => {
+    try {
+      const cid = String(linkedConversationId || '').trim()
+      if (!cid) return 0
+      const u = notifUnread && typeof notifUnread === 'object' ? (notifUnread as any) : null
+      const mention = Number(u?.mentionUnreadByConversationId?.[cid] ?? 0)
+      const m = Number.isFinite(mention) ? mention : 0
+      return m
+    } catch {
+      return 0
+    }
+  }, [linkedConversationId, notifUnread])
+
   // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
   // between renders when `linkedConversationId` flips from null -> string.
   if (!linkedConversationId) return null
@@ -350,6 +366,15 @@ function LinkedConversationCard({
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {badgeCount > 0 ? (
+            <span
+              className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[10px] leading-none font-semibold"
+              aria-label={`${badgeCount} unread mentions in thread`}
+              title={`${badgeCount} unread mentions`}
+            >
+              {badgeCount > 99 ? '99+' : String(badgeCount)}
+            </span>
+          ) : null}
           {/* Participants (overlapping avatars) */}
           {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
             <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
@@ -572,6 +597,8 @@ export function ConversationMessageList({
   const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
   const sid = typeof starshipId === 'string' ? starshipId : ''
+  const { data: notifList } = useNotificationsList(sid || null, Boolean(sid))
+  const notifUnread = useMemo(() => ((notifList as any)?.unread ?? null) as any, [notifList])
   const presence = useStarshipPresence(sid, Boolean(sid))
   const isConversationBusy = !isTerminalTurnStatus && (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') && (isResponding || isAssistantStreaming || isAwaitingToolResults)
   const expertMode = useUserPreferencesStore(s => s.expertMode)
@@ -2100,6 +2127,7 @@ export function ConversationMessageList({
                           highlightTerm={normalizedHighlightTerm}
                           expertMode={expertMode}
                           activeThreadConversationId={activeThreadConversationId ?? null}
+                          notifUnread={notifUnread}
                           turnUsage={(() => {
                             if (!expertMode) return null
                             if (message.role !== 'assistant') return null
@@ -2367,6 +2395,8 @@ interface ConversationMessageBubbleProps {
   isConversationBusy?: boolean
   /** When set, highlight this row if it links to the active thread. */
   activeThreadConversationId?: string | null
+  /** Notifications unread summary (starship-scoped) for badges. */
+  notifUnread?: any
   /**
    * Monotonic revision to force memoized bubbles to re-render when presence changes.
    * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
@@ -2708,6 +2738,7 @@ const MemoizedMessageBubble = memo(
     isUserOnline,
     isConversationBusy = false,
     activeThreadConversationId,
+    notifUnread,
     presenceRevision,
     animateUserEnter = false,
   }: ConversationMessageBubbleProps) {
@@ -2939,6 +2970,7 @@ const MemoizedMessageBubble = memo(
                     message={message}
                     starshipId={starshipId}
                     isUserOnline={isUserOnline}
+                    notifUnread={notifUnread}
                   />
                 )}
               </div>
@@ -3209,6 +3241,7 @@ const MemoizedMessageBubble = memo(
                   message={message}
                   starshipId={starshipId}
                   isUserOnline={isUserOnline}
+                  notifUnread={notifUnread}
                 />
               )}
             </div>
@@ -3345,6 +3378,7 @@ const MemoizedMessageBubble = memo(
                     message={message}
                     starshipId={starshipId}
                     isUserOnline={isUserOnline}
+                    notifUnread={notifUnread}
                   />
                 )}
               </div>
@@ -3470,6 +3504,7 @@ const MemoizedMessageBubble = memo(
                   message={message}
                   starshipId={starshipId}
                   isUserOnline={isUserOnline}
+                  notifUnread={notifUnread}
                 />
               )}
             </div>
@@ -3497,6 +3532,7 @@ const MemoizedMessageBubble = memo(
     // Presence and busy indicators are independent of message content.
     if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
     if (String(prevProps.activeThreadConversationId ?? '') !== String(nextProps.activeThreadConversationId ?? '')) return false
+    if (prevProps.notifUnread !== nextProps.notifUnread) return false
     if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
     if (Boolean(prevProps.animateUserEnter) !== Boolean(nextProps.animateUserEnter)) return false
     {

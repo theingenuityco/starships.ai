@@ -11,6 +11,61 @@ import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
 const router: Router = Router();
 
+async function attachThreadContext(starshipId: string, notifications: any[]): Promise<any[]> {
+  try {
+    const sid = String(starshipId || '').trim();
+    if (!sid) return notifications;
+    const list = Array.isArray(notifications) ? notifications : [];
+    if (list.length === 0) return list;
+
+    const threadIds = Array.from(
+      new Set(
+        list
+          .map((n: any) => (typeof n?.conversationId === 'string' ? String(n.conversationId).trim() : ''))
+          .filter(Boolean)
+      )
+    );
+    if (threadIds.length === 0) return list;
+
+    const db = getConnection();
+    const rows = await db.query<{ thread_id: string; parent_conversation_id: string; parent_channel_slug: string }>(
+      `
+      SELECT
+        c.id AS thread_id,
+        c.parent_conversation_id,
+        ch.slug AS parent_channel_slug
+      FROM conversations c
+      INNER JOIN channels ch
+              ON ch.conversation_id = c.parent_conversation_id
+             AND ch.starship_id = c.starship_id
+      WHERE c.starship_id = $1::text
+        AND c.id = ANY($2::text[])
+        AND c.parent_conversation_id IS NOT NULL
+      `,
+      [sid, threadIds]
+    );
+    if (!rows || rows.length === 0) return list;
+
+    const map = new Map<string, { parentId: string; parentSlug: string }>();
+    for (const r of rows) {
+      const tid = String(r.thread_id || '').trim();
+      const pid = String(r.parent_conversation_id || '').trim();
+      const pslug = String(r.parent_channel_slug || '').trim();
+      if (tid && pid) map.set(tid, { parentId: pid, parentSlug: pslug });
+    }
+    if (map.size === 0) return list;
+
+    return list.map((n: any) => {
+      const cid = typeof n?.conversationId === 'string' ? String(n.conversationId).trim() : '';
+      const hit = cid ? map.get(cid) : null;
+      if (!hit) return n;
+      return { ...n, threadParentConversationId: hit.parentId, threadParentChannelSlug: hit.parentSlug || null };
+    });
+  } catch {
+    return Array.isArray(notifications) ? notifications : [];
+  }
+}
+
 /**
  * GET /starships/:starshipId/notifications
  * List notifications for inbox (paged by (created_at, id) cursor).
@@ -104,12 +159,15 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       const snapshotCursor = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor = snapshotCursor;
 
-      const notifications = await repo.listForUser({
+      const notifications = await attachThreadContext(
+        params.starshipId,
+        await repo.listForUser({
         starshipId: params.starshipId,
         userId: authUserId,
         limit,
         ...(query.beforeCreatedAt && query.beforeId ? { beforeCreatedAt: query.beforeCreatedAt, beforeId: query.beforeId } : null),
-      });
+        })
+      );
       const unread = await repo.getUnreadCounts({ starshipId: params.starshipId, userId: authUserId });
       const oldest = notifications.length > 0 ? notifications[notifications.length - 1] : null;
       const hasMoreBefore = notifications.length >= limit;
@@ -168,12 +226,15 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
     }
 
     const repo = new NotificationRepository();
-    const notifications = await repo.listForUser({
+    const notifications = await attachThreadContext(
+      params.starshipId,
+      await repo.listForUser({
       starshipId: params.starshipId,
       userId: authUserId,
       limit,
       ...(query.beforeCreatedAt && query.beforeId ? { beforeCreatedAt: query.beforeCreatedAt, beforeId: query.beforeId } : null),
-    });
+      })
+    );
     const counts = await repo.getUnreadCounts({ starshipId: params.starshipId, userId: authUserId });
 
     const oldest = notifications.length > 0 ? notifications[notifications.length - 1] : null;

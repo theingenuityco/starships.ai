@@ -7,10 +7,11 @@ import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ChannelRepository, ConversationMemberRepository, getConnection } from '@starships/models';
+import { ChannelRepository, ConversationMemberRepository, ConversationNotificationPrefRepository, getConnection } from '@starships/models';
 import type { ChannelModel } from '@starships/protocol';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
+import { enforcePrivateChannelMembership } from '@/utils/conversation-membership';
 
 const router: Router = Router();
 
@@ -21,6 +22,8 @@ const ChannelSlugSchema = z
   .refine((s) => s === s.trim(), 'slug must not have leading/trailing whitespace')
   .refine((s) => s === s.toLowerCase(), 'slug must be lowercase')
   .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
+
+const ChannelNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 
 /**
  * GET /starships/:starshipId/channels
@@ -325,6 +328,126 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     sendSuccess(res, { channel: updated }, 200);
   } catch (error) {
     handleError(error, res, 'updating channel');
+  }
+});
+
+/**
+ * GET /channels/:channelId/notification-level
+ *
+ * Returns the current user's notification level preference for this channel.
+ * Default when no preference exists: 'mentions'.
+ */
+router.get('/channels/:channelId/notification-level', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    // Resolve starshipId from authoritative conversation row (defense-in-depth).
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.channelId]);
+    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.channelId });
+      return;
+    }
+
+    // Fail closed if channel row starship_id ever diverges from the conversation.
+    if (String(channel.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this channel', 403, { channelId: params.channelId });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: params.channelId,
+        conversationStarshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const prefRepo = new ConversationNotificationPrefRepository();
+    const pref = await prefRepo.get(params.channelId, authUserId);
+    const level = (pref?.level as any) || 'mentions';
+    sendSuccess(res, { level }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching channel notification level');
+  }
+});
+
+/**
+ * PUT /channels/:channelId/notification-level
+ *
+ * Updates the current user's notification level preference for this channel.
+ */
+router.put('/channels/:channelId/notification-level', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const body = validateData(z.object({ level: ChannelNotificationLevelSchema }), req.body, res, 'notification level body');
+    if (!body) return;
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    // Resolve starshipId from authoritative conversation row (defense-in-depth).
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.channelId]);
+    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.channelId });
+      return;
+    }
+
+    if (String(channel.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this channel', 403, { channelId: params.channelId });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: params.channelId,
+        conversationStarshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const prefRepo = new ConversationNotificationPrefRepository();
+    const pref = await prefRepo.upsert({ conversationId: params.channelId, userId: authUserId, level: body.level });
+    sendSuccess(res, { level: pref.level }, 200);
+  } catch (error) {
+    handleError(error, res, 'updating channel notification level');
   }
 });
 

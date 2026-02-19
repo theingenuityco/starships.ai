@@ -21,7 +21,7 @@ metadata:
     app: starships-ai
     environment: production
 spec:
-  replicas: 1 # Single replica (proven in dev)
+  replicas: 2
   revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate

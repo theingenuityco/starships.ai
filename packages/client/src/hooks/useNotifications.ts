@@ -592,6 +592,23 @@ export function useNotificationsStream(
     lastProcessedIdxRef.current = chunks.length
   }, [activeConversationId, chunks.length, enabled, starshipId])
 
+  // Keep the non-streaming notifications cache (`useNotificationsList`) in sync with the live unread state.
+  // This lets UIs that use `useNotificationsList` (starship rail, thread cards, menus) update immediately
+  // without needing to mount their own SSE reader.
+  useEffect(() => {
+    const sid = String(starshipId || '').trim()
+    if (!sid || !enabled) return
+    try {
+      queryClient.setQueryData(NOTIFICATION_QUERY_KEYS.byStarship(sid), (old: any) => {
+        const prev = old && typeof old === 'object' ? old : {}
+        const prevNotifications = Array.isArray(prev.notifications) ? prev.notifications : []
+        return { notifications: prevNotifications, unread }
+      })
+    } catch {
+      // ignore
+    }
+  }, [enabled, queryClient, starshipId, unread])
+
   return {
     notifications,
     unread,
@@ -696,6 +713,9 @@ export function useUnreadByConversationIds(starshipId: string | null, conversati
     staleTime: 10_000,
     gcTime: 60_000,
     refetchOnWindowFocus: true,
+    // Keep sidebar channel/DM bolding fresh without requiring focus changes.
+    // This endpoint is batched (all conversationIds at once), so polling is a reasonable trade-off.
+    refetchInterval: 7_500,
   })
 }
 

@@ -474,13 +474,15 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
       const aMention = Number(notifUnread?.mentionUnreadByConversationId?.[aCid] ?? 0) || 0
       const aReact = Number((notifUnread as any)?.reactionUnreadByConversationId?.[aCid] ?? 0) || 0
+      const aChannel = Number((notifUnread as any)?.channelUnreadByConversationId?.[aCid] ?? 0) || 0
       const bMention = Number(notifUnread?.mentionUnreadByConversationId?.[bCid] ?? 0) || 0
       const bReact = Number((notifUnread as any)?.reactionUnreadByConversationId?.[bCid] ?? 0) || 0
+      const bChannel = Number((notifUnread as any)?.channelUnreadByConversationId?.[bCid] ?? 0) || 0
       const aNotif = aMention + aReact
       const bNotif = bMention + bReact
 
-      const aGroup = aNotif > 0 ? 0 : aUnread ? 1 : 2
-      const bGroup = bNotif > 0 ? 0 : bUnread ? 1 : 2
+      const aGroup = aNotif > 0 ? 0 : aChannel > 0 || aUnread ? 1 : 2
+      const bGroup = bNotif > 0 ? 0 : bChannel > 0 || bUnread ? 1 : 2
       if (aGroup !== bGroup) return aGroup - bGroup
 
       // Within the "notifications" group, sort by count first.
@@ -955,8 +957,10 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                       const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
                       const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
                       const reactionCount = Number((notifUnread as any)?.reactionUnreadByConversationId?.[cid] ?? 0) || 0
+                      const channelCount = Number((notifUnread as any)?.channelUnreadByConversationId?.[cid] ?? 0) || 0
                       const notifCount = mentionCount + reactionCount
                       const hasNotifBadge = notifCount > 0
+                      const hasChannelNotif = channelCount > 0
                       const isDefaultChannel =
                         String(ch.slug || '')
                           .trim()
@@ -968,7 +972,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                               'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
-                                : hasUnread || hasNotifBadge
+                                : hasUnread || hasNotifBadge || hasChannelNotif
                                   ? 'text-foreground border-transparent hover:bg-muted'
                                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                             )}
@@ -994,8 +998,11 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                             >
                               <Icon
                                 name="hash"
-                                weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
-                                className={cn('h-3 w-3', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
+                                weight={isActive ? 'regular' : hasUnread || hasNotifBadge || hasChannelNotif ? 'bold' : 'regular'}
+                                className={cn(
+                                  'h-3 w-3',
+                                  isActive ? 'text-primary' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground' : 'text-muted-foreground'
+                                )}
                               />
                               {ch.isPrivate ? (
                                 <span
@@ -1005,7 +1012,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                                     // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
                                     isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted',
                                     // Keep visible but not louder than unread/active styling.
-                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                                    isActive ? 'text-primary/80' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground/70' : 'text-muted-foreground'
                                   )}
                                   title="Private channel"
                                   aria-label="Private channel"
@@ -1017,7 +1024,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                             <div
                               className={cn(
                                 'whitespace-nowrap pointer-events-none min-w-0 flex-1 ml-1 flex items-center gap-1',
-                                isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'font-medium'
+                                isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground font-bold' : 'font-medium'
                               )}
                             >
                               <span className="truncate min-w-0">{label}</span>
@@ -1260,8 +1267,10 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   const hasUnread = Boolean(unreadByConversationId?.[cid]?.hasUnread)
                   const mentionCount = Number(notifUnread?.mentionUnreadByConversationId?.[cid] ?? 0) || 0
                   const reactionCount = Number((notifUnread as any)?.reactionUnreadByConversationId?.[cid] ?? 0) || 0
+                  const channelCount = Number((notifUnread as any)?.channelUnreadByConversationId?.[cid] ?? 0) || 0
                   const notifCount = mentionCount + reactionCount
                   const hasNotifBadge = notifCount > 0
+                  const hasChannelNotif = channelCount > 0
                   return (
                     <div key={ch.conversationId}>
                       <div
@@ -1271,8 +1280,8 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                         <span className="relative inline-flex items-center justify-center h-4 w-4 flex-shrink-0">
                           <Icon
                             name="hash"
-                            weight={isActive ? 'regular' : hasUnread || hasNotifBadge ? 'bold' : 'regular'}
-                            className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge ? 'text-foreground' : 'text-muted-foreground')}
+                            weight={isActive ? 'regular' : hasUnread || hasNotifBadge || hasChannelNotif ? 'bold' : 'regular'}
+                            className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground' : 'text-muted-foreground')}
                           />
                           {ch.isPrivate ? (
                             <span
@@ -1281,7 +1290,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                                 // Match the row background so the icon reads cleanly over the hash.
                                 // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
                                 isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted/50',
-                                isActive ? 'text-primary/80' : hasUnread || hasNotifBadge ? 'text-foreground/70' : 'text-muted-foreground'
+                                isActive ? 'text-primary/80' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground/70' : 'text-muted-foreground'
                               )}
                               title="Private channel"
                               aria-label="Private channel"
@@ -1296,7 +1305,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                               <p
                                 className={cn(
                                   'text-sm truncate min-w-0',
-                                  isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
+                                  isActive ? 'text-primary font-medium' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground font-bold' : 'text-muted-foreground font-medium'
                                 )}
                               >
                                 {label}

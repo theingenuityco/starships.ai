@@ -18,9 +18,11 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ChannelRepository,
   ConversationRepository,
   ConversationMemberRepository,
   ConversationParticipantRepository,
+  ConversationNotificationPrefRepository,
   ConversationWidgetRepository,
   DirectMessageRepository,
   getConnection,
@@ -2114,6 +2116,152 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     handleError(error, res, 'fetching conversation details');
   }
 });
+
+/**
+ * GET /conversations/:conversationId/notification-level
+ *
+ * Thread-only: returns current user's notification level preference for a thread.
+ * Default when no preference exists: 'mentions'.
+ */
+router.get(
+  '/conversations/:conversationId/notification-level',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!params) return;
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const conn = getConnection();
+      const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
+        `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
+        [params.conversationId]
+      );
+      const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+      const parentConversationId =
+        typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
+      if (!starshipId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
+        return;
+      }
+      if (!parentConversationId) {
+        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+          conversationId: params.conversationId,
+        });
+        return;
+      }
+
+      const channelRepo = new ChannelRepository();
+      const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
+      if (!parentChannel) {
+        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+          conversationId: params.conversationId,
+          parentConversationId,
+        });
+        return;
+      }
+
+      if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId: parentConversationId,
+          conversationStarshipId: starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+
+      const prefRepo = new ConversationNotificationPrefRepository();
+      const pref = await prefRepo.get(params.conversationId, authUserId);
+      sendSuccess(res, { level: (pref?.level as any) || 'mentions' }, 200);
+    } catch (error) {
+      handleError(error, res, 'fetching thread notification level');
+    }
+  }
+);
+
+/**
+ * PUT /conversations/:conversationId/notification-level
+ *
+ * Thread-only: updates current user's notification level preference for a thread.
+ */
+router.put(
+  '/conversations/:conversationId/notification-level',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!params) return;
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const body = validateData(z.object({ level: z.enum(['all', 'mentions', 'mute']) }), req.body, res, 'notification level body');
+      if (!body) return;
+
+      const conn = getConnection();
+      const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
+        `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
+        [params.conversationId]
+      );
+      const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+      const parentConversationId =
+        typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
+      if (!starshipId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
+        return;
+      }
+      if (!parentConversationId) {
+        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+          conversationId: params.conversationId,
+        });
+        return;
+      }
+
+      const channelRepo = new ChannelRepository();
+      const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
+      if (!parentChannel) {
+        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+          conversationId: params.conversationId,
+          parentConversationId,
+        });
+        return;
+      }
+
+      if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId: parentConversationId,
+          conversationStarshipId: starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+
+      const prefRepo = new ConversationNotificationPrefRepository();
+      const pref = await prefRepo.upsert({
+        conversationId: params.conversationId,
+        userId: authUserId,
+        level: (body as any).level,
+      });
+      sendSuccess(res, { level: pref.level }, 200);
+    } catch (error) {
+      handleError(error, res, 'updating thread notification level');
+    }
+  }
+);
 
 /**
  * GET /conversations/:conversationId/agents - Get agents linked to a conversation

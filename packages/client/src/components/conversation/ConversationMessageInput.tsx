@@ -360,7 +360,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [starshipAgents])
 
     // Stream state must come from the (single) ship-layout provider; no fallbacks.
-    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults } = useConversationStreamContext()
+    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, hasSnapshot, messages: streamMessages, hasMoreBefore: streamHasMoreBefore } = useConversationStreamContext()
     const stopConversation = useConversationStop()
     // Track last known conversationId to enable stop during pre-stream window and to bridge route transitions
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
@@ -392,8 +392,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Context-window usage (mirrors server behavior: last N persisted messages + optional fold message).
     // IMPORTANT: this is **not** lifetime token usage; it's a proxy for how "full" the next-turn context is
     // given we cap history by message count on the server.
+    // Derive from stream when available to avoid redundant /messages API call.
     const CONTEXT_MESSAGE_LIMIT = 30
-    const { data: ctxUsage } = useConversationContextUsage(conversationId ?? null, { limit: CONTEXT_MESSAGE_LIMIT, enabled: Boolean(conversationId) })
+    const streamSnapshotForContext = hasSnapshot && Array.isArray(streamMessages) ? { messages: streamMessages, hasMoreBefore: Boolean(streamHasMoreBefore) } : null
+    const { data: ctxUsage } = useConversationContextUsage(conversationId ?? null, { limit: CONTEXT_MESSAGE_LIMIT, enabled: Boolean(conversationId), streamSnapshot: streamSnapshotForContext })
     const contextLimit = CONTEXT_MESSAGE_LIMIT
     const contextMessageCountRaw = Number(ctxUsage?.messageCount ?? 0)
     const contextMessageCount = Number.isFinite(contextMessageCountRaw) ? Math.max(0, Math.min(contextLimit, contextMessageCountRaw)) : 0

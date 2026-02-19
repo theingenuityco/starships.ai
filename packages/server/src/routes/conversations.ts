@@ -594,7 +594,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       let cursor: string = snapshotCursor;
 
       // 1) Always send a baseline snapshot from DB (bounded tail + latest known turn status)
-      const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
+      // Limit 30 reduces payload size and improves load time; client loads older via loadOlder.
+      const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 30 });
       const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
       let turn: ConversationStreamSnapshot['turn'] =

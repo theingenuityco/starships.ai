@@ -3,6 +3,7 @@
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -192,10 +193,15 @@ export function ConversationSummaryBar({
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   // Include human participants by sampling recent message authors (matches thread card behavior).
-  // The conversation detail endpoint does not currently include members/users.
-  const { data: participantsPreview } = useQuery({
+  // Derive from stream when available to avoid redundant /messages API call; fallback to API otherwise.
+  const stream = useConversationStreamContextOptional()
+  const participantsPreviewFromStream = useMemo(() => {
+    if (!conversationId || !stream?.hasSnapshot || !Array.isArray(stream.messages)) return null
+    return { messages: stream.messages, participants: [] as string[] }
+  }, [conversationId, stream?.hasSnapshot, stream?.messages])
+  const { data: participantsPreviewFromApi } = useQuery({
     queryKey: ['conversations', 'participants-preview', conversationId],
-    enabled: Boolean(conversationId),
+    enabled: Boolean(conversationId) && !participantsPreviewFromStream,
     queryFn: async () => {
       const cid = String(conversationId || '')
       if (!cid) return null
@@ -204,6 +210,7 @@ export function ConversationSummaryBar({
     },
     staleTime: 60_000,
   })
+  const participantsPreview = participantsPreviewFromStream ?? participantsPreviewFromApi
 
   const participantItemsFromConversation = useMemo<ConversationParticipantItem[]>(() => {
     type ParticipantWithSeen = (ConversationParticipantItem & { lastSeenAt: number }) | null

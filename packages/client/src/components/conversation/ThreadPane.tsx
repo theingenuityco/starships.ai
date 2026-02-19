@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar, type ConversationParticipantItem } from '@/components/conversation/ConversationSummaryBar'
-import { ThreadNotificationMenu } from '@/components/conversation/ThreadNotificationMenu'
+import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
@@ -201,7 +201,7 @@ export function ThreadPane(props: {
           starshipId={starshipId}
           modelId={(selectedAgent as any)?.model ?? null}
           titleRightSlot={
-            effectiveConversationId ? <ThreadNotificationMenu conversationId={effectiveConversationId} starshipId={starshipId} /> : null
+            effectiveConversationId ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} /> : null
           }
           mobileLeftSlot={
             <button

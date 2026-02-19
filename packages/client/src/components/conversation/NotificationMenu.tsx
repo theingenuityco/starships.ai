@@ -17,25 +17,53 @@ import { cn } from '@/lib/utils'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-export type ThreadNotificationLevel = 'all' | 'mentions' | 'mute'
+export type NotificationLevel = 'all' | 'mentions' | 'mute'
 
-const queryKey = (conversationId: string) => ['conversations', 'notification-level', conversationId] as const
+export type NotificationMenuType = 'channel' | 'thread'
 
-async function fetchLevel(conversationId: string): Promise<ThreadNotificationLevel> {
-  const cid = String(conversationId || '').trim()
-  if (!cid) return 'mentions'
-  const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/notification-level`)
-  const data = (resp as any)?.data?.data as { level?: unknown } | null
-  const level = typeof data?.level === 'string' ? (data.level as string) : ''
-  return level === 'all' || level === 'mentions' || level === 'mute' ? (level as ThreadNotificationLevel) : 'mentions'
+type NotificationMenuProps =
+  | {
+      type: 'channel'
+      channelId: string
+      starshipId: string
+      className?: string
+    }
+  | {
+      type: 'thread'
+      conversationId: string
+      starshipId: string
+      className?: string
+    }
+
+const getQueryKey = (type: NotificationMenuType, id: string) => {
+  if (type === 'channel') {
+    return ['channels', 'notification-level', id] as const
+  }
+  return ['conversations', 'notification-level', id] as const
 }
 
-async function updateLevel(conversationId: string, level: ThreadNotificationLevel): Promise<ThreadNotificationLevel> {
-  const cid = String(conversationId || '').trim()
-  const resp = await api.put(`/api/v1/conversations/${encodeURIComponent(cid)}/notification-level`, { level })
+const getApiPath = (type: NotificationMenuType, id: string) => {
+  if (type === 'channel') {
+    return `/api/v1/channels/${encodeURIComponent(id)}/notification-level`
+  }
+  return `/api/v1/conversations/${encodeURIComponent(id)}/notification-level`
+}
+
+async function fetchLevel(type: NotificationMenuType, id: string): Promise<NotificationLevel> {
+  const cid = String(id || '').trim()
+  if (!cid) return 'mentions'
+  const resp = await api.get(getApiPath(type, cid))
+  const data = (resp as any)?.data?.data as { level?: unknown } | null
+  const level = typeof data?.level === 'string' ? (data.level as string) : ''
+  return level === 'all' || level === 'mentions' || level === 'mute' ? (level as NotificationLevel) : 'mentions'
+}
+
+async function updateLevel(type: NotificationMenuType, id: string, level: NotificationLevel): Promise<NotificationLevel> {
+  const cid = String(id || '').trim()
+  const resp = await api.put(getApiPath(type, cid), { level })
   const data = (resp as any)?.data?.data as { level?: unknown } | null
   const next = typeof data?.level === 'string' ? (data.level as string) : ''
-  return next === 'all' || next === 'mentions' || next === 'mute' ? (next as ThreadNotificationLevel) : level
+  return next === 'all' || next === 'mentions' || next === 'mute' ? (next as NotificationLevel) : level
 }
 
 function getUnreadForConversation(unread: any, conversationId: string): number {
@@ -48,6 +76,7 @@ function getUnreadForConversation(unread: any, conversationId: string): number {
       const n = Number((m as any)[cid] ?? 0)
       return Number.isFinite(n) ? n : 0
     }
+    // Sum across all known notification kinds for this conversationId.
     return (
       pick(u.dmUnreadByConversationId) +
       pick(u.mentionUnreadByConversationId) +
@@ -72,33 +101,34 @@ function getBadgeCountForConversation(unread: any, conversationId: string): numb
   }
 }
 
-export function ThreadNotificationMenu(props: { conversationId: string; starshipId: string; className?: string }) {
-  const conversationId = String(props.conversationId || '').trim()
+export function NotificationMenu(props: NotificationMenuProps) {
+  const type = props.type
+  const id = type === 'channel' ? props.channelId : props.conversationId
   const starshipId = String(props.starshipId || '').trim()
   const qc = useQueryClient()
 
   const q = useQuery({
-    queryKey: queryKey(conversationId),
-    enabled: Boolean(conversationId),
-    queryFn: () => fetchLevel(conversationId),
+    queryKey: getQueryKey(type, id),
+    enabled: Boolean(id),
+    queryFn: () => fetchLevel(type, id),
     staleTime: 30_000,
   })
 
-  const level = (q.data ?? 'mentions') as ThreadNotificationLevel
+  const level = (q.data ?? 'mentions') as NotificationLevel
 
   const mutation = useMutation({
-    mutationFn: (next: ThreadNotificationLevel) => updateLevel(conversationId, next),
+    mutationFn: (next: NotificationLevel) => updateLevel(type, id, next),
     onMutate: async (next) => {
-      await qc.cancelQueries({ queryKey: queryKey(conversationId) })
-      const prev = qc.getQueryData(queryKey(conversationId)) as ThreadNotificationLevel | undefined
-      qc.setQueryData(queryKey(conversationId), next)
+      await qc.cancelQueries({ queryKey: getQueryKey(type, id) })
+      const prev = qc.getQueryData(getQueryKey(type, id)) as NotificationLevel | undefined
+      qc.setQueryData(getQueryKey(type, id), next)
       return { prev }
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(queryKey(conversationId), ctx.prev)
+      if (ctx?.prev) qc.setQueryData(getQueryKey(type, id), ctx.prev)
     },
     onSuccess: (next) => {
-      qc.setQueryData(queryKey(conversationId), next)
+      qc.setQueryData(getQueryKey(type, id), next)
     },
   })
 
@@ -115,17 +145,20 @@ export function ThreadNotificationMenu(props: { conversationId: string; starship
   }, [level])
 
   const { data: notifList } = useNotificationsList(starshipId, Boolean(starshipId))
-  const unreadForThisThread = useMemo(() => {
+  const unreadForThisConversation = useMemo(() => {
     const unread = (notifList as any)?.unread ?? null
-    return getUnreadForConversation(unread, conversationId)
-  }, [notifList, conversationId])
+    return getUnreadForConversation(unread, id)
+  }, [notifList, id])
   const badgeCount = useMemo(() => {
     const unread = (notifList as any)?.unread ?? null
-    return getBadgeCountForConversation(unread, conversationId)
-  }, [notifList, conversationId])
-  const hasUnread = unreadForThisThread > 0
+    return getBadgeCountForConversation(unread, id)
+  }, [notifList, id])
+  const hasUnread = unreadForThisConversation > 0
   const showBadge = badgeCount > 0
   const showDot = !showBadge && hasUnread
+
+  const menuLabel = type === 'channel' ? 'Notifications' : 'Thread notifications'
+  const ariaLabelPrefix = type === 'channel' ? 'Channel notifications' : 'Thread notifications'
 
   return (
     <DropdownMenu>
@@ -135,13 +168,13 @@ export function ThreadNotificationMenu(props: { conversationId: string; starship
           variant="ghost"
           size="sm"
           className={cn('h-8 w-8 px-0 text-muted-foreground hover:text-foreground', props.className)}
-          aria-label={`Thread notifications: ${label}`}
+          aria-label={`${ariaLabelPrefix}: ${label}`}
           title={`Notifications: ${label}`}
-          disabled={mutation.isPending || q.isLoading || !conversationId}
+          disabled={mutation.isPending || q.isLoading || !id}
         >
           <span className="relative inline-flex h-4 w-4 items-center justify-center">
             <Icon name={iconName} weight={iconWeight as any} className={cn('h-4 w-4', level === 'mute' && 'opacity-70')} />
-            {showBadge ? (
+            {type === 'thread' && showBadge ? (
               <span
                 className="absolute -top-2 -right-2 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold shadow-sm"
                 aria-label={`${badgeCount} unread mentions in thread`}
@@ -156,12 +189,12 @@ export function ThreadNotificationMenu(props: { conversationId: string; starship
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[220px]">
-        <DropdownMenuLabel>Thread notifications</DropdownMenuLabel>
+        <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={level}
           onValueChange={(v) => {
-            const next = v === 'all' || v === 'mentions' || v === 'mute' ? (v as ThreadNotificationLevel) : 'mentions'
+            const next = v === 'all' || v === 'mentions' || v === 'mute' ? (v as NotificationLevel) : 'mentions'
             mutation.mutate(next)
           }}
         >
@@ -173,4 +206,3 @@ export function ThreadNotificationMenu(props: { conversationId: string; starship
     </DropdownMenu>
   )
 }
-

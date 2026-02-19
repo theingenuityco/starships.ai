@@ -26,7 +26,7 @@ import { toast } from 'sonner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
-import { ChannelNotificationMenu } from '@/components/conversation/ChannelNotificationMenu'
+import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -965,7 +965,7 @@ export function ConversationInterface({
                 starshipId={starshipId}
                 titleRightSlot={
                   isChannelConversation && currentConversationId ? (
-                    <ChannelNotificationMenu channelId={currentConversationId} starshipId={starshipId} />
+                    <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />
                   ) : null
                 }
                 titlePrefix={

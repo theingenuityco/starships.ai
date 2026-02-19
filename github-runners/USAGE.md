@@ -136,7 +136,7 @@ Recommended: keep CI as a single job so GitHub reports a single required check, 
 ```yaml
 jobs:
   build-check:
-    runs-on: [self-hosted, linux, x64, m8a.xlarge]
+    runs-on: [self-hosted, linux, x64, m7a.xlarge]
     steps:
       - uses: actions/checkout@v4
       - run: pnpm install --frozen-lockfile

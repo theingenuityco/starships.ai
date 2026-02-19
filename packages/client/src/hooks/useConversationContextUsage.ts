@@ -1,5 +1,6 @@
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 /**
  * Mirrors the server's conversation context handling:
@@ -8,6 +9,9 @@ import { useQuery } from '@tanstack/react-query'
  *
  * This hook intentionally measures **message-window utilization** (not lifetime token usage),
  * because lifetime usage is not a proxy for the next-turn prompt context.
+ *
+ * When `streamSnapshot` is provided (from the conversation stream), derives context usage
+ * from it and skips the API call. Falls back to API when stream data is unavailable.
  */
 export interface ConversationContextUsage {
   /** The message history limit used for this query. */
@@ -23,13 +27,21 @@ export interface ConversationContextUsage {
   effectivePromptMessageCount: number
 }
 
-export function useConversationContextUsage(conversationId: string | null, opts?: { limit?: number; enabled?: boolean }) {
+export type StreamSnapshotForContext = { messages: unknown[]; hasMoreBefore: boolean } | null
+
+export function useConversationContextUsage(
+  conversationId: string | null,
+  opts?: { limit?: number; enabled?: boolean; streamSnapshot?: StreamSnapshotForContext }
+) {
   const limit = typeof opts?.limit === 'number' && Number.isFinite(opts.limit) && opts.limit > 0 ? Math.floor(opts.limit) : 30
   const enabled = Boolean(opts?.enabled ?? true) && Boolean(conversationId)
+  const streamSnapshot = opts?.streamSnapshot ?? null
 
-  return useQuery({
+  const hasStreamData = Boolean(streamSnapshot && Array.isArray(streamSnapshot.messages))
+
+  const apiQuery = useQuery({
     queryKey: enabled ? (['conversations', conversationId, 'context-usage', { limit }] as const) : (['__noop__'] as const),
-    enabled,
+    enabled: enabled && !hasStreamData,
     queryFn: async (): Promise<ConversationContextUsage> => {
       const cid = String(conversationId || '')
       const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit } })
@@ -46,4 +58,22 @@ export function useConversationContextUsage(conversationId: string | null, opts?
     staleTime: 10_000,
     gcTime: 2 * 60 * 1000,
   })
+
+  const derivedFromStream = useMemo((): ConversationContextUsage | null => {
+    if (!hasStreamData || !streamSnapshot) return null
+    const messageCount = Math.min(limit, streamSnapshot.messages.length)
+    const hasMoreBefore = Boolean(streamSnapshot.hasMoreBefore)
+    return {
+      limit,
+      messageCount,
+      hasMoreBefore,
+      effectivePromptMessageCount: messageCount + (hasMoreBefore ? 1 : 0),
+    }
+  }, [hasStreamData, streamSnapshot, limit])
+
+  return {
+    ...apiQuery,
+    data: hasStreamData ? derivedFromStream ?? undefined : apiQuery.data,
+    isLoading: hasStreamData ? false : apiQuery.isLoading,
+  }
 }

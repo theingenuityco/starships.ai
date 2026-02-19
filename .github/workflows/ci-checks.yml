@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build-check:
     name: Build Check
-    runs-on: [self-hosted, linux, x64, m8a.xlarge]
+    runs-on: [self-hosted, linux, x64, m7a.xlarge]
     timeout-minutes: 30
     environment: ci
     env:

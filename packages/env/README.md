@@ -31,13 +31,12 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 ### Server Configuration
 
 - `SERVER_PORT` (number) - Server port, defaults to 4000
-- `CLIENT_PORT` (number) - Client port, defaults to 3000
 - `NODE_ENV` (string) - Environment, defaults to 'development'
 
 ### URLs
 
 - `PUBLIC_URL` (string) - Canonical public origin (required)
-- `CLIENT_URL` (string) - Client origin (required)
+- `APP_URL` (string) - Canonical app origin (required)
 - `SERVER_URL` (string) - Server origin (required)
 - `DOCS_URL` (string) - Docs origin (required)
 
@@ -97,4 +96,4 @@ The `getEnvConfig()` function now returns the complete configuration object inst
 
 ## Runtime behavior
 
-`getEnvConfig()` validates a small set of critical values and throws if they are missing (for example: `PUBLIC_URL`, `CLIENT_URL`, `SERVER_URL`, `DOCS_URL`, `JWT_SECRET`, `POSTGRES_PASSWORD`). This is intentional: it prevents partially-configured deployments from starting with unsafe defaults.
+`getEnvConfig()` validates a small set of critical values and throws if they are missing (for example: `PUBLIC_URL`, `APP_URL`, `SERVER_URL`, `DOCS_URL`, `JWT_SECRET`, `POSTGRES_PASSWORD`). This is intentional: it prevents partially-configured deployments from starting with unsafe defaults.

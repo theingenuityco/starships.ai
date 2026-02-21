@@ -43,13 +43,8 @@ function requireUserId(req: Request, res: Response): string | null {
 }
 
 function buildClientInviteUrl(token: string): string {
-  // Invite links must be rooted at the canonical PUBLIC origin users visit.
-  // This should be the same origin that serves `/accept-invite` in the browser.
-  // (In local dev, that's the reverse proxy; in prod, that's the public domain.)
-  const appUrl = String(env.APP_URL || '').trim();
-  const publicUrl = String(env.PUBLIC_URL || '').trim();
-  const clientUrl = String(env.CLIENT_URL || '').trim();
-  const base = appUrl || publicUrl || clientUrl;
+  // Invite links should land in the app UI (accept-invite is an auth entry flow).
+  const base = String(env.APP_URL || '').trim();
   try {
     const u = new URL('/accept-invite', base);
     u.searchParams.set('invite', token);

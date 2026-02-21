@@ -81,7 +81,7 @@ function isValidRedirectUrl(url: string): boolean {
 function addQueryParamsToPath(path: string, params: Record<string, string>): string {
   try {
     // Ensure relative-path handling while preserving existing query/hash.
-    const url = new URL(path, env.LANDING_URL || env.PUBLIC_URL);
+    const url = new URL(path, env.PUBLIC_URL);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
@@ -102,8 +102,8 @@ function hostOf(baseUrl: string): string | null {
 }
 
 function pickFrontendBaseUrlForRequest(req: Request): string {
-  const landing = normalizeBaseUrl(env.LANDING_URL || env.PUBLIC_URL);
-  const app = normalizeBaseUrl(env.APP_URL || env.PUBLIC_URL);
+  const landing = normalizeBaseUrl(env.PUBLIC_URL);
+  const app = normalizeBaseUrl(env.APP_URL);
   const landingHost = hostOf(landing);
   const appHost = hostOf(app);
 
@@ -630,8 +630,8 @@ function redactOAuthCallbackQueryForLogs(query: Record<string, unknown>): Record
 
 // Shared handler for connector callbacks (OAuth2 and provider-specific flows like GitHub App).
 async function connectorCallbackHandler(req: Request, res: Response): Promise<void> {
-  const landingBase = normalizeBaseUrl(env.LANDING_URL || env.PUBLIC_URL);
-  const appBase = normalizeBaseUrl(env.APP_URL || env.PUBLIC_URL);
+  const landingBase = normalizeBaseUrl(env.PUBLIC_URL);
+  const appBase = normalizeBaseUrl(env.APP_URL);
 
   try {
     const paramsValidation = validateData(

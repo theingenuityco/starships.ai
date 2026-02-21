@@ -76,7 +76,8 @@ const app: express.Application = express();
 const PORT = config.SERVER_PORT || 3001;
 
 // Validate URL formats
-validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
+validateUrlFormat(config.PUBLIC_URL, 'PUBLIC_URL');
+validateUrlFormat(config.APP_URL, 'APP_URL');
 // Note: NEXT_PUBLIC_API_URL validation is handled by client config
 
 const dbConnection = createConnection({
@@ -93,7 +94,7 @@ function normalizeOrigin(value: unknown): string {
   return s.replace(/\/+$/, '');
 }
 
-const allowedOrigins = [normalizeOrigin(config.LANDING_URL), normalizeOrigin(config.APP_URL)].filter(Boolean);
+const allowedOrigins = [normalizeOrigin(config.PUBLIC_URL), normalizeOrigin(config.APP_URL)].filter(Boolean);
 
 // Middleware - Order is important!
 app.use(

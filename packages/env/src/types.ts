@@ -4,24 +4,20 @@
 export interface EnvironmentConfig {
   // Server Configuration
   SERVER_PORT: number;
-  CLIENT_PORT: number;
   DOCS_PORT: number;
-  PROXY_PORT: number;
   NODE_ENV: string;
 
   // URLs
   /**
-   * Canonical landing/marketing origin (apex domain in production).
+   * Canonical public/landing origin (apex domain in production).
    * Example: https://starships.ai
    */
-  LANDING_URL: string;
+  PUBLIC_URL: string;
   /**
    * Canonical app origin (subdomain in production).
    * Example: https://app.starships.ai
    */
   APP_URL: string;
-  PUBLIC_URL: string;
-  CLIENT_URL: string;
   SERVER_URL: string;
   DOCS_URL: string;
 

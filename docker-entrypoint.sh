@@ -101,10 +101,9 @@ fi
 echo "Starting all application services..."
 
 # Extract ports from existing environment variables if available
-if [ -n "$CLIENT_URL" ]; then
-    echo "  - Frontend: $CLIENT_URL"
+if [ -n "$PUBLIC_URL" ]; then
+    echo "  - Frontend: $PUBLIC_URL"
 else
-    # Extract port from CLIENT_URL if possible, otherwise use PORT env var
     if [ -n "$PORT" ]; then
         echo "  - Frontend on port $PORT"
     else

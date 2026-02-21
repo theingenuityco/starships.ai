@@ -23,11 +23,10 @@ jobs:
       # Next.js builds can exceed Node's default ~2GB heap in CI.
       NODE_OPTIONS: --max-old-space-size=6144
       SERVER_PORT: ${{ vars.SERVER_PORT }}
-      CLIENT_PORT: ${{ vars.CLIENT_PORT }}
 
       # URLs
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
-      CLIENT_URL: ${{ vars.CLIENT_URL }}
+      APP_URL: ${{ vars.APP_URL }}
       SERVER_URL: ${{ vars.SERVER_URL }}
       DOCS_URL: ${{ vars.DOCS_URL }}
 

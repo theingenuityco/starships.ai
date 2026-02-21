@@ -9,8 +9,8 @@ function getRevalidateConfig(): { token: string; baseUrl: string } {
   const env = getEnvConfig()
   return {
     token: String(env.REVALIDATE_TOKEN || '').trim(),
-    // `CLIENT_URL` is the canonical origin for the Next app.
-    baseUrl: normalizeBaseUrl(env.CLIENT_URL),
+    // Revalidation is served by the public/landing frontend.
+    baseUrl: normalizeBaseUrl(env.PUBLIC_URL),
   }
 }
 

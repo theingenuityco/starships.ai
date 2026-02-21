@@ -152,8 +152,8 @@ jobs:
           REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           SERVER_URL: ${{ vars.SERVER_URL }}
-          CLIENT_URL: ${{ vars.CLIENT_URL }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          APP_URL: ${{ vars.APP_URL }}
           DOCS_URL: ${{ vars.DOCS_URL }}
           # Default false for dev unless explicitly overridden in the GitHub Environment vars.
           ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
@@ -222,8 +222,8 @@ jobs:
             --from-literal=REVALIDATE_TOKEN="$REVALIDATE_TOKEN" \
             --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             --from-literal=SERVER_URL="$SERVER_URL" \
-            --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
+            --from-literal=APP_URL="$APP_URL" \
             --from-literal=DOCS_URL="$DOCS_URL" \
             --from-literal=ENABLE_INDEXING="$ENABLE_INDEXING" \
             --from-literal=ENABLE_EMAILS="$ENABLE_EMAILS" \

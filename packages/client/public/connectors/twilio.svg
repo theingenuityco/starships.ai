@@ -1,9 +1,0 @@
-<svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Twilio logo">
-  <title>Twilio</title>
-  <circle cx="48" cy="48" r="24" fill="#F22F46" />
-  <circle cx="48" cy="48" r="16" fill="#FFFFFF" />
-  <circle cx="42" cy="42" r="4" fill="#F22F46" />
-  <circle cx="54" cy="42" r="4" fill="#F22F46" />
-  <circle cx="42" cy="54" r="4" fill="#F22F46" />
-  <circle cx="54" cy="54" r="4" fill="#F22F46" />
-</svg>

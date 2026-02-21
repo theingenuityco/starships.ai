@@ -1,4 +1,4 @@
-import { PwaWrapper } from '@/components/pwa-wrapper'
+import { PwaWrapper } from '../../../components/pwa-wrapper'
 
 export default function PwaPage() {
   return (

@@ -26,9 +26,10 @@ export type PlatformImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
 export type PlatformImageComponent = React.ComponentType<PlatformImageProps>
 
 export type PlatformRouter = {
-  push: (href: string) => void
-  replace: (href: string) => void
+  push: (href: string, options?: { scroll?: boolean }) => void
+  replace: (href: string, options?: { scroll?: boolean }) => void
   back: () => void
+  refresh: () => void
   prefetch?: (href: string) => void
 }
 
@@ -37,7 +38,7 @@ export type PlatformContextValue = {
   Image: PlatformImageComponent
   router?: PlatformRouter
   params?: Record<string, string | string[]> | null
-  pathname?: string | null
+  pathname?: string
   searchParams?: URLSearchParams | null
   brandFontClassName?: string | null
   headingFontClassName?: string | null

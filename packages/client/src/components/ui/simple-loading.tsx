@@ -37,7 +37,7 @@ export function LoadingSpinner({ size = 'md', className, children }: LoadingSpin
         🚀
       </div>
       {children && <span className="text-muted-foreground">{children}</span>}
-      <style jsx global>{`
+      <style>{`
         @keyframes vibrate {
           0%, 100% { transform: translateX(0) rotate(0deg); }
           25% { transform: translateX(-0.5px) rotate(-0.5deg); }

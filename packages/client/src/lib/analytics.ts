@@ -39,7 +39,7 @@ export function track(event: AnalyticsEvent) {
 
     const { type, ...props } = event
 
-    // Google Analytics (GA4 via gtag). @next/third-parties/google injects gtag().
+    // Google Analytics (GA4 via gtag). We expect `window.gtag()` to exist when GA is enabled.
     // Note: pushing plain objects to dataLayer is for GTM-style tags, not GA4 gtag events.
     const gtag = (window as any).gtag as undefined | ((...args: any[]) => void)
     if (typeof gtag === 'function') {

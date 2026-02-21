@@ -15,6 +15,10 @@ const FALLBACK_ROUTER: PlatformRouter = {
     if (typeof window === 'undefined') return
     window.history.back()
   },
+  refresh: () => {
+    if (typeof window === 'undefined') return
+    window.location.reload()
+  },
 }
 
 export function useRouter(): PlatformRouter {
@@ -27,11 +31,11 @@ export function useParams<TParams extends Record<string, string | string[]> = Re
   return (params ?? {}) as TParams
 }
 
-export function usePathname(): string | null {
+export function usePathname(): string {
   const { pathname } = usePlatform()
   if (typeof pathname === 'string') return pathname
-  if (typeof window === 'undefined') return null
-  return window.location.pathname
+  if (typeof window === 'undefined') return ''
+  return window.location.pathname || ''
 }
 
 export function useSearchParams(): URLSearchParams {

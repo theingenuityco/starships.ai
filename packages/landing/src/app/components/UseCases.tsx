@@ -1,5 +1,4 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
-import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
 import DeployAgentDemo from '@/app/components/DeployAgentDemo'
 import ConnectYourAppsDemo from '@/app/components/ConnectYourAppsDemo'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'

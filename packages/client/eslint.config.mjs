@@ -17,7 +17,7 @@ export default [
   {
     ignores: ['**/dist/', '**/.next/', '**/node_modules/', '**/coverage/'],
   },
-  ...compat.extends('next/core-web-vitals', 'prettier'),
+  ...compat.extends('prettier'),
   {
     plugins: {
       '@typescript-eslint': typescriptEslint,

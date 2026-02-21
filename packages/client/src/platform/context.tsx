@@ -15,6 +15,10 @@ function defaultRouter(): PlatformRouter {
       if (typeof window === 'undefined') return
       window.history.back()
     },
+    refresh: () => {
+      if (typeof window === 'undefined') return
+      window.location.reload()
+    },
   }
 }
 
@@ -31,7 +35,7 @@ const DEFAULT_PLATFORM_VALUE: PlatformContextValue = {
   Image: DefaultImage,
   router: defaultRouter(),
   params: null,
-  pathname: typeof window !== 'undefined' ? window.location.pathname : null,
+  pathname: typeof window !== 'undefined' ? window.location.pathname : '',
   searchParams: typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null,
   brandFontClassName: null,
   headingFontClassName: null,
@@ -54,7 +58,7 @@ export function PlatformProvider({
       Image: value.Image ?? base.Image,
       router: value.router ?? base.router ?? defaultRouter(),
       params: value.params ?? base.params ?? null,
-      pathname: value.pathname ?? base.pathname ?? null,
+      pathname: value.pathname ?? base.pathname ?? '',
       searchParams: value.searchParams ?? base.searchParams ?? null,
       brandFontClassName: value.brandFontClassName ?? base.brandFontClassName ?? null,
       headingFontClassName: value.headingFontClassName ?? base.headingFontClassName ?? null,

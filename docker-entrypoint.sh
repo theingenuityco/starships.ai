@@ -84,7 +84,7 @@ if [ "$NODE_ENV" != "production" ]; then
     fi
 
     # Check if packages are built, if not build them
-    if [ ! -d "packages/server/dist" ] || [ ! -d "packages/client/.next" ]; then
+    if [ ! -d "packages/server/dist" ] || [ ! -d "packages/landing/.next" ] || [ ! -d "packages/docs/.next" ]; then
         echo "Building all packages (frontend and backend)..."
         pnpm turbo run build --concurrency=1
     fi

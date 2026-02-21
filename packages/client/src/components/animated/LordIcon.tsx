@@ -111,11 +111,11 @@ export const LordIcon = memo(function LordIcon({ src, width = 20, height = 20, c
   return (
     <div className={`lordicon ${className ?? ''}`} aria-label={label} aria-hidden={label ? undefined : true} {...eventProps}>
       <Lottie lottieRef={lottieRef} animationData={animationData} loop={loop} autoplay={autoplay} style={{ width, height }} />
-      <style jsx>{`
-        :global(.lordicon svg [fill]:not([fill='none'])) {
+      <style>{`
+        .lordicon svg [fill]:not([fill='none']) {
           fill: currentColor !important;
         }
-        :global(.lordicon svg [stroke]:not([stroke='none'])) {
+        .lordicon svg [stroke]:not([stroke='none']) {
           stroke: currentColor !important;
         }
       `}</style>

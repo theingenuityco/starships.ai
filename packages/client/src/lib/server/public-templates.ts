@@ -1,5 +1,3 @@
-import 'server-only'
-
 import type { ApiResponse, ApiResponseMeta, AgentTemplateModel, ConnectorCatalogResponse, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { getPublicEnvConfig } from '@starships/env/public'
 
@@ -89,8 +87,6 @@ export async function fetchPublicAgentTemplates(args?: {
     if (args?.search) u.searchParams.set('search', args.search)
 
     const json = await fetchJson<ApiResponse<AgentTemplateModel[]>>(u.toString(), {
-      // Match our page ISR window by default.
-      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-agent-templates'] },
       headers: { Accept: 'application/json' },
     })
     const list = Array.isArray(json.data) ? json.data : []
@@ -116,7 +112,6 @@ export async function fetchPublicAgentTemplateBySlug(args: { slug: string; reval
 
     const u = new URL(`/api/v1/agent-templates/${encodeURIComponent(slug)}`, base)
     const json = await fetchJson<ApiResponse<AgentTemplateModel>>(u.toString(), {
-      next: { revalidate: args.revalidateSeconds ?? 3600, tags: ['public-agent-templates'] },
       headers: { Accept: 'application/json' },
     })
 
@@ -153,7 +148,6 @@ export async function fetchPublicAgentTemplatesPage(args: {
     if (args.search) u.searchParams.set('search', args.search)
 
     const json = await fetchJson<ApiResponse<AgentTemplateModel[]>>(u.toString(), {
-      next: { revalidate: args.revalidateSeconds ?? 3600, tags: ['public-agent-templates'] },
       headers: { Accept: 'application/json' },
     })
 
@@ -188,7 +182,6 @@ export async function fetchPublicToolTemplates(args?: {
     if (args?.search) u.searchParams.set('query', args.search)
 
     const json = await fetchJson<ApiResponse<ToolTemplateModel[]>>(u.toString(), {
-      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-tool-templates'] },
       headers: { Accept: 'application/json' },
     })
     return Array.isArray(json.data) ? json.data : []
@@ -290,7 +283,6 @@ export async function fetchPublicToolTemplatesPage(args: {
     if (args.requiresApiKey !== undefined) u.searchParams.set('requiresApiKey', String(args.requiresApiKey))
 
     const json = await fetchJson<ApiResponse<ToolTemplateModel[]>>(u.toString(), {
-      next: { revalidate: args.revalidateSeconds ?? 3600, tags: ['public-tool-templates'] },
       headers: { Accept: 'application/json' },
     })
 
@@ -311,7 +303,6 @@ export async function fetchPublicConnectorCatalog(args?: { revalidateSeconds?: n
     const u = new URL('/api/v1/connectors/catalog', base)
 
     const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
-      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-connector-catalog'] },
       headers: { Accept: 'application/json' },
     })
     const list = (json.data as ConnectorCatalogResponse | undefined)?.connectors
@@ -341,7 +332,6 @@ export async function fetchPublicConnectorCatalogPage(args: {
     if (args.q) u.searchParams.set('q', args.q)
 
     const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
-      next: { revalidate: args.revalidateSeconds ?? 3600, tags: ['public-connector-catalog'] },
       headers: { Accept: 'application/json' },
     })
     const list = (json.data as ConnectorCatalogResponse | undefined)?.connectors

@@ -13,7 +13,7 @@ export function TypingDots({ className, dotClassName, dotSizePx = 7 }: { classNa
       <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '0ms' }} />
       <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '140ms' }} />
       <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '280ms' }} />
-      <style jsx>{`
+      <style>{`
         .ss-typing-dot {
           animation: ssTypingDot 900ms ease-in-out infinite;
           opacity: 0.45;

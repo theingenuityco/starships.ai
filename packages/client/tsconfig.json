@@ -1,14 +1,19 @@
 {
-  "extends": "../../tsconfig.nextjs.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    /* Client-specific overrides if needed */
-    "lib": ["ES2020", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "types": ["node", "react", "react-dom"],
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      
+      "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*", ".next"]
+  "include": ["src/**/*", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", "build", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*", ".next"]
 }

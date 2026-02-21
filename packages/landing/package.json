@@ -38,6 +38,7 @@
     "@react-three/postprocessing": "^2.19.1",
     "@sentry/nextjs": "^10.27.0",
     "@starships/autopilot": "workspace:*",
+    "@starships/client": "workspace:*",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/models": "workspace:*",

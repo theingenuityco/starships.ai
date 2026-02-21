@@ -1,3 +1,7 @@
-export { dynamic, revalidate } from '@/app/explore/automations/page'
-export { default } from '@/app/explore/automations/page'
+import Page from '@/app/explore/automations/page'
+
+export const dynamic = 'force-static'
+export const revalidate = 3600
+
+export default Page
 

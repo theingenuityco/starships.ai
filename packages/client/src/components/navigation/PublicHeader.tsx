@@ -109,6 +109,14 @@ export function PublicHeader(): React.JSX.Element {
             Home
           </Link>
           <Link
+            href="/use-cases"
+            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases', variant: 'desktop' })}
+            className={`${pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
+          >
+            Use cases
+          </Link>
+          <Link
             href="/explore"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
             className={`${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
@@ -166,6 +174,16 @@ export function PublicHeader(): React.JSX.Element {
                 className={`block px-3 py-2 rounded-md text-sm ${pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
                 Home
+              </Link>
+              <Link
+                href="/use-cases"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              >
+                Use cases
               </Link>
               <Link
                 href="/explore"

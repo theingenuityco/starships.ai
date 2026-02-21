@@ -9,7 +9,7 @@ import {
   useResendEmailChangeVerification,
   useCancelEmailChange,
 } from '@/hooks/useEmailChange'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import { toast } from 'sonner'
 import { validatePassword } from '@/utils/passwordStrength'
 

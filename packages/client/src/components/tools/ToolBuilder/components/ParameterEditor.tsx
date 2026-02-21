@@ -2,18 +2,14 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-import dynamic from 'next/dynamic'
 import type { OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { useTheme } from 'next-themes'
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(m => m.default), {
-  ssr: false,
-  loading: () => <div className="h-[300px] w-full rounded-b-xl bg-muted/20" />,
-})
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })))
 
 interface ParameterEditorProps {
   value: string
@@ -548,50 +544,52 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
       {/* Monaco Editor */}
       <div className="relative rounded-b-xl overflow-hidden">
         <div className="pr-4 frosted-glass-card">
-          <MonacoEditor
-            height="300px"
-            defaultLanguage="json"
-            value={value}
-            onChange={handleChange}
-            onMount={handleEditorDidMount}
-            theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
-            options={{
-              readOnly: readonly,
-              minimap: { enabled: false },
-              fixedOverflowWidgets: true,
-              fontSize: 12,
-              lineNumbers: 'off',
-              glyphMargin: true,
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              wrappingIndent: 'indent',
-              automaticLayout: true,
-              tabSize: 2,
-              insertSpaces: true,
-              formatOnPaste: true,
-              formatOnType: true,
-              quickSuggestions: !readonly,
-              suggestOnTriggerCharacters: !readonly,
-              acceptSuggestionOnEnter: readonly ? 'off' : 'on',
-              folding: false,
-              overviewRulerLanes: 0,
-              hideCursorInOverviewRuler: true,
-              overviewRulerBorder: false,
-              stickyScroll: { enabled: false },
-              padding: { top: 12, bottom: 12 },
-              scrollbar: {
-                verticalScrollbarSize: 10,
-                horizontalScrollbarSize: 10,
-                useShadows: false,
-                alwaysConsumeMouseWheel: false,
-              },
-              guides: {
-                bracketPairs: false,
-                bracketPairsHorizontal: false,
-                highlightActiveBracketPair: false,
-              },
-            }}
-          />
+          <Suspense fallback={<div className="h-[300px] w-full rounded-b-xl bg-muted/20" />}>
+            <MonacoEditor
+              height="300px"
+              defaultLanguage="json"
+              value={value}
+              onChange={handleChange}
+              onMount={handleEditorDidMount}
+              theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
+              options={{
+                readOnly: readonly,
+                minimap: { enabled: false },
+                fixedOverflowWidgets: true,
+                fontSize: 12,
+                lineNumbers: 'off',
+                glyphMargin: true,
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                wrappingIndent: 'indent',
+                automaticLayout: true,
+                tabSize: 2,
+                insertSpaces: true,
+                formatOnPaste: true,
+                formatOnType: true,
+                quickSuggestions: !readonly,
+                suggestOnTriggerCharacters: !readonly,
+                acceptSuggestionOnEnter: readonly ? 'off' : 'on',
+                folding: false,
+                overviewRulerLanes: 0,
+                hideCursorInOverviewRuler: true,
+                overviewRulerBorder: false,
+                stickyScroll: { enabled: false },
+                padding: { top: 12, bottom: 12 },
+                scrollbar: {
+                  verticalScrollbarSize: 10,
+                  horizontalScrollbarSize: 10,
+                  useShadows: false,
+                  alwaysConsumeMouseWheel: false,
+                },
+                guides: {
+                  bracketPairs: false,
+                  bracketPairsHorizontal: false,
+                  highlightActiveBracketPair: false,
+                },
+              }}
+            />
+          </Suspense>
         </div>
       </div>
 

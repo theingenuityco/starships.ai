@@ -5,7 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 
 import { cn } from '@/lib/utils'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 
 interface LoginButtonProps {
   variant?: 'default' | 'secondary' | 'outline' | 'ghost'

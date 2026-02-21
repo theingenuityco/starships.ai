@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from '@/platform/navigation'
 import { useEffect } from 'react'
 import posthog from 'posthog-js'
 

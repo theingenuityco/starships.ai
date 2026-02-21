@@ -1,6 +1,6 @@
-import '@/app/globals.css'
+import './globals.css'
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
-import { SentryWrapper } from '@/components/sentry-wrapper'
+import { SentryWrapper } from '../components/sentry-wrapper'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'

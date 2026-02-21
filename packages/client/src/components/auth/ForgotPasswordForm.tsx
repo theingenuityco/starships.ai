@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useForgotPassword } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { useState } from 'react'
-import Link from 'next/link'
+import Link from '@/platform/link'
 import { track } from '@/lib/analytics'
 
 /**

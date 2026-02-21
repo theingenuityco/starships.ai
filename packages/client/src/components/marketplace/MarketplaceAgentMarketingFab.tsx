@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'

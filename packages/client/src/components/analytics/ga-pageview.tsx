@@ -1,7 +1,7 @@
 'use client'
 
 import { sendGAEvent } from '@next/third-parties/google'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from '@/platform/navigation'
 import { useEffect, useRef } from 'react'
 
 /**

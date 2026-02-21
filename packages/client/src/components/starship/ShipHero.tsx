@@ -3,12 +3,12 @@
 import Icon from '@/components/primitives/Icon'
 
 import React from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/platform/link'
+import { useRouter } from '@/platform/navigation'
 import { Button } from '@/components/ui/button'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
-import { Outfit } from 'next/font/google'
+import { usePlatform } from '@/platform'
 
 export interface ShipHeroProps {
   slug: string
@@ -16,9 +16,8 @@ export interface ShipHeroProps {
   className?: string
 }
 
-const heroHeadingFont = Outfit({ subsets: ['latin'], weight: ['600', '700'] })
-
 export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
+  const { headingFontClassName } = usePlatform()
   const router = useRouter()
   const { data: agents = [] } = useStarshipAgents(starshipId || '', !!starshipId)
 
@@ -32,7 +31,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
       <div className="relative z-10 flex flex-col gap-8 md:flex-row md:items-center md:justify-between md:gap-10">
         {/* Gaia marketing content */}
         <div className="max-w-2xl">
-          <h2 id="ship-hero" className={cn(heroHeadingFont.className, 'text-3xl md:text-4xl lg:text-4xl font-bold tracking-tight')}>
+          <h2 id="ship-hero" className={cn(headingFontClassName ?? '', 'text-3xl md:text-4xl lg:text-4xl font-bold tracking-tight')}>
             Create agents with Gaia
           </h2>
           <p className="mt-3 md:mt-4 text-sm md:text-base text-muted-foreground">

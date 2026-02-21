@@ -5,7 +5,7 @@ import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifi
 import { useAuth } from '@/hooks/useAuth'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useSyncExternalStore, useCallback, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname } from '@/platform/navigation'
 import { useTheme } from 'next-themes'
 import { buildFaviconBaseSvg } from '@/lib/faviconSvg'
 

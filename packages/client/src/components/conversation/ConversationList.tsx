@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter } from '@/platform/navigation'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { Button } from '../ui/button'

@@ -2,7 +2,7 @@
 
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import { useAccountForm } from '@/hooks/useAccountForm'
 import { useAuth } from '@/hooks/useAuth'
 import AccountTopBar from './AccountTopBar'

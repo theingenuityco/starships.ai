@@ -1,2 +1,40 @@
-export { default } from '@/app/login/layout'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Login | Starships.ai',
+  description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
+  alternates: {
+    canonical: 'https://starships.ai/login',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'Starships.ai',
+    title: 'Login | Starships.ai',
+    description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
+    url: 'https://starships.ai/login',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/static-assets/og.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Starships.ai Login',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Login | Starships.ai',
+    description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
+    images: ['/static-assets/og.jpg'],
+  },
+  robots: {
+    index: false, // Don't index login pages
+    follow: true,
+  },
+}
+
+export default function LoginLayout({ children }: { children: React.ReactNode }) {
+  return children
+}
 

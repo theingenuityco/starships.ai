@@ -1,10 +1,9 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
 import type { ComponentType, CSSProperties } from 'react'
-import { forwardRef, useEffect, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useMemo, useState, lazy, Suspense } from 'react'
 
 type EmojiMartData = Record<string, unknown>
 type CSSVars = CSSProperties & Partial<Record<`--${string}`, string>>
@@ -43,8 +42,9 @@ type EmojiMartPickerProps = {
   noCountryFlags?: boolean
 }
 
-// next/dynamic defaults to `ComponentType<{}>`; widen props so TS accepts picker props.
-const EmojiMartPicker = dynamic<EmojiMartPickerProps>(() => import('@emoji-mart/react').then(m => m.default as unknown as ComponentType<EmojiMartPickerProps>), { ssr: false })
+const EmojiMartPicker = lazy(() =>
+  import('@emoji-mart/react').then(m => ({ default: m.default as unknown as ComponentType<EmojiMartPickerProps> }))
+)
 
 export const EmojiPicker = forwardRef<
   HTMLDivElement,
@@ -215,26 +215,34 @@ export const EmojiPicker = forwardRef<
       style={{ ...themeVars, ...(styleProp ?? {}) }}
       {...restProps}
     >
-      <EmojiMartPicker
-        data={data}
-        theme={theme}
-        previewPosition="none"
-        skinTonePosition="search"
-        dynamicWidth={false}
-        onEmojiSelect={handleEmojiSelect}
-        // Sizing / density
-        set="native"
-        emojiSize={20}
-        emojiButtonSize={32}
-        emojiButtonRadius="12px"
-        perLine={9}
-        maxFrequentRows={2}
-        navPosition="bottom"
-        searchPosition="sticky"
-        // Match our popover vibe a bit (emoji-mart uses inline styles)
-        icons="auto"
-        noCountryFlags={false}
-      />
+      <Suspense
+        fallback={
+          <div className="p-4 text-sm text-muted-foreground" role="status">
+            Loading emojis…
+          </div>
+        }
+      >
+        <EmojiMartPicker
+          data={data}
+          theme={theme}
+          previewPosition="none"
+          skinTonePosition="search"
+          dynamicWidth={false}
+          onEmojiSelect={handleEmojiSelect}
+          // Sizing / density
+          set="native"
+          emojiSize={20}
+          emojiButtonSize={32}
+          emojiButtonRadius="12px"
+          perLine={9}
+          maxFrequentRows={2}
+          navPosition="bottom"
+          searchPosition="sticky"
+          // Match our popover vibe a bit (emoji-mart uses inline styles)
+          icons="auto"
+          noCountryFlags={false}
+        />
+      </Suspense>
     </div>
   )
 })

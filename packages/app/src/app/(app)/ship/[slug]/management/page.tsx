@@ -1,2 +1,13 @@
-export { default } from '@/app/ship/[slug]/management/page'
+import { redirect } from 'next/navigation'
+
+interface PageProps {
+  params: Promise<{
+    slug: string
+  }>
+}
+
+export default async function ManagementRedirectPage({ params }: PageProps) {
+  const { slug } = await params
+  redirect(`/ship/${slug}/settings/usage`)
+}
 

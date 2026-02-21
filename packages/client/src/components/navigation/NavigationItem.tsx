@@ -4,8 +4,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import Icon from '@/components/primitives/Icon'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'motion/react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/platform/link'
+import { useRouter } from '@/platform/navigation'
 import { useCallback, useMemo } from 'react'
 
 interface NavigationItemProps {

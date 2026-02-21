@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 
 import React from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 
 interface JwtUserProfileProps {
   mode?: 'collapsed' | 'expanded'

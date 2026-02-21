@@ -20,7 +20,7 @@ import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams } from '@/platform/navigation'
 
 interface AgentSelectorProps {
   selectedAgent: AgentModel | null

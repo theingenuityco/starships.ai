@@ -2,8 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
-import dynamic from 'next/dynamic'
+import React, { forwardRef, useImperativeHandle, useMemo, lazy, Suspense } from 'react'
 
 import type { Blueprint } from '@starships/autopilot'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
@@ -12,13 +11,8 @@ import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
 
-// Lazy-load to avoid pulling ELK/WebWorker code into SSR evaluation.
-const BlueprintVisualization = dynamic(
-  () => import('@/components/blueprint/BlueprintVisualization').then(m => m.BlueprintVisualization),
-  {
-    ssr: false,
-    loading: () => <div className="h-full w-full bg-muted/20" />,
-  }
+const BlueprintVisualization = lazy(() =>
+  import('@/components/blueprint/BlueprintVisualization').then(m => ({ default: m.BlueprintVisualization }))
 )
 
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, toolId, templateId }, ref) => {
@@ -70,7 +64,9 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
 
           {/* Blueprint or Empty State */}
           {parsedBlueprint && parsedBlueprint.nodes && parsedBlueprint.nodes.length > 0 ? (
-            <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent nodesDraggable />
+            <Suspense fallback={<div className="h-full w-full bg-muted/20" />}>
+              <BlueprintVisualization blueprint={parsedBlueprint} className="h-full w-full" transparent nodesDraggable />
+            </Suspense>
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4 max-w-md px-6">

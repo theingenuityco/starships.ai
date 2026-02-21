@@ -2,8 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
-import dynamic from 'next/dynamic'
+import React, { useMemo, useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useTheme } from 'next-themes'
 import {
   ReactFlow,
@@ -31,10 +30,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { OnMount } from '@monaco-editor/react'
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(m => m.default), {
-  ssr: false,
-  loading: () => <div className="h-[200px] w-full bg-muted/20" />,
-})
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(m => ({ default: m.default })))
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
@@ -1029,47 +1025,49 @@ const NodeDetailsPanel: React.FC<{
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase">Code</h4>
               <div className="rounded-lg border bg-background overflow-hidden">
-                <MonacoEditor
-                  height={editorHeight ? `${editorHeight}px` : '200px'}
-                  defaultLanguage="javascript"
-                  value={(node as any).parameters.code as string}
-                  onMount={handleCodeEditorMount}
-                  theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
-                  options={{
-                    readOnly: true,
-                    domReadOnly: true,
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    glyphMargin: false,
-                    lineNumbersMinChars: 4,
-                    lineDecorationsWidth: 20,
-                    scrollBeyondLastLine: false,
-                    wordWrap: 'on',
-                    wrappingIndent: 'indent',
-                    automaticLayout: true,
-                    tabSize: 2,
-                    insertSpaces: true,
-                    folding: false,
-                    overviewRulerLanes: 0,
-                    hideCursorInOverviewRuler: true,
-                    overviewRulerBorder: false,
-                    stickyScroll: { enabled: true },
-                    padding: { top: 12, bottom: 12 },
-                    scrollbar: {
-                      vertical: 'hidden',
-                      horizontal: 'hidden',
-                      useShadows: false,
-                      alwaysConsumeMouseWheel: false,
-                    },
-                    guides: {
-                      indentation: false,
-                      bracketPairs: false,
-                      bracketPairsHorizontal: false,
-                      highlightActiveBracketPair: false,
-                    },
-                  }}
-                />
+                <Suspense fallback={<div className="h-[200px] w-full bg-muted/20" />}>
+                  <MonacoEditor
+                    height={editorHeight ? `${editorHeight}px` : '200px'}
+                    defaultLanguage="javascript"
+                    value={(node as any).parameters.code as string}
+                    onMount={handleCodeEditorMount}
+                    theme={theme === 'dark' ? 'starships-dark' : 'starships-light'}
+                    options={{
+                      readOnly: true,
+                      domReadOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      lineNumbers: 'on',
+                      glyphMargin: false,
+                      lineNumbersMinChars: 4,
+                      lineDecorationsWidth: 20,
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',
+                      wrappingIndent: 'indent',
+                      automaticLayout: true,
+                      tabSize: 2,
+                      insertSpaces: true,
+                      folding: false,
+                      overviewRulerLanes: 0,
+                      hideCursorInOverviewRuler: true,
+                      overviewRulerBorder: false,
+                      stickyScroll: { enabled: true },
+                      padding: { top: 12, bottom: 12 },
+                      scrollbar: {
+                        vertical: 'hidden',
+                        horizontal: 'hidden',
+                        useShadows: false,
+                        alwaysConsumeMouseWheel: false,
+                      },
+                      guides: {
+                        indentation: false,
+                        bracketPairs: false,
+                        bracketPairsHorizontal: false,
+                        highlightActiveBracketPair: false,
+                      },
+                    }}
+                  />
+                </Suspense>
               </div>
             </div>
           )}

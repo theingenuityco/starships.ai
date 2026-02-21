@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from '@/platform/navigation'
 
 import api from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,17 +18,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { Orbitron } from 'next/font/google'
-import { useRouter } from 'next/navigation'
 import { AnimatePresence, motion } from 'motion/react'
+import { usePlatform } from '@/platform'
 
 type InstallValidateResponse = {
   ok: true
   provider: string
   verifiedLaunchMetadata: Record<string, unknown>
 }
-
-const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 function titleCase(input: string): string {
   const s = String(input || '').trim()
@@ -37,6 +34,7 @@ function titleCase(input: string): string {
 }
 
 export function ConnectorInstallPage() {
+  const { brandFontClassName } = usePlatform()
   const router = useRouter()
   const params = useParams<{ provider: string }>()
   const searchParams = useSearchParams()
@@ -211,7 +209,7 @@ export function ConnectorInstallPage() {
             <button className="cursor-pointer select-none h-8 flex items-center" onClick={() => router.push('/')} title="Go to home" type="button">
               <span className="flex items-center gap-2">
                 <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
-                <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>starships.ai</span>
+                <span className={`${brandFontClassName ?? ''} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>starships.ai</span>
               </span>
             </button>
           </div>

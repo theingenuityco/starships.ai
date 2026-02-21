@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from '@/platform/navigation'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import Link from 'next/link'
+import Link from '@/platform/link'
 
 import api from '@/lib/api'
 import type { AgentModel, ApiResponse, PaginationMeta, ToolModel } from '@starships/protocol'

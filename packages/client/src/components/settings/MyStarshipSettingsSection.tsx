@@ -16,7 +16,7 @@ import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { StarshipToolsDefaultsSection } from '@/components/settings/StarshipToolsDefaultsSection'
 

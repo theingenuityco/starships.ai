@@ -1,2 +1,7 @@
-export { default } from '@/app/ship/[slug]/conversations/page'
+'use client'
+
+export default function ConversationsIndexPage() {
+  // The /conversations layout renders the conversation UI and handles DM deep-links.
+  return null
+}
 

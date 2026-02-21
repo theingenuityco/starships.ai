@@ -42,7 +42,7 @@ import api, { agentAPI, templateAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
-import Link from 'next/link'
+import Link from '@/platform/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'

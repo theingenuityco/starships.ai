@@ -7,7 +7,7 @@ import { useNotificationsList } from '@/hooks/useNotifications'
 import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
 import { memo, useCallback, useMemo, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from '@/platform/navigation'
 
 function getInitials(name: string): string {
   const cleaned = (name || '').trim()

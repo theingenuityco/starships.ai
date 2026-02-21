@@ -1,6 +1,6 @@
 import { resolveApiUrl, setTokenProvider, type SyncedUser } from '@/lib/api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'

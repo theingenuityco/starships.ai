@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter } from '@/platform/navigation'
 import { useMemo } from 'react'
 
 export function ForumChannelView(props: {

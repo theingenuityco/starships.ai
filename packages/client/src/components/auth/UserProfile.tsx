@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
 import { isImageUrl } from '@/lib/isImageUrl'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from '@/platform/navigation'
 import React from 'react'
 
 interface UserProfileProps {

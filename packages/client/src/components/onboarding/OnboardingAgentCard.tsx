@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import Image from '@/platform/image'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'

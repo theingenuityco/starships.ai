@@ -11,10 +11,8 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
 import api from '@/lib/api'
 import Icon from '@/components/primitives/Icon'
-import { Orbitron } from 'next/font/google'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-
-const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
+import { usePathname, useRouter, useSearchParams } from '@/platform/navigation'
+import { usePlatform } from '@/platform'
 
 export interface StarshipDetailsProps {
   starshipId: string
@@ -28,6 +26,7 @@ export interface StarshipDetailsProps {
  * Intended to be rendered inline in chat via widgetType: "StarshipDetails".
  */
 export function StarshipDetails({ starshipId, className }: StarshipDetailsProps): React.JSX.Element {
+  const { brandFontClassName } = usePlatform()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -161,7 +160,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
         <div className="flex items-center gap-3 mb-4">
           <StarshipsLogo width={44} height={44} gradientId={logoGradientId} idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} animationDelay={0} activeStroke="gradient" />
           <div className="min-w-0">
-            <div className={`${orbitron.className} text-2xl sm:text-3xl font-semibold leading-none tracking-tight`}>My Starship</div>
+            <div className={`${brandFontClassName ?? ''} text-2xl sm:text-3xl font-semibold leading-none tracking-tight`}>My Starship</div>
           </div>
           <div className="ml-auto">
             <Button type="submit" form="starship-details-form" disabled={!canSubmit} className="shadow-sm">

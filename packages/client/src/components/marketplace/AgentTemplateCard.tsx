@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import Image from '@/platform/image'
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import { AgentDeploymentWizardModal } from './AgentDeploymentWizardModal'
 
 import { memo, useCallback, useMemo, useState } from 'react'
 import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protocol'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from '@/platform/navigation'
 import { track } from '@/lib/analytics'
 import api from '@/lib/api'
 import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'

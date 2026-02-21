@@ -3,7 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import React, { useEffect, useRef } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from '@/platform/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { type ResolvedIcon, registerIcons } from '@/components/primitives/iconMap'

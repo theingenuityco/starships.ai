@@ -10,7 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { isImageUrl } from '@/lib/isImageUrl'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from '@/platform/navigation'
 import { useCallback, useMemo } from 'react'
 
 interface UserProfileMenuProps {

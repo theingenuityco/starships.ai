@@ -6,7 +6,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/platform/navigation'
 import type { AgentModel } from '@starships/protocol'
 
 interface AgentDeploymentModalProps {

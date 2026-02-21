@@ -14,7 +14,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
 
 import { motion } from 'motion/react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter } from '@/platform/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 

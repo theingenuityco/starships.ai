@@ -9,7 +9,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from '@/platform/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams, useSearchParams } from '@/platform/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'

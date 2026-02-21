@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-webapp
+  namespace: starships-prod
+  labels:
+    app: starships-webapp
+    environment: production
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: starships-webapp
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: starships-webapp
+        environment: production
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+
+      containers:
+        - name: starships-webapp
+          image: 'ghcr.io/theingenuityco/starships.ai:latest'
+          imagePullPolicy: Always
+          command: ['sh', '-lc']
+          args:
+            - pnpm --filter @starships/app start
+
+          ports:
+            - containerPort: 3000
+              name: webapp
+
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: SKIP_BUILD
+              value: 'true'
+            - name: SKIP_INSTALL
+              value: 'true'
+
+            # URLs
+            - name: PUBLIC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: PUBLIC_URL
+            - name: LANDING_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: LANDING_URL
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: APP_URL
+            - name: CLIENT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: CLIENT_URL
+            - name: SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SERVER_URL
+            - name: DOCS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DOCS_URL
+
+            # Analytics
+            - name: GA_MEASUREMENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: GA_MEASUREMENT_ID
+            - name: META_PIXEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: META_PIXEL_ID
+            - name: POSTHOG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTHOG_KEY
+            - name: POSTHOG_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTHOG_HOST
+            - name: SENTRY_DSN_CLIENT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SENTRY_DSN_CLIENT
+
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '1Gi'
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 5
+            timeoutSeconds: 3
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 5
+            timeoutSeconds: 5
+

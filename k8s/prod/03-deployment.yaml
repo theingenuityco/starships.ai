@@ -78,6 +78,16 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: PUBLIC_URL
+            - name: LANDING_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: LANDING_URL
+            - name: APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: APP_URL
             - name: CLIENT_URL
               valueFrom:
                 secretKeyRef:

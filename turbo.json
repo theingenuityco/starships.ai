@@ -23,6 +23,8 @@
     "VAPID_PUBLIC_KEY",
     "VAPID_PRIVATE_KEY",
     "PUBLIC_URL",
+    "LANDING_URL",
+    "APP_URL",
     "CLIENT_URL",
     "SERVER_URL",
     "DOCS_URL"

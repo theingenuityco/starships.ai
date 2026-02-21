@@ -130,9 +130,9 @@ echo "Ensuring pnpm is ready..."
 pnpm --version > /dev/null 2>&1
 
 exec npx concurrently \
-    --names "client,server,docs" \
+    --names "landing,server,docs" \
     --prefix-colors "blue,green,yellow" \
     --kill-others \
-    "pnpm --filter @starships/client start" \
+    "pnpm --filter @starships/landing start" \
     "pnpm --filter @starships/server start" \
     "pnpm --filter @starships/docs start"

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: starships-webapp
+  namespace: starships-prod
+  labels:
+    app: starships-webapp
+    environment: production
+spec:
+  type: ClusterIP
+  selector:
+    app: starships-webapp
+    environment: production
+  ports:
+    - name: webapp
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+

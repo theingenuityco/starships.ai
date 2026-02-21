@@ -41,6 +41,10 @@ metadata:
     alb.ingress.kubernetes.io/actions.redirect-to-apex: >
       {"Type":"redirect","RedirectConfig":{"Host":"starships.ai","Path":"/#{path}","Query":"#{query}","Protocol":"HTTPS","Port":"443","StatusCode":"HTTP_301"}}
 
+    # Redirect app-owned routes on apex -> app subdomain
+    alb.ingress.kubernetes.io/actions.redirect-to-app: >
+      {"Type":"redirect","RedirectConfig":{"Host":"app.starships.ai","Path":"/#{path}","Query":"#{query}","Protocol":"HTTPS","Port":"443","StatusCode":"HTTP_301"}}
+
 spec:
   ingressClassName: alb
   rules:
@@ -66,12 +70,99 @@ spec:
                 port:
                   number: 4000
 
+          # App-owned routes (redirect to app.starships.ai)
+          - path: /ship
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /account
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /login
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /forgot-password
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /reset-password
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /accept-invite
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /onboarding
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+          - path: /pwa
+            pathType: Prefix
+            backend:
+              service:
+                name: redirect-to-app
+                port:
+                  name: use-annotation
+
           # Frontend (catch-all, last)
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: starships-app
+                port:
+                  number: 3000
+
+    # app.starships.ai
+    - host: app.starships.ai
+      http:
+        paths:
+          # API routes
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app
+                port:
+                  number: 4000
+
+          # App frontend (catch-all)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-webapp
                 port:
                   number: 3000
 

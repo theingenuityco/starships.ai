@@ -54,3 +54,17 @@ The backend remains shared and is exposed on both hosts at `https://<host>/api/*
 - `starships.ai`: public HTML can be cached at the edge; assets immutable.
 - `app.starships.ai`: all authenticated pages must be `private, no-store`.
 
+---
+
+## Local dev
+
+The dev reverse proxy routes by **Host header** (mirrors prod subdomains):
+
+- Landing: `http://starships.localhost:8080`
+- App: `http://app.localhost:8080`
+
+Upstream dev servers default to:
+
+- `LANDING_UPSTREAM_URL=http://localhost:3002`
+- `APP_UPSTREAM_URL=http://localhost:3003`
+

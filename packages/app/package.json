@@ -2,11 +2,10 @@
   "name": "@starships/app",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p 3003",
     "build": "next build",
-    "start": "next start -p 3001",
+    "start": "next start -p 3000",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
@@ -40,6 +39,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^9.46.0",
+    "@next/env": "16.1.6",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/models": "workspace:*",

@@ -20,6 +20,16 @@ export interface EnvironmentConfig {
    * Example: https://app.starships.ai
    */
   APP_URL: string;
+  /**
+   * Reverse-proxy upstream for the landing Next dev server.
+   * Example: http://localhost:3002
+   */
+  LANDING_UPSTREAM_URL: string;
+  /**
+   * Reverse-proxy upstream for the app Next dev server.
+   * Example: http://localhost:3003
+   */
+  APP_UPSTREAM_URL: string;
   PUBLIC_URL: string;
   CLIENT_URL: string;
   SERVER_URL: string;

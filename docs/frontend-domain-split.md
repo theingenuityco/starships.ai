@@ -58,10 +58,10 @@ The backend remains shared and is exposed on both hosts at `https://<host>/api/*
 
 ## Local dev
 
-The dev reverse proxy routes by **Host header** (mirrors prod subdomains):
+The dev reverse proxy runs on plain `localhost` (no subdomains):
 
-- Landing: `http://starships.localhost:8080`
-- App: `http://app.localhost:8080`
+- Landing: `http://localhost:8080`
+- App: `http://localhost:8080/app`
 
 Upstream dev servers default to:
 

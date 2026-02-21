@@ -1,4 +1,3 @@
-import { ClientLayout } from '@/app/client-layout'
 import '@/app/globals.css'
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider'
 import { SentryWrapper } from '@/components/sentry-wrapper'
@@ -121,9 +120,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <AuthUserHtmlClassSync />
               <TooltipProvider>
                 <div className="min-h-[100dvh] bg-background">
-                  <Suspense fallback={<div className="min-h-[100dvh] bg-background" />}>
-                    <ClientLayout>{children}</ClientLayout>
-                  </Suspense>
+                  <Suspense fallback={<div className="min-h-[100dvh] bg-background" />}>{children}</Suspense>
                   <Toaster />
                   <SonnerToaster position="top-center" />
                 </div>

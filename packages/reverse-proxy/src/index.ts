@@ -14,19 +14,6 @@ const APP_URL = envConfig.APP_UPSTREAM_URL
 const BACKEND_URL = envConfig.SERVER_URL
 const DOCS_URL = envConfig.DOCS_URL
 
-function normalizeHost(raw: unknown): string {
-  const v = String(raw || '')
-    .trim()
-    .toLowerCase()
-  if (!v) return ''
-  return v.includes(':') ? v.split(':')[0] : v
-}
-
-function isAppHost(rawHost: unknown): boolean {
-  const host = normalizeHost(rawHost)
-  return host === 'app.starships.ai' || host === 'app.localhost' || host.startsWith('app.')
-}
-
 // Proxy options for backend API routes
 const apiProxyOptions: Options = {
   target: BACKEND_URL,
@@ -43,15 +30,20 @@ const docsProxyOptions: Options = {
   pathFilter: '/docs', // Match paths starting with /docs
 }
 
-// Proxy options for frontend routes
-const frontendProxyOptions: Options = {
-  target: LANDING_URL,
+// Proxy options for app frontend routes (mounted at /app in local dev)
+const appProxyOptions: Options = {
+  target: APP_URL,
   changeOrigin: true,
   ws: true, // Enable WebSocket support for Next.js HMR
-  pathFilter: (path: string) => !path.startsWith('/api') && !path.startsWith('/docs'), // Everything except /api and /docs
-  router: (req) => {
-    return isAppHost(req.headers.host) ? APP_URL : LANDING_URL
-  },
+  pathFilter: '/app',
+}
+
+// Proxy options for landing frontend routes
+const landingProxyOptions: Options = {
+  target: LANDING_URL,
+  changeOrigin: true,
+  ws: true,
+  pathFilter: (path: string) => !path.startsWith('/api') && !path.startsWith('/docs') && !path.startsWith('/app'),
 }
 
 // Health check endpoint for the proxy itself
@@ -62,14 +54,16 @@ app.get('/_proxy/health', (req, res) => {
 })
 
 // Create proxy middlewares
-const apiProxy = createProxyMiddleware(apiProxyOptions);
-const docsProxy = createProxyMiddleware(docsProxyOptions);
-const frontendProxy = createProxyMiddleware(frontendProxyOptions);
+const apiProxy = createProxyMiddleware(apiProxyOptions)
+const docsProxy = createProxyMiddleware(docsProxyOptions)
+const appProxy = createProxyMiddleware(appProxyOptions)
+const landingProxy = createProxyMiddleware(landingProxyOptions)
 
 // Apply proxies - order matters!
 app.use(docsProxy) // /docs/* → docs (includes /docs/api/*)
 app.use(apiProxy) // /api/* → backend
-app.use(frontendProxy) // everything else → landing/app (by Host header)
+app.use(appProxy) // /app/* → app
+app.use(landingProxy) // everything else → landing
 
 // Start the proxy server
 const server = app.listen(PORT, () => {
@@ -84,10 +78,10 @@ Docs URL:       ${DOCS_URL}
 Health Check:   http://localhost:${PORT}/_proxy/health
 
 Routes:
-  Host=starships.ai     /*     →  ${LANDING_URL}
-  Host=app.starships.ai /*     →  ${APP_URL}
+  /app/*                       →  ${APP_URL}
   /docs/*                      →  ${DOCS_URL}/docs/*
   /api/*                       →  ${BACKEND_URL}/api/*
+  /*                           →  ${LANDING_URL}
 ================================
   `)
 })

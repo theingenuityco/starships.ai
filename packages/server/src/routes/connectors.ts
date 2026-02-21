@@ -81,12 +81,42 @@ function isValidRedirectUrl(url: string): boolean {
 function addQueryParamsToPath(path: string, params: Record<string, string>): string {
   try {
     // Ensure relative-path handling while preserving existing query/hash.
-    const url = new URL(path, env.PUBLIC_URL);
+    const url = new URL(path, env.LANDING_URL || env.PUBLIC_URL);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return path;
   }
+}
+
+function normalizeBaseUrl(value: string): string {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
+
+function hostOf(baseUrl: string): string | null {
+  try {
+    return new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function pickFrontendBaseUrlForRequest(req: Request): string {
+  const landing = normalizeBaseUrl(env.LANDING_URL || env.PUBLIC_URL);
+  const app = normalizeBaseUrl(env.APP_URL || env.PUBLIC_URL);
+  const landingHost = hostOf(landing);
+  const appHost = hostOf(app);
+
+  const reqHost = String((req.headers['x-forwarded-host'] as string) || req.headers.host || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+
+  if (landingHost && reqHost === landingHost) return landing;
+  if (appHost && reqHost === appHost) return app;
+
+  // Fallback: prefer app as the canonical auth/app base.
+  return app || landing;
 }
 
 // GET /connectors/catalog - Static connector catalog (with optional search)
@@ -564,6 +594,7 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
     const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider, {
       metadata: bodyValidation.metadata,
       returnUrl: bodyValidation.returnUrl,
+      redirectBaseUrl: pickFrontendBaseUrlForRequest(req),
     });
 
     const response: StartOAuthResponse = {
@@ -599,6 +630,9 @@ function redactOAuthCallbackQueryForLogs(query: Record<string, unknown>): Record
 
 // Shared handler for connector callbacks (OAuth2 and provider-specific flows like GitHub App).
 async function connectorCallbackHandler(req: Request, res: Response): Promise<void> {
+  const landingBase = normalizeBaseUrl(env.LANDING_URL || env.PUBLIC_URL);
+  const appBase = normalizeBaseUrl(env.APP_URL || env.PUBLIC_URL);
+
   try {
     const paramsValidation = validateData(
       z.object({ provider: z.string().min(1, 'provider is required') }),
@@ -640,7 +674,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
               connector: provider,
               status: 'error',
             });
-            const redirectUrl = `/?${redirectParams.toString()}`;
+            const redirectUrl = `${landingBase}/?${redirectParams.toString()}`;
             res.redirect(redirectUrl);
             return;
           }
@@ -656,7 +690,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         connector: provider,
         status: 'error',
       });
-      const redirectUrl = `/?${redirectParams.toString()}`;
+      const redirectUrl = `${landingBase}/?${redirectParams.toString()}`;
       res.redirect(redirectUrl);
       return;
     }
@@ -668,7 +702,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         starshipSlug !== undefined && starshipSlug.length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/connectors`
           : `/ship/${encodeURIComponent(starshipId)}/connectors`;
-      return `${basePath}?${params.toString()}`;
+      return `${appBase}${basePath}?${params.toString()}`;
     };
 
     // Custom connector completion is removed in v2 (no fallback).
@@ -713,7 +747,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         connector: provider,
         status: 'error',
       });
-      const redirectUrl = `/?${redirectParams.toString()}`;
+      const redirectUrl = `${landingBase}/?${redirectParams.toString()}`;
       res.redirect(redirectUrl);
       return;
     }
@@ -770,7 +804,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
               res.redirect(withParams);
             } else {
               const basePath = `/ship/${encodeURIComponent(starshipId)}/connectors`;
-              const redirectUrl = `${basePath}?${redirectParams.toString()}`;
+              const redirectUrl = `${appBase}${basePath}?${redirectParams.toString()}`;
               res.redirect(redirectUrl);
             }
             return;
@@ -790,7 +824,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       connector: req.params.provider || 'unknown',
       status: 'error',
     });
-    const redirectUrl = `/?${redirectParams.toString()}`;
+    const redirectUrl = `${landingBase}/?${redirectParams.toString()}`;
     res.redirect(redirectUrl);
   }
 }

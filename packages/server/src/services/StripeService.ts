@@ -113,10 +113,10 @@ export class StripeService {
             },
           },
           // Return users back to the Billing tab (where they initiated the top-up) and show a status callout there.
-          success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=success&topupId=${encodeURIComponent(
+          success_url: `${envConfig.APP_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=success&topupId=${encodeURIComponent(
             topupId
           )}&amount=${encodeURIComponent(amountUsd.toFixed(2))}`,
-          cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=cancelled&topupId=${encodeURIComponent(
+          cancel_url: `${envConfig.APP_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=cancelled&topupId=${encodeURIComponent(
             topupId
           )}`,
           expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
@@ -205,8 +205,8 @@ export class StripeService {
             price_id: priceId,
           },
         },
-        success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
-        cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
+        success_url: `${envConfig.APP_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
+        cancel_url: `${envConfig.APP_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
         expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
       },
       { idempotencyKey }

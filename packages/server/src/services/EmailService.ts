@@ -57,7 +57,7 @@ export class EmailService {
    * Business logic: Email template generation and delivery
    */
   async sendVerificationEmail(email: string, token: string, displayName?: string): Promise<void> {
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
+    const verificationUrl = `${this.env.APP_URL}/api/v1/auth/verify-email?token=${token}`;
 
     if (!this.env.ENABLE_EMAILS) {
       logger.info('[EmailService] ENABLE_EMAILS=false; skipping verification email send', { email, verificationUrl });
@@ -102,7 +102,7 @@ export class EmailService {
    * Business logic: Password reset email template generation and delivery
    */
   async sendPasswordResetEmail(email: string, token: string, displayName?: string): Promise<void> {
-    const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
+    const resetUrl = `${this.env.APP_URL}/reset-password?token=${token}`;
 
     if (!this.env.ENABLE_EMAILS) {
       logger.info('[EmailService] ENABLE_EMAILS=false; skipping password reset email send', { email, resetUrl });
@@ -147,7 +147,7 @@ export class EmailService {
    * Business logic: Email change verification template generation and delivery
    */
   async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string, displayName?: string): Promise<void> {
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
+    const verificationUrl = `${this.env.APP_URL}/api/v1/auth/email/change/verify?token=${token}`;
 
     if (!this.env.ENABLE_EMAILS) {
       logger.info('[EmailService] ENABLE_EMAILS=false; skipping email change verification email send', {

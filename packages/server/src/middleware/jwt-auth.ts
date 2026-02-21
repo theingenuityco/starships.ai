@@ -10,6 +10,7 @@ import { getEnvConfig } from '@starships/env';
 import { sendError } from '@/utils/responseHelpers';
 import { logger } from '@/utils/logger';
 import { dynamicImport } from '@/utils/dynamicImport';
+import { clearAuthCookie, getAuthTokenFromRequest } from '@/utils/auth-cookie';
 
 const env = getEnvConfig();
 
@@ -24,14 +25,12 @@ const JWT_AUDIENCE = 'starships-users';
  */
 export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
+    // Extract token from Authorization header OR shared auth cookie.
+    const token = getAuthTokenFromRequest(req);
+    if (!token) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing authentication token', 401);
       return;
     }
-
-    const token = authHeader.replace('Bearer ', '');
 
     // Basic token validation
     if (!token || token.length < 10) {
@@ -103,8 +102,10 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
 
     // Provide more specific error messages
     if (name === 'JWTExpired') {
+      clearAuthCookie(res);
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
     } else if (name === 'JWTInvalid') {
+      clearAuthCookie(res);
       sendError(res, 'TOKEN_INVALID', 'Invalid token', 401);
     } else {
       sendError(res, 'AUTHENTICATION_FAILED', 'Authentication failed', 401);
@@ -117,15 +118,7 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
  * Optional JWT middleware - allows unauthenticated requests but attaches user if token is provided
  */
 export const optionalJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // No token provided, continue without user
-    next();
-    return;
-  }
-
-  const token = authHeader.replace('Bearer ', '');
+  const token = getAuthTokenFromRequest(req);
 
   // IMPORTANT: This middleware is intentionally "best effort".
   // If a token is present but invalid/expired/unresolvable, we treat the request as anonymous.

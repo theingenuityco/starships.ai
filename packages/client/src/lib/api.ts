@@ -58,6 +58,7 @@ class FetchClient {
       let config: RequestConfig = {
         ...options,
         url,
+        credentials: (options as RequestConfig).credentials ?? 'include',
         headers: {
           ...this.baseHeaders,
           ...((options.headers as Record<string, string>) || {}),

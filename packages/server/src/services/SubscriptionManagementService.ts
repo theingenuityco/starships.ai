@@ -267,14 +267,14 @@ export class SubscriptionManagementService {
       const portalSession = await stripe.billingPortal.sessions.create({
         customer: stripeCustomerId,
         // Used when the customer exits the Portal (e.g. clicks “Return to business”).
-        return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=cancelled`,
+        return_url: `${envConfig.APP_URL}/ship/${starship.slug}/settings/my-starship?status=cancelled`,
         flow_data: {
           type: 'subscription_update_confirm',
           // Ensure an automatic redirect after the customer completes the plan change in the Portal.
           after_completion: {
             type: 'redirect',
             redirect: {
-              return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=success`,
+              return_url: `${envConfig.APP_URL}/ship/${starship.slug}/settings/my-starship?status=success`,
             },
           },
           subscription_update_confirm: {

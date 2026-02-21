@@ -85,21 +85,22 @@ const setStoredToken = (token: string | null) => {
   }
 }
 
-// Validate token and get user info
-const validateToken = async (token: string): Promise<AuthUser | null> => {
+// Validate session and get user info (supports Bearer token and/or cookie session).
+const fetchMe = async (token: string | null): Promise<AuthUser | null> => {
   try {
-    // Avoid hitting the network for obviously invalid tokens.
-    const looksLikeJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)
-    if (!token || !looksLikeJwt) {
+    // Avoid sending obviously invalid tokens (but still allow cookie-only sessions).
+    const looksLikeJwt = token ? /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token) : false
+    if (token && !looksLikeJwt) {
       setStoredToken(null)
-      return null
+      token = null
     }
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+
     const response = await fetch('/api/v1/auth/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
+      credentials: 'include',
     })
 
     if (response.ok) {
@@ -107,7 +108,7 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
       return json.data
     }
 
-    // If the token is invalid/expired, clear it so we don't keep calling /auth/me on mount/focus.
+    // If the token is invalid/expired, clear it so we don't keep retrying with stale localStorage.
     if (response.status === 401 || response.status === 403) {
       setStoredToken(null)
     }
@@ -138,11 +139,8 @@ export function useAuthUser() {
     queryKey: AUTH_QUERY_KEYS.me(),
     queryFn: async (): Promise<AuthUser | null> => {
       const token = getStoredToken()
-      if (!token) {
-        return null
-      }
-
-      return await validateToken(token)
+      // Always attempt `/auth/me` so cookie-based sessions work across subdomains.
+      return await fetchMe(token)
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
@@ -178,6 +176,7 @@ export function useLogin() {
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
       const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -239,6 +238,7 @@ export function useRegister() {
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
       const response = await fetch('/api/v1/auth/register', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -308,6 +308,7 @@ export function useOAuthLogin() {
       // Exchange authorization code for JWT token via secure POST endpoint
       const response = await fetch('/api/v1/auth/oauth/exchange', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -470,9 +471,8 @@ export function useLogout() {
         // Call logout endpoint (optional since JWT is stateless)
         await fetch('/api/v1/auth/logout', {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: 'include',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {

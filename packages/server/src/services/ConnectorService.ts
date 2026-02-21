@@ -309,7 +309,7 @@ export class ConnectorService {
     starshipId: string,
     userId: string,
     provider: ConnectorProvider,
-    opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
+    opts?: { metadata?: Record<string, unknown>; returnUrl?: string; redirectBaseUrl?: string }
   ): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
@@ -369,11 +369,13 @@ export class ConnectorService {
       // Carry through a best-effort return URL so the callback can redirect back to the initiating page.
       // This is validated again at redirect time.
       ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+      ...(opts?.redirectBaseUrl ? { redirectBaseUrl: opts.redirectBaseUrl } : {}),
     });
 
     // Redirect URI is derived from the standard callback route (no template field).
     const env = getEnvConfig();
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
+    const base = String(opts?.redirectBaseUrl || env.APP_URL || env.PUBLIC_URL || '').replace(/\/+$/, '');
+    const redirectUri = `${base}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -456,13 +458,15 @@ export class ConnectorService {
     const starshipId = context?.starshipId as string | undefined;
     const provider = context?.provider as string | undefined;
     const returnUrl = context?.returnUrl as string | undefined;
+    const redirectBaseUrlFromState = context?.redirectBaseUrl as string | undefined;
 
     if (!starshipId || provider !== providerFromCallback) {
       throw new Error('OAuth state missing starship context');
     }
 
     const env = getEnvConfig();
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(providerFromCallback))}/callback`;
+    const base = String(redirectBaseUrlFromState || env.APP_URL || env.PUBLIC_URL || '').replace(/\/+$/, '');
+    const redirectUri = `${base}/api/v1/connectors/${encodeURIComponent(String(providerFromCallback))}/callback`;
 
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, providerFromCallback);
 

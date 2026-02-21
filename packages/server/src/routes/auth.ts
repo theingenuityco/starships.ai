@@ -24,6 +24,7 @@ import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
 import { StarshipService } from '@/services/StarshipService';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { clearAuthCookie, getAuthTokenFromRequest, setAuthCookie } from '@/utils/auth-cookie';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -214,6 +215,9 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       name: user.displayName || user.email?.split('@')[0],
     });
 
+    // Set shared-subdomain auth cookie for cross-subdomain sessions (landing ↔ app).
+    setAuthCookie(res, token);
+
     sendSuccess(res, {
       user: {
         id: user.id,
@@ -241,14 +245,11 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
  */
 router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
+    const token = getAuthTokenFromRequest(req);
+    if (!token) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing authentication token', 401);
       return;
     }
-
-    const token = authHeader.replace('Bearer ', '');
 
     // Verify JWT token
     const { payload } = await verifyJWT(token);
@@ -287,10 +288,13 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
     }
 
     if (error instanceof Error && error.name === 'JWTExpired') {
+      // If the browser is authenticating via cookie, clear it to avoid repeated failures.
+      clearAuthCookie(res);
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
       return;
     }
     if (error instanceof Error && error.name === 'JWTInvalid') {
+      clearAuthCookie(res);
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid token', 401);
       return;
     }
@@ -304,8 +308,9 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
  * POST /auth/logout
  */
 router.post('/auth/logout', (req: Request, res: Response): void => {
-  // With JWT, logout is primarily handled client-side by removing the token
-  // Server-side logout would require a token blacklist, which adds complexity
+  // With stateless JWT, logout is primarily client-side. We still clear the shared auth cookie
+  // so cross-subdomain sessions (landing ↔ app) terminate immediately.
+  clearAuthCookie(res);
   sendSuccess(res, { message: 'Logged out successfully' });
 });
 
@@ -364,15 +369,11 @@ router.post('/auth/token/agent', jwtAuthMiddleware, async (req: Request, res: Re
  */
 async function getAuthenticatedUserFromRequest(req: Request): Promise<UserModel | null> {
   try {
-    // Try Authorization header (frontend sends JWT via Authorization header)
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      if (token && token.length >= 10) {
-        const { payload } = await verifyJWT(token);
-        const user = await UserService.getUserById(payload.sub as string);
-        if (user) return user;
-      }
+    const token = getAuthTokenFromRequest(req);
+    if (token && token.length >= 10) {
+      const { payload } = await verifyJWT(token);
+      const user = await UserService.getUserById(payload.sub as string);
+      if (user) return user;
     }
 
     // Email links clicked directly won't have Authorization header (browser redirects)
@@ -425,13 +426,13 @@ router.get('/auth/verify-email', async (req: Request, res: Response) => {
     const registrationOrchestrator = ServiceFactory.createRegistrationOrchestrator();
     await registrationOrchestrator.completeEmailVerification(token);
 
-    // Redirect to login page with success parameter for toast notification
-    const redirectUrl = `${env.PUBLIC_URL}/login?verification=success`;
+    // Redirect to app login page with success parameter for toast notification
+    const redirectUrl = `${env.APP_URL}/login?verification=success`;
     return res.redirect(redirectUrl);
   } catch (error) {
     logger.error('[EMAIL-VERIFY] Error:', { error });
     const env = getEnvConfig();
-    return res.redirect(`${env.PUBLIC_URL}/login?verification=error`);
+    return res.redirect(`${env.APP_URL}/login?verification=error`);
   }
 });
 
@@ -506,7 +507,7 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
     let redirectPath: string;
     if (authenticatedUser && authenticatedUser.id === result.userId) {
       // User is authenticated AND userId matches - redirect to profile page
-      redirectPath = `${env.PUBLIC_URL}${profilePath}?emailChange=success`;
+      redirectPath = `${env.APP_URL}${profilePath}?emailChange=success`;
     } else {
       // User is not authenticated OR userId mismatch - redirect to login page with guidance
       const params = new URLSearchParams({
@@ -517,7 +518,7 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
       if (result.newEmail) {
         params.set('expectedEmail', result.newEmail);
       }
-      redirectPath = `${env.PUBLIC_URL}/login?${params.toString()}`;
+      redirectPath = `${env.APP_URL}/login?${params.toString()}`;
     }
 
     return res.redirect(redirectPath);
@@ -528,7 +529,7 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
       emailChange: 'error',
       logout: 'true',
     });
-    return res.redirect(`${env.PUBLIC_URL}/login?${params.toString()}`);
+    return res.redirect(`${env.APP_URL}/login?${params.toString()}`);
   }
 });
 
@@ -547,8 +548,8 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     if (!paramValidation) return;
 
     const { provider } = paramValidation;
-    // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
+    // Use APP_URL for OAuth callbacks (login lives on app domain).
+    const redirectUri = `${env.APP_URL}/api/v1/auth/${provider}/callback`;
 
     // Check if this is a linking request (user already logged in)
     const isLinking = req.query.link === 'true';
@@ -556,7 +557,7 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     // SECURITY: Block direct linking attempts without proper authentication
     if (isLinking) {
       // Return error for unauthenticated linking attempts
-      return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=unauthorized_linking`);
+      return res.redirect(`${env.APP_URL}/profile?oauth_link=error&message=unauthorized_linking`);
     }
 
     // Optional: carry a safe returnUrl through OAuth via state context.
@@ -609,13 +610,13 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 
     // Handle OAuth provider errors
     if (oauthError) {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=provider_error`);
+      return res.redirect(`${env.APP_URL}/login?oauth_error=provider_error`);
     }
 
     // Validate state parameter (CSRF protection)
     const stateValidation = await validateOAuthState(state);
     if (!stateValidation.valid) {
-      return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=invalid_state`);
+      return res.redirect(`${env.APP_URL}/login?oauth_error=invalid_state`);
     }
 
     const { isLinking, userId, context } = stateValidation;
@@ -627,7 +628,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     if (isLinking) {
       // SECURITY: Verify userId is present in linking state
       if (!userId) {
-        return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=invalid_state`);
+        return res.redirect(`${env.APP_URL}/profile?oauth_link=error&message=invalid_state`);
       }
 
       // Implement actual account linking logic
@@ -660,7 +661,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           });
         }
 
-        return res.redirect(`${env.PUBLIC_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
+        return res.redirect(`${env.APP_URL}${redirectPath}?oauth_link=success&provider=${provider}`);
       } catch (error) {
         logger.error('[OAUTH-LINKING] Failed to link account', {
           userId,
@@ -696,7 +697,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
           });
         }
 
-        return res.redirect(`${env.PUBLIC_URL}${errorRedirectPath}?oauth_link=error&message=${errorMessage}`);
+        return res.redirect(`${env.APP_URL}${errorRedirectPath}?oauth_link=error&message=${errorMessage}`);
       }
     }
 
@@ -709,9 +710,9 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
 
     // Redirect with secure authorization code (short-lived, single-use)
     if (safeReturnUrl) {
-      return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}&returnUrl=${encodeURIComponent(safeReturnUrl)}`);
+      return res.redirect(`${env.APP_URL}/login?auth_code=${authCode}&returnUrl=${encodeURIComponent(safeReturnUrl)}`);
     }
-    return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}`);
+    return res.redirect(`${env.APP_URL}/login?auth_code=${authCode}`);
   } catch (error) {
     logger.error('[AUTH] OAuth callback error:', {
       provider: req.params.provider,
@@ -721,7 +722,7 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       hasState: !!req.query.state,
     });
 
-    return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=callback_failed`);
+    return res.redirect(`${env.APP_URL}/login?oauth_error=callback_failed`);
   }
 });
 
@@ -874,6 +875,8 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
+    setAuthCookie(res, token);
+
     // Get user's starships for redirect (owned + member).
     // Default starships are created at signup (password + OAuth), not on login.
     let firstStarship: { id: string; slug: string; name: string } | null = null;
@@ -949,8 +952,7 @@ router.post('/auth/oauth/link/:provider', jwtAuthMiddleware, async (req: Request
 
     const { provider } = paramValidation;
     const userId = req.user!.id;
-    // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
-    const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
+    const redirectUri = `${env.APP_URL}/api/v1/auth/${provider}/callback`;
 
     // Generate secure state with authenticated user ID
     const state = await generateOAuthState(true, userId);

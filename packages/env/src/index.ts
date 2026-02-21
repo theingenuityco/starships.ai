@@ -27,6 +27,9 @@ export function getEnvConfig(): EnvironmentConfig {
   // (like email/S3) are validated in their respective services.
   const requiredEnvVars = {
     PUBLIC_URL: process.env.PUBLIC_URL,
+    // Optional for backwards compatibility (defaults derived from PUBLIC_URL)
+    LANDING_URL: process.env.LANDING_URL,
+    APP_URL: process.env.APP_URL,
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
     DOCS_URL: process.env.DOCS_URL,
@@ -38,7 +41,8 @@ export function getEnvConfig(): EnvironmentConfig {
 
   // Check for missing required environment variables
   const missing = Object.entries(requiredEnvVars)
-    .filter(([, value]) => !value)
+    // LANDING_URL/APP_URL are optional (we derive fallbacks below)
+    .filter(([key, value]) => (key === 'LANDING_URL' || key === 'APP_URL' ? false : !value))
     .map(([key]) => key);
 
   if (missing.length > 0) {
@@ -62,6 +66,12 @@ export function getEnvConfig(): EnvironmentConfig {
   // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
   const resolvedEnableEmails = process.env.ENABLE_EMAILS === 'true';
 
+  // URL defaults for split-frontend setups:
+  // - In the legacy single-frontend deployment, PUBLIC_URL is the only canonical origin.
+  // - When split, set LANDING_URL and APP_URL explicitly.
+  const resolvedLandingUrl = (process.env.LANDING_URL || requiredEnvVars.PUBLIC_URL || '').trim() || requiredEnvVars.PUBLIC_URL!;
+  const resolvedAppUrl = (process.env.APP_URL || requiredEnvVars.PUBLIC_URL || '').trim() || requiredEnvVars.PUBLIC_URL!;
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -71,6 +81,8 @@ export function getEnvConfig(): EnvironmentConfig {
     NODE_ENV: process.env.NODE_ENV || 'development',
 
     // URLs - Required, no localhost fallbacks
+    LANDING_URL: resolvedLandingUrl,
+    APP_URL: resolvedAppUrl,
     PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
     CLIENT_URL: requiredEnvVars.CLIENT_URL!,
     SERVER_URL: requiredEnvVars.SERVER_URL!,

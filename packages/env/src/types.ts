@@ -10,6 +10,16 @@ export interface EnvironmentConfig {
   NODE_ENV: string;
 
   // URLs
+  /**
+   * Canonical landing/marketing origin (apex domain in production).
+   * Example: https://starships.ai
+   */
+  LANDING_URL: string;
+  /**
+   * Canonical app origin (subdomain in production).
+   * Example: https://app.starships.ai
+   */
+  APP_URL: string;
   PUBLIC_URL: string;
   CLIENT_URL: string;
   SERVER_URL: string;

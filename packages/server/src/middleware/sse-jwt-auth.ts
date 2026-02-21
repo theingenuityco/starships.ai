@@ -11,6 +11,7 @@ import { getEnvConfig } from '@starships/env';
 import { NextFunction, Request, Response } from 'express';
 import { logger } from '@/utils/logger';
 import { dynamicImport } from '@/utils/dynamicImport';
+import { getAuthTokenFromRequest } from '@/utils/auth-cookie';
 
 const env = getEnvConfig();
 
@@ -26,21 +27,15 @@ const JWT_AUDIENCE = 'starships-users';
  */
 export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    let token: string | undefined;
+    let token: string | null | undefined = getAuthTokenFromRequest(req);
 
-    // Try to get token from Authorization header first
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.replace('Bearer ', '');
-    }
-
-    // If no header token, try query parameter
+    // If no header/cookie token, try query parameter (EventSource cannot set custom headers)
     if (!token && req.query.token) {
       token = req.query.token as string;
     }
 
     if (!token) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing authentication token', 401);
       return;
     }
 

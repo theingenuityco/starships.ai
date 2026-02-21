@@ -58,13 +58,10 @@ The backend remains shared and is exposed on both hosts at `https://<host>/api/*
 
 ## Local dev
 
-The dev reverse proxy runs on plain `localhost` (no subdomains):
+No reverse proxy in local dev:
 
-- Landing: `http://localhost:8080`
-- App: `http://localhost:8080/app`
-
-Upstream dev servers default to:
-
-- `LANDING_UPSTREAM_URL=http://localhost:3002`
-- `APP_UPSTREAM_URL=http://localhost:3003`
+- Landing: `http://localhost:3002`
+- App: `http://localhost:3003`
+- API: `http://localhost:4000`
+- Docs: `http://localhost:3001` (if running)
 

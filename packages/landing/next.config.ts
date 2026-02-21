@@ -22,6 +22,9 @@ const nextConfig: NextConfig = {
     externalDir: true,
     ...(process.env.CI ? { optimizePackageImports: ['@radix-ui/react-icons', '@iconify/react'] } : {}),
   },
+  env: {
+    NEXT_PUBLIC_SERVER_URL: process.env.SERVER_URL,
+  },
   async headers() {
     return [
       // Security headers

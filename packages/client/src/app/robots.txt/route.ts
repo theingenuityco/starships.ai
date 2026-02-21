@@ -17,8 +17,14 @@ function getConfiguredPublicUrl(): string {
   return configured || 'https://starships.ai'
 }
 
+function getConfiguredDocsUrl(): string {
+  const configured = trimTrailingSlashes(String(process.env.DOCS_URL || '').trim())
+  return configured || 'https://docs.starships.ai'
+}
+
 export async function GET(_req: Request): Promise<Response> {
   const publicUrl = getConfiguredPublicUrl()
+  const docsUrl = getConfiguredDocsUrl()
   const indexingEnabled = isIndexingEnabled()
 
   // Default OFF for safety; enable explicitly per environment.
@@ -43,7 +49,7 @@ export async function GET(_req: Request): Promise<Response> {
       // Next internals
       'Disallow: /_next',
       `Sitemap: ${publicUrl}/sitemap.xml`,
-      `Sitemap: ${publicUrl}/docs/sitemap.xml`,
+      `Sitemap: ${docsUrl}/sitemap.xml`,
       `Host: ${publicUrl}`,
     ]),
     {

@@ -88,8 +88,26 @@ const dbConnection = createConnection({
   ssl: config.POSTGRES_SSL,
 });
 
+function normalizeOrigin(value: unknown): string {
+  const s = String(value || '').trim();
+  return s.replace(/\/+$/, '');
+}
+
+const allowedOrigins = [normalizeOrigin(config.LANDING_URL), normalizeOrigin(config.APP_URL)].filter(Boolean);
+
 // Middleware - Order is important!
-app.use(cors());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser clients (no Origin header), health checks, etc.
+      if (!origin) return callback(null, true);
+      const o = normalizeOrigin(origin);
+      if (allowedOrigins.includes(o)) return callback(null, true);
+      return callback(new Error(`CORS: origin not allowed: ${origin}`), false);
+    },
+    credentials: true,
+  })
+);
 // Add request ID early
 app.use(requestIdMiddleware);
 // Apply global rate limiting (before routes but after request ID)
@@ -99,6 +117,11 @@ app.use('/api/v1', webhooksRoutes);
 // Parse JSON for all other routes
 app.use(express.json());
 app.use(cookieParser());
+
+// Root is used for load balancer health checks (shared across target groups).
+app.get('/', (_req, res) => {
+  res.status(200).send('ok');
+});
 
 // Starship routes are now self-contained with internal service instantiation
 

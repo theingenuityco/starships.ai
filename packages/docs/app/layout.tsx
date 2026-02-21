@@ -28,11 +28,11 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Starships.ai' }],
   creator: 'Starships.ai',
-  metadataBase: new URL('https://starships.ai/docs'),
+  metadataBase: new URL('https://docs.starships.ai'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://starships.ai/docs',
+    url: 'https://docs.starships.ai',
     title: 'Starships.ai Documentation',
     description: 'Build the future of AI-powered applications with Starships.ai',
     siteName: 'Starships.ai',
@@ -56,7 +56,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
         <RootProvider
           search={{
             options: {
-              api: '/docs/api/search',
+              api: '/api/search',
             },
           }}
           theme={{

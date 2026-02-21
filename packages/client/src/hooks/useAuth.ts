@@ -1,4 +1,4 @@
-import { setTokenProvider, type SyncedUser } from '@/lib/api'
+import { resolveApiUrl, setTokenProvider, type SyncedUser } from '@/lib/api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
@@ -98,7 +98,7 @@ const fetchMe = async (token: string | null): Promise<AuthUser | null> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
 
-    const response = await fetch('/api/v1/auth/me', {
+    const response = await fetch(resolveApiUrl('/api/v1/auth/me'), {
       headers,
       credentials: 'include',
     })
@@ -174,7 +174,7 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
-      const response = await fetch('/api/v1/auth/login', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -236,7 +236,7 @@ export function useRegister() {
 
   return useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
-      const response = await fetch('/api/v1/auth/register', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/register'), {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -306,7 +306,7 @@ export function useOAuthLogin() {
   return useMutation({
     mutationFn: async ({ authCode }: { authCode: string }) => {
       // Exchange authorization code for JWT token via secure POST endpoint
-      const response = await fetch('/api/v1/auth/oauth/exchange', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/oauth/exchange'), {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -371,7 +371,7 @@ export function useResendVerification() {
 
   return useMutation({
     mutationFn: async (email: string) => {
-      const response = await fetch('/api/v1/auth/resend-verification', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/resend-verification'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,7 +400,7 @@ export function useResendVerification() {
 export function useForgotPassword() {
   return useMutation({
     mutationFn: async (data: { email: string }) => {
-      const response = await fetch('/api/v1/auth/forgot-password', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/forgot-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -428,7 +428,7 @@ export function useResetPassword(options?: { onSuccess?: (data: any) => void; on
 
   return useMutation({
     mutationFn: async (data: { token: string; newPassword: string; confirmPassword: string }) => {
-      const response = await fetch('/api/v1/auth/reset-password', {
+      const response = await fetch(resolveApiUrl('/api/v1/auth/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -469,7 +469,7 @@ export function useLogout() {
 
       try {
         // Call logout endpoint (optional since JWT is stateless)
-        await fetch('/api/v1/auth/logout', {
+        await fetch(resolveApiUrl('/api/v1/auth/logout'), {
           method: 'POST',
           credentials: 'include',
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -591,7 +591,7 @@ export function useAuth() {
         const token = getStoredToken()
         if (!token) throw new Error('Not authenticated')
 
-        const response = await fetch('/api/v1/auth/set-password', {
+        const response = await fetch(resolveApiUrl('/api/v1/auth/set-password'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

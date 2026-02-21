@@ -79,9 +79,10 @@ pnpm dev
 ```
 
 Default local URLs (from `.env.example`):
-- App: `http://localhost:8080`
-- API: `http://localhost:8080/api/v1`
-- Docs: `http://localhost:8080/docs`
+- Landing: `http://localhost:3002`
+- App: `http://localhost:3003`
+- API: `http://localhost:4000/api/v1`
+- Docs: `http://localhost:3001`
 
 ### Run schedulers/workers (development)
 
@@ -93,10 +94,10 @@ pnpm dev:with-schedule
 
 ## Usage examples (API)
 
-The UI uses same-origin requests (`/api/v1/*`). For cURL, set an API base:
+For cURL, set an API base:
 
 ```bash
-export API="http://localhost:8080/api/v1"
+export API="http://localhost:4000/api/v1"
 ```
 
 Register + login (password auth):

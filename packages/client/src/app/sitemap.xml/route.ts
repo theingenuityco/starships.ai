@@ -10,6 +10,11 @@ function getConfiguredBaseUrl(): string {
   return configured || 'https://starships.ai'
 }
 
+function getConfiguredDocsUrl(): string {
+  const configured = trimTrailingSlashes(String(process.env.DOCS_URL || '').trim())
+  return configured || 'https://docs.starships.ai'
+}
+
 function xmlEscape(value: string): string {
   return (
     value
@@ -44,10 +49,10 @@ export async function GET(_req: Request) {
   }
 
   const publicUrl = getConfiguredBaseUrl()
+  const docsUrl = getConfiguredDocsUrl()
   const now = new Date()
 
-  // Important: In K8s ingress, `/docs/*` routes to the docs service.
-  const sitemapUrls = [`${publicUrl}/sitemaps/app.xml`, `${publicUrl}/docs/sitemap.xml`]
+  const sitemapUrls = [`${publicUrl}/sitemaps/app.xml`, `${docsUrl}/sitemap.xml`]
 
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

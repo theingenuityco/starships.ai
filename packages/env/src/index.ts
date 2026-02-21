@@ -21,8 +21,6 @@ export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_SERVER_PORT = 4000;
   const DEFAULT_DOCS_PORT = 3001;
   const DEFAULT_PROXY_PORT = 8080;
-  const DEFAULT_LANDING_DEV_PORT = 3002;
-  const DEFAULT_APP_DEV_PORT = 3003;
 
   // Validate critical environment variables for production safety.
   // Only core infrastructure is enforced here; optional integrations
@@ -73,8 +71,6 @@ export function getEnvConfig(): EnvironmentConfig {
   // - When split, set LANDING_URL and APP_URL explicitly.
   const resolvedLandingUrl = (process.env.LANDING_URL || requiredEnvVars.PUBLIC_URL || '').trim() || requiredEnvVars.PUBLIC_URL!;
   const resolvedAppUrl = (process.env.APP_URL || requiredEnvVars.PUBLIC_URL || '').trim() || requiredEnvVars.PUBLIC_URL!;
-  const resolvedLandingUpstreamUrl = (process.env.LANDING_UPSTREAM_URL || '').trim() || `http://localhost:${DEFAULT_LANDING_DEV_PORT}`;
-  const resolvedAppUpstreamUrl = (process.env.APP_UPSTREAM_URL || '').trim() || `http://localhost:${DEFAULT_APP_DEV_PORT}`;
 
   return {
     // Server Configuration
@@ -87,8 +83,6 @@ export function getEnvConfig(): EnvironmentConfig {
     // URLs - Required, no localhost fallbacks
     LANDING_URL: resolvedLandingUrl,
     APP_URL: resolvedAppUrl,
-    LANDING_UPSTREAM_URL: resolvedLandingUpstreamUrl,
-    APP_UPSTREAM_URL: resolvedAppUpstreamUrl,
     PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
     CLIENT_URL: requiredEnvVars.CLIENT_URL!,
     SERVER_URL: requiredEnvVars.SERVER_URL!,

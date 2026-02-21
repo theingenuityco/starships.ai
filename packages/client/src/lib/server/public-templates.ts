@@ -7,26 +7,23 @@ function normalizeBaseUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '')
 }
 
-let didWarnPublicUrlFallback = false
+let didWarnApiUrlFallback = false
 
-function getPublicBaseUrl(): string {
-  // Public marketing pages should fetch from the *public* origin so the HTML
-  // they generate is consistent with what the browser can reach.
-  // (Using SERVER_URL can succeed server-side, but the browser may not have the same routing.)
+function getApiBaseUrl(): string {
+  // With the backend served on its own domain/origin, marketing pages should fetch
+  // directly from the API origin so both SSR and the browser can reach the same host.
+  const fromServerEnv = normalizeBaseUrl(String(process.env.SERVER_URL || '').trim())
+  if (fromServerEnv) return fromServerEnv
+
+  // Fallback to PUBLIC_URL for legacy environments (NOT recommended).
   const { PUBLIC_URL } = getPublicEnvConfig()
   const fromPublicEnv = normalizeBaseUrl(PUBLIC_URL || '')
   if (fromPublicEnv) return fromPublicEnv
 
-  // Fallback: Next in a monorepo can fail to load the root `.env` depending on how it’s started.
-  // In `pnpm dev`, we always start the reverse proxy on PROXY_PORT (default 8080), which exposes `/api/*`
-  // publicly. Using that origin keeps ISR HTML consistent with what the browser can reach.
-  //
-  // NOTE: We still recommend setting PUBLIC_URL explicitly in all environments.
-  const proxyPort = String(process.env.PROXY_PORT || '8080').trim() || '8080'
-  const fallback = `http://localhost:${proxyPort}`
-  if (!didWarnPublicUrlFallback) {
-    didWarnPublicUrlFallback = true
-    console.warn('[public-templates] PUBLIC_URL missing; falling back to', { fallback })
+  const fallback = 'http://localhost:4000'
+  if (!didWarnApiUrlFallback) {
+    didWarnApiUrlFallback = true
+    console.warn('[public-templates] SERVER_URL missing; falling back to', { fallback })
   }
   return fallback
 }
@@ -85,7 +82,7 @@ export async function fetchPublicAgentTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<AgentTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
 
     const u = new URL('/api/v1/agent-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -113,7 +110,7 @@ export async function fetchPublicAgentTemplates(args?: {
 
 export async function fetchPublicAgentTemplateBySlug(args: { slug: string; revalidateSeconds?: number }): Promise<AgentTemplateModel | null> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
     const slug = String(args.slug || '').trim()
     if (!slug) return null
 
@@ -145,7 +142,7 @@ export async function fetchPublicAgentTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<AgentTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -183,7 +180,7 @@ export async function fetchPublicToolTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<ToolTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
 
     const u = new URL('/api/v1/tool-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -281,7 +278,7 @@ export async function fetchPublicToolTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ToolTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -310,7 +307,7 @@ export async function fetchPublicToolTemplatesPage(args: {
 
 export async function fetchPublicConnectorCatalog(args?: { revalidateSeconds?: number }): Promise<ConnectorCatalogItem[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
     const u = new URL('/api/v1/connectors/catalog', base)
 
     const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
@@ -334,7 +331,7 @@ export async function fetchPublicConnectorCatalogPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ConnectorCatalogItem>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = getApiBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 

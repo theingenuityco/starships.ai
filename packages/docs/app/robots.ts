@@ -5,7 +5,7 @@ import { publicEnvConfig } from '@starships/env/public';
 export const revalidate = 3600 // 1 hour
 
 export default function robots(): MetadataRoute.Robots {
-  const publicUrl = publicEnvConfig.PUBLIC_URL.replace(/\/+$/, '')
+  const publicUrl = String(process.env.DOCS_URL || publicEnvConfig.PUBLIC_URL || '').replace(/\/+$/, '')
 
   if (!isIndexingEnabled()) {
     return {
@@ -16,7 +16,7 @@ export default function robots(): MetadataRoute.Robots {
 
   return {
     rules: [{ userAgent: '*', allow: '/' }],
-    sitemap: [`${publicUrl}/docs/sitemap.xml`],
+    sitemap: [`${publicUrl}/sitemap.xml`],
   }
 }
 

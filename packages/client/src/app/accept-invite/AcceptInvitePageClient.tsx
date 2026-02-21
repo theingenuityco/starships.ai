@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAcceptStarshipInvite } from '@/hooks/useStarshipInvites'
 import { STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
 import type { StarshipModel } from '@starships/protocol'
+import { resolveApiUrl } from '@/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -43,7 +44,7 @@ export default function AcceptInvitePageClient() {
     if (preview || previewLoading || previewError) return
 
     setPreviewLoading(true)
-    void fetch('/api/v1/starship-invites/preview', {
+    void fetch(resolveApiUrl('/api/v1/starship-invites/preview'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: inviteToken }),

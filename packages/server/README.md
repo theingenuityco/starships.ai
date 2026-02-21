@@ -12,7 +12,7 @@ cp .env.example .env
 pnpm dev
 ```
 
-The API is then available at `http://localhost:8080/api/v1` (same-origin behind the dev reverse proxy).
+The API is then available at `http://localhost:4000/api/v1`.
 
 To run only the server:
 
@@ -175,7 +175,7 @@ Operational helper:
 ## Quick cURL sanity checks
 
 ```bash
-curl -s "http://localhost:8080/api/v1/health" | jq .
+curl -s "http://localhost:4000/api/v1/health" | jq .
 ```
 
 ## Links

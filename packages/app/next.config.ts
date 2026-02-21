@@ -12,20 +12,6 @@ loadEnvConfig(monorepoRoot, isDev)
 const PRIVATE_NO_STORE = 'private, no-store'
 const IMMUTABLE_STATIC = 'public, max-age=31536000, immutable'
 
-function inferDevBasePath(): string | undefined {
-  if (process.env.NODE_ENV === 'production') return undefined
-  const raw = String(process.env.APP_URL || '').trim()
-  if (!raw) return undefined
-  try {
-    const u = new URL(raw)
-    const p = String(u.pathname || '').trim()
-    if (!p || p === '/' || p === '') return undefined
-    return p.replace(/\/+$/, '')
-  } catch {
-    return undefined
-  }
-}
-
 const nextConfig: NextConfig = {
   typescript: {
     // Keep app deployable even with type errors (matches current client config stance).
@@ -36,8 +22,9 @@ const nextConfig: NextConfig = {
     externalDir: true,
     ...(process.env.CI ? { optimizePackageImports: ['@radix-ui/react-icons', '@iconify/react'] } : {}),
   },
-  // Local dev convenience: allow mounting the app at e.g. http://localhost:8080/app
-  basePath: inferDevBasePath(),
+  env: {
+    NEXT_PUBLIC_SERVER_URL: process.env.SERVER_URL,
+  },
   async headers() {
     return [
       // Security headers

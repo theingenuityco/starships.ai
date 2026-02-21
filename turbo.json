@@ -68,10 +68,6 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "buf.yaml", "buf.gen.yaml", "src/proto/**"],
       "outputs": ["dist/**", "src/gen/**"]
     },
-    "@starships/reverse-proxy#build": {
-      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
-      "outputs": ["dist/**"]
-    },
     "@starships/docs#build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
@@ -84,11 +80,6 @@
     },
     "@starships/autopilot#dev": {
       "dependsOn": ["@starships/autopilot#build"],
-      "cache": false,
-      "persistent": true
-    },
-    "@starships/reverse-proxy#dev": {
-      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -188,11 +179,6 @@
     "@starships/errors#type-check": {
       "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/protocol/dist/**"],
-      "outputs": []
-    },
-    "@starships/reverse-proxy#type-check": {
-      "dependsOn": ["@starships/env#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/env/dist/**"],
       "outputs": []
     },
     "@starships/autopilot-runner#type-check": {

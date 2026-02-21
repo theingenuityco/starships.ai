@@ -15,17 +15,18 @@ function normalizePublicUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '');
 }
 
+function getDocsBaseUrl(): string {
+  const configured = String(process.env.DOCS_URL || '').trim();
+  if (configured) return normalizePublicUrl(configured);
+  return normalizePublicUrl(publicEnvConfig.PUBLIC_URL);
+}
+
 function buildCanonicalUrl(pageUrl: string): string {
-  const publicUrl = normalizePublicUrl(publicEnvConfig.PUBLIC_URL);
+  const publicUrl = getDocsBaseUrl();
   const raw = String(pageUrl || '/').trim() || '/';
   const path = raw.startsWith('/') ? raw : `/${raw}`;
 
-  // Docs are served under `/docs` (Next basePath), but `page.url` from fumadocs
-  // is usually rooted at `/` (e.g. `/getting-started`).
-  const docsPath = path === '/' ? '/docs' : `/docs${path}`;
-
-  // Prefer canonical URLs without trailing slashes.
-  const full = `${publicUrl}${docsPath}`;
+  const full = `${publicUrl}${path === '/' ? '' : path}`;
   return full.replace(/\/+$/, '');
 }
 

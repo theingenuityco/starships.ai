@@ -1,10 +1,13 @@
-# @starships/client
+# @starships/client (shared UI + API client)
 
-Next.js (App Router) frontend for **starships.ai**. This package renders the product UI for managing starships (workspaces), agents, tools, connectors, conversations, schedules, and billing.
+Shared UI code + API client used by:
+
+- `@starships/landing` (public landing + marketplace)
+- `@starships/app` (authenticated app)
 
 ## How it talks to the backend
 
-The client uses **same-origin** requests to the API (e.g. `fetch('/api/v1/auth/me')`). In development and production, `/api/*` is expected to be routed to `@starships/server` by a reverse proxy / ingress (see `@starships/reverse-proxy`).
+All API requests are made to the backend origin configured via `SERVER_URL` (exposed to the browser as `NEXT_PUBLIC_SERVER_URL`).
 
 ## Run (recommended)
 
@@ -17,15 +20,13 @@ pnpm dev
 ```
 
 Then open:
-- App: `http://localhost:8080`
-- Docs: `http://localhost:8080/docs`
-- API health: `http://localhost:8080/api/v1/health`
+- Landing: `http://localhost:3002`
+- App: `http://localhost:3003`
+- API health: `http://localhost:4000/api/v1/health`
 
-## Run this package alone (advanced)
+## Run this package alone
 
-If you start only the client (`pnpm --filter @starships/client dev`), you must still ensure that:
-- `/api/*` routes to the server (e.g. via `@starships/reverse-proxy`, or your own proxy)
-- the server can reach Postgres (and Redis if using schedules)
+`@starships/client` is no longer a runnable Next.js app. Use `@starships/landing` and/or `@starships/app`.
 
 ## App routes (high-level)
 
@@ -50,16 +51,15 @@ If you start only the client (`pnpm --filter @starships/client dev`), you must s
 
 ## Troubleshooting
 
-- **API requests 404 in the browser**: you’re likely hitting the client directly (port 3000) without a proxy/ingress mapping `/api/*` to the server.
+- **API requests failing in the browser**: verify `SERVER_URL` (and therefore `NEXT_PUBLIC_SERVER_URL`) is correctly set to your API origin (e.g. `http://localhost:4000`).
 - **Streaming not updating**: verify the SSE endpoint works:
 
 ```bash
-curl -N -H "Accept: text/event-stream" "http://localhost:8080/api/v1/conversations/<id>/messages?stream=true"
+curl -N -H "Accept: text/event-stream" "http://localhost:4000/api/v1/conversations/<id>/messages?stream=true"
 ```
 
 ## Links
 
 - Root: `../../README.md`
 - Server: `../server/README.md`
-- Reverse proxy: `../reverse-proxy/README.md`
 - Autopilot engine: `../autopilot/README.md`

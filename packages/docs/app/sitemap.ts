@@ -10,17 +10,22 @@ function normalizePublicUrl(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
+function getDocsBaseUrl(): string {
+  const configured = String(process.env.DOCS_URL || '').trim()
+  if (configured) return normalizePublicUrl(configured)
+  // Fallback to PUBLIC_URL for legacy environments.
+  return normalizePublicUrl(publicEnvConfig.PUBLIC_URL)
+}
+
 function toAbsoluteUrl(publicUrl: string, path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`
-  // Ensure all docs URLs live under `/docs` at the root domain.
-  const fullPath = p.startsWith('/docs') ? p : `/docs${p === '/' ? '' : p}`
-  return `${publicUrl}${fullPath}`
+  return `${publicUrl}${p === '/' ? '' : p}`
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
   if (!isIndexingEnabled()) return []
 
-  const publicUrl = normalizePublicUrl(publicEnvConfig.PUBLIC_URL)
+  const publicUrl = getDocsBaseUrl()
   const now = new Date()
 
   return source.getPages().map((page) => ({

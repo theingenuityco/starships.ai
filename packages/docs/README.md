@@ -1,6 +1,6 @@
 # @starships/docs
 
-Documentation site for **starships.ai** (Next.js + Fumadocs). This is the human-facing docs UI served at `/docs`.
+Documentation site for **starships.ai** (Next.js + Fumadocs). This is the human-facing docs UI served on `docs.starships.ai`.
 
 > Note: this is separate from `public-docs/`, which is markdown indexed by the API for in-product/agent consumption via `GET /api/v1/docs`.
 
@@ -14,7 +14,7 @@ cp .env.example .env
 pnpm dev
 ```
 
-Then open `http://localhost:8080/docs` (routed via `@starships/reverse-proxy`).
+Then open `http://localhost:3001` (docs dev server).
 
 To run only this package:
 

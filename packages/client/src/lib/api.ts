@@ -21,6 +21,31 @@ interface RequestConfig extends RequestInit {
   timeout?: number
 }
 
+function normalizeBaseUrl(value: unknown): string {
+  return String(value ?? '').trim().replace(/\/+$/, '')
+}
+
+function resolveApiBaseUrl(): string {
+  // In the browser, only NEXT_PUBLIC_* variables are available.
+  // In Node/server contexts, SERVER_URL may also exist.
+  const fromPublic = normalizeBaseUrl(process.env.NEXT_PUBLIC_SERVER_URL)
+  if (fromPublic) return fromPublic
+  const fromServer = normalizeBaseUrl(process.env.SERVER_URL)
+  if (fromServer) return fromServer
+  return ''
+}
+
+function resolveApiUrl(url: string): string {
+  const raw = String(url ?? '').trim()
+  if (!raw) return raw
+  if (/^https?:\/\//i.test(raw)) return raw
+  if (!(raw.startsWith('/api/') || raw.startsWith('/api/v1'))) return raw
+
+  const base = resolveApiBaseUrl()
+  if (!base) return raw
+  return `${base}${raw}`
+}
+
 // Custom fetch client with timeout and headers
 class FetchClient {
   private timeout: number
@@ -52,12 +77,13 @@ class FetchClient {
   async request<T = any>(url: string, options: RequestInit = {}): Promise<FetchResponse<T>> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+    const resolvedUrl = resolveApiUrl(url)
 
     try {
       // Apply request interceptors
       let config: RequestConfig = {
         ...options,
-        url,
+        url: resolveApiUrl((options as RequestConfig).url ?? resolvedUrl),
         credentials: (options as RequestConfig).credentials ?? 'include',
         headers: {
           ...this.baseHeaders,
@@ -70,7 +96,7 @@ class FetchClient {
         config = await interceptor(config)
       }
 
-      const response = await fetch(config.url || url, config)
+      const response = await fetch(config.url || resolvedUrl, config)
 
       clearTimeout(timeoutId)
 
@@ -124,7 +150,7 @@ class FetchClient {
       if (error.name === 'AbortError') {
         const timeoutError = new Error('Request timeout') as any
         timeoutError.code = 'ECONNABORTED'
-        timeoutError.config = { url, method: options.method }
+        timeoutError.config = { url: resolvedUrl, method: options.method }
         throw timeoutError
       }
 
@@ -707,3 +733,5 @@ export const starshipAPI = {
 }
 
 export default api
+
+export { resolveApiUrl }

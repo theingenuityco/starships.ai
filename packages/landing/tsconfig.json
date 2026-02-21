@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.nextjs.json",
+  "compilerOptions": {
+    "lib": ["ES2020", "dom", "dom.iterable"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../client/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*", ".next"]
+}
+

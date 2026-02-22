@@ -7,6 +7,7 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 import { Orbitron } from 'next/font/google'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -108,14 +109,49 @@ export function PublicHeader(): React.JSX.Element {
           >
             Home
           </Link>
-          <Link
-            href="/use-cases"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases', variant: 'desktop' })}
-            className={`${pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
-            aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
-          >
-            Use cases
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={[
+                  'inline-flex items-center gap-1.5',
+                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors',
+                ].join(' ')}
+                aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
+              >
+                <span>Use cases</span>
+                <Icon name="chevron-down" className="h-4 w-4 opacity-80" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Use cases</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
+                  router.push('/use-cases/lead-generation')
+                }}
+              >
+                <Icon name="sparkles" />
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-foreground">Lead generation</div>
+                  <div className="text-xs text-muted-foreground truncate">Research → personalize → follow up → improve</div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
+                  router.push('/use-cases/wordpress-site')
+                }}
+              >
+                <Icon name="globe" />
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-foreground">WordPress site</div>
+                  <div className="text-xs text-muted-foreground truncate">Plan → write → SEO → launch checklist</div>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link
             href="/explore"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
@@ -175,15 +211,26 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Home
               </Link>
+              <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground">Use cases</div>
               <Link
-                href="/use-cases"
+                href="/use-cases/lead-generation"
                 onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases', variant: 'mobile' })
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
-                Use cases
+                Lead generation
+              </Link>
+              <Link
+                href="/use-cases/wordpress-site"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              >
+                WordPress site
               </Link>
               <Link
                 href="/explore"

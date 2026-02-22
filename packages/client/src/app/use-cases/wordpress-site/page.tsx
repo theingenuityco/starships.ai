@@ -59,6 +59,17 @@ export default function WordPressSiteUseCasePage() {
             ].join(', '),
           }}
         />
+        <div
+          className="absolute inset-x-0 bottom-0 h-[120vh] pointer-events-none z-[1]"
+          style={{
+            backgroundImage: [
+              'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.45), transparent 65%)',
+              'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.32), transparent 70%)',
+              'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.24), transparent 75%)',
+            ].join(', '),
+          }}
+          aria-hidden
+        />
 
         <div className="relative z-10">
           <PublicHeader />
@@ -70,7 +81,8 @@ export default function WordPressSiteUseCasePage() {
             </div>
           </main>
 
-          <PublicFooter fromPath="/use-cases/wordpress-site" />
+          <div suppressHydrationWarning className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent" aria-hidden />
+          <PublicFooter fromPath="/use-cases/wordpress-site" showTopDivider={false} />
         </div>
       </div>
     </StarTheme>

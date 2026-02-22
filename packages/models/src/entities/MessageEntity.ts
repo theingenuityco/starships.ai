@@ -131,7 +131,7 @@ export class MessageEntity implements MessageModel {
   @Expose()
   @IsOptional()
   @IsString()
-  @Length(1, 500)
+  @Length(1, 2400)
   userAvatar?: string;
 
   // File attachments (array of attachment IDs)

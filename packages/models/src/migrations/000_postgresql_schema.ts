@@ -20,7 +20,7 @@ CREATE TABLE users (
     id VARCHAR(255) PRIMARY KEY,
     email VARCHAR(255) UNIQUE,
     display_name VARCHAR(100),
-    avatar VARCHAR(500),
+    avatar VARCHAR(2400),
     password VARCHAR(255),
     stripe_customer_id VARCHAR(255) UNIQUE,
     email_verified BOOLEAN NOT NULL DEFAULT false,

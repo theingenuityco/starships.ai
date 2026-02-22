@@ -170,7 +170,7 @@ export const DisplayNameSchema = z
  */
 export const AvatarSchema = z
   .string()
-  .max(500, 'Avatar URL must be less than 500 characters')
+  .max(2400, 'Avatar URL must be less than 2400 characters')
   .refine(
     (val) => {
       if (typeof val !== 'string') return false;

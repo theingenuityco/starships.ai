@@ -134,7 +134,7 @@ export class UserEntity implements UserModel {
   @IsOptional()
   @UserTransformers.AvatarTransform()
   @IsString()
-  @Length(1, 500)
+  @Length(1, 2400)
   avatar?: string;
 
   @Expose()

@@ -11,8 +11,19 @@ export async function up(client: Client): Promise<void> {
     ALTER TABLE users
       ALTER COLUMN avatar TYPE VARCHAR(2400);
 
-    ALTER TABLE messages
-      ALTER COLUMN IF EXISTS user_avatar TYPE VARCHAR(2400);
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'messages'
+          AND column_name = 'user_avatar'
+      ) THEN
+        ALTER TABLE messages
+          ALTER COLUMN user_avatar TYPE VARCHAR(2400);
+      END IF;
+    END $$;
   `;
 
   await client.query(sql);
@@ -20,8 +31,19 @@ export async function up(client: Client): Promise<void> {
 
 export async function down(client: Client): Promise<void> {
   const sql = `
-    ALTER TABLE messages
-      ALTER COLUMN IF EXISTS user_avatar TYPE VARCHAR(500);
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'messages'
+          AND column_name = 'user_avatar'
+      ) THEN
+        ALTER TABLE messages
+          ALTER COLUMN user_avatar TYPE VARCHAR(500);
+      END IF;
+    END $$;
 
     ALTER TABLE users
       ALTER COLUMN avatar TYPE VARCHAR(500);
@@ -29,4 +51,3 @@ export async function down(client: Client): Promise<void> {
 
   await client.query(sql);
 }
-

@@ -643,7 +643,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
               // Capture canonical agent identity for the active turn (used for snapshot.turn + stream placeholder identity).
               if (!activeTurnAgent && evt.type === 'turn.started') {
-                const d = (evt as Extract<ConversationStreamEvent, { type: 'turn.started' }>).data as any;
+                const d = (evt as Extract<ConversationStreamEvent, { type: 'turn.started' }>).data;
                 if (d && d.turnId === activeTurnId) {
                   const agentId = typeof d.agentId === 'string' ? String(d.agentId).trim() : '';
                   const agentName = typeof d.agentName === 'string' ? String(d.agentName).trim() : '';
@@ -659,8 +659,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                 if (!data || data.turnId !== activeTurnId) continue;
                 // Fallback identity source (should match turn.started); helps if the stream is missing turn.started for any reason.
                 if (!activeTurnAgent) {
-                  const agentId = typeof (data as any)?.agentId === 'string' ? String((data as any).agentId).trim() : '';
-                  const agentName = typeof (data as any)?.agentName === 'string' ? String((data as any).agentName).trim() : '';
+                  const agentId = typeof data.agentId === 'string' ? String(data.agentId).trim() : '';
+                  const agentName = typeof data.agentName === 'string' ? String(data.agentName).trim() : '';
                   if (agentId) activeTurnAgent = { agentId, ...(agentName ? { agentName } : {}) };
                 }
                 const messageId = typeof data.messageId === 'string' ? data.messageId : '';
@@ -678,7 +678,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             }
 
             if (activeTurnAgent && turn && turn.turnId === activeTurnId) {
-              turn = { ...turn, agentId: activeTurnAgent.agentId, ...(activeTurnAgent.agentName ? { agentName: activeTurnAgent.agentName } : {}) };
+              turn = {
+                ...turn,
+                agentId: activeTurnAgent.agentId,
+                ...(activeTurnAgent.agentName ? { agentName: activeTurnAgent.agentName } : {}),
+              };
             }
 
             // Pick the messageId with the most accumulated data.
@@ -729,7 +733,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Best-effort: include recent per-turn usage so token-based UI survives refresh.
       // We scan the same Redis stream window we already used above (or fetch it again if needed).
-      let turnUsageByTurnId: Record<string, any> | undefined;
+      type TurnUsageByTurnId = NonNullable<ConversationStreamSnapshot['turnUsageByTurnId']>;
+      type TurnUsageAggregate = TurnUsageByTurnId[string];
+      let turnUsageByTurnId: TurnUsageByTurnId | undefined;
       try {
         const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
         if (Array.isArray(recentDesc) && recentDesc.length > 0) {
@@ -738,11 +744,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           // A single "assistant turn" can trigger multiple LLM calls (planning/tool flows, retries, etc).
           // We want per-turn totals for UX, so we AGGREGATE all `turn.usage` events per turnId here
           // (rather than only keeping the last event).
-          const map = new Map<string, any>();
+          const map = new Map<string, TurnUsageAggregate>();
           for (const item of recent) {
-            const evt = item.evt as any;
-            if (!evt || evt.type !== 'turn.usage') continue;
-            const d = evt.data as any;
+            const evt = item.evt;
+            if (evt.type !== 'turn.usage') continue;
+            const d = evt.data;
             const tid = typeof d?.turnId === 'string' ? String(d.turnId) : '';
             if (!tid) continue;
             const u = d?.usage && typeof d.usage === 'object' ? d.usage : null;
@@ -754,9 +760,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             const prev = map.get(tid);
             if (!prev) {
+              const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString();
               map.set(tid, {
-                ...d,
                 turnId: tid,
+                at,
+                ...(typeof d?.agentId === 'string' ? { agentId: d.agentId } : null),
+                ...(typeof d?.agentName === 'string' ? { agentName: d.agentName } : null),
+                ...(typeof d?.model === 'string' ? { model: d.model } : null),
                 usage: {
                   promptTokens,
                   completionTokens,
@@ -767,7 +777,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
               continue;
             }
 
-            const pu = prev?.usage && typeof prev.usage === 'object' ? prev.usage : {};
+            const pu = prev.usage;
             const prevPrompt = typeof pu.promptTokens === 'number' ? pu.promptTokens : 0;
             const prevCompletion = typeof pu.completionTokens === 'number' ? pu.completionTokens : 0;
             const prevTotal = typeof pu.totalTokens === 'number' ? pu.totalTokens : Number(prevPrompt) + Number(prevCompletion);
@@ -800,7 +810,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             });
           }
           if (map.size > 0) {
-            turnUsageByTurnId = Object.fromEntries(map.entries());
+            turnUsageByTurnId = Object.fromEntries(map.entries()) as TurnUsageByTurnId;
           }
         }
       } catch {
@@ -993,13 +1003,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const agents = await conversationService.getConversationAgents(conversationId);
       // Participants should include BOTH linked agents + human users, derived from unified participant store.
       const participantRepo = new ConversationParticipantRepository();
-      const participantRows = await participantRepo.listByConversation(conversationId).catch(() => []);
-      const userIds = Array.isArray(participantRows)
-        ? participantRows.map((p) => (p as any)?.userId).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-        : [];
-      const agentIds = Array.isArray(participantRows)
-        ? participantRows.map((p) => (p as any)?.agentId).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-        : [];
+      const [userIds, agentIds] = await Promise.all([
+        participantRepo.listUserIdsByConversation(conversationId).catch(() => []),
+        participantRepo.listAgentIdsByConversation(conversationId).catch(() => []),
+      ]);
       const participants = Array.from(new Set([...agentIds, ...userIds]));
 
       // Structure response to match client expectations
@@ -2124,145 +2131,135 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
  * Thread-only: returns current user's notification level preference for a thread.
  * Default when no preference exists: 'mentions'.
  */
-router.get(
-  '/conversations/:conversationId/notification-level',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
-      if (!params) return;
+router.get('/conversations/:conversationId/notification-level', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!params) return;
 
-      const authUserId = req.user?.id as string | undefined;
-      if (!authUserId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const conn = getConnection();
-      const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
-        `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
-        [params.conversationId]
-      );
-      const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
-      const parentConversationId =
-        typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
-      if (!starshipId) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
-        return;
-      }
-      if (!parentConversationId) {
-        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
-          conversationId: params.conversationId,
-        });
-        return;
-      }
-
-      const channelRepo = new ChannelRepository();
-      const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
-      if (!parentChannel) {
-        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
-          conversationId: params.conversationId,
-          parentConversationId,
-        });
-        return;
-      }
-
-      if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
-      if (
-        !(await enforcePrivateChannelMembership({
-          conversationId: parentConversationId,
-          conversationStarshipId: starshipId,
-          userId: authUserId,
-          req,
-          res,
-        }))
-      )
-        return;
-
-      const prefRepo = new ConversationNotificationPrefRepository();
-      const pref = await prefRepo.get(params.conversationId, authUserId);
-      sendSuccess(res, { level: (pref?.level as any) || 'mentions' }, 200);
-    } catch (error) {
-      handleError(error, res, 'fetching thread notification level');
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
+
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
+      `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
+      [params.conversationId]
+    );
+    const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    const parentConversationId = typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
+    if (!starshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
+      return;
+    }
+    if (!parentConversationId) {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+        conversationId: params.conversationId,
+      });
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
+    if (!parentChannel) {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+        conversationId: params.conversationId,
+        parentConversationId,
+      });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: parentConversationId,
+        conversationStarshipId: starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const prefRepo = new ConversationNotificationPrefRepository();
+    const pref = await prefRepo.get(params.conversationId, authUserId);
+    sendSuccess(res, { level: pref?.level || 'mentions' }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching thread notification level');
   }
-);
+});
 
 /**
  * PUT /conversations/:conversationId/notification-level
  *
  * Thread-only: updates current user's notification level preference for a thread.
  */
-router.put(
-  '/conversations/:conversationId/notification-level',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
-      if (!params) return;
+router.put('/conversations/:conversationId/notification-level', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!params) return;
 
-      const authUserId = req.user?.id as string | undefined;
-      if (!authUserId) {
-        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-        return;
-      }
-
-      const body = validateData(z.object({ level: z.enum(['all', 'mentions', 'mute']) }), req.body, res, 'notification level body');
-      if (!body) return;
-
-      const conn = getConnection();
-      const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
-        `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
-        [params.conversationId]
-      );
-      const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
-      const parentConversationId =
-        typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
-      if (!starshipId) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
-        return;
-      }
-      if (!parentConversationId) {
-        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
-          conversationId: params.conversationId,
-        });
-        return;
-      }
-
-      const channelRepo = new ChannelRepository();
-      const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
-      if (!parentChannel) {
-        sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
-          conversationId: params.conversationId,
-          parentConversationId,
-        });
-        return;
-      }
-
-      if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
-      if (
-        !(await enforcePrivateChannelMembership({
-          conversationId: parentConversationId,
-          conversationStarshipId: starshipId,
-          userId: authUserId,
-          req,
-          res,
-        }))
-      )
-        return;
-
-      const prefRepo = new ConversationNotificationPrefRepository();
-      const pref = await prefRepo.upsert({
-        conversationId: params.conversationId,
-        userId: authUserId,
-        level: (body as any).level,
-      });
-      sendSuccess(res, { level: pref.level }, 200);
-    } catch (error) {
-      handleError(error, res, 'updating thread notification level');
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
     }
+
+    const body = validateData(z.object({ level: z.enum(['all', 'mentions', 'mute']) }), req.body, res, 'notification level body');
+    if (!body) return;
+
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string; parent_conversation_id: string | null }>(
+      `SELECT starship_id, parent_conversation_id FROM conversations WHERE id = $1`,
+      [params.conversationId]
+    );
+    const starshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    const parentConversationId = typeof convoRow?.parent_conversation_id === 'string' ? String(convoRow.parent_conversation_id).trim() : '';
+    if (!starshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
+      return;
+    }
+    if (!parentConversationId) {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+        conversationId: params.conversationId,
+      });
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
+    if (!parentChannel) {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+        conversationId: params.conversationId,
+        parentConversationId,
+      });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: parentConversationId,
+        conversationStarshipId: starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const prefRepo = new ConversationNotificationPrefRepository();
+    const pref = await prefRepo.upsert({
+      conversationId: params.conversationId,
+      userId: authUserId,
+      level: body.level,
+    });
+    sendSuccess(res, { level: pref.level }, 200);
+  } catch (error) {
+    handleError(error, res, 'updating thread notification level');
   }
-);
+});
 
 /**
  * GET /conversations/:conversationId/agents - Get agents linked to a conversation
@@ -2322,7 +2319,7 @@ router.get('/conversations/:conversationId/linked-message', jwtAuthMiddleware, a
 
     const queryValidation = validateData(z.object({ linkedConversationId: IdSchema }), req.query, res, 'linked message query');
     if (!queryValidation) return;
-    const linkedConversationId = String((queryValidation as any).linkedConversationId);
+    const linkedConversationId = String(queryValidation.linkedConversationId);
 
     const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {

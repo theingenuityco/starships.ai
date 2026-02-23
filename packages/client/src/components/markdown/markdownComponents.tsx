@@ -3,7 +3,10 @@
 import React, { useRef } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { adaptDomTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
+import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -109,13 +112,44 @@ function TableWithCopy({
     }
   }
 
+  const handleDownloadTable = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!tableRef.current) return
+    try {
+      const table = adaptDomTable(tableRef.current)
+      if (table.headers.length === 0 && table.rows.length === 0) return
+      const filename = sanitizeFilename(`table-${messageId}-${tableIdRef.current.slice(-6)}`) + '.csv'
+      downloadTableAsCsv(table, filename)
+      toast.success('Table exported')
+    } catch {
+      toast.error('Export failed')
+    }
+  }
+
+  const hasActions = hasCopy || true
+
   return (
     <div className="table-wrapper relative rounded-lg border bg-muted/30 my-2 group/table">
-      {hasCopy && (
-        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover/table:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTable}>
-            {copiedStates?.[tableIdRef.current] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-          </Button>
+      {hasActions && (
+        <div className="absolute top-2 right-2 z-10 flex gap-0.5 opacity-0 group-hover/table:opacity-100 transition-opacity">
+          {hasCopy && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTable} aria-label="Copy table">
+                  {copiedStates?.[tableIdRef.current] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy table</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadTable} aria-label="Export table as CSV">
+                <Icon name="file-csv" className="w-3 h-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Download as CSV</TooltipContent>
+          </Tooltip>
         </div>
       )}
       <div className="overflow-x-auto">

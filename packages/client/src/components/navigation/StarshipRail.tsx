@@ -136,39 +136,6 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
         })}
-
-        <div className="my-1 h-px w-8 bg-border/60" aria-hidden />
-
-        <Tooltip delayDuration={250}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => router.push('/explore')}
-              className={[
-                'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
-                'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
-                isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
-              ].join(' ')}
-              aria-label="Explore"
-              aria-current={isMarketplaceActive ? 'page' : undefined}
-            >
-              {/* Discord-like active indicator */}
-              <span
-                className={['absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity', isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0'].join(' ')}
-              />
-              <Icon name="store" className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-            <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
-              <div className="mt-0.5">
-                <Icon name="store" className="h-[22px] w-[22px] text-muted-foreground" />
-              </div>
-              <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Explore</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Explore agents</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   )

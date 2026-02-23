@@ -296,6 +296,16 @@ export function Navigation(props: NavigationProps) {
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
+      ...(isAuthenticated
+        ? [
+            {
+              href: '/explore/agents',
+              label: 'Find Agents',
+              icon: 'search',
+              isActive: isMarketplaceRoute,
+            } as const,
+          ]
+        : []),
       ...(isAuthenticated && starshipSlug
         ? [
             {
@@ -339,6 +349,7 @@ export function Navigation(props: NavigationProps) {
     ],
     [
       isAuthenticated,
+      isMarketplaceRoute,
       starshipSlug,
       pathname,
       isSchedulesRoute,

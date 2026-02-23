@@ -21,7 +21,7 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
           imageUrl={avatarUrl || null}
           label={displayName || 'Agent'}
           seed={displayName || template.slug || 'AI'}
-          sizeClassName="h-[72px] w-[72px]"
+          sizeClassName="h-[144px] w-[144px]"
           shapeClassName="rounded-xl"
           ringClassName="ring-1 ring-border/40"
           shadowClassName="shadow-md"

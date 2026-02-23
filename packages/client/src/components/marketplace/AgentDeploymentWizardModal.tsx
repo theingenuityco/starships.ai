@@ -43,10 +43,9 @@ interface AgentDeploymentWizardModalProps {
 
 type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
-  { id: 1, label: 'Starship', subtitle: 'Select a starship' },
-  { id: 2, label: 'Automations', subtitle: 'Automations & permissions' },
-  { id: 3, label: 'Connectors', subtitle: 'Connect required apps' },
-  { id: 4, label: 'Review', subtitle: 'Confirm & install' },
+  { id: 1, label: 'Select Starship', subtitle: '' },
+  { id: 2, label: 'Connect Apps', subtitle: '' },
+  // { id: 3, label: 'Automations', subtitle: 'Automations & permissions' },
 ]
 
 function toolsStepTitle(agentName: string, count: number): string {
@@ -70,9 +69,8 @@ function StarshipRightSlot({ children }: { children: React.ReactNode }) {
 }
 
 function stepTitle(step: WizardStep): string {
-  if (step === 1) return 'Select starship'
-  if (step === 2) return 'Automations & permissions'
-  if (step === 3) return 'Connectors'
+  if (step === 1) return 'Select Starship'
+  if (step === 2) return 'Connect Apps'
   return 'Review & install'
 }
 
@@ -100,9 +98,9 @@ export function AgentDeploymentWizardModal({
   const [starshipPickerOpen, setStarshipPickerOpen] = useState(false)
   const [starshipPickerSearch, setStarshipPickerSearch] = useState('')
 
-  // Only fetch tool/connectors when the modal is open and user reaches configuration step.
-  const shouldFetchTools = isOpen && step >= 2
-  const shouldFetchConnectors = isOpen && step >= 3
+  // Fetch connectors when step >= 2. Automations step is currently disabled.
+  const shouldFetchTools = false
+  const shouldFetchConnectors = isOpen && step >= 2 && !!templateId
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, shouldFetchTools && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, shouldFetchConnectors && !!templateId)
   const selectedStarshipId = String(selectedStarship?.id || '')
@@ -177,8 +175,6 @@ export function AgentDeploymentWizardModal({
 
   const canGoNext = useMemo(() => {
     if (step === 1) return !!selectedStarship && !(selectedStarship as DeployStarshipOptionWithAccess)?.deployDisabled
-    if (step === 2) return true
-    if (step === 3) return !!selectedStarship
     return false
   }, [step, selectedStarship])
 
@@ -196,15 +192,11 @@ export function AgentDeploymentWizardModal({
     if (isProcessing) return
     if (!canGoNext) return
     if (step === 1) setStep(2)
-    else if (step === 2) setStep(3)
-    else if (step === 3) setStep(4)
   }
 
   const handleBack = () => {
     if (isProcessing) return
     if (step === 2) setStep(1)
-    else if (step === 3) setStep(2)
-    else if (step === 4) setStep(3)
   }
 
   const handleDeploy = async () => {
@@ -245,7 +237,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 1 ? (
                 <div className="mt-8 space-y-4">
-                  <div className="text-sm font-semibold">Choose a starship to install {agentDeployLabel}</div>
+                  <div className="text-sm font-semibold">Install at</div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
@@ -268,17 +260,12 @@ export function AgentDeploymentWizardModal({
                             )}
                             disabled={isProcessing}
                           >
-                            <span className="flex items-start gap-3 min-w-0">
+                            <span className="flex items-center gap-3 min-w-0">
                               <StarshipPickerIcon starship={selectedStarship ?? { id: '', name: 'S' }} />
-                              <span className="min-w-0 flex-1">
+                              <span className="min-w-0 flex-1 flex items-center">
                                 <span className="block truncate text-sm font-semibold leading-tight">
                                   {selectedStarship?.name || selectedStarship?.slug || 'Select a starship…'}
                                 </span>
-                                {selectedStarship ? (
-                                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                    {selectedStarship.slug ? `/${selectedStarship.slug}` : selectedStarship.id}
-                                  </span>
-                                ) : null}
                               </span>
                             </span>
                             <Icon name="chevron-down" className={cn('h-4 w-4 opacity-50 shrink-0', starshipPickerOpen && 'rotate-180')} />
@@ -336,7 +323,6 @@ export function AgentDeploymentWizardModal({
                                         <StarshipPickerIcon starship={s} disabled={disabled} />
                                         <div className="min-w-0 flex flex-col flex-1">
                                           <div className="text-sm font-semibold leading-tight text-foreground truncate">{s.name || s.slug || s.id}</div>
-                                          <div className="mt-0.5 text-xs leading-4 text-muted-foreground truncate">{s.slug ? `/${s.slug}` : s.id}</div>
                                         </div>
                                         {disabled ? <Icon name="lock" className="h-4 w-4 text-muted-foreground shrink-0" /> : null}
                                       </div>
@@ -348,101 +334,14 @@ export function AgentDeploymentWizardModal({
                           </div>
                         </PopoverContent>
                       </Popover>
-
                     </div>
                   )}
                 </div>
               ) : null}
 
               {step === 2 ? (
-                <div className="mt-8 space-y-2">
-                  <div className="text-sm font-semibold">
-                    {toolsStepTitle(agentDeployLabel, assignedToolSlugs.length)}
-                  </div>
-
-                  {assignedToolSlugs.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      {assignedToolSlugs.map(slug => {
-                        const info = toolTemplateBySlug.get(slug)
-                        const title = info?.name?.trim() || slug
-                        const desc = info?.description?.trim() || ''
-                        const current = toolPermissions[slug] ?? 'ask'
-                        const leftIcon = pickToolLeftIcon(title)
-                        return (
-                          <div key={slug} className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                            <div className="flex flex-col gap-1">
-                              {/* Row 1: icon + name + permission selector */}
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Icon name={leftIcon.name} className="h-4 w-4 text-foreground shrink-0" />
-                                  <div className="text-sm font-semibold leading-tight text-foreground truncate">{title}</div>
-                                </div>
-
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
-                                      <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
-                                        <Badge
-                                          variant="outline"
-                                          className={cn('whitespace-nowrap border text-[9px] px-1 py-0.5', permissionBadgeClassName(current))}
-                                        >
-                                          <span className="inline-flex items-center gap-1">
-                                            <Icon name={permissionIconName(current)} className="h-2.5 w-2.5" />
-                                            <span>{permissionLabel(current)}</span>
-                                            <Icon name="chevron-down" className="h-2.5 w-2.5 opacity-70" />
-                                          </span>
-                                        </Badge>
-                                      </button>
-                                    </span>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-64">
-                                    {(['allow', 'ask', 'deny'] as const).map(p => (
-                                      <DropdownMenuItem
-                                        key={p}
-                                        className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
-                                        onClick={() => {
-                                          if (isProcessing) return
-                                          setToolPermissions(prev => ({ ...prev, [slug]: p }))
-                                        }}
-                                      >
-                                        <div className="flex flex-col gap-0.5">
-                                          <div className="flex items-center gap-2">
-                                            <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
-                                            <span className="text-sm font-medium">{permissionLabel(p)}</span>
-                                            <span className="ml-auto" />
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
-                                        </div>
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-
-                              {/* Row 2: full-width description */}
-                              {desc ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{desc}</div> : null}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-card/50 p-4">
-                      <div className="flex items-center gap-2">
-                        <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
-                        <p className="text-sm font-semibold">No automations required</p>
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">This agent doesn’t require any automations to be installed.</p>
-                    </div>
-                  )}
-
-                  <div className="pt-1 text-xs text-muted-foreground italic">Note: Permissions can be changed later.</div>
-                </div>
-              ) : null}
-
-              {step === 3 ? (
                 <div className="mt-8 space-y-4">
-                  <div className="text-sm font-semibold">{connectorsStepTitle(agentDeployLabel, visibleRequiredConnectors.length)}</div>
+                  <div className="text-sm font-semibold">Connect Apps</div>
 
                   {visibleRequiredConnectors.length > 0 ? (
                     selectedStarship?.id ? (
@@ -474,104 +373,24 @@ export function AgentDeploymentWizardModal({
                 </div>
               ) : null}
 
-              {step === 4 ? (
+              {/* Automations & permissions step temporarily disabled
+              {step === 3 ? (
                 <div className="mt-8 space-y-2">
-                  <div className="text-sm font-semibold">Review</div>
-
-                  <div className="space-y-3 pt-2">
-                    <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Icon name="rocket" className="h-4 w-4 text-foreground shrink-0" />
-                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Target starship</div>
-                          </div>
-                        </div>
-
-                        {selectedStarship ? (
-                          <div className="mt-1 flex items-start gap-3 min-w-0">
-                            <StarshipMonogram starship={selectedStarship} />
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium text-muted-foreground truncate">{selectedStarship?.name || selectedStarship?.slug || selectedStarship?.id}</div>
-                              <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{selectedStarship?.slug ? `/${selectedStarship.slug}` : selectedStarship?.id}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-1 text-xs text-muted-foreground truncate">Not selected</div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Icon name="wrench" className="h-4 w-4 text-foreground shrink-0" />
-                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Automations & permissions</div>
-                          </div>
-                          {assignedToolSlugs.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{assignedToolSlugs.length} automations</span>
-                              {(() => {
-                                const parts = [
-                                  { key: 'allow', count: permissionCounts.allow, label: 'Always', className: 'text-emerald-700 dark:text-emerald-300' },
-                                  { key: 'ask', count: permissionCounts.ask, label: 'Ask First', className: 'text-yellow-700 dark:text-yellow-300' },
-                                  { key: 'deny', count: permissionCounts.deny, label: 'Never', className: 'text-red-700 dark:text-red-300' },
-                                ].filter(p => (p.count ?? 0) > 0)
-
-                                if (parts.length === 0) return null
-
-                                return (
-                                  <>
-                                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                                    {parts.map((p, idx) => (
-                                      <React.Fragment key={p.key}>
-                                        {idx > 0 ? <span aria-hidden="true" className="h-3 w-px bg-border/60" /> : null}
-                                        <span className={cn('font-medium leading-none tabular-nums', p.className)}>
-                                          {p.count} {p.label}
-                                        </span>
-                                      </React.Fragment>
-                                    ))}
-                                  </>
-                                )
-                              })()}
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-xs text-muted-foreground leading-relaxed tabular-nums line-clamp-2">No automations</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Icon name="plug" className="h-4 w-4 text-foreground shrink-0" />
-                            <div className="text-sm font-semibold leading-tight text-foreground truncate">Connectors</div>
-                          </div>
-                          {visibleRequiredConnectors.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                              <span className="font-medium leading-none tabular-nums text-muted-foreground">{visibleRequiredConnectors.length} required</span>
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span className="font-medium leading-none tabular-nums text-emerald-700 dark:text-emerald-300">{connectedRequiredConnectorsCount} connected</span>
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-xs font-medium leading-none text-emerald-700 dark:text-emerald-300">No connectors required</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  ...
                 </div>
               ) : null}
+              */}
+
+              {/* Review step temporarily disabled
+              {step === 4 ? (
+                <div className="mt-8 space-y-2">
+                  ...
+                </div>
+              ) : null}
+              */}
             </div>
 
             <DialogFooter className="shrink-0 px-6 py-4 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
-              <div>
-                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isProcessing}>
-                  Cancel
-                </Button>
-              </div>
-
               <div className="flex items-center gap-2">
                 {step > 1 ? (
                   <Button type="button" variant="ghost" onClick={handleBack} disabled={isProcessing}>
@@ -579,7 +398,10 @@ export function AgentDeploymentWizardModal({
                     Back
                   </Button>
                 ) : null}
-                {step < 4 ? (
+              </div>
+
+              <div className="flex items-center gap-2">
+                {step < 2 ? (
                   <Button type="button" variant="primaryOutline" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
                     Next
                     <Icon name="caret-right" className="h-4 w-4 ml-1" />

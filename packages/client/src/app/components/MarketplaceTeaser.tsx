@@ -70,8 +70,8 @@ export default function MarketplaceTeaser(props: { initialAgentTemplates?: Agent
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col items-center text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Explore agents and tools</h2>
-          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Find and install agents, tools, and connectors. Deploy in one click.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Explore agents and connectors</h2>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Find and install agents and connectors. Deploy in one click.</p>
         </div>
 
         {/* Featured agents carousel */}

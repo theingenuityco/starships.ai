@@ -74,12 +74,12 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
       className={cn(
         'group relative flex items-center w-full h-8 cursor-pointer text-sm px-3 rounded-2xl transition-colors border border-transparent',
         special
-          ? 'text-primary hover:text-primary hover:bg-muted/40'
+          ? 'text-primary hover:text-primary hover:bg-[#2C2C30]'
           : isActive
             ? 'text-primary bg-primary/10'
             : hasBadge
-              ? 'text-foreground hover:text-foreground hover:bg-muted/60'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              ? 'text-foreground hover:text-foreground hover:bg-[#2C2C30]'
+              : 'text-muted-foreground hover:text-foreground hover:bg-[#2C2C30]'
       )}
       style={{
         justifyContent: 'flex-start',

@@ -31,19 +31,19 @@ export function AgentTemplatePreviewCard({ template, className }: { template: Ag
           tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
         />
 
-        {/* Content */}
-        <div className="min-w-0 flex-1 flex flex-col pt-0.5">
-          <div className="min-w-0">
-            {/* Name (small) */}
-            {displayRole ? <div className="min-w-0 text-xs text-muted-foreground truncate">{displayName || 'Unnamed agent'}</div> : null}
-
-            {/* Role (big) */}
-            <div className={displayRole ? 'mt-0.5 text-sm font-semibold leading-tight truncate' : 'text-sm font-semibold leading-tight truncate'}>
-              {displayRole || displayName || 'Unnamed agent'}
-            </div>
+        {/* Content: name (primary), role (subtitle), description (body) */}
+        <div className="min-w-0 flex-1 flex flex-col justify-center gap-1 pt-0.5">
+          <div className="min-w-0 space-y-0.5">
+            <h3 className="text-base font-semibold leading-tight truncate text-foreground">
+              {displayName || 'Unnamed agent'}
+            </h3>
+            {displayRole ? (
+              <p className="text-sm text-muted-foreground truncate">{displayRole}</p>
+            ) : null}
           </div>
-
-          {displayDescription ? <div className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{displayDescription}</div> : null}
+          {displayDescription ? (
+            <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed line-clamp-3">{displayDescription}</p>
+          ) : null}
         </div>
       </div>
     </div>

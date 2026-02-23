@@ -15,7 +15,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { Button } from '@/components/ui/button'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
@@ -35,13 +34,14 @@ interface IntegrationsSettingsContentProps {
   slug: string
 }
 
-type IntegrationsTab = 'all' | 'agents' | 'automations' | 'connectors'
+type IntegrationsTab = 'all' | 'agents' | 'connectors'
 
 function toIntegrationsTab(raw: string | null | undefined): IntegrationsTab {
   const v = String(raw || '').trim()
-  // Back-compat: old URLs used `tab=tools`
-  if (v === 'tools') return 'automations'
-  if (v === 'agents' || v === 'automations' || v === 'connectors' || v === 'all') return v
+  // Back-compat: old URLs used `tab=tools` or `tab=automations` for this page.
+  // Both now map to the Connectors view.
+  if (v === 'tools' || v === 'automations') return 'connectors'
+  if (v === 'agents' || v === 'connectors' || v === 'all') return v
   // Default to connectors when no tab is specified.
   return 'connectors'
 }
@@ -292,11 +292,10 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
 
   const allTabTotalForBadges = useMemo<number | null>(() => {
     if (typeof agentsTotalForBadges !== 'number') return null
-    if (typeof automationsTotalForBadges !== 'number') return null
-    if (!canManageConnectors) return agentsTotalForBadges + automationsTotalForBadges
+    if (!canManageConnectors) return agentsTotalForBadges
     if (typeof connectorsTotalForBadges !== 'number') return null
-    return agentsTotalForBadges + automationsTotalForBadges + connectorsTotalForBadges
-  }, [agentsTotalForBadges, automationsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
+    return agentsTotalForBadges + connectorsTotalForBadges
+  }, [agentsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
 
   // IMPORTANT: During search on the All tab, we hide empty sections.
   // For connectors, the "emptiness" signal (catalog total) is emitted by `StarshipConnectorsPanel`.
@@ -322,7 +321,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [debouncedQuery, isAllTab])
 
   const baseShowAgents = false
-  const baseShowAutomations = tabFromUrl === 'automations'
+  const baseShowAutomations = false
   const baseShowConnectors = tabFromUrl === 'connectors' && canManageConnectors
 
   // In the All tab, hide empty sections during search (q present).
@@ -360,9 +359,8 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (canManageConnectors) {
       opts.push({ value: 'connectors', label: withCount('Connectors', connectorsTotalForBadges) })
     }
-    opts.push({ value: 'automations', label: withCount('Automations', automationsTotalForBadges) })
     return opts
-  }, [automationsTotalForBadges, canManageConnectors, connectorsTotalForBadges])
+  }, [canManageConnectors, connectorsTotalForBadges])
 
   const renderRowSkeleton = useCallback((key: string) => {
     return (
@@ -603,9 +601,9 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
                       <span
                         className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
-                        title="Connect and manage apps and automations for this starship."
+                        title="Connect and manage connectors for this starship."
                       >
-                        Connect and manage apps and automations for this starship.
+                        Connect and manage connectors for this starship.
                       </span>
                     </div>
                   </div>
@@ -619,57 +617,22 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
           <div className="pt-4 pb-8 hidden md:block">
-            <Tabs value={tabFromUrl} onValueChange={value => setTab(toIntegrationsTab(value))}>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex justify-start">
-                  <TabsList className="w-full sm:w-auto flex-nowrap justify-center sm:justify-start gap-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
-                    {canManageConnectors ? (
-                      <TabsTrigger value="connectors" className="flex-1 sm:flex-none min-w-0 justify-center">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span>Connectors</span>
-                          {typeof connectorCatalogTotalVisible === 'number' ? (
-                            <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                              {connectorCatalogTotalVisible}
-                            </Badge>
-                          ) : typeof catalogTotal === 'number' ? (
-                            <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                              {catalogTotal}
-                            </Badge>
-                          ) : typeof totalConnectors === 'number' ? (
-                            <Badge variant={tabFromUrl === 'connectors' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                              {totalConnectors}
-                            </Badge>
-                          ) : null}
-                        </span>
-                      </TabsTrigger>
-                    ) : null}
-                    <TabsTrigger value="automations" className="flex-1 sm:flex-none min-w-0 justify-center">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span>Automations</span>
-                        {typeof toolsPagination?.total === 'number' ? (
-                          <Badge variant={tabFromUrl === 'automations' ? 'default' : 'secondary'} className="h-4 px-1.5 py-0 text-[10px] font-medium leading-none tabular-nums">
-                            {toolsPagination.total}
-                          </Badge>
-                        ) : null}
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex justify-start" />
 
-                <div className="w-full sm:w-64">
-                  <div className="relative">
-                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                    <Input
-                      value={searchValue}
-                      onChange={e => setSearchValue(e.target.value)}
-                      placeholder="Search installed"
-                      className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
-                      aria-label="Search installed"
-                    />
-                  </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                  <Input
+                    value={searchValue}
+                    onChange={e => setSearchValue(e.target.value)}
+                    placeholder="Search connectors"
+                    className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
+                    aria-label="Search connectors"
+                  />
                 </div>
               </div>
-            </Tabs>
+            </div>
           </div>
 
           {starshipLoading ? (
@@ -789,15 +752,17 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
         </div>
       </div>
 
-      <MobileBottomFilterBar
-        filterValue={tabFromUrl}
-        onFilterChange={v => setTab(toIntegrationsTab(v))}
-        filterOptions={mobileFilterOptions}
-        filterPlaceholder="Filter"
-        searchValue={searchValue}
-        onSearchChange={setSearchValue}
-        searchPlaceholder="Search installed"
-      />
+      {mobileFilterOptions.length > 1 ? (
+        <MobileBottomFilterBar
+          filterValue={tabFromUrl}
+          onFilterChange={v => setTab(toIntegrationsTab(v))}
+          filterOptions={mobileFilterOptions}
+          filterPlaceholder="Filter"
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          searchPlaceholder="Search connectors"
+        />
+      ) : null}
     </div>
   )
 }

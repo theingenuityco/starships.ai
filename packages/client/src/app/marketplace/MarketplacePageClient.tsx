@@ -24,8 +24,10 @@ import ExploreCTA from '@/app/components/ExploreCTA'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 
-const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
-type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
+const ALL_MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
+type MarketplaceTab = (typeof ALL_MARKETPLACE_TABS)[number]
+// Tabs shown in the hero navigation (we no longer surface "All" or "Automations" there).
+const MARKETPLACE_TABS: MarketplaceTab[] = ['agents', 'connectors']
 
 const MAX_LISTING_RESULTS = 9
 
@@ -39,7 +41,7 @@ function excludeInternalStarshipsConnectorFromTotal(total: number): number {
 }
 
 function isMarketplaceTab(value: string): value is MarketplaceTab {
-  return (MARKETPLACE_TABS as readonly string[]).includes(value)
+  return (ALL_MARKETPLACE_TABS as readonly string[]).includes(value)
 }
 
 const TAB_TO_ROUTE: Record<MarketplaceTab, string> = {
@@ -406,9 +408,30 @@ export default function MarketplacePageClient(props: {
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
   const hero = useMemo(() => {
-    const t = tab === 'all' ? 'Explore' : tab === 'agents' ? 'Explore agents' : tab === 'tools' ? 'Explore automations' : 'Explore connectors'
-    const subtitle = 'Search and install agents, automations, and connectors.'
-    return { title: t, subtitle }
+    let title: string
+    let subtitle: string
+    let placeholder: string
+
+    if (tab === 'agents') {
+      title = 'Explore agents'
+      subtitle = 'Search and install agents for your workflows.'
+      placeholder = 'Search agents'
+    } else if (tab === 'tools') {
+      title = 'Explore automations'
+      subtitle = 'Search and install automations for your agents.'
+      placeholder = 'Search automations'
+    } else if (tab === 'connectors') {
+      title = 'Explore connectors'
+      subtitle = 'Search and connect apps and services to your starships.'
+      placeholder = 'Search connectors'
+    } else {
+      // "All" landing page
+      title = 'Explore'
+      subtitle = 'Search and install agents and connectors.'
+      placeholder = 'Search agents and connectors'
+    }
+
+    return { title, subtitle, placeholder }
   }, [tab])
 
   const renderConnectorCard = useCallback(
@@ -548,12 +571,12 @@ export default function MarketplacePageClient(props: {
           <div className="relative">
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
               {/* Hero (transparent, normal container width) */}
-              <div className="pt-10 sm:pt-12 pb-6">
+              <div className="pt-4 sm:pt-6 pb-3">
                 <div className="flex flex-col items-center text-center">
-                  <h1 className="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">{hero.title}</h1>
-                  <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-2xl">{hero.subtitle}</p>
+                  <h1 className="mt-0 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">{hero.title}</h1>
+                  <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl">{hero.subtitle}</p>
 
-                  <div className="mt-6 max-w-2xl mx-auto w-full">
+                  <div className="mt-4 max-w-2xl mx-auto w-full">
                     <div
                       className={
                         // Match ConversationMessageInput "minimal/compact" composer styling:
@@ -565,7 +588,7 @@ export default function MarketplacePageClient(props: {
                         <span className="flex flex-shrink-0 items-center justify-center p-1.5 rounded-lg text-muted-foreground">
                           <Icon name="search" className="h-5 w-5" />
                         </span>
-                        <Input
+                          <Input
                           value={searchText}
                           onChange={e => setSearchText(e.target.value)}
                           onKeyDown={e => {
@@ -574,7 +597,7 @@ export default function MarketplacePageClient(props: {
                               if (q) track({ type: 'marketplace_search_used', query: q })
                             }
                           }}
-                          placeholder="Search agents, tools, and connectors"
+                          placeholder={hero.placeholder}
                           aria-label="Search Explore"
                           className="h-auto border-0 bg-transparent shadow-none p-0 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
@@ -584,14 +607,14 @@ export default function MarketplacePageClient(props: {
                 </div>
               </div>
 
-              <div className="pb-2">
+              <div className="pt-0 pb-2">
                 <nav aria-label="Explore categories" className="flex justify-center">
                   <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
                     <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
                       {MARKETPLACE_TABS.map(t => {
-                        const label = t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Automations' : 'Connectors'
+                        const label = t === 'agents' ? 'Agents' : 'Connectors'
                         const isActive = tab === t
-                        const isLoading = t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading
+                        const isLoading = t === 'agents' ? agentTemplatesLoading : connectorsLoading
                         return (
                           <button
                             key={t}

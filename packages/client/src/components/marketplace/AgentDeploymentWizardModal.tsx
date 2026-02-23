@@ -45,14 +45,12 @@ type StepMeta = { id: WizardStep; label: string; subtitle: string }
 const WIZARD_STEPS: StepMeta[] = [
   { id: 1, label: 'Select Starship', subtitle: '' },
   { id: 2, label: 'Connect Apps', subtitle: '' },
-  // { id: 3, label: 'Automations', subtitle: 'Automations & permissions' },
+  { id: 3, label: 'Permissions', subtitle: '' },
+  { id: 4, label: 'Review', subtitle: '' },
 ]
 
-function toolsStepTitle(agentName: string, count: number): string {
-  const n = Number.isFinite(count) ? count : 0
-  if (n <= 0) return `${agentName} has no automations`
-  if (n === 1) return `${agentName} can use this automation`
-  return `${agentName} can use these ${n} automations`
+function capabilitiesStepTitle(agentName: string): string {
+  return `${agentName}'s capabilities`
 }
 
 function connectorsStepTitle(agentName: string, count: number): string {
@@ -71,6 +69,7 @@ function StarshipRightSlot({ children }: { children: React.ReactNode }) {
 function stepTitle(step: WizardStep): string {
   if (step === 1) return 'Select Starship'
   if (step === 2) return 'Connect Apps'
+  if (step === 3) return 'Permissions'
   return 'Review & install'
 }
 
@@ -98,8 +97,7 @@ export function AgentDeploymentWizardModal({
   const [starshipPickerOpen, setStarshipPickerOpen] = useState(false)
   const [starshipPickerSearch, setStarshipPickerSearch] = useState('')
 
-  // Fetch connectors when step >= 2. Automations step is currently disabled.
-  const shouldFetchTools = false
+  const shouldFetchTools = isOpen && step >= 3 && assignedToolSlugs.length > 0
   const shouldFetchConnectors = isOpen && step >= 2 && !!templateId
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, shouldFetchTools && assignedToolSlugs.length > 0)
   const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, shouldFetchConnectors && !!templateId)
@@ -175,6 +173,7 @@ export function AgentDeploymentWizardModal({
 
   const canGoNext = useMemo(() => {
     if (step === 1) return !!selectedStarship && !(selectedStarship as DeployStarshipOptionWithAccess)?.deployDisabled
+    if (step === 2 || step === 3) return true
     return false
   }, [step, selectedStarship])
 
@@ -192,11 +191,15 @@ export function AgentDeploymentWizardModal({
     if (isProcessing) return
     if (!canGoNext) return
     if (step === 1) setStep(2)
+    else if (step === 2) setStep(3)
+    else if (step === 3) setStep(4)
   }
 
   const handleBack = () => {
     if (isProcessing) return
     if (step === 2) setStep(1)
+    else if (step === 3) setStep(2)
+    else if (step === 4) setStep(3)
   }
 
   const handleDeploy = async () => {
@@ -231,9 +234,7 @@ export function AgentDeploymentWizardModal({
             </DialogHeader>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              {/* Agent details (compact preview, matches marketplace card layout). */}
-              <div className="text-sm font-semibold">Agent details</div>
-              <AgentTemplatePreviewCard template={template} className="mt-3 mb-6" />
+              <AgentTemplatePreviewCard template={template} className="mb-6" />
 
               {step === 1 ? (
                 <div className="mt-8 space-y-4">
@@ -373,21 +374,155 @@ export function AgentDeploymentWizardModal({
                 </div>
               ) : null}
 
-              {/* Automations & permissions step temporarily disabled
               {step === 3 ? (
-                <div className="mt-8 space-y-2">
-                  ...
+                <div className="mt-8 space-y-4">
+                  <div className="text-sm font-semibold">{capabilitiesStepTitle(agentDeployLabel)}</div>
+                  {assignedToolSlugs.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {assignedToolSlugs.map(slug => {
+                        const info = toolTemplateBySlug.get(slug)
+                        const title = info?.name?.trim() || slug
+                        const desc = info?.description?.trim() || ''
+                        const current = toolPermissions[slug] ?? 'ask'
+                        return (
+                          <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="mt-1.5 flex-shrink-0">
+                                  <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
+                                    <Tooltip delayDuration={250}>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors flex-shrink-0"
+                                          aria-label={`Tool info: ${title}`}
+                                        >
+                                          <Icon name="info" className="h-4 w-4" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="start" className="max-w-xs p-2 text-xs">
+                                        <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                </div>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <span className={cn('inline-flex', isProcessing && 'cursor-not-allowed')}>
+                                    <button type="button" disabled={isProcessing} className={cn('inline-flex items-center', isProcessing && 'opacity-70')}>
+                                      <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
+                                        <span className="inline-flex items-center gap-1.5">
+                                          <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
+                                          <span>{permissionLabel(current)}</span>
+                                          <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
+                                        </span>
+                                      </Badge>
+                                    </button>
+                                  </span>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-72">
+                                  {(['allow', 'ask', 'deny'] as const).map(p => (
+                                    <DropdownMenuItem
+                                      key={p}
+                                      className={cn('cursor-pointer', permissionMenuItemClassName(p), p === current && permissionMenuItemSelectedClassName(p))}
+                                      onClick={() => {
+                                        if (isProcessing) return
+                                        setToolPermissions(prev => ({ ...prev, [slug]: p }))
+                                      }}
+                                    >
+                                      <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <Icon name={permissionIconName(p)} className={cn('h-4 w-4', permissionMenuIconClassName(p))} />
+                                          <span className="text-sm font-medium">{permissionLabel(p)}</span>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{permissionDescription(p)}</div>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <Icon name="check-circle" className="h-4 w-4 text-emerald-500" />
+                        <p className="text-sm font-semibold leading-tight">No automations</p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">This agent has no automations to configure.</p>
+                    </div>
+                  )}
                 </div>
               ) : null}
-              */}
 
-              {/* Review step temporarily disabled
               {step === 4 ? (
-                <div className="mt-8 space-y-2">
-                  ...
+                <div className="mt-8">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Review</h3>
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+                          <Icon name="rocket" className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Install at</p>
+                          <p className="mt-0.5 text-sm font-semibold text-foreground truncate">
+                            {selectedStarship ? selectedStarship.name || selectedStarship.slug || selectedStarship.id : 'Not selected'}
+                          </p>
+                        </div>
+                        {selectedStarship ? (
+                          <div className="shrink-0">
+                            <StarshipMonogram starship={selectedStarship} />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="rounded-xl border border-border/60 bg-muted/20 p-4 flex flex-col justify-center min-h-[72px]">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50">
+                            <Icon name="plug" className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Connect Apps</p>
+                        </div>
+                        {visibleRequiredConnectors.length > 0 ? (
+                          <p className="mt-2 text-sm text-foreground">
+                            <span className="tabular-nums font-medium text-emerald-600 dark:text-emerald-400">{connectedRequiredConnectorsCount}</span>
+                            <span className="text-muted-foreground"> / {visibleRequiredConnectors.length} connected</span>
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">No connectors required</p>
+                        )}
+                      </div>
+                      {assignedToolSlugs.length > 0 ? (
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-4 flex flex-col justify-center min-h-[72px]">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/50">
+                              <Icon name="wrench" className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Permissions</p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            {permissionCounts.allow > 0 && <span className="font-medium text-foreground">{permissionCounts.allow} always</span>}
+                            {permissionCounts.allow > 0 && permissionCounts.ask > 0 && <span className="text-border">·</span>}
+                            {permissionCounts.ask > 0 && <span className="font-medium text-foreground">{permissionCounts.ask} ask first</span>}
+                            {(permissionCounts.allow > 0 || permissionCounts.ask > 0) && permissionCounts.deny > 0 && <span className="text-border">·</span>}
+                            {permissionCounts.deny > 0 && <span className="font-medium text-foreground">{permissionCounts.deny} never</span>}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               ) : null}
-              */}
             </div>
 
             <DialogFooter className="shrink-0 px-6 py-4 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
@@ -401,7 +536,7 @@ export function AgentDeploymentWizardModal({
               </div>
 
               <div className="flex items-center gap-2">
-                {step < 2 ? (
+                {step < 4 ? (
                   <Button type="button" variant="primaryOutline" onClick={handleNext} disabled={isProcessing || !canGoNext} className="min-w-[120px]">
                     Next
                     <Icon name="caret-right" className="h-4 w-4 ml-1" />

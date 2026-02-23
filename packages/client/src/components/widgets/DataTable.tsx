@@ -73,7 +73,7 @@ export function DataTable({
                       aria-label="Export table as CSV"
                       className="shrink-0"
                     >
-                      <Icon name="file-csv" className="w-3.5 h-3.5 mr-1.5" />
+                      <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
                       Export CSV
                     </Button>
                   </TooltipTrigger>

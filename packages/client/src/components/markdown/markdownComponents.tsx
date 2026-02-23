@@ -145,7 +145,7 @@ function TableWithCopy({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleDownloadTable} aria-label="Export table as CSV">
-                <Icon name="file-csv" className="w-3 h-3" />
+                <Icon name="download" className="w-3 h-3" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Download as CSV</TooltipContent>

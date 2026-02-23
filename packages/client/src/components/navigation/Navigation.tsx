@@ -320,8 +320,8 @@ export function Navigation(props: NavigationProps) {
         ? [
             {
               href: `/ship/${starshipSlug}/installed`,
-              label: 'Installed',
-              icon: 'download',
+              label: 'Connect Apps',
+              icon: 'plug',
               isActive: isInstalledRoute,
             },
           ]
@@ -442,13 +442,6 @@ export function Navigation(props: NavigationProps) {
                   className="flex flex-1 min-w-0 items-center gap-1.5"
                   title={starshipData?.name || 'Starships.ai'}
                 >
-                  <span
-                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted/60 px-1 text-[10px] font-semibold tracking-wide text-muted-foreground"
-                    aria-label={`Starship monogram ${starshipMonogram(starshipData?.name || 'Starships.ai')}`}
-                    title={starshipMonogram(starshipData?.name || 'Starships.ai')}
-                  >
-                    {starshipMonogram(starshipData?.name || 'Starships.ai')}
-                  </span>
                   <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">
                     {starshipData?.name || 'Starships.ai'}
                   </span>
@@ -491,11 +484,14 @@ export function Navigation(props: NavigationProps) {
             </div>
           </div>
 
+          {/* Divider below starship name/header */}
+          <div className="ml-2 mr-1.5 h-px bg-border/60" />
+
           {/* Navigation Content - directly under header */}
           <div
             className="flex-shrink-0"
             style={{
-              marginTop: '0rem',
+              marginTop: '0.75rem',
               marginBottom: '0.5rem',
               paddingTop: '0rem',
               paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',

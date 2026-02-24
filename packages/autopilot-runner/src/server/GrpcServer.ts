@@ -3,6 +3,7 @@ import { Queue, RunnerTask } from '@/queue/Queue';
 import { Executor } from '@/executor/Executor';
 import { WorkerPool } from '@/queue/Worker';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
+import { withRunnerRetry } from '@starships/autopilot';
 
 interface GrpcServerOptions {
   port: number;
@@ -261,14 +262,18 @@ export class GrpcServer {
   ): Promise<unknown> {
     const fastPath = this.opts.fastPathEnabled && this.opts.workers !== undefined;
     if (fastPath) {
-      return await this.opts.executor.execute({
-        requestId: String(req?.request_id || ''),
-        blueprintJson: String(req?.blueprint_json || '{}'),
-        executionJson: String(req?.execution_json || '{}'),
-        configJson: String(req?.config_json || '{}'),
-        timeoutMs: Number(req?.timeout_ms || 0) || undefined,
-        onEvent,
-      });
+      return await withRunnerRetry(
+        () =>
+          this.opts.executor.execute({
+            requestId: String(req?.request_id || ''),
+            blueprintJson: String(req?.blueprint_json || '{}'),
+            executionJson: String(req?.execution_json || '{}'),
+            configJson: String(req?.config_json || '{}'),
+            timeoutMs: Number(req?.timeout_ms || 0) || undefined,
+            onEvent,
+          }),
+        { logPrefix: '[GrpcServer]' }
+      );
     }
     return await new Promise<unknown>((resolve, reject) => {
       const task: RunnerTask = {

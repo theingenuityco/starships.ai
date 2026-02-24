@@ -30,6 +30,8 @@ export type { ConditionalResult } from './nodes/Conditional';
 
 // Utils
 export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
+export { isRetryableRunnerError, withRunnerRetry } from './utils/retry';
+export type { RetryOptions } from './utils/retry';
 
 // Errors
 export { CancelledError } from './errors/CancelledError';

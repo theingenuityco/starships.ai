@@ -1,5 +1,6 @@
 import { Queue, RunnerTask } from './Queue';
 import { Executor } from '@/executor/Executor';
+import { withRunnerRetry } from '@starships/autopilot';
 
 interface WorkerPoolOptions {
   queue: Queue<RunnerTask>;
@@ -34,14 +35,18 @@ export class WorkerPool {
       const task = await this.queue.dequeue();
       const startedAt = Date.now();
       try {
-        const result = await this.executor.execute({
-          requestId: task.requestId,
-          blueprintJson: task.blueprintJson,
-          executionJson: task.executionJson,
-          configJson: task.configJson,
-          timeoutMs: task.timeoutMs,
-          onEvent: task.onEvent,
-        });
+        const result = await withRunnerRetry(
+          () =>
+            this.executor.execute({
+              requestId: task.requestId,
+              blueprintJson: task.blueprintJson,
+              executionJson: task.executionJson,
+              configJson: task.configJson,
+              timeoutMs: task.timeoutMs,
+              onEvent: task.onEvent,
+            }),
+          { logPrefix: '[Worker]' }
+        );
         if (task.onEvent) {
           await task.onEvent({ type: 'completed', data: { durationMs: Date.now() - startedAt, result } });
         }

@@ -25,7 +25,7 @@ export const config = {
 
   // Default retry configuration
   DEFAULT_RETRIES: 3,
-  RETRY_BACKOFF_MS: 1000,
+  RETRY_BACKOFF_MS: 2000,
 
   // Expression evaluation timeout to prevent hanging
   EXPRESSION_TIMEOUT_MS: 5000,

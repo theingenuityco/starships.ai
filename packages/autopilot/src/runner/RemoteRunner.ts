@@ -4,6 +4,7 @@ import type { EngineConfig } from '@/engine/Engine';
 import type { AutopilotEvent } from '@/types/events';
 import { nanoid } from 'nanoid';
 import { autopilot } from '@/Autopilot';
+import { withRunnerRetry } from '@/utils/retry';
 
 export class RemoteRunner implements Runner {
   private readonly baseUrl: string;
@@ -24,34 +25,31 @@ export class RemoteRunner implements Runner {
     execution: Execution,
     config?: EngineConfig
   ): { promise: Promise<ExecutionItem[]>; cancel: () => void } {
-    const requestId = nanoid();
-    const payload: Record<string, unknown> = {
-      blueprint_json: JSON.stringify(blueprint),
-      execution_json: JSON.stringify(execution),
-      config_json: JSON.stringify({ ...(config || {}), eventCallback: undefined }),
-      request_id: requestId,
-    };
-
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
 
+    let currentRequestId = nanoid();
     const cancel = () => {
-      // Fire-and-forget: tell the runner to cancel the request by id.
-      // IMPORTANT: do NOT abort the ExecuteStream connection here; we want the runner to
-      // complete the stream gracefully with a 'completed' payload so the caller does not
-      // treat cancellation as a failure.
       try {
         void fetch(`${this.baseUrl}/runner.Runner/Cancel`, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ request_id: requestId }),
+          body: JSON.stringify({ request_id: currentRequestId }),
         }).catch(() => {});
       } catch {
         // ignore
       }
     };
 
-    const promise = (async (): Promise<ExecutionItem[]> => {
+    const runOnce = async (): Promise<ExecutionItem[]> => {
+      currentRequestId = nanoid();
+      const payload: Record<string, unknown> = {
+        blueprint_json: JSON.stringify(blueprint),
+        execution_json: JSON.stringify(execution),
+        config_json: JSON.stringify({ ...(config || {}), eventCallback: undefined }),
+        request_id: currentRequestId,
+      };
+
       const streamUrl = `${this.baseUrl}/runner.Runner/ExecuteStream`;
       const streamRes = await fetch(streamUrl, {
         method: 'POST',
@@ -59,7 +57,9 @@ export class RemoteRunner implements Runner {
         body: JSON.stringify(payload),
       });
       if (!streamRes.ok || !streamRes.body) {
-        throw new Error(`Remote runner stream error: ${streamRes.status} ${streamRes.statusText}`);
+        const err = new Error(`Remote runner stream error: ${streamRes.status} ${streamRes.statusText}`);
+        (err as Error & { status?: number }).status = streamRes.status;
+        throw err;
       }
 
       const reader = streamRes.body.getReader();
@@ -140,7 +140,9 @@ export class RemoteRunner implements Runner {
         throw new Error('Remote runner stream ended without a completed result');
       }
       return finalResult;
-    })();
+    };
+
+    const promise = withRunnerRetry(runOnce, { logPrefix: '[RemoteRunner]' });
 
     return { promise, cancel };
   }

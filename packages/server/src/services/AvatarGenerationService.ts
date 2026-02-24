@@ -478,6 +478,12 @@ export class AvatarGenerationService {
         materials: 'high_quality_surfaces' | 'matte_stylized' | 'stylized_pbr_punchy';
         geometry: 'clean_game_mesh' | 'highpoly_bake';
         shading: 'real_time' | 'offline';
+        framing: {
+          crop: 'bust_up_mid_chest';
+          include: 'head_neck_shoulders_upper_chest';
+          exclude: Array<'hands' | 'forearms' | 'full_torso' | 'full_body'>;
+          padding: 'none_full_bleed';
+        };
         shaders: {
           skin: 'subsurface_profile_pbr';
           hair: 'anisotropic_strands_or_cards';
@@ -495,7 +501,7 @@ export class AvatarGenerationService {
           grain: 'none' | 'subtle';
         };
         camera: {
-          shot: 'head_and_shoulders_to_mid_chest';
+          shot: 'bust_up_mid_chest';
           pose: 'three_quarter';
           yaw_deg: number;
           facing: 'viewer_left';
@@ -597,6 +603,12 @@ export class AvatarGenerationService {
           materials: 'stylized_pbr_punchy',
           geometry: 'clean_game_mesh',
           shading: 'real_time',
+          framing: {
+            crop: 'bust_up_mid_chest',
+            include: 'head_neck_shoulders_upper_chest',
+            exclude: ['hands', 'forearms', 'full_torso', 'full_body'],
+            padding: 'none_full_bleed',
+          },
           shaders: {
             skin: 'subsurface_profile_pbr',
             hair: 'anisotropic_strands_or_cards',
@@ -614,7 +626,7 @@ export class AvatarGenerationService {
             grain: 'none',
           },
           camera: {
-            shot: 'head_and_shoulders_to_mid_chest',
+            shot: 'bust_up_mid_chest',
             pose: 'three_quarter',
             yaw_deg: 10,
             facing: 'viewer_left',

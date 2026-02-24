@@ -859,7 +859,7 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
-  const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
+    const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
 
     const connectButton = (
       <Button
@@ -893,20 +893,20 @@ export function StarshipConnectorsPanel({
 
     const cta = isConnected ? (disconnectButton ?? connectButton) : connectButton
 
-  const howToButton =
-    demoEmbedUrl != null
-      ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-8 px-2 text-xs shrink-0 text-primary hover:text-primary hover:bg-primary/10"
-          onClick={() => setActiveDemo({ provider, label, url: demoEmbedUrl })}
-        >
-          <Icon name="play-circle" className="h-3.5 w-3.5 mr-1" />
-          How to connect
-        </Button>
-        )
-      : null
+    const howToButton =
+      demoEmbedUrl != null
+        ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-8 group min-w-[130px] justify-center shrink-0')}
+            onClick={() => setActiveDemo({ provider, label, url: demoEmbedUrl })}
+          >
+            <Icon name="play-circle" className={CONNECTOR_CTA_ICON_CLASS} />
+            How to connect
+          </Button>
+          )
+        : null
 
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>

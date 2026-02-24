@@ -674,35 +674,6 @@ export default function MarketplacePageClient(props: {
                         </section>
                       ) : null}
 
-                      {toolsVisible.length > 0 ? (
-                        <section>
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular automations</h2>
-                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
-                                {toolsVisible.length}
-                              </Badge>
-                            </div>
-                            <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.tools)}>
-                              <span>Explore all automations</span>
-                              <Icon name="chevron-right" className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
-                              <motion.div
-                                key={template.id || `${idx}`}
-                                initial={{ opacity: 0, y: 14 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.04 }}
-                              >
-                                <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
-                              </motion.div>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-
                       {connectorsVisible.length > 0 ? (
                         <section>
                           <div className="mb-4 flex items-center justify-between gap-3">

@@ -122,7 +122,7 @@ export class AvatarGenerationService {
 
     // Mirror prompt generation should be consistent and high-quality regardless of the agent's runtime model.
     // We route this through OpenRouter using a fixed model id.
-    const mirrorModel = 'openai/gpt-5.2';
+    const mirrorModel = 'anthropic/claude-sonnet-4.5';
 
     type MirrorPromptSpec = {
       agent: string;
@@ -141,6 +141,10 @@ export class AvatarGenerationService {
         contrast: 'high_value_separation';
         hair_color: 'unrestricted';
         skin_tone: 'natural_only';
+        female_physique_bias?: {
+          apply_when_gender: 'female';
+          chest: 'fuller';
+        };
         wardrobe: {
           color_rule: 'vibrant_accents_not_overpowering';
           visibility: 'upper_body_only_bust_crop';
@@ -170,7 +174,6 @@ export class AvatarGenerationService {
         no_celebs: true;
         no_copyrighted_characters: true;
         no_brands_logos: true;
-        no_nsfw: true;
         bodily_marks: 'rare_max_1_subtle_only_if_implied';
         forbid_render_style_terms: true;
         allow_game_like_colors: true;
@@ -223,8 +226,7 @@ export class AvatarGenerationService {
       if (!isRecord(value)) return undefined;
       const genderRaw = value['gender'];
       const gender = typeof genderRaw === 'string' ? (genderRaw.trim().toLowerCase() as string) : '';
-      const genderNorm =
-        gender === 'male' || gender === 'female' || gender === 'nonbinary' ? (gender as 'male' | 'female' | 'nonbinary') : undefined;
+      const genderNorm = gender === 'male' || gender === 'female' ? (gender as 'male' | 'female') : undefined;
 
       const getStr = (k: keyof Omit<MirrorPromptOutput, 'v'>): string | undefined => {
         const v = value[k as string];
@@ -278,6 +280,12 @@ export class AvatarGenerationService {
           contrast: 'high_value_separation',
           hair_color: 'unrestricted',
           skin_tone: 'natural_only',
+          // Subtle, non-sexualized bias to avoid extremely flat/androgynous physiques when gender=female.
+          // This should be expressed in the required `physique` field (bust-up framing only).
+          female_physique_bias: {
+            apply_when_gender: 'female',
+            chest: 'fuller',
+          },
           wardrobe: {
             color_rule: 'vibrant_accents_not_overpowering',
             visibility: 'upper_body_only_bust_crop',
@@ -307,7 +315,6 @@ export class AvatarGenerationService {
           no_celebs: true,
           no_copyrighted_characters: true,
           no_brands_logos: true,
-          no_nsfw: true,
           bodily_marks: 'rare_max_1_subtle_only_if_implied',
           forbid_render_style_terms: true,
           allow_game_like_colors: true,
@@ -571,7 +578,7 @@ export class AvatarGenerationService {
           saturation: 'medium_high' | 'balanced' | 'high';
           accent: 'neon_allowed' | 'neon_subtle';
           hair_color: 'unrestricted';
-          hair_color_spectrum: 'vivid_neon_full_spectrum' | 'natural_only';
+          eyes_color: 'unrestricted';
           skin_tone: 'natural_only';
           emissive_accents: 'allowed_subtle' | 'allowed';
         };
@@ -710,7 +717,7 @@ export class AvatarGenerationService {
             saturation: 'medium_high',
             accent: 'neon_subtle',
             hair_color: 'unrestricted',
-            hair_color_spectrum: 'vivid_neon_full_spectrum',
+            eyes_color: 'unrestricted',
             skin_tone: 'natural_only',
             emissive_accents: 'allowed',
           },

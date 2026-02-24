@@ -137,26 +137,15 @@ export class AvatarGenerationService {
       };
       // Character-design guidance (NOT rendering jargon): push a loud, readable game-character look.
       character_design_guidance: {
-        silhouette: 'bold_readable';
-        proportions: 'exaggerated_hero_readable';
-        feature_exaggeration: {
-          enabled: true;
-          targets: Array<'eyes' | 'brows' | 'jawline' | 'cheekbones' | 'nose_shape' | 'hair_shape'>;
-        };
         palette: 'very_vibrant_complementary_accents';
         contrast: 'high_value_separation';
-        hair_color: 'neon_full_spectrum_vivid';
+        hair_color: 'unrestricted';
         skin_tone: 'natural_only';
         wardrobe: {
-          fashion: 'futuristic';
-          materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
           color_rule: 'vibrant_accents_not_overpowering';
-          readability: 'large_shapes_clear_silhouette';
           visibility: 'upper_body_only_bust_crop';
         };
         equipment: {
-          requirement: '1_to_2_distinctive_role_tools';
-          vibe: 'retro_future_tech';
           surface_detail: 'iconic_shapes_not_micro_detail';
           effects: 'subtle_glow_allowed';
           forbid: Array<'brand_names' | 'logos' | 'text' | 'real_world_gun_model'>;
@@ -285,26 +274,15 @@ export class AvatarGenerationService {
           forbid: ['text', 'logos', 'ui', 'busy_details'],
         },
         character_design_guidance: {
-          silhouette: 'bold_readable',
-          proportions: 'exaggerated_hero_readable',
-          feature_exaggeration: {
-            enabled: true,
-            targets: ['eyes', 'brows', 'jawline', 'cheekbones', 'nose_shape', 'hair_shape'],
-          },
           palette: 'very_vibrant_complementary_accents',
           contrast: 'high_value_separation',
-          hair_color: 'neon_full_spectrum_vivid',
+          hair_color: 'unrestricted',
           skin_tone: 'natural_only',
           wardrobe: {
-            fashion: 'futuristic',
-            materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
             color_rule: 'vibrant_accents_not_overpowering',
-            readability: 'large_shapes_clear_silhouette',
             visibility: 'upper_body_only_bust_crop',
           },
           equipment: {
-            requirement: '1_to_2_distinctive_role_tools',
-            vibe: 'retro_future_tech',
             surface_detail: 'iconic_shapes_not_micro_detail',
             effects: 'subtle_glow_allowed',
             forbid: ['brand_names', 'logos', 'text', 'real_world_gun_model'],

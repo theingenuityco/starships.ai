@@ -689,7 +689,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                   {isAllTab && !isSearchActive ? (
                     <div className="flex justify-center pt-4">
                       <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                        <Link href={buildInstalledTabHref('automations')}>Show all automations</Link>
+                        <Link href={buildInstalledTabHref('connectors')}>Show all automations</Link>
                       </Button>
                     </div>
                   ) : null}

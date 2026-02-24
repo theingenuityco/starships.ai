@@ -277,6 +277,7 @@ export function ToolInstallationWizardModal({
                         compactCard
                         connectButtonLabel="Connect"
                         animateCards={false}
+                        showDemoVideos
                       />
                     </div>
                   ) : (

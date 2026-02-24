@@ -119,6 +119,11 @@ interface StarshipConnectorsPanelProps {
    * Useful for wizard/modals where staggered animations feel distracting.
    */
   animateCards?: boolean
+  /**
+   * When true, render optional demo videos for connectors that
+   * provide a demoVideoUrl in the catalog (e.g. YouTube walkthroughs).
+   */
+  showDemoVideos?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -133,6 +138,41 @@ function toSafeConnectorLogoSlug(provider: string): string {
 
 function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
+}
+
+function getYouTubeEmbedUrl(raw: string | null | undefined): string | null {
+  const url = typeof raw === 'string' ? raw.trim() : ''
+  if (!url) return null
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  const host = parsed.hostname.toLowerCase()
+  let videoId: string | null = null
+
+  if (host.includes('youtu.be')) {
+    videoId = parsed.pathname.replace(/^\/+/, '') || null
+  } else if (host.includes('youtube.com')) {
+    const v = parsed.searchParams.get('v')
+    if (v && v.trim()) {
+      videoId = v.trim()
+    } else if (parsed.pathname.startsWith('/embed/')) {
+      videoId = parsed.pathname.replace('/embed/', '').replace(/^\/+/, '') || null
+    }
+  }
+
+  if (!videoId) return null
+  const safeId = videoId.replace(/[^a-zA-Z0-9_-]/g, '')
+  if (!safeId) return null
+  const base = `https://www.youtube.com/embed/${safeId}`
+  const params = new URLSearchParams({
+    autoplay: '1',
+    mute: '1',
+    rel: '0',
+  })
+  return `${base}?${params.toString()}`
 }
 
 export function StarshipConnectorsPanel({
@@ -158,6 +198,7 @@ export function StarshipConnectorsPanel({
   matchAgentCardStyle = false,
   onStatsChange,
   animateCards = true,
+  showDemoVideos = false,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -540,6 +581,8 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
+    const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
+
     if (cardVariant === 'explore') {
       const compact = density === 'compact'
       const exploreConnectButton = (
@@ -584,7 +627,7 @@ export function StarshipConnectorsPanel({
       if (compact) {
         const CardShell = (
           <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {provider && showLogo ? (
@@ -606,7 +649,24 @@ export function StarshipConnectorsPanel({
                 </div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
+
+              {demoEmbedUrl ? (
+                <div className="mt-1">
+                  <div className="relative w-full overflow-hidden rounded-md bg-black/70 aspect-video">
+                    <iframe
+                      src={demoEmbedUrl}
+                      title={`${label} demo video`}
+                      className="absolute inset-0 h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )
@@ -646,7 +706,24 @@ export function StarshipConnectorsPanel({
                 <div className="text-base font-semibold leading-tight truncate">{label}</div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
+
+              {demoEmbedUrl ? (
+                <div className="mt-3">
+                  <div className="relative w-full overflow-hidden rounded-md bg-black/70 aspect-video">
+                    <iframe
+                      src={demoEmbedUrl}
+                      title={`${label} demo video`}
+                      className="absolute inset-0 h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mt-auto pt-3 flex items-center justify-end gap-2">
                 {exploreDisconnectButton}

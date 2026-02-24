@@ -78,6 +78,7 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
   const [isEnabled, setIsEnabled] = useState(true)
   const [version, setVersion] = useState('1.0.0')
   const [category, setCategory] = useState('connector')
+  const [demoVideoUrl, setDemoVideoUrl] = useState('')
 
   const [baseUrl, setBaseUrl] = useState('')
   const [authText, setAuthText] = useState(formatJson(defaultAuthForType('oauth2')))
@@ -215,6 +216,7 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                       isEnabled,
                       version: version.trim() || undefined,
                       category: category.trim() || undefined,
+                      demoVideoUrl: demoVideoUrl.trim() || undefined,
                       baseUrl: baseUrl.trim(),
                       auth: auth as any,
                       variables: variables === undefined ? undefined : (variables as any),
@@ -286,6 +288,16 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Category</label>
                     <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="connector" spellCheck={false} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Demo video URL (optional)</label>
+                    <Input
+                      value={demoVideoUrl}
+                      onChange={e => setDemoVideoUrl(e.target.value)}
+                      spellCheck={false}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                    />
+                    <div className="text-xs text-muted-foreground">Optional YouTube URL shown as a demo video when users connect this connector.</div>
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-sm font-medium">Description *</label>

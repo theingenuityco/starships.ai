@@ -348,6 +348,7 @@ export function AgentDeploymentWizardModal({ isOpen, onOpenChange, onConfirm, is
                         compactCard
                         connectButtonLabel="Connect"
                         animateCards={false}
+                        showDemoVideos
                       />
                     ) : (
                       <div className="rounded-xl border border-border/60 bg-card/50 p-4">

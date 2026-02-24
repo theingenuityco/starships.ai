@@ -69,7 +69,7 @@ export function UseCaseHeroPromptInput(props: { placeholder: string; examples: P
       </form>
 
       {examples.length > 0 ? (
-        <div className="mt-3 text-center">
+        <div className="pt-7 sm:pt-8 text-center">
           <div className="text-xs text-muted-foreground">Not sure where to start? Try one of these:</div>
           <div className="mt-2 flex flex-wrap gap-2 justify-center">
             {examples.slice(0, 6).map((ex, idx) => {

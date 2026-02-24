@@ -126,6 +126,14 @@ export class AvatarGenerationService {
     type MirrorPromptSpec = {
       agent: string;
       role: string;
+      background_guidance: {
+        setting: 'workplace_environment';
+        composition: 'uncluttered';
+        focus: 'subject_in_focus_background_soft';
+        dof: 'shallow';
+        bokeh: 'soft_circular';
+        forbid: Array<'text' | 'logos' | 'ui' | 'busy_details'>;
+      };
       out: {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
@@ -213,6 +221,14 @@ export class AvatarGenerationService {
       const spec: MirrorPromptSpec = {
         agent: options.agentName,
         role,
+        background_guidance: {
+          setting: 'workplace_environment',
+          composition: 'uncluttered',
+          focus: 'subject_in_focus_background_soft',
+          dof: 'shallow',
+          bokeh: 'soft_circular',
+          forbid: ['text', 'logos', 'ui', 'busy_details'],
+        },
         out: {
           format: 'json_object_only',
           schema_id: 'mirror_prompt_v1',

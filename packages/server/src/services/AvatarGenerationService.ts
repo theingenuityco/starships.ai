@@ -627,7 +627,8 @@ export class AvatarGenerationService {
           fstop: 2.8;
           dof: 'subtle';
         };
-        bg: { type: 'simple_studio'; keep_uncluttered: true };
+        // Prefer a soft environment over a flat studio backdrop.
+        bg: { type: 'soft_environment'; keep_uncluttered: true };
         palette: {
           vibe: 'colorful_game';
           saturation: 'medium_high';
@@ -757,7 +758,8 @@ export class AvatarGenerationService {
           fstop: 2.8,
           dof: 'subtle',
         },
-        bg: { type: 'simple_studio', keep_uncluttered: true },
+        // Prefer a soft environment over a flat studio backdrop.
+        bg: { type: 'soft_environment', keep_uncluttered: true },
         palette: {
           vibe: 'colorful_game',
           saturation: 'medium_high',

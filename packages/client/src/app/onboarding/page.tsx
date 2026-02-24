@@ -443,6 +443,10 @@ export default function OnboardingPage() {
                           hideCardDescription
                           connectButtonLabel="Connect"
                           matchAgentCardStyle
+                          cardVariant="explore"
+                          density="compact"
+                          animateCards={false}
+                          showDemoVideos
                         />
                       ) : (
                         <StarshipConnectorsPanel
@@ -455,6 +459,10 @@ export default function OnboardingPage() {
                           connectButtonLabel="Connect"
                           matchAgentCardStyle
                           maxItems={3}
+                          cardVariant="explore"
+                          density="compact"
+                          animateCards={false}
+                          showDemoVideos
                         />
                       )}
                     </div>

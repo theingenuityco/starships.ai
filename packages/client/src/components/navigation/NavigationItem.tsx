@@ -71,20 +71,20 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1 ${
+      className={cn(
+        'group relative flex items-center w-full h-8 cursor-pointer text-sm px-3 rounded-2xl transition-colors border border-transparent',
         special
-          ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
+          ? 'text-primary hover:text-primary hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
           : isActive
-            ? 'text-primary bg-primary/10 border-transparent'
+            ? 'text-primary bg-primary/10'
             : hasBadge
-              ? 'text-foreground border-transparent hover:text-foreground hover:bg-muted'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-      }`}
+              ? 'text-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+      )}
       style={{
         justifyContent: 'flex-start',
-        transition: 'background-color 0.15s ease',
         cursor: 'pointer',
-        minHeight: '28px',
+        minHeight: '32px',
       }}
     >
       {StableIcon}

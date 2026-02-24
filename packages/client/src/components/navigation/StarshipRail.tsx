@@ -30,32 +30,30 @@ const StarshipRailItem = memo(
             type="button"
             onClick={() => onSelect(starship)}
             className={[
-              'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
-              'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
-              isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
+              'group relative flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
+              isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
             ].join(' ')}
             aria-label={`Switch to ${starship.name}${hasUnread ? ' (has unread notifications)' : ''}`}
             aria-current={isActive ? 'page' : undefined}
           >
-            {/* Discord-like active indicator */}
-            <span className={['absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity', isActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0'].join(' ')} />
+            {/* Discord-like indicator: full height when active, half height when hover only */}
+            <span
+              className={[
+                'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
+                isActive ? 'h-6 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
+              ].join(' ')}
+            />
 
             {/* Pending notifications badge */}
             {hasUnread ? (
               <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm" aria-label="Unread notifications" title="Unread notifications" />
             ) : null}
 
-            <span className="text-[11px] font-semibold">{getInitials(starship.name)}</span>
+            <span className="text-xs font-semibold">{getInitials(starship.name)}</span>
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-          <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
-            <div className="mt-0.5">
-              <StarshipsLogo width={22} height={22} className="text-muted-foreground" gradientId={`rail-tooltip-gradient-${starship.id}`} idleLoop={false} playOnMountOnce={false} />
-            </div>
-            <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">{starship.name}</div>
-            <div className="col-span-2 text-xs text-muted-foreground">Switch starship</div>
-          </div>
+        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
+          <p className="text-sm font-medium">{starship.name}</p>
         </TooltipContent>
       </Tooltip>
     )
@@ -96,20 +94,24 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
   const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
   return (
-    <div className="flex h-full w-[52px] flex-col items-center gap-1.5 bg-card pt-5 pb-3" aria-label="Starship switcher">
-      {/* Top logo */}
+    <div className="flex h-full w-[72px] flex-col items-center gap-2 bg-card pt-4 pb-3" aria-label="Starship switcher">
+      {/* Top logo – same sizing as rail items for clean alignment */}
       <Tooltip delayDuration={250}>
         <TooltipTrigger asChild>
           <button
             type="button"
             onClick={handleTopLogoClick}
-            className="relative mt-0 flex w-full items-center justify-center py-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            className={[
+              'group relative flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
+              'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
+            ].join(' ')}
             aria-label="Home"
             title="Home"
           >
+            <span className="absolute -left-2 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
             <StarshipsLogo
-              width={24}
-              height={24}
+              width={22}
+              height={22}
               className="text-current"
               gradientId="rail-top-gradient"
               triggerAnimation={logoTrigger}
@@ -119,54 +121,42 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-          <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
-            <div className="mt-0.5">
-              <StarshipsLogo width={22} height={22} className="text-muted-foreground" gradientId="rail-tooltip-gradient" activeStroke="currentColor" idleLoop={false} playOnMountOnce={false} />
-            </div>
-            <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Starships.ai</div>
-            <div className="col-span-2 text-xs text-muted-foreground">Go to your default channel</div>
-          </div>
+        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
+          <p className="text-sm font-medium">Home</p>
         </TooltipContent>
       </Tooltip>
 
-      {/* Add vertical padding so corner badges/indicators never clip at scroll edges. */}
-      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pt-0 pb-2 custom-scrollbar">
+      {/* Scrollable starships + marketplace – spacing matches Discord-style rail */}
+      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-3 pt-1 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
         })}
 
-        <div className="my-1 h-px w-8 bg-border/60" aria-hidden />
-
+        {/* Marketplace shortcut (Explore agents) – directly after last starship */}
         <Tooltip delayDuration={250}>
           <TooltipTrigger asChild>
             <button
               type="button"
-              onClick={() => router.push('/explore')}
+              onClick={() => router.push('/explore/agents')}
+            className={[
+              'group relative mt-1 flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
+              isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
+            ].join(' ')}
+            aria-label="Explore agents"
+            aria-current={isMarketplaceActive ? 'page' : undefined}
+          >
+            <span
               className={[
-                'relative flex h-9 w-9 items-center justify-center rounded-2xl border transition-all',
-                'bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground',
-                isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60',
+                'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
+                isMarketplaceActive ? 'h-6 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
               ].join(' ')}
-              aria-label="Explore"
-              aria-current={isMarketplaceActive ? 'page' : undefined}
-            >
-              {/* Discord-like active indicator */}
-              <span
-                className={['absolute -left-2 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full transition-opacity', isMarketplaceActive ? 'bg-primary opacity-100' : 'bg-primary opacity-0'].join(' ')}
-              />
-              <Icon name="store" className="h-4 w-4" />
+            />
+            <Icon name="store" className="h-5 w-5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-            <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
-              <div className="mt-0.5">
-                <Icon name="store" className="h-[22px] w-[22px] text-muted-foreground" />
-              </div>
-              <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Explore</div>
-              <div className="col-span-2 text-xs text-muted-foreground">Explore agents</div>
-            </div>
+          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
+            <p className="text-sm font-medium">Explore agents</p>
           </TooltipContent>
         </Tooltip>
       </div>

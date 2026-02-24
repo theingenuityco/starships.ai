@@ -511,12 +511,19 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
            * then generate a new avatar using that regenerated prompt.
            */
           mode: z.enum(['avatar_only', 'full_chain']).optional(),
+          /**
+           * Optional style switch for avatar generation.
+           * - '3d': current pipeline (default)
+           * - '2d': legacy pipeline
+           */
+          avatarMode: z.enum(['2d', '3d']).optional(),
         }),
         (req.body ?? {}) as unknown,
         res,
         'avatar generation options'
       ) ?? {};
     const mode = bodyValidation.mode ?? 'avatar_only';
+    const avatarMode = bodyValidation.avatarMode;
 
     const agentService = new AgentService();
     const agent = await agentService.getAgent(agentId);
@@ -572,6 +579,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       subjectDescription: agent.description,
       subjectAvatarPrompt: avatarPrompt,
       starshipId: agent.starshipId,
+      ...(avatarMode ? { avatarMode } : {}),
       engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
     });
 

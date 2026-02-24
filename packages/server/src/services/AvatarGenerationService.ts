@@ -20,6 +20,28 @@ export type AvatarGenerationResult = {
   model: string;
 };
 
+export type AvatarGenerationMode = '2d' | '3d';
+
+export type GenerateAvatarOptions = {
+  subjectName: string;
+  subjectDescription?: string;
+  subjectAvatarPrompt?: string;
+  styleHint?: string;
+  starshipId: string;
+  runtimeEnv?: Record<string, unknown>;
+  /**
+   * Choose between 2D (legacy/anime) and 3D (current/game character) generation.
+   * Defaults to env.AVATAR_GENERATION_MODE, falling back to '3d'.
+   */
+  avatarMode?: AvatarGenerationMode;
+  /**
+   * Optional engine config from the host (e.g. from buildAutopilotExecutionBundle).
+   * When using the remote runner, this must include modelRoutes so the runner can route
+   * the image model to a provider.
+   */
+  engineConfigFromHost?: Record<string, unknown>;
+};
+
 export class AvatarGenerationService {
   private isRetryableLlmError(err: unknown): boolean {
     if (!err) return false;
@@ -545,23 +567,18 @@ export class AvatarGenerationService {
   /**
    * Generate a 1:1 avatar for an agent-like entity.
    */
-  async generateAvatar(options: {
-    subjectName: string;
-    subjectDescription?: string;
-    subjectAvatarPrompt?: string;
-    styleHint?: string;
-    starshipId: string;
-    runtimeEnv?: Record<string, unknown>;
-    /**
-     * Optional engine config from the host (e.g. from buildAutopilotExecutionBundle).
-     * When using the remote runner, this must include modelRoutes so the runner can route
-     * the image model to a provider.
-     */
-    engineConfigFromHost?: Record<string, unknown>;
-  }): Promise<AvatarGenerationResult> {
+  async generateAvatar(options: GenerateAvatarOptions): Promise<AvatarGenerationResult> {
     const env = getEnvConfig();
     if (!env.OPENROUTER_API_KEY) {
       throw new Error('OPENROUTER_API_KEY not configured on server');
+    }
+
+    const modeRaw =
+      options.avatarMode ??
+      (env as unknown as { AVATAR_GENERATION_MODE?: AvatarGenerationMode | undefined }).AVATAR_GENERATION_MODE;
+    const avatarMode: AvatarGenerationMode = modeRaw === '2d' || modeRaw === '3d' ? modeRaw : '3d';
+    if (avatarMode === '2d') {
+      return await this.generateAvatar2D(env, options);
     }
 
     const model = 'google/gemini-3-pro-image-preview';
@@ -1097,6 +1114,311 @@ export class AvatarGenerationService {
     }
 
     throw new Error(`Image generation returned no images. Debug: ${JSON.stringify(lastDebug)}`);
+  }
+
+  private async generateAvatar2D(env: ReturnType<typeof getEnvConfig>, options: GenerateAvatarOptions): Promise<AvatarGenerationResult> {
+    const model = 'google/gemini-2.5-flash-image';
+
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const tryParseJson = (s: string): unknown => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return undefined;
+      }
+    };
+
+    const normalizeMirrorFor2D = (
+      raw: string | undefined
+    ): { gender?: 'male' | 'female'; normalizedText?: string } => {
+      const text = typeof raw === 'string' ? raw.trim() : '';
+      if (!text) return {};
+
+      const parsed = text.startsWith('{') || text.startsWith('[') ? tryParseJson(text) : undefined;
+      if (isRecord(parsed) && parsed.v === 'mirror_prompt_v1') {
+        const genderRaw = typeof parsed.gender === 'string' ? parsed.gender.trim().toLowerCase() : '';
+        const gender = genderRaw === 'male' || genderRaw === 'female' ? (genderRaw as 'male' | 'female') : undefined;
+        const age = typeof parsed.age === 'string' ? parsed.age.trim() : '';
+        const faceSkin = typeof parsed.face_skin === 'string' ? parsed.face_skin.trim() : '';
+        const eyes = typeof parsed.eyes === 'string' ? parsed.eyes.trim() : '';
+        const hair = typeof parsed.hair === 'string' ? parsed.hair.trim() : '';
+        const outfit = typeof parsed.outfit === 'string' ? parsed.outfit.trim() : '';
+        const apparatus = typeof parsed.apparatus === 'string' ? parsed.apparatus.trim() : '';
+        const background = typeof parsed.background === 'string' ? parsed.background.trim() : '';
+
+        const normalizedText = [
+          gender ? `- Gender: ${gender}` : undefined,
+          age ? `- Age: ${age}` : undefined,
+          faceSkin ? `- Face/skin: ${faceSkin}` : undefined,
+          eyes ? `- Eyes: ${eyes}` : undefined,
+          hair ? `- Hair: ${hair}` : undefined,
+          outfit ? `- Outfit: ${outfit}` : undefined,
+          apparatus ? `- Apparatus: ${apparatus}` : undefined,
+          background ? `- Background vibe: ${background}` : undefined,
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        return { gender, normalizedText: normalizedText || text };
+      }
+
+      // Legacy mirror prompt format: bullet list with "- Gender: <male|female>" on first non-empty line.
+      const firstLine = text
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.length > 0);
+      const m = firstLine ? firstLine.match(/^-\s*Gender:\s*(male|female)\s*$/i) : null;
+      const gender = m ? ((m[1].toLowerCase() as string) === 'male' ? 'male' : 'female') : undefined;
+      return { gender, normalizedText: text };
+    };
+
+    const mirror = normalizeMirrorFor2D(options.subjectAvatarPrompt);
+    const gender = mirror.gender;
+    const subjectAvatarPromptForPrompt = mirror.normalizedText;
+
+    const user = [
+      'Generate a 1:1 (square) avatar image.',
+      '',
+      'STARSHIPS AVATAR SPEC (STRICT CHECKLIST — must satisfy all):',
+      '',
+      '[STYLE — MUST]',
+      '- 2D anime character portrait illustration (NOT photorealistic; NOT 3D/CGI).',
+      '- Extra-anime facial features: very large expressive eyes; bold upper lash line; simplified small nose; simplified small mouth.',
+      '- Clean lineart: crisp outlines; simplified shapes; no painterly brushwork; no texture noise.',
+      '- Cel shading only: 2–3 shading tones max; clean shading bands; no smooth realistic gradients on skin.',
+      '- No skin micro-detail: no pores, no freckles-as-texture, no wrinkles detail, no realistic subsurface scattering.',
+      '- Imaginative color accents are encouraged (e.g., pink/teal hair, unusual eye colors), even if unrealistic.',
+      '',
+      '[COMPOSITION — MUST]',
+      '- Edge-to-edge square avatar: full-bleed on the entire 1:1 canvas (no padding, no inset container).',
+      '- Single subject only: head-and-shoulders avatar.',
+      '- In this avatar, include the head and both shoulders; no full-body.',
+      '- Include an outfit hint that is visible in the avatar (collar/neckline/top edge of clothing).',
+      '- Eyes placed in the upper third.',
+      '- Fixed pose for all avatars: 10° three-quarter view facing viewer-left, with gaze looking to viewer-left (off-camera).',
+      '- No extreme angles; no wide-angle distortion.',
+      '',
+      '[BACKGROUND — MUST]',
+      '- Background is a SOLID flat color only: exactly #F3EFE6.',
+      '- No gradients. No patterns. No textures. No vignette. No shadows cast onto background.',
+      '',
+      '[NO CONTAINERS — MUST]',
+      '- The portrait must be drawn directly on the full square canvas.',
+      '- No inner frame/inset, no circular mask, no rounded-rectangle, no matte/border, no picture-in-picture.',
+      '',
+      '[SAFETY — MUST]',
+      '- Fictional character only. No real-person likeness. No celebrity. No copyrighted character. No brand marks/logos.',
+      '- No NSFW. No gore. No violence. No hate. No illegal content.',
+      '',
+      '[NEGATIVE PROMPT — MUST AVOID]',
+      '- photorealistic, hyperrealistic, ultra-detailed, highly detailed skin, pores, microtexture',
+      '- 3d, cgi, render, octane, unreal engine, realistic lighting, subsurface scattering',
+      '- painterly, oil paint, watercolor, airbrush, soft realism, high frequency detail, skin texture',
+      '- gradient background, patterned background, textured paper, vignette, background shadow',
+      '- text, watermark, signature, logo, UI frame, border',
+      '- inset portrait, inner frame, circular crop, avatar mask, matte, picture frame',
+      '',
+      '[IDENTITY INPUTS]',
+      '- Use the agent avatar prompt below as the PRIMARY inspiration for appearance details (including gender).',
+      '- You MAY creatively embellish with imaginative, vibrant color choices while staying consistent with the described character.',
+      '- If the agent avatar prompt is missing, do NOT guess; the server should regenerate it via the full-chain flow.',
+      '',
+      '[GENDER RENDER RULE]',
+      gender ? `- Render as ${gender.toUpperCase()} as specified by the agent avatar prompt.` : undefined,
+      '',
+      'AGENT IDENTITY (use these to design the character):',
+      `Name: ${options.subjectName}`,
+      options.subjectDescription ? `Description: ${options.subjectDescription}` : undefined,
+      subjectAvatarPromptForPrompt
+        ? ['Agent avatar prompt (agent-authored; treat as primary source of appearance):', subjectAvatarPromptForPrompt].join('\n')
+        : undefined,
+      options.styleHint ? `Extra hint (optional): ${options.styleHint}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
+    const baseConfig = {
+      runtimeEnv,
+      llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
+      failOnNodeError: true,
+    };
+    const engineConfig = {
+      ...baseConfig,
+      ...(options.engineConfigFromHost ?? {}),
+      runtimeEnv: (options.engineConfigFromHost?.runtimeEnv as Record<string, unknown>) ?? runtimeEnv,
+    } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
+
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const exec = ExecutionItemUtils.createExecution();
+    exec.state = { ...(exec.state ?? {}), starshipId: options.starshipId };
+
+    const buildBlueprint = (messages: Array<{ role: string; content: string }>): Blueprint => ({
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+        {
+          ref: 'llm_1',
+          type: 'llm',
+          name: 'Generate avatar (2D)',
+          description: 'Generate 2D avatar image using OpenRouter image model',
+          parameters: {
+            model,
+            messages,
+            modalities: ['image', 'text'],
+            imageConfig: { aspect_ratio: '1:1', num_images: 1 },
+            maxTokens: 256,
+            temperature: 0.85,
+            stream: false,
+          },
+        },
+        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+      ],
+      edges: [
+        { ref: 'e1', from: 'start_1', to: 'llm_1' },
+        { ref: 'e2', from: 'llm_1', to: 'end_1' },
+      ],
+      metadata: {},
+    });
+
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
+
+    const unwrapResponse = (value: unknown): unknown => {
+      if (!isRecord(value)) return value;
+      const topChoices = value.choices;
+      if (Array.isArray(topChoices)) return value;
+      for (const key of ['response', 'data', 'result'] as const) {
+        const nested = value[key];
+        if (isRecord(nested) && Array.isArray(nested.choices)) return nested;
+      }
+      return value;
+    };
+
+    const extractFirstImageUrl = (msg: unknown): string | undefined => {
+      if (!isRecord(msg)) return undefined;
+
+      const readUrl = (imageUrlObj: unknown): string | undefined => {
+        if (!isRecord(imageUrlObj)) return undefined;
+        const url = (imageUrlObj as AnyRecord).url;
+        return typeof url === 'string' && url.length > 0 ? url : undefined;
+      };
+
+      const imgs = (msg as AnyRecord).images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        for (const it of imgs) {
+          if (!isRecord(it)) continue;
+          const url =
+            readUrl((it as AnyRecord).image_url) ??
+            readUrl((it as AnyRecord).imageUrl) ??
+            (typeof (it as AnyRecord).url === 'string' ? ((it as AnyRecord).url as string) : undefined);
+          if (url) return url;
+        }
+      }
+
+      const contentVal = (msg as AnyRecord).content;
+      if (Array.isArray(contentVal) && contentVal.length > 0) {
+        for (const part of contentVal) {
+          if (!isRecord(part)) continue;
+          if ((part as AnyRecord).type !== 'image_url') continue;
+          const url = readUrl((part as AnyRecord).image_url) ?? readUrl((part as AnyRecord).imageUrl);
+          if (url) return url;
+        }
+      }
+
+      return undefined;
+    };
+
+    const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
+      try {
+        const s = JSON.stringify(value, (_k, v) => {
+          if (typeof v === 'string') {
+            if (v.startsWith('data:image/')) return `<data:image/... len=${v.length}>`;
+            if (v.length > 800) return `${v.slice(0, 800)}…(len=${v.length})`;
+          }
+          return v;
+        });
+        if (typeof s !== 'string') return String(s);
+        return s.length > maxChars ? `${s.slice(0, maxChars)}…(len=${s.length})` : s;
+      } catch (err) {
+        return `[unstringifiable:${err instanceof Error ? err.message : String(err)}]`;
+      }
+    };
+
+    let lastDebug: Record<string, unknown> | undefined;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const messages: Array<{ role: string; content: string }> = [{ role: 'user', content: user }];
+      if (attempt > 1) {
+        messages.push({ role: 'user', content: 'Return 1 image only. No text.' });
+      }
+
+      const blueprint = buildBlueprint(messages);
+      const resultItems = await this.withRetry(() => runner.run(blueprint, exec, engineConfig), { attempts: 2, label: 'avatar_2d' });
+      const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
+      const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
+      if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
+        throw new Error(`Avatar generation (2D) LLM node failed: ${firstError}`);
+      }
+
+      let llmNodeJson: unknown = llmJson;
+      if (Array.isArray(llmJson)) {
+        const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+        if (typeof extracted !== 'undefined') {
+          llmNodeJson = extracted;
+        }
+      }
+
+      const response = unwrapResponse(llmNodeJson);
+      const responseRec = isRecord(response) ? response : undefined;
+      const choices = responseRec?.choices;
+      const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+      const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+      const msgCandidate =
+        (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ??
+        (choice0Rec && isRecord(choice0Rec.delta) ? (choice0Rec.delta as AnyRecord) : undefined) ??
+        choice0Rec ??
+        undefined;
+
+      const message = msgCandidate;
+      const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
+      const firstUrl = extractFirstImageUrl(message);
+
+      if (typeof firstUrl === 'string' && firstUrl.length > 0) {
+        const decoded = this.decodeDataUrl(firstUrl);
+        const optimized = await this.optimizeAvatarImage(decoded);
+        const dataUrl = `data:${optimized.mimeType};base64,${optimized.buffer.toString('base64')}`;
+        return { dataUrl, mimeType: optimized.mimeType, buffer: optimized.buffer, ...(text ? { text } : {}), model };
+      }
+
+      lastDebug = {
+        attemptedModel: model,
+        attempt,
+        llmJsonType: llmJson === null ? 'null' : Array.isArray(llmJson) ? 'array' : typeof llmJson,
+        llmNodeJsonType: llmNodeJson === null ? 'null' : Array.isArray(llmNodeJson) ? 'array' : typeof llmNodeJson,
+        hasChoices: isRecord(response) && Array.isArray((response as AnyRecord).choices),
+        choice0Keys: isRecord(choice0) ? Object.keys(choice0) : [],
+        messageKeys: isRecord(message) ? Object.keys(message) : [],
+        imagesCount: isRecord(message) && Array.isArray(message.images) ? (message.images as unknown[]).length : 0,
+        textPreview: typeof text === 'string' ? text.slice(0, 160) : undefined,
+        responseModel: isRecord(response) ? (response as AnyRecord).model : undefined,
+        responsePreview: safeStringifyForDebug(response),
+      };
+    }
+
+    throw new Error(`Image generation (2D) returned no images. Debug: ${JSON.stringify(lastDebug)}`);
   }
 
   private decodeDataUrl(dataUrl: string): { buffer: Buffer; mimeType: string } {

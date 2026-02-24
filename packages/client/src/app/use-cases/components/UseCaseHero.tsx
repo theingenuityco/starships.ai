@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
+import { UseCaseHeroPromptInput } from '@/app/use-cases/components/UseCaseHeroPromptInput'
 
 export function UseCaseHero(props: { useCase: UseCaseModel }) {
   const useCase = props.useCase
@@ -53,6 +54,10 @@ export function UseCaseHero(props: { useCase: UseCaseModel }) {
 
                 <h1 className="mt-5 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05] text-balance">{useCase.title}</h1>
                 <p className="mt-4 text-sm sm:text-base text-muted-foreground max-w-2xl text-balance">{useCase.heroSubtitle}</p>
+
+                {useCase.heroPrompt ? (
+                  <UseCaseHeroPromptInput placeholder={useCase.heroPrompt.placeholder} examples={useCase.heroPrompt.examples} />
+                ) : null}
 
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-3xl">
                   {(useCase.outputs ?? []).slice(0, 4).map((o, idx) => (

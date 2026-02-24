@@ -10,6 +10,16 @@ export type UseCaseLink = {
   label: string
 }
 
+export type UseCaseHeroPromptExample = {
+  label: string
+  prompt: string
+}
+
+export type UseCaseHeroPrompt = {
+  placeholder: string
+  examples: UseCaseHeroPromptExample[]
+}
+
 export type UseCaseSeo = {
   title: string
   description: string
@@ -24,6 +34,7 @@ export type UseCaseModel = {
   cardDescription: string
   tag?: string
   heroSubtitle: string
+  heroPrompt?: UseCaseHeroPrompt
   tip?: string
   outputs: string[]
   steps: UseCaseStep[]
@@ -42,6 +53,15 @@ export const USE_CASES: UseCaseModel[] = [
     cardDescription: 'Source prospects, personalize outreach, and keep your pipeline warm with agents + automations.',
     tag: 'Growth',
     heroSubtitle: 'A practical workflow to research prospects, personalize outreach, and keep a clean pipeline—without living in spreadsheets.',
+    heroPrompt: {
+      placeholder: 'Find finance decision makers at Series A SaaS startups…',
+      examples: [
+        { label: 'Build lead lists', prompt: 'Build a list of 50 SaaS startups (10–50 employees) hiring for RevOps, with website + LinkedIn + 1 sentence “why now”.' },
+        { label: 'Personalize outreach', prompt: 'For each company, draft a 90-word cold email referencing one specific thing they ship and a likely bottleneck.' },
+        { label: 'Find contact info', prompt: 'Enrich this prospect list with verified work emails + titles, then score each lead by fit and timing.' },
+        { label: 'Meeting prep', prompt: 'Create a 1-page meeting brief for each prospect: company context, key initiatives, likely pain points, and 3 tailored questions.' },
+      ],
+    },
     tip: 'Start narrow: one vertical + one role + one offer. Expand only after you see replies.',
     outputs: ['Prospect list with signals + fit score', 'Personalized first-touch messages', 'Follow-up sequences + reminders', 'Weekly learnings + next experiments'],
     steps: [

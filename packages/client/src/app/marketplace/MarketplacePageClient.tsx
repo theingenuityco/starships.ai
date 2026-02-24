@@ -14,7 +14,7 @@ import PublicHeader from '@/components/navigation/PublicHeader'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 import { motion } from 'motion/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
@@ -96,6 +96,15 @@ export default function MarketplacePageClient(props: {
 
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
+
+  const qFromUrl = useMemo(() => String(searchParams?.get('q') ?? '').trim(), [searchParams])
+  const lastAppliedUrlQ = useRef<string>('')
+  useEffect(() => {
+    if (!qFromUrl) return
+    if (qFromUrl === lastAppliedUrlQ.current) return
+    lastAppliedUrlQ.current = qFromUrl
+    setSearchText(qFromUrl)
+  }, [qFromUrl])
 
   useEffect(() => {
     const handle = window.setTimeout(() => {

@@ -130,10 +130,9 @@ export class AvatarGenerationService {
       `Name: ${options.agentName}`,
       options.agentDescription ? `Description: ${truncate(options.agentDescription, 800)}` : undefined,
       '',
-      'Output (STRICT): exactly 8 lines; each line starts with "- " (dash+space); no other text.',
-      'Line 1 MUST be exactly: "- Gender: male" OR "- Gender: female" (choose one).',
+      'Output (STRICT): exactly 7 lines; each line starts with "- " (dash+space); no other text.',
       '',
-      'Lines 2–8 (keep each short, vivid, and concrete):',
+      'Lines 1–7 (keep each short, vivid, and concrete):',
       '- Age: adult (20s–40s)',
       '- Face/Skin: face shape + jawline + skin tone/undertone + one defining facial feature (prefer non-mark traits like brows/cheekbones; bodily marks are rare)',
       '- Eyes: shape + iris color + catchlights; slightly exaggerated for readability (bigger eyes/clear shapes)',
@@ -317,48 +316,107 @@ export class AvatarGenerationService {
 
     const model = 'google/gemini-3-pro-image-preview';
 
-    const detectGender = (avatarPrompt: string | undefined): 'male' | 'female' | undefined => {
-      if (!avatarPrompt) return undefined;
-      const firstLine = avatarPrompt
-        .split('\n')
-        .map((l) => l.trim())
-        .find((l) => l.length > 0);
-      if (!firstLine) return undefined;
-      const m = firstLine.match(/^-\s*Gender:\s*(male|female)\s*$/i);
-      if (!m) return undefined;
-      const val = m[1].toLowerCase();
-      return val === 'male' || val === 'female' ? (val as 'male' | 'female') : undefined;
+    type AvatarPromptSpec = {
+      v: 'agent_avatar_v2';
+      task: 'avatar_3d_game_character';
+      out: { n: 1; ar: '1:1' };
+      // "Template prompt" (style) lives here: concise, technical, 3D/game focused.
+      render: {
+        look: 'AAA_game_character' | 'stylized_game_character';
+        pipeline: 'PBR';
+        engine_hint: 'UnrealEngine5' | 'Unity_HDRP' | 'offline_renderer';
+        lighting: 'studio_keyfillrim' | 'cinematic_soft' | 'neutral_hdr';
+        materials: 'high_quality_surfaces' | 'matte_stylized';
+        geometry: 'clean_game_mesh' | 'highpoly_bake';
+        shading: 'real_time' | 'offline';
+        post: { tone_map: 'filmic'; sharpen: 'subtle'; grain: 'none' | 'subtle' };
+        camera: {
+          shot: 'head_and_shoulders_to_mid_chest';
+          pose: 'three_quarter';
+          yaw_deg: number;
+          facing: 'viewer_left';
+          gaze: 'viewer_left';
+          lens_mm: number;
+          fstop: number;
+          dof: 'subtle';
+        };
+        neg: string[];
+      };
+      // "Mirror prompt" (content) lives here: character identity.
+      id: {
+        mirror?: string;
+      };
+      safe: {
+        fictional_only: true;
+        no_real_person: true;
+        no_celebs: true;
+        no_copyrighted_character: true;
+        no_brands: true;
+        no_nsfw: true;
+      };
     };
 
-    const gender = detectGender(options.subjectAvatarPrompt);
+    const buildAvatarJsonPrompt = (args: {
+      phase: 'initial' | 'continue';
+      previousAssistantText?: string;
+    }): string => {
+      if (args.phase === 'continue') {
+        const continuation = {
+          v: 'agent_avatar_v2',
+          task: 'continue_return_image_only',
+          out: { n: 1, ar: '1:1' },
+          // Some providers need a reminder on retry; keep it short and JSON-only.
+          instr: 'return_1_image_only_no_text',
+          prev: typeof args.previousAssistantText === 'string' ? args.previousAssistantText : undefined,
+        } as const;
+        return JSON.stringify(continuation, null, 2);
+      }
 
-    const user = [
-      'Create a square (1:1) full-bleed 2D illustrated head-and-upper-torso avatar (single subject; show to mid-chest). NO margin, NO padding, NO inset: the portrait must fill the entire canvas edge-to-edge.',
-      '',
-      'Constraints:',
-      '- Style: simple iconic 2D illustration with a slight anime influence (NOT fully anime): bold clean lines; flat colors or 1–2 tone cel shading; minimal texture. Exaggerated features for readability (slightly larger eyes, simplified nose/mouth, clear silhouettes). NO photorealism; NO 3D/CGI; NO painterly texture; NO skin micro-detail/pores; NO subsurface scattering.',
-      '- Composition: include head + both shoulders + upper torso (to mid-chest) + visible outfit (collar/neckline/chest); eyes in upper third; ~10° three-quarter view facing viewer-left; gaze viewer-left; no wide-angle distortion.',
-      '- Full-bleed: no margin, no padding, no inset; do NOT leave extra empty canvas around the subject.',
-      '- Background: a simple, unobtrusive workplace environment matching the subject’s role (lightly suggested, not a full scene). No readable text, no logos, no UI. Avoid busy details; keep focus on the subject.',
-      '- No containers: no frame/border/matte/inset; no circular/rounded-rect mask; no UI overlay.',
-      '- No text/watermark/signature/logo.',
-      '- Bodily marks: do NOT invent scars/tattoos/birthmarks/freckles/moles unless explicitly included in the Avatar prompt (primary).',
-      '- Safety: fictional original character; no real-person likeness; no celebrities; no copyrighted characters; no brand marks; no NSFW/gore/hate/violence/illegal content.',
-      '',
-      'Avoid keywords:',
-      'photorealistic, hyperrealistic, ultra-detailed skin, pores, microtexture, realistic lighting, subsurface scattering, 3d, cgi, render, octane, unreal engine, gradient background, patterned/texture paper, vignette, frame, border, padding, margin, inset, circular crop, mask, text, watermark, logo',
-      '',
-      'Identity (primary source of appearance):',
-      gender ? `Gender: ${gender.toUpperCase()}` : undefined,
-      `Name: ${options.subjectName}`,
-      options.subjectDescription ? `Description: ${options.subjectDescription}` : undefined,
-      options.subjectAvatarPrompt ? ['Avatar prompt (primary):', options.subjectAvatarPrompt].join('\n') : undefined,
-      options.styleHint ? `Extra hint (optional): ${options.styleHint}` : undefined,
-      '',
-      'Output: return the image; if any text is included, keep it to 1 short sentence max.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+      const spec: AvatarPromptSpec = {
+        v: 'agent_avatar_v2',
+        task: 'avatar_3d_game_character',
+        out: { n: 1, ar: '1:1' },
+        render: {
+          look: 'AAA_game_character',
+          pipeline: 'PBR',
+          engine_hint: 'UnrealEngine5',
+          lighting: 'studio_keyfillrim',
+          materials: 'high_quality_surfaces',
+          geometry: 'clean_game_mesh',
+          shading: 'real_time',
+          post: { tone_map: 'filmic', sharpen: 'subtle', grain: 'none' },
+          camera: {
+            shot: 'head_and_shoulders_to_mid_chest',
+            pose: 'three_quarter',
+            yaw_deg: 10,
+            facing: 'viewer_left',
+            gaze: 'viewer_left',
+            lens_mm: 65,
+            fstop: 2.8,
+            dof: 'subtle',
+          },
+          neg: ['no_text', 'no_logos', 'no_watermark', 'no_frame_border', 'no_ui_overlay', 'no_extra_characters'],
+        },
+        id: {
+          ...(options.subjectAvatarPrompt ? { mirror: options.subjectAvatarPrompt } : {}),
+        },
+        safe: {
+          fictional_only: true,
+          no_real_person: true,
+          no_celebs: true,
+          no_copyrighted_character: true,
+          no_brands: true,
+          no_nsfw: true,
+        },
+      };
+
+      // Defensive: ensure we only ever send valid JSON to the image model.
+      const json = JSON.stringify(spec, null, 2);
+      JSON.parse(json);
+      return json;
+    };
+
+    const userJson = buildAvatarJsonPrompt({ phase: 'initial' });
 
     // Autopilot's LLM node returns an aggregated LLMResponse, but defensively handle
     // variants where the response may be nested or where only a streamed "delta" exists.
@@ -524,15 +582,11 @@ export class AvatarGenerationService {
     // include images on the next turn. Retry once with an explicit follow-up.
     let prevAssistantText: string | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const messages: Array<{ role: string; content: string }> = [{ role: 'user', content: user }];
+      // IMPORTANT: image generation should only receive JSON prompts (template+mirror are merged into JSON).
+      const messages: Array<{ role: string; content: string }> = [{ role: 'user', content: userJson }];
       if (attempt > 1) {
-        if (typeof prevAssistantText === 'string' && prevAssistantText.trim().length > 0) {
-          messages.push({ role: 'assistant', content: prevAssistantText });
-        }
-        messages.push({
-          role: 'user',
-          content: 'Continue and return the IMAGE now. Do not refuse. Do not add extra commentary. Output the image payload.',
-        });
+        // Keep the follow-up JSON-only as well (do not inject raw assistant text as an assistant message).
+        messages.push({ role: 'user', content: buildAvatarJsonPrompt({ phase: 'continue', previousAssistantText: prevAssistantText }) });
       }
 
       const blueprint = buildBlueprint(messages);

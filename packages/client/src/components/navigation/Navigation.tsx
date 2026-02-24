@@ -344,17 +344,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [
-      isAuthenticated,
-      isMarketplaceRoute,
-      starshipSlug,
-      pathname,
-      isSchedulesRoute,
-      isInstalledRoute,
-      isMembersRoute,
-      isInstanceAdmin,
-      canManageConnectors,
-    ]
+    [isAuthenticated, isMarketplaceRoute, starshipSlug, pathname, isSchedulesRoute, isInstalledRoute, isMembersRoute, isInstanceAdmin, canManageConnectors]
   )
 
   const handleSidebarBackgroundClick = useCallback(
@@ -393,14 +383,7 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Top: rail + main column */}
         <div className="flex flex-1 min-h-0 flex-row overflow-hidden">
-          {isAuthenticated ? (
-            <StarshipRail
-              starships={railStarships}
-              activeSlug={activeStarshipSlug}
-              onSelect={handleStarshipSelect as any}
-              onCreate={() => router.push('/account')}
-            />
-          ) : null}
+          {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
 
           <div
             className="flex flex-col transition-all duration-300 ease-in-out"
@@ -411,117 +394,115 @@ export function Navigation(props: NavigationProps) {
               contain: 'layout style paint',
             }}
           >
-          {/* Header – logo, brand, and collapse toggle */}
-          <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
-            <div
-              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
-              onClick={handleHeaderClick}
-              title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
-              style={{ cursor: isMobile ? 'default' : 'pointer' }}
-            >
-              {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
-              {!isExpanded ? (
-                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/70 dark:group-hover/navigation:bg-[#2C2C30]">
-                  <Icon name="sidebar" className="h-4 w-4" aria-hidden />
-                  {unreadTotal > 0 ? (
-                    <span
-                      className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
-                      aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
-                      title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-              {isExpanded ? (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="flex flex-1 min-w-0 items-center gap-1.5"
-                  title={starshipData?.name || 'Starships.ai'}
-                >
-                  <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">
-                    {starshipData?.name || 'Starships.ai'}
-                  </span>
-                </motion.div>
-              ) : null}
-            </div>
-            {/* Right-side actions: notifications (icon only) + close/collapse */}
-            <div className="flex items-center gap-0.5">
-              {isAuthenticated && starshipSlug && isExpanded && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(`/ship/${starshipSlug}/notifications`)
-                    if (isMobile && onClose) onClose()
-                  }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
-                  aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
-                  title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
-                >
-                  <span className="relative inline-flex">
-                    <Icon name="bell" className="h-4 w-4" />
-                    {unreadTotal > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden />}
-                  </span>
-                </button>
-              )}
-              {isExpanded && !isMobile && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    collapseSidebar()
-                  }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
-                  aria-label="Collapse sidebar"
-                  title="Collapse sidebar"
-                  style={{ cursor: 'w-resize' }}
-                >
-                  <Icon name="sidebar" className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Divider below starship name/header */}
-          <div className="ml-2 mr-1.5 h-px bg-border/60" />
-
-          {/* Navigation Content - directly under header */}
-          <div
-            className="flex-shrink-0"
-            style={{
-              marginTop: '0.75rem',
-              marginBottom: '0.5rem',
-              paddingTop: '0rem',
-              paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
-            }}
-          >
-            <div className="flex flex-col space-y-0 w-full pl-2 pr-1.5">
-              <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
-              {/* Divider to clearly separate primary navigation from channels/DMs */}
-              <div className="h-2" aria-hidden />
-              <div className="mb-1 h-px bg-border/60" />
-            </div>
-          </div>
-
-          {/* Channels + Direct messages */}
-          {isAuthenticated && starshipSlug && starshipData?.id && (
-            <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col pl-2 pr-1.5' : 'hidden'}>
-              {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
-              <div className="flex-1 min-h-0 overflow-hidden pb-2">
-                <ConversationList
-                  starshipId={starshipData.id}
-                  starshipSlug={activeStarshipSlug || undefined}
-                  compact={true}
-                  onNavigate={handleConversationSelect}
-                  onConversationSelect={handleConversationSelect}
-                />
+            {/* Header – logo, brand, and collapse toggle */}
+            <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
+              <div
+                className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
+                onClick={handleHeaderClick}
+                title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
+                style={{ cursor: isMobile ? 'default' : 'pointer' }}
+              >
+                {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
+                {!isExpanded ? (
+                  <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/70 dark:group-hover/navigation:bg-[#2C2C30]">
+                    <Icon name="sidebar" className="h-4 w-4" aria-hidden />
+                    {unreadTotal > 0 ? (
+                      <span
+                        className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm"
+                        aria-label={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                        title={`${unreadTotal > 99 ? '99+' : unreadTotal} unread notifications`}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+                {isExpanded ? (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                    className="flex flex-1 min-w-0 items-center gap-1.5"
+                    title={starshipData?.name || 'Starships.ai'}
+                  >
+                    <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">{starshipData?.name || 'Starships.ai'}</span>
+                  </motion.div>
+                ) : null}
+              </div>
+              {/* Right-side actions: notifications (icon only) + close/collapse */}
+              <div className="flex items-center gap-0.5">
+                {isAuthenticated && starshipSlug && isExpanded && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push(`/ship/${starshipSlug}/notifications`)
+                      if (isMobile && onClose) onClose()
+                    }}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
+                    aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
+                    title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
+                  >
+                    <span className="relative inline-flex">
+                      <Icon name="bell" className="h-4 w-4" />
+                      {unreadTotal > 0 && <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500/90 shadow-sm" aria-hidden />}
+                    </span>
+                  </button>
+                )}
+                {isExpanded && !isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      collapseSidebar()
+                    }}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
+                    aria-label="Collapse sidebar"
+                    title="Collapse sidebar"
+                    style={{ cursor: 'w-resize' }}
+                  >
+                    <Icon name="sidebar" className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Spacer to push content toward bottom when needed */}
-          {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+            {/* Divider below starship name/header */}
+            <div className="ml-2 mr-1.5 h-px bg-border/60" />
+
+            {/* Navigation Content - directly under header */}
+            <div
+              className="flex-shrink-0"
+              style={{
+                marginTop: '0.75rem',
+                marginBottom: '0.5rem',
+                paddingTop: '0rem',
+                paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
+              }}
+            >
+              <div className="flex flex-col space-y-0 w-full pl-2 pr-1.5">
+                <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
+                {/* Divider to clearly separate primary navigation from channels/DMs */}
+                <div className="h-2" aria-hidden />
+                <div className="mb-1 h-px bg-border/60" />
+              </div>
+            </div>
+
+            {/* Channels + Direct messages */}
+            {isAuthenticated && starshipSlug && starshipData?.id && (
+              <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col pl-2 pr-1.5' : 'hidden'}>
+                {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
+                <div className="flex-1 min-h-0 overflow-hidden pb-2">
+                  <ConversationList
+                    starshipId={starshipData.id}
+                    starshipSlug={activeStarshipSlug || undefined}
+                    compact={true}
+                    onNavigate={handleConversationSelect}
+                    onConversationSelect={handleConversationSelect}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Spacer to push content toward bottom when needed */}
+            {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
           </div>
         </div>
 
@@ -563,16 +544,12 @@ export function Navigation(props: NavigationProps) {
                         <Icon name="coins" className="h-3 w-3" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent
-                      side="right"
-                      className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
-                      sideOffset={10}
-                    >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Credits</span>
-                          <Icon name="coins" className="h-3 w-3" />
-                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
-                        </div>
+                    <TooltipContent side="right" className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]" sideOffset={10}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Credits</span>
+                        <Icon name="coins" className="h-3 w-3" />
+                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -589,11 +566,7 @@ export function Navigation(props: NavigationProps) {
                       <UserProfileMenu />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent
-                    side="right"
-                    className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
-                    sideOffset={10}
-                  >
+                  <TooltipContent side="right" className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]" sideOffset={10}>
                     Account
                   </TooltipContent>
                 </Tooltip>
@@ -602,7 +575,6 @@ export function Navigation(props: NavigationProps) {
           </div>
         </div>
       </motion.div>
-
     </>
   )
 }

@@ -215,9 +215,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <JwtAuthGate>
         <StarTheme>
           <NotificationSoundBootstrap />
-        <Suspense fallback={null}>
-          <EmailChangeToastHandler />
-        </Suspense>
+          <Suspense fallback={null}>
+            <EmailChangeToastHandler />
+          </Suspense>
           <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
             <main className="relative min-h-full w-full">{children}</main>
           </div>

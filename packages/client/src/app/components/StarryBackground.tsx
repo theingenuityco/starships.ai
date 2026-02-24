@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useEffect } from 'react'
 
+import { LightAccretionBackground } from '@/app/components/LightAccretionBackground'
+
 // Generate random star positions
 function generateStars(count: number, maxWidth: number, maxHeight: number) {
   return Array.from({ length: count }, () => ({
@@ -44,6 +46,15 @@ export default function StarryBackground() {
   return (
     <>
       <div className="fixed inset-0 pointer-events-none z-0">
+        {/* Light mode background (stars are dark-only) */}
+        <div className="light-surface" aria-hidden>
+          {/* Base light surface */}
+          <div className="light-surface-base app-gradient-bg" />
+          <div className="light-accretion">
+            <LightAccretionBackground />
+          </div>
+        </div>
+
         {/* Stars layer 1 - Small stars */}
         <div className="stars-small" style={{ boxShadow: smallStarsShadow }} />
         {/* Stars layer 2 - Medium stars */}
@@ -53,6 +64,36 @@ export default function StarryBackground() {
       </div>
 
       <style jsx>{`
+        .light-surface {
+          position: absolute;
+          inset: 0;
+          display: block;
+        }
+
+        .light-surface-base {
+          position: absolute;
+          inset: 0;
+          opacity: 1;
+        }
+
+        .light-accretion {
+          position: absolute;
+          inset: 0;
+          opacity: 1;
+        }
+
+        :global(.ss-light-accretion-canvas) {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+        }
+
+        /* In dark mode, hide the light surface and show stars */
+        :global(.dark) .light-surface {
+          display: none;
+        }
+
         .stars-small,
         .stars-medium,
         .stars-large {
@@ -62,6 +103,13 @@ export default function StarryBackground() {
           width: 100%;
           height: 100%;
           background: transparent;
+          display: none;
+        }
+
+        :global(.dark) .stars-small,
+        :global(.dark) .stars-medium,
+        :global(.dark) .stars-large {
+          display: block;
         }
 
         /* Small stars */

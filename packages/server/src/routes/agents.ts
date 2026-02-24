@@ -786,7 +786,7 @@ router.post('/agents/:id/avatar/upload/complete', jwtAuthMiddleware, async (req:
     }
 
     const attachmentService = new AttachmentService();
-    const safeFilename = String(filename || 'avatar').replace(/[^\w.\-]+/g, '_');
+    const safeFilename = String(filename || 'avatar').replace(/[^\w.-]+/g, '_');
     const attachment = await attachmentService.createAttachmentReference({
       starshipId: agent.starshipId,
       filename: safeFilename.length > 0 ? safeFilename : `agent-${agent.slug || agent.id}-avatar`,

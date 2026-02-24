@@ -589,7 +589,7 @@ export function StarshipConnectorsPanel({
 
       const exploreConnectButton = (
         <Button
-          variant={isConnected ? 'ghost' : 'ghost'}
+          variant="ghost"
           size="sm"
           disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
           onClick={() => {
@@ -599,7 +599,14 @@ export function StarshipConnectorsPanel({
             if (isApiKeyConnectable) return openApiKeyDialog(provider)
             if (isBasicConnectable) return openBasicDialog(provider)
           }}
-          className={cn('h-7 px-2 shrink-0 text-xs', isConnected ? 'text-emerald-700 dark:text-emerald-300 opacity-100' : 'text-primary hover:text-primary disabled:text-muted-foreground')}
+          className={cn(
+            'group min-w-[110px] justify-center shrink-0 text-xs',
+            isConnected
+              ? 'h-7 px-2 text-emerald-700 dark:text-emerald-300 opacity-100'
+              : isManaged
+                ? 'h-7 px-2 text-muted-foreground'
+                : [CONNECTOR_CTA_BUTTON_CLASS, 'h-7 px-3']
+          )}
         >
           {isConnected ? (
             <>
@@ -648,12 +655,12 @@ export function StarshipConnectorsPanel({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {provider && showLogo ? (
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                      <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                      <ConnectorLogo provider={provider} className="h-5 w-5 object-contain" />
                     </div>
                   ) : (
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
-                      <Icon name="plug" className="h-3.5 w-3.5" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
+                      <Icon name="plug" className="h-4 w-4" />
                     </div>
                   )}
 
@@ -694,8 +701,8 @@ export function StarshipConnectorsPanel({
             <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
               <div className="absolute inset-0 flex items-center justify-center">
                 {provider ? (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                    <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                    <ConnectorLogo provider={provider} className="h-7 w-7 object-contain" />
                   </div>
                 ) : (
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">

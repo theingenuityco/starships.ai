@@ -502,7 +502,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 px-4 py-3">
                   <div className="flex flex-col">
                     <div className="text-sm font-medium">Avatar style</div>
-                    <div className="text-xs text-muted-foreground">2D = anime • 3D = game character</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={avatarStyleMode === '2d' ? 'text-sm font-semibold text-foreground' : 'text-sm text-muted-foreground'}>

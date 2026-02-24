@@ -143,6 +143,20 @@ export class AvatarGenerationService {
         contrast: 'high_value_separation';
         hair_color: 'allowed_unusual';
         skin_tone: 'natural_only';
+        wardrobe: {
+          fashion: 'futuristic';
+          materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
+          color_rule: 'high_saturation_accent_blocks';
+          readability: 'large_shapes_clear_silhouette';
+          visibility: 'upper_body_only_bust_crop';
+        };
+        equipment: {
+          requirement: '1_to_2_distinctive_role_tools';
+          vibe: 'retro_future_tech';
+          surface_detail: 'iconic_shapes_not_micro_detail';
+          effects: 'subtle_glow_allowed';
+          forbid: Array<'brand_names' | 'logos' | 'text' | 'real_world_gun_model'>;
+        };
         forbid: Array<'render_terms' | 'camera_terms' | 'engine_terms' | 'game_names'>;
       };
       out: {
@@ -247,6 +261,20 @@ export class AvatarGenerationService {
           contrast: 'high_value_separation',
           hair_color: 'allowed_unusual',
           skin_tone: 'natural_only',
+          wardrobe: {
+            fashion: 'futuristic',
+            materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
+            color_rule: 'high_saturation_accent_blocks',
+            readability: 'large_shapes_clear_silhouette',
+            visibility: 'upper_body_only_bust_crop',
+          },
+          equipment: {
+            requirement: '1_to_2_distinctive_role_tools',
+            vibe: 'retro_future_tech',
+            surface_detail: 'iconic_shapes_not_micro_detail',
+            effects: 'subtle_glow_allowed',
+            forbid: ['brand_names', 'logos', 'text', 'real_world_gun_model'],
+          },
           forbid: ['render_terms', 'camera_terms', 'engine_terms', 'game_names'],
         },
         out: {
@@ -483,6 +511,23 @@ export class AvatarGenerationService {
           include: 'head_neck_shoulders_upper_chest';
           exclude: Array<'hands' | 'forearms' | 'full_torso' | 'full_body'>;
           padding: 'none_full_bleed';
+          strict: true;
+        };
+        wardrobe_gear: {
+          outfit: {
+            style: 'retro_future_futuristic';
+            neckline: 'visible_collar_or_harness_or_jacket';
+            materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
+            color: 'vivid_accent_blocks_high_contrast';
+            details: 'panel_lines_hardware_clasps_emissive_piping_subtle';
+          };
+          equipment: {
+            show: '1_to_2_iconic_role_tools';
+            silhouette: 'readable';
+            finish: 'pbr_metal_plastic_glass';
+            emissive: 'allowed';
+            forbid: Array<'logos' | 'text' | 'real_world_brand_devices'>;
+          };
         };
         shaders: {
           skin: 'subsurface_profile_pbr';
@@ -608,6 +653,23 @@ export class AvatarGenerationService {
             include: 'head_neck_shoulders_upper_chest',
             exclude: ['hands', 'forearms', 'full_torso', 'full_body'],
             padding: 'none_full_bleed',
+            strict: true,
+          },
+          wardrobe_gear: {
+            outfit: {
+              style: 'retro_future_futuristic',
+              neckline: 'visible_collar_or_harness_or_jacket',
+              materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
+              color: 'vivid_accent_blocks_high_contrast',
+              details: 'panel_lines_hardware_clasps_emissive_piping_subtle',
+            },
+            equipment: {
+              show: '1_to_2_iconic_role_tools',
+              silhouette: 'readable',
+              finish: 'pbr_metal_plastic_glass',
+              emissive: 'allowed',
+              forbid: ['logos', 'text', 'real_world_brand_devices'],
+            },
           },
           shaders: {
             skin: 'subsurface_profile_pbr',
@@ -657,6 +719,14 @@ export class AvatarGenerationService {
             'no_ui_overlay',
             'no_extra_characters',
             'no_photoreal_real_person_likeness',
+            // Hard framing constraints (repeat in negatives for better compliance).
+            'no_hands',
+            'no_arms',
+            'no_forearms',
+            'no_elbows',
+            'no_full_torso',
+            'no_full_body',
+            'tight_bust_crop_mid_chest',
           ],
         },
         id: {

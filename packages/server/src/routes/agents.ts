@@ -510,7 +510,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
            * full_chain: regenerate avatarPrompt by asking the agent ("mirror"), save it,
            * then generate a new avatar using that regenerated prompt.
            */
-          mode: z.enum(['avatar_only', 'full_chain']).optional(),
+          mode: z.enum(['avatar_only', 'full_chain', 'migrate_2d_to_3d']).optional(),
           /**
            * Optional style switch for avatar generation.
            * - '3d': current pipeline (default)
@@ -543,8 +543,56 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       runtimeEnv: { STARSHIP_ID: agent.starshipId },
     });
 
-    // Ensure we have an agent-authored "mirror" description saved for this agent.
+    // Avatar generator
     const generator = new AvatarGenerationService();
+
+    // Special mode: migrate legacy 2D avatar to 3D using the existing avatar image as reference.
+    if (mode === 'migrate_2d_to_3d') {
+      if (!agent.avatarAttachmentId) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent has no existing avatar to migrate', 400);
+        return;
+      }
+
+      // Resolve a presigned inline URL for the current avatar so the image model can fetch it.
+      const attachmentService = new AttachmentService();
+      const refs = await attachmentService.getAttachmentsBatch([agent.avatarAttachmentId], agent.starshipId);
+      const refUrl = refs?.[0]?.previewUrl;
+      if (!refUrl) {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to resolve reference avatar URL', 500);
+        return;
+      }
+
+      const gen = await generator.generateAvatar3DFromReference({
+        subjectName: agent.name,
+        subjectDescription: agent.description,
+        starshipId: agent.starshipId,
+        referenceImageUrl: refUrl,
+        engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
+      });
+
+      // Store as attachment (auth-scoped)
+      const filename = `agent-${agent.slug || agent.id}-avatar.${
+        gen.mimeType.includes('webp') ? 'webp' : gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'
+      }`;
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-avatar-${agent.id}`,
+        filename,
+        mimeType: gen.mimeType,
+        buffer: gen.buffer,
+      });
+
+      // Persist link on agent
+      const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id });
+
+      sendSuccess(res, {
+        agent: updated,
+        attachment,
+      });
+      return;
+    }
+
+    // Ensure we have an agent-authored "mirror" description saved for this agent.
     let avatarPrompt = agent.avatarPrompt;
     if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
       if (!agent.blueprint) {

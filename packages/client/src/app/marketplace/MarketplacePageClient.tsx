@@ -429,7 +429,7 @@ export default function MarketplacePageClient(props: {
 
     if (tab === 'agents') {
       title = 'Explore agents'
-      subtitle = 'Search and install agents for your workflows.'
+      subtitle = 'Search and install agents for your business.'
       placeholder = 'Search agents'
     } else if (tab === 'tools') {
       title = 'Explore automations'
@@ -442,7 +442,11 @@ export default function MarketplacePageClient(props: {
     } else {
       // "All" landing page
       title = agentsOnlyLanding ? 'Explore agents' : 'Explore'
-      subtitle = agentsOnlyLanding ? 'Search and install agents for your workflows.' : showConnectors ? 'Search and install agents and connectors.' : 'Search and install agents.'
+      subtitle = agentsOnlyLanding
+        ? 'Search and install agents for your business.'
+        : showConnectors
+          ? 'Search and install agents and connectors.'
+          : 'Search and install agents.'
       placeholder = agentsOnlyLanding ? 'Search agents' : showConnectors ? 'Search agents and connectors' : 'Search agents'
     }
 

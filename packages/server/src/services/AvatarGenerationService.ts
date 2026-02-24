@@ -95,9 +95,10 @@ export class AvatarGenerationService {
    */
   async generateMirrorDescription(options: {
     agentName: string;
-    agentDescription?: string;
+    agentRole?: string;
     /**
-     * The agent's configured model. Required for Agent default blueprints which use `{{ state.model }}`.
+     * The agent's configured model. Historically required for Agent default blueprints which use `{{ state.model }}`.
+     * NOTE: Mirror prompt generation now forces a fixed model (GPT‑5.2) regardless of this value.
      * When executing a blueprint directly (bypassing Agent.execute()), callers must seed runtime config
      * into execution.state for template resolution and node validation.
      */
@@ -118,16 +119,13 @@ export class AvatarGenerationService {
       throw new Error('OPENROUTER_API_KEY not configured on server');
     }
 
-    const truncate = (s: unknown, max = 3000): string => {
-      const v = typeof s === 'string' ? s : '';
-      if (!v) return '';
-      return v.length > max ? `${v.slice(0, max)}…` : v;
-    };
+    // Mirror prompt generation should be consistent and high-quality regardless of the agent's runtime model.
+    // We route this through OpenRouter using a fixed model id.
+    const mirrorModel = 'openai/gpt-5.2';
 
     type MirrorPromptSpec = {
-      v: 'agent_mirror_v2';
-      task: 'generate_avatar_mirror_prompt';
-      ctx: { name: string; desc?: string };
+      agent: string;
+      role: string;
       out: {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
@@ -211,13 +209,10 @@ export class AvatarGenerationService {
     };
 
     const mirrorJson = (() => {
+      const role = typeof options.agentRole === 'string' ? options.agentRole.trim() : '';
       const spec: MirrorPromptSpec = {
-        v: 'agent_mirror_v2',
-        task: 'generate_avatar_mirror_prompt',
-        ctx: {
-          name: options.agentName,
-          ...(options.agentDescription ? { desc: truncate(options.agentDescription, 800) } : {}),
-        },
+        agent: options.agentName,
+        role,
         out: {
           format: 'json_object_only',
           schema_id: 'mirror_prompt_v1',
@@ -268,8 +263,9 @@ export class AvatarGenerationService {
     // user prompt and the agent's blueprint behavior.
     const agentParams: AgentParams = {
       name: options.agentName,
-      description: options.agentDescription,
-      model: options.agentModel,
+      // Do not pass agent description here; mirror prompt should be driven only by the JSON spec (agent+role).
+      description: undefined,
+      model: mirrorModel,
       // Encourage creative but consistent identity details
       temperature: 1.1,
       // Hard-disable tool calling by providing no tools
@@ -391,9 +387,8 @@ export class AvatarGenerationService {
       );
     }
 
-    // Autopilot Agent execution resolves the LLM model from `state.model`.
-    // For mirror generation we require agentModel, so report it as the effective model used.
-    return { description: JSON.stringify(normalized), model: options.agentModel };
+    // Autopilot Agent execution resolves the LLM model from `state.model` (seeded from AgentParams.model).
+    return { description: JSON.stringify(normalized), model: mirrorModel };
   }
 
   /**

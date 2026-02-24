@@ -1,9 +1,13 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import Icon from '@/components/primitives/Icon'
+import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
+import { formatDataCellValue } from '@/lib/table-format'
+import { toast } from 'sonner'
 
 export type DataCellValue = string | number | boolean | null | undefined
 
@@ -23,37 +27,6 @@ export interface DataTableProps {
   className?: string
 }
 
-const formatValue = (value: DataCellValue, format: DataColumn['format'] = 'text'): string => {
-  if (value === null || value === undefined) {
-    return '-'
-  }
-
-  if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No'
-  }
-
-  if (format === 'currency') {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value))
-  }
-
-  if (format === 'date') {
-    const asDate = new Date(value)
-    return Number.isNaN(asDate.getTime())
-      ? String(value)
-      : asDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-  }
-
-  if (format === 'percentage') {
-    return `${(Number(value) * 100).toFixed(1)}%`
-  }
-
-  if (format === 'number') {
-    return new Intl.NumberFormat('en-US').format(Number(value))
-  }
-
-  return String(value)
-}
-
 export function DataTable({
   columns,
   data,
@@ -70,9 +43,45 @@ export function DataTable({
   const pageEnd = pageSize === 0 ? data.length : pageStart + pageSize
   const visibleRows = data.slice(pageStart, pageEnd)
 
+  const handleExportCsv = () => {
+    try {
+      const table = adaptDataTable(columns, data)
+      const baseName = sanitizeFilename(title || 'data-table')
+      const filename = `${baseName}-${Date.now()}.csv`
+      downloadTableAsCsv(table, filename)
+      toast.success('Table exported')
+    } catch {
+      toast.error('Export failed')
+    }
+  }
+
+  const canExport = columns.length > 0 && data.length > 0
+
   return (
     <div className={cn('w-full max-w-none', className)}>
       <div className="space-y-4">
+          {(title || canExport) && (
+            <div className="flex items-center justify-between gap-2">
+              {title && <h3 className="text-sm font-medium">{title}</h3>}
+              {canExport && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportCsv}
+                      aria-label="Export table as CSV"
+                      className="shrink-0"
+                    >
+                      <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
+                      Export CSV
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download as CSV</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          )}
           <div className="w-full max-w-none rounded-md border overflow-visible">
             <table className="w-full">
               <thead className="bg-muted/50">
@@ -109,7 +118,7 @@ export function DataTable({
                           key={`${tableRowIndex}-${column.key}`}
                           className="px-4 py-3 text-sm text-left whitespace-normal break-words"
                         >
-                          {formatValue(row[column.key], column.format)}
+                          {formatDataCellValue(row[column.key], column.format ?? 'text')}
                         </td>
                       ))}
                     </tr>

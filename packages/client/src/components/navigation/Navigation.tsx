@@ -17,6 +17,7 @@ import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -200,6 +201,12 @@ export function Navigation(props: NavigationProps) {
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
   const starshipId = starshipData?.id ? String(starshipData.id) : null
+
+  const canManageConnectors = useMemo(() => {
+    if (!user?.id) return false
+    if (!starshipData?.id) return false
+    return Boolean(isInstanceAdmin === true || String(starshipData.ownerId) === String(user.id))
+  }, [isInstanceAdmin, starshipData?.id, starshipData?.ownerId, user?.id])
   const queryClient = useQueryClient()
 
   // Badge data:
@@ -306,12 +313,12 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(isAuthenticated && starshipSlug
+      ...(isAuthenticated && starshipSlug && canManageConnectors
         ? [
             {
               href: `/ship/${starshipSlug}/installed`,
-              label: 'Installed',
-              icon: 'download',
+              label: 'Connect Apps',
+              icon: 'plug',
               isActive: isInstalledRoute,
             },
           ]
@@ -339,12 +346,14 @@ export function Navigation(props: NavigationProps) {
     ],
     [
       isAuthenticated,
+      isMarketplaceRoute,
       starshipSlug,
       pathname,
       isSchedulesRoute,
       isInstalledRoute,
       isMembersRoute,
       isInstanceAdmin,
+      canManageConnectors,
     ]
   )
 
@@ -378,40 +387,41 @@ export function Navigation(props: NavigationProps) {
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className={`group/navigation flex flex-row h-full overflow-hidden bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
+        className={`group/navigation flex flex-col h-full overflow-hidden bg-card ${isMobile ? 'fixed left-0 top-0 z-50' : 'transition-all duration-300 ease-in-out'}`}
         style={{ willChange: isMobile ? 'transform' : 'width', cursor: !isMobile && !isExpanded ? 'e-resize' : 'auto' }}
         onClick={handleSidebarBackgroundClick}
       >
-        {/* Discord-style starship rail */}
-        {isAuthenticated ? (
-          <StarshipRail
-            starships={railStarships}
-            activeSlug={activeStarshipSlug}
-            onSelect={handleStarshipSelect as any}
-            onCreate={() => router.push('/account')}
-          />
-        ) : null}
+        {/* Top: rail + main column */}
+        <div className="flex flex-1 min-h-0 flex-row overflow-hidden">
+          {isAuthenticated ? (
+            <StarshipRail
+              starships={railStarships}
+              activeSlug={activeStarshipSlug}
+              onSelect={handleStarshipSelect as any}
+              onCreate={() => router.push('/account')}
+            />
+          ) : null}
 
-        <div
-          className="flex flex-col transition-all duration-300 ease-in-out"
-          style={{
-            width: isExpanded ? '15rem' : '3.25rem',
-            height: '100%',
-            willChange: 'width',
-            contain: 'layout style paint',
-          }}
-        >
+          <div
+            className="flex flex-col transition-all duration-300 ease-in-out"
+            style={{
+              width: isExpanded ? '15rem' : '3.25rem',
+              height: '100%',
+              willChange: 'width',
+              contain: 'layout style paint',
+            }}
+          >
           {/* Header – logo, brand, and collapse toggle */}
           <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
-              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/40 transition-colors"
+              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
               onClick={handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
               {!isExpanded ? (
-                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/40">
+                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/70 dark:group-hover/navigation:bg-[#2C2C30]">
                   <Icon name="sidebar" className="h-4 w-4" aria-hidden />
                   {unreadTotal > 0 ? (
                     <span
@@ -431,13 +441,6 @@ export function Navigation(props: NavigationProps) {
                   className="flex flex-1 min-w-0 items-center gap-1.5"
                   title={starshipData?.name || 'Starships.ai'}
                 >
-                  <span
-                    className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-muted/60 px-1 text-[10px] font-semibold tracking-wide text-muted-foreground"
-                    aria-label={`Starship monogram ${starshipMonogram(starshipData?.name || 'Starships.ai')}`}
-                    title={starshipMonogram(starshipData?.name || 'Starships.ai')}
-                  >
-                    {starshipMonogram(starshipData?.name || 'Starships.ai')}
-                  </span>
                   <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">
                     {starshipData?.name || 'Starships.ai'}
                   </span>
@@ -453,7 +456,7 @@ export function Navigation(props: NavigationProps) {
                     router.push(`/ship/${starshipSlug}/notifications`)
                     if (isMobile && onClose) onClose()
                   }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
                   aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                   title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                 >
@@ -469,7 +472,7 @@ export function Navigation(props: NavigationProps) {
                   onClick={() => {
                     collapseSidebar()
                   }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
                   aria-label="Collapse sidebar"
                   title="Collapse sidebar"
                   style={{ cursor: 'w-resize' }}
@@ -480,11 +483,14 @@ export function Navigation(props: NavigationProps) {
             </div>
           </div>
 
+          {/* Divider below starship name/header */}
+          <div className="ml-2 mr-1.5 h-px bg-border/60" />
+
           {/* Navigation Content - directly under header */}
           <div
             className="flex-shrink-0"
             style={{
-              marginTop: '0rem',
+              marginTop: '0.75rem',
               marginBottom: '0.5rem',
               paddingTop: '0rem',
               paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
@@ -516,88 +522,84 @@ export function Navigation(props: NavigationProps) {
 
           {/* Spacer to push content toward bottom when needed */}
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+          </div>
+        </div>
 
-          {/* Divider before footer controls (match menu/channels divider) */}
-          <div className="ml-2 mr-1.5 my-0 h-px bg-border/60" />
-
-          {/* Bottom controls */}
-          <div className="pl-2 pr-1.5 pt-2 pb-4 flex-shrink-0">
-            <div className="flex flex-col gap-1">
-              {isAuthenticated && starshipData?.id && canManageBilling ? (
-                isExpanded ? (
-                  <button
-                    type="button"
-                    disabled={!activeStarshipSlug}
-                    onClick={() => {
-                      if (!activeStarshipSlug) return
-                      router.push(`/ship/${activeStarshipSlug}/settings/billing`)
-                    }}
-                    className="h-7 w-full flex items-center gap-1.5 rounded-lg px-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="View credits and billing"
-                  >
-                    <span className="flex-1 text-left text-[11px] font-medium">Credits</span>
-                    <div className="flex items-center gap-1">
-                      <Icon name="coins" className="h-3 w-3" />
-                      <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
-                    </div>
-                  </button>
-                ) : (
-                  <div className="flex justify-center">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          disabled={!activeStarshipSlug}
-                          onClick={() => {
-                            if (!activeStarshipSlug) return
-                            router.push(`/ship/${activeStarshipSlug}/settings/billing`)
-                          }}
-                          className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                          aria-label="View credits and billing"
-                        >
-                          <Icon name="coins" className="h-3 w-3" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="right"
-                        className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
-                        sideOffset={10}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Credits</span>
-                          <Icon name="coins" className="h-3 w-3" />
-                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
+        {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
+        <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
+          <div className="flex flex-col gap-2 w-full">
+            {isAuthenticated && starshipData?.id && canManageBilling ? (
+              isExpanded ? (
+                <button
+                  type="button"
+                  disabled={!activeStarshipSlug}
+                  onClick={() => {
+                    if (!activeStarshipSlug) return
+                    router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                  }}
+                  className="h-7 w-full flex items-center gap-1.5 rounded-lg pl-2 pr-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] disabled:opacity-60 disabled:cursor-not-allowed"
+                  aria-label="View credits and billing"
+                >
+                  <span className="flex-1 text-left text-[11px] font-medium">Credits</span>
+                  <div className="flex items-center gap-1">
+                    <Icon name="coins" className="h-3 w-3" />
+                    <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
                   </div>
-                )
-              ) : null}
-
-              <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
-                {isExpanded ? (
-                  <UserProfileMenu expanded />
-                ) : (
+                </button>
+              ) : (
+                <div className="flex justify-center">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div>
-                        <UserProfileMenu />
-                      </div>
+                      <button
+                        type="button"
+                        disabled={!activeStarshipSlug}
+                        onClick={() => {
+                          if (!activeStarshipSlug) return
+                          router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                        }}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted/70 dark:hover:bg-[#2C2C30] hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-label="View credits and billing"
+                      >
+                        <Icon name="coins" className="h-3 w-3" />
+                      </button>
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
                       className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                       sideOffset={10}
                     >
-                      Account
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Credits</span>
+                          <Icon name="coins" className="h-3 w-3" />
+                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
+                        </div>
                     </TooltipContent>
                   </Tooltip>
-                )}
-              </div>
+                </div>
+              )
+            ) : null}
+
+            <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
+              {isExpanded ? (
+                <UserProfileMenu expanded />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <UserProfileMenu />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
+                    sideOffset={10}
+                  >
+                    Account
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
           </div>
-
-          {/* Profile lives in bottom controls */}
         </div>
       </motion.div>
 

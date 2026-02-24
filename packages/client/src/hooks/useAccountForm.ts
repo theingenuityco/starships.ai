@@ -185,8 +185,8 @@ export function useAccountForm() {
     if (!form.email || !form.email.includes('@')) {
       return 'Email must be a valid email address'
     }
-    if (form.avatar && form.avatar.length > 500) {
-      return 'Avatar URL must be at most 500 characters'
+    if (form.avatar && form.avatar.length > 2400) {
+      return 'Avatar URL must be at most 2400 characters'
     }
     return null
   }

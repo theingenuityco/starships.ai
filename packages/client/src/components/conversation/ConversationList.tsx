@@ -369,8 +369,8 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
           isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasUnread || hasNotifBadge
-              ? 'text-foreground border-transparent hover:bg-muted'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
+              ? 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]',
           isBusy && 'opacity-70 pointer-events-none'
         )}
         style={{
@@ -900,7 +900,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
             <div className="w-full flex items-center justify-between pr-2 py-1">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsChannelsExpanded(v => !v)}
                 aria-expanded={isChannelsExpanded}
@@ -926,7 +926,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
               <button
                 type="button"
                 onClick={() => setIsCreateChannelOpen(true)}
-                className="inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
                 aria-label="Create channel"
               >
                 <Icon name="plus" className="w-3 h-3" />
@@ -973,8 +973,8 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                               isActive
                                 ? 'text-primary bg-primary/10 border-transparent'
                                 : hasUnread || hasNotifBadge || hasChannelNotif
-                                  ? 'text-foreground border-transparent hover:bg-muted'
-                                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                                  ? 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+                                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
                             )}
                             style={{
                               justifyContent: 'flex-start',
@@ -1010,7 +1010,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                                     'absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                     // Match the row background so the icon reads cleanly over the hash.
                                     // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
-                                    isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted',
+                                    isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted/70 dark:group-hover:bg-[#2C2C30]',
                                     // Keep visible but not louder than unread/active styling.
                                     isActive ? 'text-primary/80' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground/70' : 'text-muted-foreground'
                                   )}
@@ -1046,7 +1046,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                                         'hidden group-hover:inline-flex data-[state=open]:inline-flex focus-visible:inline-flex',
                                         'items-center justify-center w-6 h-6 rounded-md',
                                         // Offset the list's scroll padding (`pr-1`) so ⋮ aligns with the header "+" column.
-                                        '-mr-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors'
+                                        '-mr-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors'
                                       )}
                                       aria-label="Channel actions"
                                       onClick={e => {
@@ -1152,7 +1152,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
             <div className="w-full flex items-center justify-between pr-2 py-1">
               <button
                 type="button"
-                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                className={cn('flex-1 min-w-0 h-6 flex items-center rounded-lg border border-transparent text-muted-foreground px-1', 'hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors')}
                 style={{ justifyContent: 'flex-start' }}
                 onClick={() => setIsDirectMessagesExpanded(v => !v)}
                 aria-expanded={isDirectMessagesExpanded}
@@ -1274,7 +1274,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-[#2C2C30]', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleChannelClick(String(ch.slug))}
                       >
                         <span className="relative inline-flex items-center justify-center h-4 w-4 flex-shrink-0">
@@ -1289,7 +1289,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                                 'absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] transition-colors',
                                 // Match the row background so the icon reads cleanly over the hash.
                                 // For active rows, keep `bg-card` so the container doesn't visually disappear into the active row bg.
-                                isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-muted/50',
+                                isActive ? 'bg-card group-hover:bg-card' : 'bg-card group-hover:bg-[#2C2C30]',
                                 isActive ? 'text-primary/80' : hasUnread || hasNotifBadge || hasChannelNotif ? 'text-foreground/70' : 'text-muted-foreground'
                               )}
                               title="Private channel"
@@ -1365,7 +1365,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
                       className={cn(
                         // Match channel row styling (spacing, hover, active background)
                         'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                        'hover:bg-muted/50',
+                        'hover:bg-muted/70 dark:hover:bg-[#2C2C30]',
                         isActive && 'bg-muted/70 shadow-sm',
                         isBusy && 'opacity-70 pointer-events-none'
                       )}

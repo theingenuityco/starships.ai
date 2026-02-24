@@ -197,6 +197,17 @@ export async function invokeOpenRouter(
     // Non-fatal: ignore unsupported fields
   }
 
+  // Structured outputs (OpenAI-compatible):
+  // - response_format: { type: 'json_schema', json_schema: { name, schema, strict } }
+  try {
+    const rf = (request as unknown as { responseFormat?: unknown }).responseFormat;
+    if (rf && typeof rf === 'object') {
+      baseRequest.response_format = rf;
+    }
+  } catch {
+    // Non-fatal: ignore unsupported fields
+  }
+
   // OpenRouter plugins (e.g., web browsing):
   // - plugins: [{ id: 'web', max_results: 3 }]
   try {

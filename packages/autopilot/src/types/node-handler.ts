@@ -41,6 +41,13 @@ export interface LlmHostRequest {
   presencePenalty?: number;
   reasoning?: unknown;
   /**
+   * Optional structured output / response formatting.
+   * OpenRouter forwards OpenAI-compatible `response_format` to underlying providers when supported.
+   * Example:
+   * { type: 'json_schema', json_schema: { name: 'mirror_prompt', schema: {...}, strict: true } }
+   */
+  responseFormat?: Record<string, unknown>;
+  /**
    * Optional streaming control.
    *
    * - When true/omitted: host may stream tokens/chunks.

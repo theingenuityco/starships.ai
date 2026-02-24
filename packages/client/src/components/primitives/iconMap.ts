@@ -122,6 +122,7 @@ const map: Record<string, ResolvedIcon> = {
 
   // Commerce & actions
   download: { type: 'phosphor', component: 'DownloadSimple' },
+  upload: { type: 'phosphor', component: 'UploadSimple' },
   'user-plus': { type: 'phosphor', component: 'UserPlus' },
   'log-in': { type: 'phosphor', component: 'SignIn' },
   'log-out': { type: 'phosphor', component: 'SignOut' },

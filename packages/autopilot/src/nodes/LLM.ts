@@ -490,6 +490,7 @@ export class LLM extends BaseNode<LlmParams> {
       const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
+      const responseFormat = this.coerceMaybeJson<Record<string, unknown>>(params.responseFormat);
 
       const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
 
@@ -557,6 +558,7 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        ...(responseFormat && typeof responseFormat === 'object' ? { responseFormat } : {}),
         ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),

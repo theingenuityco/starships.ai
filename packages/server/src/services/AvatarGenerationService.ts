@@ -134,6 +134,16 @@ export class AvatarGenerationService {
         bokeh: 'soft_circular';
         forbid: Array<'text' | 'logos' | 'ui' | 'busy_details'>;
       };
+      // Character-design guidance (NOT rendering jargon): push a loud, readable game-character look.
+      character_design_guidance: {
+        silhouette: 'bold_readable';
+        proportions: 'slightly_exaggerated_hero';
+        palette: 'vibrant_complementary_accents';
+        contrast: 'high_value_separation';
+        hair_color: 'allowed_unusual';
+        skin_tone: 'natural_only';
+        forbid: Array<'render_terms' | 'camera_terms' | 'engine_terms' | 'game_names'>;
+      };
       out: {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
@@ -228,6 +238,15 @@ export class AvatarGenerationService {
           dof: 'shallow',
           bokeh: 'soft_circular',
           forbid: ['text', 'logos', 'ui', 'busy_details'],
+        },
+        character_design_guidance: {
+          silhouette: 'bold_readable',
+          proportions: 'slightly_exaggerated_hero',
+          palette: 'vibrant_complementary_accents',
+          contrast: 'high_value_separation',
+          hair_color: 'allowed_unusual',
+          skin_tone: 'natural_only',
+          forbid: ['render_terms', 'camera_terms', 'engine_terms', 'game_names'],
         },
         out: {
           format: 'json_object_only',
@@ -437,13 +456,19 @@ export class AvatarGenerationService {
       out: { n: 1; ar: '1:1' };
       // "Template prompt" (style) lives here: concise, technical, 3D/game focused.
       render: {
+        style_id: 'starships_loud_hero_v1' | 'generic_game';
         look: 'AAA_game_character' | 'stylized_game_character';
-        art_dir: 'semi_real_stylized' | 'realistic' | 'toon_stylized';
-        genre_ref: 'hero_shooter' | 'rpg' | 'sci_fi' | 'fantasy' | 'modern';
+        art_dir:
+          | 'starships_loud_hero'
+          | 'starships_signature'
+          | 'semi_real_stylized'
+          | 'realistic'
+          | 'toon_stylized';
+        genre_ref: 'starships' | 'hero_shooter' | 'rpg' | 'sci_fi' | 'fantasy' | 'modern';
         pipeline: 'PBR';
         engine_hint: 'UnrealEngine5' | 'Unity_HDRP' | 'offline_renderer';
-        lighting: 'studio_keyfillrim' | 'cinematic_soft' | 'neutral_hdr';
-        materials: 'high_quality_surfaces' | 'matte_stylized';
+        lighting: 'studio_keyfillrim' | 'cinematic_soft' | 'neutral_hdr' | 'hero_rim_keyfill';
+        materials: 'high_quality_surfaces' | 'matte_stylized' | 'stylized_pbr_punchy';
         geometry: 'clean_game_mesh' | 'highpoly_bake';
         shading: 'real_time' | 'offline';
         shaders: {
@@ -453,7 +478,15 @@ export class AvatarGenerationService {
           cloth: 'sheen';
         };
         tech: { gi: 'lumen_like' | 'baked'; shadows: 'vsm_like'; aa: 'taa' | 'fxaa' };
-        post: { tone_map: 'filmic'; grade: 'neutral' | 'teal_orange_subtle'; sharpen: 'subtle'; grain: 'none' | 'subtle' };
+        post: {
+          tone_map: 'filmic';
+          grade: 'neutral' | 'teal_orange_subtle' | 'vibrant_lut';
+          bloom: 'subtle' | 'medium';
+          chromatic_aberration: 'none' | 'subtle';
+          vignette: 'none' | 'subtle';
+          sharpen: 'subtle';
+          grain: 'none' | 'subtle';
+        };
         camera: {
           shot: 'head_and_shoulders_to_mid_chest';
           pose: 'three_quarter';
@@ -466,12 +499,18 @@ export class AvatarGenerationService {
         };
         bg: { type: 'simple_studio' | 'soft_environment'; keep_uncluttered: true };
         palette: {
-          vibe: 'colorful_game' | 'muted_cinematic';
-          saturation: 'medium_high';
-          accent: 'neon_allowed';
+          vibe: 'starships_signature' | 'colorful_game' | 'muted_cinematic';
+          saturation: 'medium_high' | 'balanced' | 'high';
+          accent: 'neon_allowed' | 'neon_subtle';
           hair_color: 'unrestricted';
-          skin_tone: 'natural_or_fantasy';
-          emissive_accents: 'allowed_subtle';
+          skin_tone: 'natural_only';
+          emissive_accents: 'allowed_subtle' | 'allowed';
+        };
+        // Starships signature: subtle retro‑future space tech motifs (no text/logos).
+        starships: {
+          motifs: Array<'retro_futurism' | 'sleek_spacefaring' | 'holo_glow_accents' | 'cosmic_palette' | 'clean_silhouette'>;
+          accents: Array<'cyan_magenta_glow' | 'iridescent_edge' | 'soft_bloom'>;
+          forbid_brand_marks: true;
         };
         neg: string[];
       };
@@ -541,13 +580,14 @@ export class AvatarGenerationService {
         task: 'avatar_3d_game_character',
         out: { n: 1, ar: '1:1' },
         render: {
+          style_id: 'starships_loud_hero_v1',
           look: 'AAA_game_character',
-          art_dir: 'semi_real_stylized',
-          genre_ref: 'hero_shooter',
+          art_dir: 'starships_loud_hero',
+          genre_ref: 'starships',
           pipeline: 'PBR',
           engine_hint: 'UnrealEngine5',
-          lighting: 'studio_keyfillrim',
-          materials: 'high_quality_surfaces',
+          lighting: 'hero_rim_keyfill',
+          materials: 'stylized_pbr_punchy',
           geometry: 'clean_game_mesh',
           shading: 'real_time',
           shaders: {
@@ -557,7 +597,15 @@ export class AvatarGenerationService {
             cloth: 'sheen',
           },
           tech: { gi: 'lumen_like', shadows: 'vsm_like', aa: 'taa' },
-          post: { tone_map: 'filmic', grade: 'neutral', sharpen: 'subtle', grain: 'none' },
+          post: {
+            tone_map: 'filmic',
+            grade: 'vibrant_lut',
+            bloom: 'medium',
+            chromatic_aberration: 'subtle',
+            vignette: 'none',
+            sharpen: 'subtle',
+            grain: 'none',
+          },
           camera: {
             shot: 'head_and_shoulders_to_mid_chest',
             pose: 'three_quarter',
@@ -568,14 +616,19 @@ export class AvatarGenerationService {
             fstop: 2.8,
             dof: 'subtle',
           },
-          bg: { type: 'simple_studio', keep_uncluttered: true },
+          bg: { type: 'soft_environment', keep_uncluttered: true },
           palette: {
-            vibe: 'colorful_game',
-            saturation: 'medium_high',
+            vibe: 'starships_signature',
+            saturation: 'high',
             accent: 'neon_allowed',
             hair_color: 'unrestricted',
-            skin_tone: 'natural_or_fantasy',
-            emissive_accents: 'allowed_subtle',
+            skin_tone: 'natural_only',
+            emissive_accents: 'allowed',
+          },
+          starships: {
+            motifs: ['sleek_spacefaring', 'retro_futurism', 'holo_glow_accents', 'cosmic_palette', 'clean_silhouette'],
+            accents: ['cyan_magenta_glow', 'soft_bloom'],
+            forbid_brand_marks: true,
           },
           neg: [
             'no_text',

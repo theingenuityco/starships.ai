@@ -331,6 +331,11 @@ export interface ConnectorCatalogItem {
   description: string;
   auth: { type: ConnectorAuthTypeV2 };
   /**
+   * Optional demo video URL (e.g. YouTube) used for
+   * in-product connector education in the Connect Apps step.
+   */
+  demoVideoUrl?: string;
+  /**
    * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. a tenant subdomain),
    * the client should collect these values before initiating OAuth.
    */
@@ -359,6 +364,11 @@ export interface ConnectorTemplateModel {
   name: string;
   description: string;
   auth: { type: ConnectorAuthTypeV2 };
+  /**
+   * Optional demo video URL for this connector template.
+   * Intended for short product walkthroughs in the UI.
+   */
+  demoVideoUrl?: string;
   isEnabled: boolean;
   version: string;
   category: string;
@@ -373,6 +383,7 @@ export interface ConnectorTemplateModel {
  * Instance-admin view of a connector template, including runtime fields.
  */
 export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
+  demoVideoUrl?: string;
   baseUrl: string;
   auth: ConnectorAuthV2;
   variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
@@ -422,6 +433,7 @@ export interface UpdateConnectorTemplateRequest {
   description?: string;
   isEnabled?: boolean;
   version?: string;
+  demoVideoUrl?: string;
   category?: string;
   baseUrl?: string;
   auth?: ConnectorAuthV2;
@@ -445,6 +457,7 @@ export interface CreateConnectorTemplateRequest {
   isEnabled?: boolean;
   version?: string;
   category?: string;
+  demoVideoUrl?: string;
 
   // runtime fields (root columns in connector_templates)
   baseUrl: string;

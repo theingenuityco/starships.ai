@@ -16,6 +16,8 @@ export interface ConnectorSuggestionCardProps {
   /** Disable entrance animations for connector cards (useful in wizard step 3). */
   animateCards?: boolean
   className?: string
+  /** When true, show optional demo videos for connectors that define demoVideoUrl. */
+  showDemoVideos?: boolean
 }
 
 /**
@@ -49,6 +51,7 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         density={compactCard ? 'compact' : 'default'}
         animateCards={animateCards}
         connectButtonLabel={connectButtonLabel}
+        showDemoVideos
       />
     </div>
   )

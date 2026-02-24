@@ -273,6 +273,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
           provider: data.provider,
           name: data.name,
           description: data.description,
+          demoVideoUrl: typeof data.demoVideoUrl === 'string' ? data.demoVideoUrl.trim() || undefined : undefined,
           // Persist denormalized auth_type for DB filtering/legacy reasons, derived from auth_json.type.
           authType: ((data.auth as unknown as { type?: string })?.type || 'none') as CreateConnectorTemplateRequest['auth']['type'],
           baseUrl: data.baseUrl,
@@ -307,6 +308,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
         ConnectorTemplateEntity,
         | 'name'
         | 'description'
+        | 'demoVideoUrl'
         | 'authType'
         | 'isEnabled'
         | 'version'

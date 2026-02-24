@@ -165,7 +165,7 @@ export class AvatarGenerationService {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
         extra_text: 'forbidden';
-        required_keys: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
+        required_keys: ['gender', 'age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
       };
       rules: {
         fictional_original: true;
@@ -186,16 +186,6 @@ export class AvatarGenerationService {
       v: 'mirror_prompt_v1';
       gender: 'male' | 'female';
       age: string;
-      /**
-       * Upper-body physique only (bust-up framing): shoulders, neck, upper chest, build/posture.
-       * Keep it concrete + visual (silhouette/shape), non-medical, and non-sexualized.
-       */
-      physique: string;
-      /**
-       * Non-sexualized bust/chest fullness for bust-up avatars.
-       * For male characters this is typically "flat".
-       */
-      bust_size: 'flat' | 'small' | 'medium' | 'full';
       face_skin: string;
       eyes: string;
       hair: string;
@@ -233,10 +223,6 @@ export class AvatarGenerationService {
       const gender = typeof genderRaw === 'string' ? (genderRaw.trim().toLowerCase() as string) : '';
       const genderNorm = gender === 'male' || gender === 'female' ? (gender as 'male' | 'female') : undefined;
 
-      const bustRaw = value['bust_size'];
-      const bust = typeof bustRaw === 'string' ? bustRaw.trim().toLowerCase() : '';
-      const bustNorm = bust === 'flat' || bust === 'small' || bust === 'medium' || bust === 'full' ? (bust as MirrorPromptOutput['bust_size']) : undefined;
-
       const getStr = (k: keyof Omit<MirrorPromptOutput, 'v'>): string | undefined => {
         const v = value[k as string];
         if (typeof v !== 'string') return undefined;
@@ -249,8 +235,6 @@ export class AvatarGenerationService {
         v: 'mirror_prompt_v1',
         gender: genderNorm as 'male' | 'female',
         age: getStr('age') ?? '',
-        physique: getStr('physique') ?? '',
-        bust_size: bustNorm ?? 'flat',
         face_skin: getStr('face_skin') ?? '',
         eyes: getStr('eyes') ?? '',
         hair: getStr('hair') ?? '',
@@ -262,8 +246,6 @@ export class AvatarGenerationService {
       const requiredOk =
         !!genderNorm &&
         !!out.age &&
-        !!out.physique &&
-        !!bustNorm &&
         !!out.face_skin &&
         !!out.eyes &&
         !!out.hair &&
@@ -291,8 +273,7 @@ export class AvatarGenerationService {
           contrast: 'high_value_separation',
           hair_color: 'unrestricted',
           skin_tone: 'natural_only',
-          // Subtle, non-sexualized bias to avoid extremely flat/androgynous physiques when gender=female.
-          // This should be expressed in the required `physique` field (bust-up framing only).
+          // Subtle, non-sexualized bias for female characters (express via general upper-body silhouette).
           female_physique_bias: {
             apply_when_gender: 'female',
             chest: 'fuller',
@@ -317,7 +298,7 @@ export class AvatarGenerationService {
           format: 'json_object_only',
           schema_id: 'mirror_prompt_v1',
           extra_text: 'forbidden',
-          required_keys: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+          required_keys: ['gender', 'age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
         },
         rules: {
           fictional_original: true,
@@ -338,6 +319,8 @@ export class AvatarGenerationService {
       return json;
     })();
 
+    const sanitizeTemplateDelimiters = (s: string): string => s.split('{{').join('{ {').split('}}').join('} }');
+
     const truncateSystemPrompt = (s: unknown, max = 6000): string => {
       const v = typeof s === 'string' ? s : '';
       if (!v) return '';
@@ -347,12 +330,18 @@ export class AvatarGenerationService {
       // Many system prompts contain literal `{{ ... }}` which would be treated as template syntax
       // and can fail validation ("partial template usage is not supported" / "Unexpected token").
       // We want to pass these through literally to the LLM, so we break the `{{` / `}}` sequences.
-      return truncated.split('{{').join('{ {').split('}}').join('} }');
+      return sanitizeTemplateDelimiters(truncated);
     };
     const systemPrompt = truncateSystemPrompt(options.agentSystemPrompt, 6000);
 
+    const agentRoleForInstruction = typeof options.agentRole === 'string' ? options.agentRole.trim() : '';
+    const mirrorInstruction = sanitizeTemplateDelimiters(
+      `You (the agent) are ${options.agentName}${agentRoleForInstruction ? ` (${agentRoleForInstruction})` : ''} and you just looked into the mirror - describe yourself.`
+    );
+
     const messages: LlmMessage[] = [
       ...(systemPrompt ? ([{ role: 'system', content: systemPrompt }] as LlmMessage[]) : []),
+      ...(mirrorInstruction ? ([{ role: 'system', content: mirrorInstruction }] as LlmMessage[]) : []),
       { role: 'user', content: mirrorJson },
     ];
 
@@ -367,8 +356,6 @@ export class AvatarGenerationService {
           properties: {
             gender: { type: 'string', enum: ['male', 'female'] },
             age: { type: 'string' },
-            physique: { type: 'string' },
-            bust_size: { type: 'string', enum: ['flat', 'small', 'medium', 'full'] },
             face_skin: { type: 'string' },
             eyes: { type: 'string' },
             hair: { type: 'string' },
@@ -376,7 +363,7 @@ export class AvatarGenerationService {
             apparatus: { type: 'string' },
             background: { type: 'string' },
           },
-          required: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+          required: ['gender', 'age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
         },
       },
     } as Record<string, unknown>;

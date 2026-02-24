@@ -84,7 +84,7 @@ export class AgentMarketingService {
     if (!agent.avatarPrompt || !agent.avatarAttachmentId) {
       const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
         agentName: agent.name,
-        agentDescription: agent.description,
+        agentRole: agent.role,
         agentModel: agent.model,
         agentBlueprint: agent.blueprint!,
         agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),

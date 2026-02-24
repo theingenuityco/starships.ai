@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
-import { fetchPublicAgentTemplatesPage, fetchPublicConnectorCatalogPage, fetchPublicToolTemplatesPage } from '@/lib/server/public-templates'
+import { fetchPublicAgentTemplatesPage } from '@/lib/server/public-templates'
 
 type PageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -37,24 +37,22 @@ export default async function ExplorePage(props: PageProps) {
     redirect(`${dest}${toQueryString(searchParams)}`)
   }
 
-  const PREVIEW_LIMIT = 9
-  const [agentsPage, toolsPage, connectorsPage] = await Promise.all([
-    fetchPublicAgentTemplatesPage({ page: 1, limit: PREVIEW_LIMIT, revalidateSeconds: revalidate }),
-    fetchPublicToolTemplatesPage({ page: 1, limit: PREVIEW_LIMIT, revalidateSeconds: revalidate }),
-    fetchPublicConnectorCatalogPage({ page: 1, limit: PREVIEW_LIMIT, revalidateSeconds: revalidate }),
-  ])
+  const PAGE_SIZE = 18
+  const agentsPage = await fetchPublicAgentTemplatesPage({ page: 1, limit: PAGE_SIZE, revalidateSeconds: revalidate })
 
   return (
     <MarketplacePageClient
       activeTab="all"
       initialAgentTemplates={agentsPage.items}
-      initialToolTemplates={toolsPage.items}
-      initialConnectorCatalog={connectorsPage.items}
+      initialToolTemplates={[]}
+      initialConnectorCatalog={[]}
+      showConnectors={false}
       initialTotals={{
         agents: agentsPage.pagination.total,
-        tools: toolsPage.pagination.total,
-        connectors: connectorsPage.pagination.total,
+        tools: 0,
+        connectors: 0,
       }}
+      pagination={agentsPage.pagination}
     />
   )
 }

@@ -22,7 +22,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
@@ -513,13 +512,9 @@ export function StarshipConnectorsPanel({
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')}>
           <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+            <div className="mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
                 <Skeleton className="h-[22px] w-[22px] rounded-md" />
-              </span>
-              {/* Presence dot placeholder (match `PresenceIndicator` placement + connectors row offsets). */}
-              <span className="absolute bottom-0 right-0 translate-x-[22%] translate-y-[6%] z-50 pointer-events-none">
-                <Skeleton className="h-2 w-2 rounded-full ring-2 ring-background outline outline-1 outline-border" />
               </span>
             </div>
             <div className="min-w-0 flex-1">
@@ -802,16 +797,17 @@ export function StarshipConnectorsPanel({
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-3 min-w-0">
                 {showLogo && (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white shadow-sm border',
+                      isConnected ? 'border-emerald-500/80' : 'border-border/40'
+                    )}
+                  >
                     <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                   </div>
                 )}
                 <div className="flex flex-col justify-center min-w-0">
                   <span className="text-lg leading-tight truncate">{label}</span>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
-                  </div>
                 </div>
               </CardTitle>
               {hideCardDescription ? (
@@ -912,36 +908,23 @@ export function StarshipConnectorsPanel({
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label}>
           <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+            <div className="mt-0.5 h-10 w-10 flex-shrink-0">
+              <span
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-full overflow-hidden',
+                  isConnected ? 'ring-2 ring-emerald-500/80 bg-emerald-500/5' : 'ring-1 ring-border/50 bg-muted/10'
+                )}
+              >
                 {showLogo ? (
                   <Image src={logoSrc} alt={`${label} logo`} width={22} height={22} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                 ) : (
                   <Icon name="plug" className="h-4 w-4 text-muted-foreground" />
                 )}
               </span>
-              <PresenceIndicator
-                kind={isConnected ? 'online' : 'offline'}
-                active={true}
-                size="sm"
-                placement="outset"
-                // Match Members page placement for 40px avatar.
-                className="translate-x-[22%] translate-y-[6%]"
-              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium truncate text-foreground')}>{label}</span>
-                <span
-                  className={cn(
-                    'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                    isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-border/50 bg-muted/20 text-muted-foreground'
-                  )}
-                  aria-label={isConnected ? 'Connected' : 'Not connected'}
-                  title={isConnected ? 'Connected' : 'Not connected'}
-                >
-                  {isConnected ? 'Connected' : 'Not connected'}
-                </span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="truncate">{catalogItem.description}</span>

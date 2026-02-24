@@ -582,7 +582,7 @@ export class AvatarGenerationService {
         character_style?: {
           face: {
             proportions: 'anime_leaning_realistic_3d';
-            eyes: 'large_expressive_almond_with_clean_eyeliner';
+            eyes: 'large_expressive_anime_like';
             nose_mouth: 'simplified_clean';
             skin: 'very_smooth_minimal_microdetail';
             makeup: 'subtle_clean_not_heavy';
@@ -725,7 +725,7 @@ export class AvatarGenerationService {
         character_style: {
           face: {
             proportions: 'anime_leaning_realistic_3d',
-            eyes: 'large_expressive_almond_with_clean_eyeliner',
+            eyes: 'large_expressive_anime_like',
             nose_mouth: 'simplified_clean',
             skin: 'very_smooth_minimal_microdetail',
             makeup: 'subtle_clean_not_heavy',

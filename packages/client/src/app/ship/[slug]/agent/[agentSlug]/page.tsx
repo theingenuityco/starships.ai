@@ -14,7 +14,7 @@ import type { ConversationMessageInputRef } from '@/components/conversation/Conv
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import api, { agentAPI } from '@/lib/api'
+import api, { agentAPI, getCurrentToken } from '@/lib/api'
 import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents, useStarshipChannels } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/primitives/LoadingSpinner'
+import Icon from '@/components/primitives/Icon'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -55,6 +56,9 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState<boolean>(false)
   const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | 'migrate_2d_to_3d' | null>(null)
   const [avatarStyleMode, setAvatarStyleMode] = useState<'2d' | '3d'>('3d')
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState<boolean>(false)
+  const [isDownloadingAvatar, setIsDownloadingAvatar] = useState<boolean>(false)
+  const avatarFileInputRef = useRef<HTMLInputElement>(null)
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -298,6 +302,107 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }
 
+  const handleUploadAvatar = async (file: File) => {
+    if (!existingAgent?.id || !starship?.id) return
+    try {
+      setIsUploadingAvatar(true)
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Invalid file type', { description: 'Please upload an image (PNG, JPG, WebP, GIF).' })
+        return
+      }
+
+      const initResponse = await api.post(`/api/v1/agents/${existingAgent.id}/avatar/upload/init`, {
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      })
+      const upload = (initResponse as any)?.data?.data?.upload as { uploadUrl: string; s3Key: string } | undefined
+      if (!upload?.uploadUrl || !upload?.s3Key) {
+        toast.error('Avatar upload failed', { description: 'Failed to initialize upload' })
+        return
+      }
+
+      const putResp = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      })
+      if (!putResp.ok) {
+        toast.error('Avatar upload failed', { description: 'Failed to upload to storage' })
+        return
+      }
+
+      await api.post(`/api/v1/agents/${existingAgent.id}/avatar/upload/complete`, {
+        s3Key: upload.s3Key,
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+      })
+
+      toast.success('Avatar uploaded')
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.message || 'Upload failed'
+      toast.error('Avatar upload failed', { description: message })
+    } finally {
+      setIsUploadingAvatar(false)
+      // Reset the file input so the same file can be selected again
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = ''
+    }
+  }
+
+  const handleDownloadAvatar = async () => {
+    if (!headerAvatarAttachmentId || !starship?.id) return
+    try {
+      setIsDownloadingAvatar(true)
+      const token = await getCurrentToken()
+      if (!token) {
+        toast.error('Not authenticated', { description: 'Please sign in again and retry.' })
+        return
+      }
+
+      const previewUrl = `/api/v1/attachments/${encodeURIComponent(headerAvatarAttachmentId)}/preview?starshipId=${encodeURIComponent(starship.id)}`
+      const response = await fetch(previewUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        const message = errorData?.error?.message || errorData?.error || 'Download failed'
+        toast.error('Avatar download failed', { description: message })
+        return
+      }
+
+      const blob = await response.blob()
+      const contentType = response.headers.get('content-type') || blob.type
+      const ext =
+        contentType.includes('image/webp') ? 'webp' : contentType.includes('image/png') ? 'png' : contentType.includes('image/jpeg') ? 'jpg' : 'img'
+
+      const agentSlugOrId = String((headerAgentModel as any)?.slug || headerAgentModel?.id || 'agent')
+      const filename = `agent-${agentSlugOrId}-avatar.${ext}`
+
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch (err: any) {
+      const message = err?.message || 'Download failed'
+      toast.error('Avatar download failed', { description: message })
+    } finally {
+      setIsDownloadingAvatar(false)
+    }
+  }
+
   return (
     <div className="bg-background min-h-screen">
       <div className="flex flex-col items-center px-6 py-6">
@@ -339,8 +444,45 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               <div className="flex items-center justify-center py-2">
                 <div className="relative rounded-2xl overflow-hidden bg-background/80 shadow-lg ring-1 ring-border/70">
                   <AgentAvatar seed={headerAgentName} imageUrl={headerAvatarUrl} size={384} rounded={false} className="h-96 w-96 rounded-2xl" />
+                  <input
+                    ref={avatarFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) void handleUploadAvatar(file)
+                    }}
+                    disabled={!canRegenerateAvatar || isRegeneratingAvatar || isUploadingAvatar}
+                  />
+                  <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => avatarFileInputRef.current?.click()}
+                      disabled={!canRegenerateAvatar || isRegeneratingAvatar || isUploadingAvatar}
+                      aria-label="Upload avatar"
+                      title="Upload avatar"
+                      className="h-9 w-9 bg-background/75 hover:bg-background/90 backdrop-blur border border-border/60 shadow-sm"
+                    >
+                      {isUploadingAvatar ? <Icon name="loading" className="h-4 w-4" /> : <Icon name="upload" className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => void handleDownloadAvatar()}
+                      disabled={!headerAvatarAttachmentId || isRegeneratingAvatar || isDownloadingAvatar}
+                      aria-label="Download avatar"
+                      title="Download avatar"
+                      className="h-9 w-9 bg-background/75 hover:bg-background/90 backdrop-blur border border-border/60 shadow-sm"
+                    >
+                      {isDownloadingAvatar ? <Icon name="loading" className="h-4 w-4" /> : <Icon name="download" className="h-4 w-4" />}
+                    </Button>
+                  </div>
                   {isRegeneratingAvatar && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
                       <LoadingSpinner size={28} className="text-foreground" label="Regenerating avatar" />
                       <div className="mt-2 text-xs font-medium text-foreground/80">
                         {avatarRegenMode === 'migrate_2d_to_3d'

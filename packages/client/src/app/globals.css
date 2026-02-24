@@ -394,7 +394,7 @@
     --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
 
     /* Decorative stars (StarryBackground) */
-    --star-color: transparent;
+    --star-color: rgba(2, 6, 23, 0.18);
   }
 
   .dark {
@@ -793,7 +793,7 @@
   --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
 
   /* Decorative stars (StarryBackground) */
-  --star-color: transparent;
+  --star-color: rgba(2, 6, 23, 0.18);
 }
 
 /*

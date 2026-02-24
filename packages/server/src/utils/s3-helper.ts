@@ -50,6 +50,17 @@ export interface UploadOptions {
 }
 
 /**
+ * Build a private (auth-scoped) object key under the starship/conversation prefix.
+ *
+ * Key format: starship-{starshipId}/conv-{conversationId}/{timestamp}_{filename}
+ */
+export function buildPrivateConversationS3Key(options: { starshipId: string; conversationId: string; filename: string }): string {
+  const timestamp = Date.now();
+  const sanitizedFilename = String(options.filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `starship-${options.starshipId}/conv-${options.conversationId}/${timestamp}_${sanitizedFilename}`;
+}
+
+/**
  * Upload file to S3
  *
  * Key format: starship-{starshipId}/conv-{conversationId}/{timestamp}_{filename}
@@ -61,9 +72,7 @@ export async function uploadToS3(options: UploadOptions): Promise<string> {
   const { starshipId, conversationId, filename, mimeType, buffer } = options;
 
   // Generate S3 key with readable prefixes
-  const timestamp = Date.now();
-  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const s3Key = `starship-${starshipId}/conv-${conversationId}/${timestamp}_${sanitizedFilename}`;
+  const s3Key = buildPrivateConversationS3Key({ starshipId, conversationId, filename });
 
   const bucket = env.AWS_S3_BUCKET;
   if (!bucket) {
@@ -82,6 +91,40 @@ export async function uploadToS3(options: UploadOptions): Promise<string> {
   await getS3Client().send(command);
 
   return s3Key;
+}
+
+/**
+ * Generate a presigned URL for direct client uploads (PUT).
+ *
+ * Note: The client MUST send the same Content-Type header used to sign the request.
+ */
+export async function generatePresignedUploadUrl(options: {
+  starshipId: string;
+  conversationId: string;
+  filename: string;
+  mimeType: string;
+  expiresIn?: number;
+}): Promise<{ s3Key: string; uploadUrl: string; expiresIn: number }> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const expiresIn = typeof options.expiresIn === 'number' && options.expiresIn > 0 ? options.expiresIn : 60;
+  const s3Key = buildPrivateConversationS3Key({
+    starshipId: options.starshipId,
+    conversationId: options.conversationId,
+    filename: options.filename,
+  });
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+    ContentType: options.mimeType,
+  });
+
+  const uploadUrl = await getSignedUrl(getS3Client(), command, { expiresIn });
+  return { s3Key, uploadUrl, expiresIn };
 }
 
 /**

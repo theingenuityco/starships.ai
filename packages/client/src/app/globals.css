@@ -392,6 +392,9 @@
     --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
     --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
     --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
+
+    /* Decorative stars (StarryBackground) */
+    --star-color: transparent;
   }
 
   .dark {
@@ -433,6 +436,9 @@
     --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%);
     --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%);
     --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%);
+
+    /* Decorative stars (StarryBackground) */
+    --star-color: rgba(255, 255, 255, 0.95);
   }
 
   /* 
@@ -736,6 +742,9 @@
   --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%) !important;
   --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%) !important;
 
+  /* Decorative stars (StarryBackground) */
+  --star-color: rgba(255, 255, 255, 0.95) !important;
+
   /* Force dark background and text colors */
   background-color: hsl(var(--background)) !important;
   color: hsl(var(--foreground)) !important;
@@ -782,6 +791,9 @@
   --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
   --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
   --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
+
+  /* Decorative stars (StarryBackground) */
+  --star-color: transparent;
 }
 
 /*

@@ -24,15 +24,15 @@ export default function StarryBackground() {
 
   // Create box-shadow strings for each layer
   const smallStarsShadow = useMemo(
-    () => smallStars.map(star => `${star.x}px ${star.y}px #fff`).join(', '),
+    () => smallStars.map(star => `${star.x}px ${star.y}px var(--star-color)`).join(', '),
     [smallStars]
   )
   const mediumStarsShadow = useMemo(
-    () => mediumStars.map(star => `${star.x}px ${star.y}px #fff`).join(', '),
+    () => mediumStars.map(star => `${star.x}px ${star.y}px var(--star-color)`).join(', '),
     [mediumStars]
   )
   const largeStarsShadow = useMemo(
-    () => largeStars.map(star => `${star.x}px ${star.y}px #fff`).join(', '),
+    () => largeStars.map(star => `${star.x}px ${star.y}px var(--star-color)`).join(', '),
     [largeStars]
   )
 

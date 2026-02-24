@@ -551,6 +551,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       const mirrorResult = await generator.generateMirrorDescription({
         agentName: agent.name,
         agentRole: agent.role,
+        agentSystemPrompt: agent.systemPrompt,
         agentModel: agent.model,
         agentBlueprint: agent.blueprint,
         agentTools:

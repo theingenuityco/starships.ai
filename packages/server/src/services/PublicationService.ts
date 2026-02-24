@@ -731,6 +731,7 @@ export class PublicationService {
         const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
           agentName: agent.name,
           agentRole: agent.role,
+          agentSystemPrompt: agent.systemPrompt,
           agentModel: agent.model,
           agentBlueprint: agent.blueprint!,
           agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),

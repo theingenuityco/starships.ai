@@ -96,6 +96,7 @@ export class AvatarGenerationService {
   async generateMirrorDescription(options: {
     agentName: string;
     agentRole?: string;
+    agentSystemPrompt?: string;
     /**
      * The agent's configured model. Historically required for Agent default blueprints which use `{{ state.model }}`.
      * NOTE: Mirror prompt generation now forces a fixed model (GPT‑5.2) regardless of this value.
@@ -294,12 +295,18 @@ export class AvatarGenerationService {
     // This ensures the Agent node seeds runtime config into execution.state, which the default agent blueprint
     // expects (e.g. LLM node model: `{{ state.model }}`).
     //
-    // We intentionally do NOT inject any system prompt here. Mirror generation should be driven purely by the
-    // user prompt and the agent's blueprint behavior.
+    // We DO include the agent's systemPrompt (if present) so the mirror output reflects the agent's persona.
+    const truncateSystemPrompt = (s: unknown, max = 6000): string => {
+      const v = typeof s === 'string' ? s : '';
+      if (!v) return '';
+      return v.length > max ? `${v.slice(0, max)}…` : v;
+    };
+    const systemPrompt = truncateSystemPrompt(options.agentSystemPrompt, 6000);
     const agentParams: AgentParams = {
       name: options.agentName,
       // Do not pass agent description here; mirror prompt should be driven only by the JSON spec (agent+role).
       description: undefined,
+      ...(systemPrompt ? { systemPrompt } : {}),
       model: mirrorModel,
       // Encourage creative but consistent identity details
       temperature: 1.1,

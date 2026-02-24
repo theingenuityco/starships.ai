@@ -56,7 +56,7 @@ export function UseCaseHero(props: { useCase: UseCaseModel }) {
                 <p className="mt-4 text-sm sm:text-base text-muted-foreground max-w-2xl text-balance">{useCase.heroSubtitle}</p>
 
                 {useCase.heroPrompt ? (
-                  <UseCaseHeroPromptInput placeholder={useCase.heroPrompt.placeholder} examples={useCase.heroPrompt.examples} />
+                  <UseCaseHeroPromptInput className="mt-6" placeholder={useCase.heroPrompt.placeholder} examples={useCase.heroPrompt.examples} />
                 ) : null}
 
                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-3xl">

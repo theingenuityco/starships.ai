@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { PublicFooter } from '@/app/components/PublicFooter'
-import LightCosmicParallaxBackground from '@/app/components/LightCosmicParallaxBackground'
 import { StarTheme } from '@/components/theme-context'
 import { USE_CASES_BY_SLUG } from '@/app/use-cases/use-cases.data'
 import { UseCaseHero } from '@/app/use-cases/components/UseCaseHero'
@@ -47,8 +46,6 @@ export default function WordPressSiteUseCasePage() {
   return (
     <StarTheme theme="light">
       <div className="min-h-[100dvh] bg-background relative">
-        <LightCosmicParallaxBackground />
-
         <div className="relative z-10">
           <PublicHeader />
 

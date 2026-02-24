@@ -323,13 +323,22 @@ export class AvatarGenerationService {
       // "Template prompt" (style) lives here: concise, technical, 3D/game focused.
       render: {
         look: 'AAA_game_character' | 'stylized_game_character';
+        art_dir: 'semi_real_stylized' | 'realistic' | 'toon_stylized';
+        genre_ref: 'hero_shooter' | 'rpg' | 'sci_fi' | 'fantasy' | 'modern';
         pipeline: 'PBR';
         engine_hint: 'UnrealEngine5' | 'Unity_HDRP' | 'offline_renderer';
         lighting: 'studio_keyfillrim' | 'cinematic_soft' | 'neutral_hdr';
         materials: 'high_quality_surfaces' | 'matte_stylized';
         geometry: 'clean_game_mesh' | 'highpoly_bake';
         shading: 'real_time' | 'offline';
-        post: { tone_map: 'filmic'; sharpen: 'subtle'; grain: 'none' | 'subtle' };
+        shaders: {
+          skin: 'subsurface_profile_pbr';
+          hair: 'anisotropic_strands_or_cards';
+          eyes: 'parallax_cornea_catchlights';
+          cloth: 'sheen';
+        };
+        tech: { gi: 'lumen_like' | 'baked'; shadows: 'vsm_like'; aa: 'taa' | 'fxaa' };
+        post: { tone_map: 'filmic'; grade: 'neutral' | 'teal_orange_subtle'; sharpen: 'subtle'; grain: 'none' | 'subtle' };
         camera: {
           shot: 'head_and_shoulders_to_mid_chest';
           pose: 'three_quarter';
@@ -340,6 +349,7 @@ export class AvatarGenerationService {
           fstop: number;
           dof: 'subtle';
         };
+        bg: { type: 'simple_studio' | 'soft_environment'; keep_uncluttered: true };
         neg: string[];
       };
       // "Mirror prompt" (content) lives here: character identity.
@@ -378,13 +388,22 @@ export class AvatarGenerationService {
         out: { n: 1, ar: '1:1' },
         render: {
           look: 'AAA_game_character',
+          art_dir: 'semi_real_stylized',
+          genre_ref: 'hero_shooter',
           pipeline: 'PBR',
           engine_hint: 'UnrealEngine5',
           lighting: 'studio_keyfillrim',
           materials: 'high_quality_surfaces',
           geometry: 'clean_game_mesh',
           shading: 'real_time',
-          post: { tone_map: 'filmic', sharpen: 'subtle', grain: 'none' },
+          shaders: {
+            skin: 'subsurface_profile_pbr',
+            hair: 'anisotropic_strands_or_cards',
+            eyes: 'parallax_cornea_catchlights',
+            cloth: 'sheen',
+          },
+          tech: { gi: 'lumen_like', shadows: 'vsm_like', aa: 'taa' },
+          post: { tone_map: 'filmic', grade: 'neutral', sharpen: 'subtle', grain: 'none' },
           camera: {
             shot: 'head_and_shoulders_to_mid_chest',
             pose: 'three_quarter',
@@ -395,7 +414,16 @@ export class AvatarGenerationService {
             fstop: 2.8,
             dof: 'subtle',
           },
-          neg: ['no_text', 'no_logos', 'no_watermark', 'no_frame_border', 'no_ui_overlay', 'no_extra_characters'],
+          bg: { type: 'simple_studio', keep_uncluttered: true },
+          neg: [
+            'no_text',
+            'no_logos',
+            'no_watermark',
+            'no_frame_border',
+            'no_ui_overlay',
+            'no_extra_characters',
+            'no_photoreal_real_person_likeness',
+          ],
         },
         id: {
           ...(options.subjectAvatarPrompt ? { mirror: options.subjectAvatarPrompt } : {}),

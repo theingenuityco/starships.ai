@@ -19,8 +19,8 @@ function toQueryString(params: Record<string, string | string[] | undefined> | n
   return qs ? `?${qs}` : ''
 }
 
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
+// Public marketing page: rendered on-demand (avoid build-time API dependency).
+export const dynamic = 'force-dynamic'
 export const revalidate = 3600 // 1 hour
 
 export default async function ExplorePage(props: PageProps) {

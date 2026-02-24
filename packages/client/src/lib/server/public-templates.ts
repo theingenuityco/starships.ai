@@ -2,12 +2,35 @@ import 'server-only'
 
 import type { ApiResponse, ApiResponseMeta, AgentTemplateModel, ConnectorCatalogResponse, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { getPublicEnvConfig } from '@starships/env/public'
+import { headers } from 'next/headers'
 
 function normalizeBaseUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '')
 }
 
 let didWarnPublicUrlFallback = false
+
+function firstForwardedValue(value: string | null | undefined): string {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const first = raw.split(',')[0]
+  return String(first || '').trim()
+}
+
+function getRequestBaseUrl(): string | null {
+  try {
+    const h = headers()
+    const host = firstForwardedValue(h.get('x-forwarded-host')) || firstForwardedValue(h.get('host'))
+    if (!host) return null
+
+    const proto = firstForwardedValue(h.get('x-forwarded-proto')) || 'https'
+    const safeProto = proto === 'http' || proto === 'https' ? proto : 'https'
+    return `${safeProto}://${host}`
+  } catch {
+    // No request context (e.g. build-time or static generation).
+    return null
+  }
+}
 
 function getPublicBaseUrl(): string {
   // Public marketing pages should fetch from the *public* origin so the HTML
@@ -16,6 +39,10 @@ function getPublicBaseUrl(): string {
   const { PUBLIC_URL } = getPublicEnvConfig()
   const fromPublicEnv = normalizeBaseUrl(PUBLIC_URL || '')
   if (fromPublicEnv) return fromPublicEnv
+
+  // Runtime fallback: infer the origin from the request (works behind proxies/CDNs).
+  const fromRequest = getRequestBaseUrl()
+  if (fromRequest) return normalizeBaseUrl(fromRequest)
 
   // Fallback: Next in a monorepo can fail to load the root `.env` depending on how it’s started.
   // In `pnpm dev`, we always start the reverse proxy on PROXY_PORT (default 8080), which exposes `/api/*`

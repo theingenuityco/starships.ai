@@ -737,6 +737,7 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                     maxItems={isAllTab ? SECTION_PREVIEW_LIMIT : undefined}
                     showLoadMore={!isAllTab}
                     sortBy="recently_used"
+                    showDemoVideos
                   />
                   {isAllTab && !isSearchActive ? (
                     <div className="flex justify-center pt-4">

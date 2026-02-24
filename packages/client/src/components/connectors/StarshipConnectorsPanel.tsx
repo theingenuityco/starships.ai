@@ -431,6 +431,8 @@ export function StarshipConnectorsPanel({
   //   setGithubDialogOpen(false)
   // }
 
+  const [activeDemo, setActiveDemo] = useState<{ provider: string; label: string; url: string } | null>(null)
+
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
     const base = (catalogItems || []).filter(item => item.provider !== 'starships')
@@ -857,6 +859,8 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
+  const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
+
     const connectButton = (
       <Button
         size="sm"
@@ -888,6 +892,21 @@ export function StarshipConnectorsPanel({
     ) : null
 
     const cta = isConnected ? (disconnectButton ?? connectButton) : connectButton
+
+  const howToButton =
+    demoEmbedUrl != null
+      ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2 text-xs shrink-0 text-primary hover:text-primary hover:bg-primary/10"
+          onClick={() => setActiveDemo({ provider, label, url: demoEmbedUrl })}
+        >
+          <Icon name="play-circle" className="h-3.5 w-3.5 mr-1" />
+          How to connect
+        </Button>
+        )
+      : null
 
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -931,7 +950,10 @@ export function StarshipConnectorsPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 self-center">{!shouldHideConnectButton ? cta : null}</div>
+        <div className="flex items-center gap-2 self-center">
+          {howToButton}
+          {!shouldHideConnectButton ? cta : null}
+        </div>
       </div>
     )
   }
@@ -1000,6 +1022,34 @@ export function StarshipConnectorsPanel({
               </Button>
               <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
                 Disconnect
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {showDemoVideos && activeDemo ? (
+        <Dialog open={true} onOpenChange={open => !open && setActiveDemo(null)}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitlePrimitive>{`How to connect ${activeDemo.label}`}</DialogTitlePrimitive>
+              <DialogDescription>Watch this quick video to see how to connect this connector.</DialogDescription>
+            </DialogHeader>
+            <div className="mt-2">
+              <div className="relative w-full overflow-hidden rounded-md bg-black/80 aspect-video">
+                <iframe
+                  src={activeDemo.url}
+                  title={`${activeDemo.label} connection guide`}
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  loading="lazy"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveDemo(null)}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

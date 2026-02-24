@@ -526,8 +526,8 @@ export function Navigation(props: NavigationProps) {
         </div>
 
         {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
-        <div className={cn('flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 pr-3', isExpanded ? 'pl-20' : 'pl-[72px]')}>
-          <div className="flex flex-col gap-2 w-full max-w-[15rem] px-3">
+        <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
+          <div className="flex flex-col gap-2 w-full">
             {isAuthenticated && starshipData?.id && canManageBilling ? (
               isExpanded ? (
                 <button
@@ -568,11 +568,11 @@ export function Navigation(props: NavigationProps) {
                       className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                       sideOffset={10}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Credits</span>
-                        <Icon name="coins" className="h-3 w-3" />
-                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
-                      </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Credits</span>
+                          <Icon name="coins" className="h-3 w-3" />
+                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
+                        </div>
                     </TooltipContent>
                   </Tooltip>
                 </div>

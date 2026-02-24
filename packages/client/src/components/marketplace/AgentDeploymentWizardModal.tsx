@@ -73,23 +73,12 @@ function stepTitle(step: WizardStep): string {
   return 'Review & install'
 }
 
-export function AgentDeploymentWizardModal({
-  isOpen,
-  onOpenChange,
-  onConfirm,
-  isProcessing,
-  template,
-  ownedStarships,
-  starshipId,
-  starshipSlug,
-  starshipName,
-}: AgentDeploymentWizardModalProps) {
+export function AgentDeploymentWizardModal({ isOpen, onOpenChange, onConfirm, isProcessing, template, ownedStarships, starshipId, starshipSlug, starshipName }: AgentDeploymentWizardModalProps) {
   const assignedToolSlugs = (template?.assignedToolSlugs || []).filter(Boolean)
   const templateId = template?.id ?? ''
   const agentDeployLabel = String(template?.name || 'agent').trim() || 'agent'
 
-  const singleStarshipFromProps: DeployStarshipOptionWithAccess | null =
-    starshipId && (starshipName || starshipSlug) ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName ?? '' } : null
+  const singleStarshipFromProps: DeployStarshipOptionWithAccess | null = starshipId && (starshipName || starshipSlug) ? { id: starshipId, slug: starshipSlug ?? '', name: starshipName ?? '' } : null
   const listForSelection = (ownedStarships?.length ? ownedStarships : singleStarshipFromProps ? [singleStarshipFromProps] : []) as DeployStarshipOptionWithAccess[]
 
   const [step, setStep] = useState<WizardStep>(1)
@@ -114,10 +103,20 @@ export function AgentDeploymentWizardModal({
   }, [requiredConnectors])
 
   const connectedRequiredConnectorsCount = useMemo(() => {
-    const requiredProviders = new Set(visibleRequiredConnectors.map(c => String(c?.provider || '').trim().toLowerCase()).filter(Boolean))
+    const requiredProviders = new Set(
+      visibleRequiredConnectors
+        .map(c =>
+          String(c?.provider || '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    )
     if (requiredProviders.size === 0) return 0
     return (selectedStarshipConnectors ?? []).filter(c => {
-      const provider = String(c?.provider || '').trim().toLowerCase()
+      const provider = String(c?.provider || '')
+        .trim()
+        .toLowerCase()
       if (!provider || provider === 'starships') return false
       const status = String(c?.status || '').trim()
       return requiredProviders.has(provider) && status === 'connected'
@@ -167,7 +166,8 @@ export function AgentDeploymentWizardModal({
     return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
   }
   const permissionDotClassName = (p: AgentToolPermission): string => (p === 'allow' ? 'bg-emerald-500/70' : p === 'ask' ? 'bg-amber-500/70' : 'bg-red-500/70')
-  const permissionMenuItemClassName = (p: AgentToolPermission): string => (p === 'allow' ? 'hover:bg-emerald-500/10 focus:bg-emerald-500/10' : p === 'ask' ? 'hover:bg-amber-500/10 focus:bg-amber-500/10' : 'hover:bg-red-500/10 focus:bg-red-500/10')
+  const permissionMenuItemClassName = (p: AgentToolPermission): string =>
+    p === 'allow' ? 'hover:bg-emerald-500/10 focus:bg-emerald-500/10' : p === 'ask' ? 'hover:bg-amber-500/10 focus:bg-amber-500/10' : 'hover:bg-red-500/10 focus:bg-red-500/10'
   const permissionMenuItemSelectedClassName = (p: AgentToolPermission): string => (p === 'allow' ? 'bg-emerald-500/10' : p === 'ask' ? 'bg-amber-500/10' : 'bg-red-500/10')
   const permissionMenuIconClassName = (p: AgentToolPermission): string => (p === 'allow' ? 'text-emerald-500' : p === 'ask' ? 'text-amber-500' : 'text-red-500')
 
@@ -226,7 +226,7 @@ export function AgentDeploymentWizardModal({
         <TooltipProvider>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
-              <DialogTitle>Install agent</DialogTitle>
+              <DialogTitle>Install Agent</DialogTitle>
 
               <div>
                 <WizardStepper currentStep={step} steps={WIZARD_STEPS} />
@@ -238,7 +238,7 @@ export function AgentDeploymentWizardModal({
 
               {step === 1 ? (
                 <div className="mt-8 space-y-4">
-                  <div className="text-sm font-semibold">Install at</div>
+                  <div className="text-sm font-semibold">Select Workspace</div>
 
                   {listForSelection.length === 0 ? (
                     <div className="rounded-xl border border-border/60 bg-card/50 p-4">
@@ -254,9 +254,9 @@ export function AgentDeploymentWizardModal({
                             aria-label={selectedStarship ? `Selected starship: ${selectedStarship.name || selectedStarship.slug}. Change starship.` : 'Select a starship'}
                             className={cn(
                               // Match starship-level tool selector trigger styling (ToolDropdown)
-                              'flex min-h-14 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-4 py-3 text-sm text-left',
+                              'flex min-h-14 w-full max-w-sm items-center justify-between whitespace-nowrap rounded-md border border-input bg-primary/10 px-4 py-3 text-sm text-left',
                               'ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                              'hover:bg-background hover:text-foreground',
+                              'hover:bg-primary/15 hover:text-foreground',
                               isProcessing && 'opacity-60 cursor-not-allowed'
                             )}
                             disabled={isProcessing}
@@ -264,9 +264,7 @@ export function AgentDeploymentWizardModal({
                             <span className="flex items-center gap-3 min-w-0">
                               <StarshipPickerIcon starship={selectedStarship ?? { id: '', name: 'S' }} />
                               <span className="min-w-0 flex-1 flex items-center">
-                                <span className="block truncate text-sm font-semibold leading-tight">
-                                  {selectedStarship?.name || selectedStarship?.slug || 'Select a starship…'}
-                                </span>
+                                <span className="block truncate text-sm font-semibold leading-tight">{selectedStarship?.name || selectedStarship?.slug || 'Select a starship…'}</span>
                               </span>
                             </span>
                             <Icon name="chevron-down" className={cn('h-4 w-4 opacity-50 shrink-0', starshipPickerOpen && 'rotate-180')} />
@@ -283,13 +281,7 @@ export function AgentDeploymentWizardModal({
                           <div className="border-b border-border/40 p-2">
                             <div className="relative">
                               <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
-                              <Input
-                                value={starshipPickerSearch}
-                                onChange={e => setStarshipPickerSearch(e.target.value)}
-                                placeholder="Search starships…"
-                                className="h-9 pl-10"
-                                autoFocus
-                              />
+                              <Input value={starshipPickerSearch} onChange={e => setStarshipPickerSearch(e.target.value)} placeholder="Search starships…" className="h-9 pl-10" autoFocus />
                             </div>
                           </div>
 
@@ -316,7 +308,9 @@ export function AgentDeploymentWizardModal({
                                       }}
                                       className={cn(
                                         'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
-                                        selected ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm',
+                                        selected
+                                          ? 'text-primary bg-primary/10 border-transparent'
+                                          : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm',
                                         disabled && 'opacity-60 cursor-not-allowed hover:bg-transparent hover:shadow-none'
                                       )}
                                     >
@@ -473,7 +467,7 @@ export function AgentDeploymentWizardModal({
                           <Icon name="rocket" className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Install at</p>
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Select Workspace</p>
                           <p className="mt-0.5 text-sm font-semibold text-foreground truncate">
                             {selectedStarship ? selectedStarship.name || selectedStarship.slug || selectedStarship.id : 'Not selected'}
                           </p>
@@ -564,4 +558,3 @@ export function AgentDeploymentWizardModal({
     </Dialog>
   )
 }
-

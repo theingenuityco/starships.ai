@@ -124,29 +124,125 @@ export class AvatarGenerationService {
       return v.length > max ? `${v.slice(0, max)}…` : v;
     };
 
-    const user = [
-      'Write a compact avatar appearance prompt for yourself (original fictional character). You may invent details to be memorable.',
-      '',
-      `Name: ${options.agentName}`,
-      options.agentDescription ? `Description: ${truncate(options.agentDescription, 800)}` : undefined,
-      '',
-      'Output (STRICT): exactly 7 lines; each line starts with "- " (dash+space); no other text.',
-      '',
-      'Lines 1–7 (keep each short, vivid, and concrete):',
-      '- Age: adult (20s–40s)',
-      '- Face/Skin: face shape + jawline + skin tone/undertone + one defining facial feature (prefer non-mark traits like brows/cheekbones; bodily marks are rare)',
-      '- Eyes: shape + iris color + catchlights; slightly exaggerated for readability (bigger eyes/clear shapes)',
-      '- Hair: style + texture + color (allow unusual colors)',
-      '- Outfit: collar/neckline/top colors (visible in head-and-shoulders avatar)',
-      '- Apparatus: 1–2 role-related items visible in a portrait (no brands/logos). REQUIRED.',
-      '- Background: their workplace environment (1 short phrase). REQUIRED. No text, no logos, no UI.',
-      '',
-      'Bodily marks policy: scars/tattoos/birthmarks/freckles/moles are RARE; avoid unless strongly implied by the agent description/role. If included, at most ONE subtle mark.',
-      '',
-      'Constraints: adult; fictional original; no real-person likeness; no celebrities; no copyrighted characters; no brands/logos; no NSFW; do not mention camera/rendering/engine/art-style terms.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    type MirrorPromptSpec = {
+      v: 'agent_mirror_v2';
+      task: 'generate_avatar_mirror_prompt';
+      ctx: { name: string; desc?: string };
+      out: {
+        format: 'json_object_only';
+        schema_id: 'mirror_prompt_v1';
+        extra_text: 'forbidden';
+        required_keys: ['age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
+      };
+      rules: {
+        fictional_original: true;
+        adult_only: true;
+        no_real_person_likeness: true;
+        no_celebs: true;
+        no_copyrighted_characters: true;
+        no_brands_logos: true;
+        no_nsfw: true;
+        bodily_marks: 'rare_max_1_subtle_only_if_implied';
+        forbid_render_style_terms: true;
+        allow_game_like_colors: true;
+        allow_non_human_skin_tones: true;
+        encourage_distinctive_palette: 'vivid_readable';
+      };
+    };
+
+    type MirrorPromptOutput = {
+      v: 'mirror_prompt_v1';
+      age: string;
+      face_skin: string;
+      eyes: string;
+      hair: string;
+      outfit: string;
+      apparatus: string;
+      background: string;
+    };
+
+    const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const tryParseJson = (raw: string): unknown => {
+      const s = String(raw || '').trim();
+      if (!s) return undefined;
+      try {
+        return JSON.parse(s);
+      } catch {
+        // Best-effort: extract the first {...} block (models sometimes wrap JSON in prose).
+        const start = s.indexOf('{');
+        const end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+          const inner = s.slice(start, end + 1);
+          try {
+            return JSON.parse(inner);
+          } catch {
+            return undefined;
+          }
+        }
+        return undefined;
+      }
+    };
+
+    const normalizeMirrorOutput = (value: unknown): MirrorPromptOutput | undefined => {
+      if (!isRecord(value)) return undefined;
+      const getStr = (k: keyof Omit<MirrorPromptOutput, 'v'>): string | undefined => {
+        const v = value[k as string];
+        if (typeof v !== 'string') return undefined;
+        const t = v.trim();
+        if (!t) return undefined;
+        return t.length > 220 ? `${t.slice(0, 220)}…` : t;
+      };
+
+      const out: MirrorPromptOutput = {
+        v: 'mirror_prompt_v1',
+        age: getStr('age') ?? '',
+        face_skin: getStr('face_skin') ?? '',
+        eyes: getStr('eyes') ?? '',
+        hair: getStr('hair') ?? '',
+        outfit: getStr('outfit') ?? '',
+        apparatus: getStr('apparatus') ?? '',
+        background: getStr('background') ?? '',
+      };
+
+      const requiredOk =
+        !!out.age && !!out.face_skin && !!out.eyes && !!out.hair && !!out.outfit && !!out.apparatus && !!out.background;
+      return requiredOk ? out : undefined;
+    };
+
+    const mirrorJson = (() => {
+      const spec: MirrorPromptSpec = {
+        v: 'agent_mirror_v2',
+        task: 'generate_avatar_mirror_prompt',
+        ctx: {
+          name: options.agentName,
+          ...(options.agentDescription ? { desc: truncate(options.agentDescription, 800) } : {}),
+        },
+        out: {
+          format: 'json_object_only',
+          schema_id: 'mirror_prompt_v1',
+          extra_text: 'forbidden',
+          required_keys: ['age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+        },
+        rules: {
+          fictional_original: true,
+          adult_only: true,
+          no_real_person_likeness: true,
+          no_celebs: true,
+          no_copyrighted_characters: true,
+          no_brands_logos: true,
+          no_nsfw: true,
+          bodily_marks: 'rare_max_1_subtle_only_if_implied',
+          forbid_render_style_terms: true,
+          allow_game_like_colors: true,
+          allow_non_human_skin_tones: true,
+          encourage_distinctive_palette: 'vivid_readable',
+        },
+      };
+      const json = JSON.stringify(spec, null, 2);
+      JSON.parse(json);
+      return json;
+    })();
 
     const inputBlueprint = options.agentBlueprint;
     if (!inputBlueprint || !Array.isArray(inputBlueprint.nodes) || inputBlueprint.nodes.length === 0) {
@@ -201,7 +297,8 @@ export class AvatarGenerationService {
       runnerConfig: engineConfig as unknown as Record<string, unknown>,
     });
 
-    const inputMessages: LlmMessage[] = [{ role: 'user', content: user }];
+    // JSON-only prompt spec (no plain-text preamble)
+    const inputMessages: LlmMessage[] = [{ role: 'user', content: mirrorJson }];
     const resultItems = await this.withRetry(() => agent.execute(ExecutionItemUtils.wrapSingle(inputMessages)), {
       attempts: 2,
       label: 'mirror_description',
@@ -262,7 +359,6 @@ export class AvatarGenerationService {
     }
 
     type AnyRecord = Record<string, unknown>;
-    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
     const unwrapResponse = (value: unknown): unknown => {
       if (!isRecord(value)) return value;
@@ -287,9 +383,17 @@ export class AvatarGenerationService {
       throw new Error('Mirror description returned empty text');
     }
 
+    const parsed = tryParseJson(text);
+    const normalized = normalizeMirrorOutput(parsed);
+    if (!normalized) {
+      throw new Error(
+        'Mirror description returned non-JSON or invalid JSON (expected mirror_prompt_v1 with required string keys)'
+      );
+    }
+
     // Autopilot Agent execution resolves the LLM model from `state.model`.
     // For mirror generation we require agentModel, so report it as the effective model used.
-    return { description: text, model: options.agentModel };
+    return { description: JSON.stringify(normalized), model: options.agentModel };
   }
 
   /**
@@ -350,11 +454,19 @@ export class AvatarGenerationService {
           dof: 'subtle';
         };
         bg: { type: 'simple_studio' | 'soft_environment'; keep_uncluttered: true };
+        palette: {
+          vibe: 'colorful_game' | 'muted_cinematic';
+          saturation: 'medium_high';
+          accent: 'neon_allowed';
+          hair_color: 'unrestricted';
+          skin_tone: 'natural_or_fantasy';
+          emissive_accents: 'allowed_subtle';
+        };
         neg: string[];
       };
       // "Mirror prompt" (content) lives here: character identity.
       id: {
-        mirror?: string;
+        mirror?: unknown;
       };
       safe: {
         fictional_only: true;
@@ -382,7 +494,38 @@ export class AvatarGenerationService {
         return JSON.stringify(continuation, null, 2);
       }
 
+      const tryParseMirrorJson = (raw: string): unknown => {
+        const s = String(raw || '').trim();
+        if (!s) return undefined;
+        // Only attempt JSON parsing for obvious JSON-like strings.
+        if (!s.startsWith('{') && !s.startsWith('[')) return undefined;
+        try {
+          return JSON.parse(s);
+        } catch {
+          const start = s.indexOf('{');
+          const end = s.lastIndexOf('}');
+          if (start >= 0 && end > start) {
+            const inner = s.slice(start, end + 1);
+            try {
+              return JSON.parse(inner);
+            } catch {
+              return undefined;
+            }
+          }
+          return undefined;
+        }
+      };
+
+      const mirrorValue: unknown = (() => {
+        const raw = options.subjectAvatarPrompt;
+        if (typeof raw !== 'string') return undefined;
+        const t = raw.trim();
+        if (!t) return undefined;
+        return tryParseMirrorJson(t) ?? t;
+      })();
+
       const spec: AvatarPromptSpec = {
+
         v: 'agent_avatar_v2',
         task: 'avatar_3d_game_character',
         out: { n: 1, ar: '1:1' },
@@ -415,6 +558,14 @@ export class AvatarGenerationService {
             dof: 'subtle',
           },
           bg: { type: 'simple_studio', keep_uncluttered: true },
+          palette: {
+            vibe: 'colorful_game',
+            saturation: 'medium_high',
+            accent: 'neon_allowed',
+            hair_color: 'unrestricted',
+            skin_tone: 'natural_or_fantasy',
+            emissive_accents: 'allowed_subtle',
+          },
           neg: [
             'no_text',
             'no_logos',
@@ -426,7 +577,7 @@ export class AvatarGenerationService {
           ],
         },
         id: {
-          ...(options.subjectAvatarPrompt ? { mirror: options.subjectAvatarPrompt } : {}),
+          ...(typeof mirrorValue !== 'undefined' ? { mirror: mirrorValue } : {}),
         },
         safe: {
           fictional_only: true,

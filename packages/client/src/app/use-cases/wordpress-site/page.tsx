@@ -46,6 +46,29 @@ export default function WordPressSiteUseCasePage() {
   return (
     <StarTheme theme="light">
       <div className="min-h-[100dvh] bg-background relative">
+        <div
+          className="absolute inset-x-0 top-0 h-[620px] pointer-events-none z-[1]"
+          aria-hidden
+          style={{
+            backgroundImage: [
+              'radial-gradient(900px 360px at 50% 0%, rgba(124,58,237,0.18), transparent 60%)',
+              'radial-gradient(700px 300px at 15% 30%, rgba(59,130,246,0.12), transparent 62%)',
+              'radial-gradient(720px 320px at 85% 22%, rgba(245,158,11,0.10), transparent 62%)',
+            ].join(', '),
+          }}
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-[120vh] pointer-events-none z-[1]"
+          style={{
+            backgroundImage: [
+              'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.20), transparent 65%)',
+              'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.14), transparent 70%)',
+              'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.10), transparent 75%)',
+            ].join(', '),
+          }}
+          aria-hidden
+        />
+
         <div className="relative z-10">
           <PublicHeader />
 

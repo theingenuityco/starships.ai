@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 
 export default function WordPressSiteUseCasePage() {
   return (
-    <StarTheme theme="dark">
+    <StarTheme theme="light">
       <div className="min-h-[100dvh] bg-background relative">
         <StarryBackground />
         <div
@@ -63,9 +63,9 @@ export default function WordPressSiteUseCasePage() {
           className="absolute inset-x-0 bottom-0 h-[120vh] pointer-events-none z-[1]"
           style={{
             backgroundImage: [
-              'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.45), transparent 65%)',
-              'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.32), transparent 70%)',
-              'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.24), transparent 75%)',
+              'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.22), transparent 65%)',
+              'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.16), transparent 70%)',
+              'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.12), transparent 75%)',
             ].join(', '),
           }}
           aria-hidden

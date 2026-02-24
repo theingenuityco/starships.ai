@@ -4,8 +4,8 @@
  * Generates square avatar images via OpenRouter image models using the Autopilot LLM node
  * (executed through the remote runner).
  */
-import { Agent, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
-import type { AgentParams, Blueprint, EngineConfig, LlmMessage } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import type { Blueprint, EngineConfig, LlmMessage } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import sharp from 'sharp';
 
@@ -327,45 +327,73 @@ export class AvatarGenerationService {
       return json;
     })();
 
-    const inputBlueprint = options.agentBlueprint;
-    if (!inputBlueprint || !Array.isArray(inputBlueprint.nodes) || inputBlueprint.nodes.length === 0) {
-      throw new Error('Agent blueprint is missing or empty; cannot generate avatarPrompt via agent blueprint');
-    }
-
-    // Pick a primary LLM node to extract text from. For default agent blueprints this is usually "ai_assistant".
-    const llmRefs = inputBlueprint.nodes
-      .filter((n) => n && typeof n === 'object' && (n as { type?: unknown }).type === 'llm')
-      .map((n) => (n as { ref?: unknown }).ref)
-      .filter((r): r is string => typeof r === 'string' && r.trim().length > 0);
-    const llmNodeRef = llmRefs.length > 0 ? llmRefs[llmRefs.length - 1] : undefined;
-    if (!llmNodeRef) {
-      throw new Error('Agent blueprint contains no LLM node; cannot generate avatarPrompt via agent blueprint');
-    }
-
-    // IMPORTANT:
-    // Use Agent.execute() (the same contract ConversationService uses) rather than calling runner.run() directly.
-    // This ensures the Agent node seeds runtime config into execution.state, which the default agent blueprint
-    // expects (e.g. LLM node model: `{{ state.model }}`).
-    //
-    // We DO include the agent's systemPrompt (if present) so the mirror output reflects the agent's persona.
     const truncateSystemPrompt = (s: unknown, max = 6000): string => {
       const v = typeof s === 'string' ? s : '';
       if (!v) return '';
-      return v.length > max ? `${v.slice(0, max)}…` : v;
+      const truncated = v.length > max ? `${v.slice(0, max)}…` : v;
+      // IMPORTANT:
+      // Autopilot validates template expressions in ALL strings inside node parameters.
+      // Many system prompts contain literal `{{ ... }}` which would be treated as template syntax
+      // and can fail validation ("partial template usage is not supported" / "Unexpected token").
+      // We want to pass these through literally to the LLM, so we break the `{{` / `}}` sequences.
+      return truncated.split('{{').join('{ {').split('}}').join('} }');
     };
     const systemPrompt = truncateSystemPrompt(options.agentSystemPrompt, 6000);
-    const agentParams: AgentParams = {
-      name: options.agentName,
-      // Do not pass agent description here; mirror prompt should be driven only by the JSON spec (agent+role).
-      description: undefined,
-      ...(systemPrompt ? { systemPrompt } : {}),
-      model: mirrorModel,
-      // Encourage creative but consistent identity details
-      temperature: 1.1,
-      // Hard-disable tool calling by providing no tools
-      state: { messages: [], tools: [] },
-      blueprint: inputBlueprint,
-    };
+
+    const messages: LlmMessage[] = [
+      ...(systemPrompt ? ([{ role: 'system', content: systemPrompt }] as LlmMessage[]) : []),
+      { role: 'user', content: mirrorJson },
+    ];
+
+    const responseFormat = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'mirror_prompt_v1',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            gender: { type: 'string', enum: ['male', 'female'] },
+            age: { type: 'string' },
+            physique: { type: 'string' },
+            face_skin: { type: 'string' },
+            eyes: { type: 'string' },
+            hair: { type: 'string' },
+            outfit: { type: 'string' },
+            apparatus: { type: 'string' },
+            background: { type: 'string' },
+          },
+          required: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+        },
+      },
+    } as Record<string, unknown>;
+
+    const buildMirrorBlueprint = (): Blueprint => ({
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+        {
+          ref: 'llm_1',
+          type: 'llm',
+          name: 'Generate mirror prompt',
+          description: 'Generate structured mirror prompt JSON',
+          parameters: {
+            model: mirrorModel,
+            messages,
+            responseFormat,
+            maxTokens: 512,
+            temperature: 0.9,
+            stream: false,
+          },
+        },
+        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+      ],
+      edges: [
+        { ref: 'e1', from: 'start_1', to: 'llm_1' },
+        { ref: 'e2', from: 'llm_1', to: 'end_1' },
+      ],
+      metadata: {},
+    });
 
     const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
     const baseConfig = {
@@ -380,54 +408,47 @@ export class AvatarGenerationService {
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
     const runner = RunnerFactory.getTopLevelRunner(0);
-    const agent = new Agent(agentParams, {
-      runtimeEnv,
-      runner,
-      // Forward remote-runner configuration (llm credentials, modelRoutes, etc.)
-      runnerConfig: engineConfig as unknown as Record<string, unknown>,
-    });
+    const exec = ExecutionItemUtils.createExecution();
+    exec.state = { ...(exec.state ?? {}), starshipId: options.starshipId };
 
-    // JSON-only prompt spec (no plain-text preamble)
-    const inputMessages: LlmMessage[] = [{ role: 'user', content: mirrorJson }];
-    const resultItems = await this.withRetry(() => agent.execute(ExecutionItemUtils.wrapSingle(inputMessages)), {
+    const resultItems = await this.withRetry(() => runner.run(buildMirrorBlueprint(), exec, engineConfig), {
       attempts: 2,
       label: 'mirror_description',
     });
     const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
     const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
     if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
-      throw new Error(`Mirror description agent blueprint failed: ${firstError}`);
+      throw new Error(`Mirror description LLM node failed: ${firstError}`);
     }
 
+    // Mirror execution may return either a direct provider response OR an execution.results array.
+    // Prefer extracting the LLM node output when the results array shape is present.
     const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
       if (!Array.isArray(value)) return undefined;
-      // Take the last recorded output for the nodeRef
-      for (let i = value.length - 1; i >= 0; i--) {
-        const entry = value[i];
+      for (const entry of value) {
         if (!entry || typeof entry !== 'object') continue;
         const rec = entry as Record<string, unknown>;
         if (rec.nodeRef !== nodeRef) continue;
         const items = rec.items;
         if (!Array.isArray(items) || items.length === 0) return undefined;
-        const last = items[items.length - 1];
-        if (!last || typeof last !== 'object') return undefined;
-        return (last as Record<string, unknown>).json;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
       }
       return undefined;
     };
 
     const extractNodeErrorFromExecutionResults = (value: unknown, nodeRef: string): string | undefined => {
       if (!Array.isArray(value)) return undefined;
-      for (let i = value.length - 1; i >= 0; i--) {
-        const entry = value[i];
+      for (const entry of value) {
         if (!entry || typeof entry !== 'object') continue;
         const rec = entry as Record<string, unknown>;
         if (rec.nodeRef !== nodeRef) continue;
         const items = rec.items;
         if (!Array.isArray(items) || items.length === 0) return undefined;
-        const last = items[items.length - 1];
-        if (!last || typeof last !== 'object') return undefined;
-        const err = (last as Record<string, unknown>).error;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        const err = (first as Record<string, unknown>).error;
         return typeof err === 'string' && err.trim().length > 0 ? err.trim() : undefined;
       }
       return undefined;
@@ -435,14 +456,19 @@ export class AvatarGenerationService {
 
     let llmNodeJson: unknown = llmJson;
     if (Array.isArray(llmJson)) {
-      const extracted = extractNodeJsonFromExecutionResults(llmJson, llmNodeRef);
+      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
       if (typeof extracted === 'undefined') {
-        const nodeError = extractNodeErrorFromExecutionResults(llmJson, llmNodeRef);
+        const nodeError = extractNodeErrorFromExecutionResults(llmJson, 'llm_1');
         if (nodeError) {
-          throw new Error(`Mirror description agent blueprint failed: ${nodeError}`);
+          throw new Error(`Mirror description LLM node failed: ${nodeError}`);
         }
+        const nodeRefs = llmJson
+          .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).nodeRef : undefined))
+          .filter((x): x is string => typeof x === 'string');
         throw new Error(
-          `Mirror description agent blueprint returned execution.results but did not include output for nodeRef "${llmNodeRef}"`
+          `Mirror description workflow returned execution.results, but no output was found for nodeRef "llm_1". nodeRefs=${JSON.stringify(
+            nodeRefs
+          )}`
         );
       }
       llmNodeJson = extracted;
@@ -467,16 +493,50 @@ export class AvatarGenerationService {
     const choice0 = Array.isArray(choices) ? choices[0] : undefined;
     const choice0Rec = isRecord(choice0) ? choice0 : undefined;
     const msg = (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ?? undefined;
-    const text = isRecord(msg) && typeof msg.content === 'string' ? (msg.content as string).trim() : '';
+    const contentVal = isRecord(msg) ? (msg as AnyRecord).content : undefined;
+    const parsedVal = isRecord(msg) ? (msg as AnyRecord).parsed : undefined;
+    const choiceTextVal = choice0Rec && typeof (choice0Rec as AnyRecord).text === 'string' ? ((choice0Rec as AnyRecord).text as string) : undefined;
 
-    if (!text) {
-      throw new Error('Mirror description returned empty text');
+    // Structured output providers can return:
+    // - message.content as a JSON string (most common)
+    // - message.content as an object/array
+    // - message.parsed as an object
+    // - choice.text as a string (some providers flatten)
+    const raw =
+      typeof contentVal === 'string'
+        ? contentVal.trim()
+        : typeof choiceTextVal === 'string'
+          ? choiceTextVal.trim()
+          : isRecord(parsedVal) || Array.isArray(parsedVal)
+            ? JSON.stringify(parsedVal)
+            : isRecord(contentVal) || Array.isArray(contentVal)
+              ? JSON.stringify(contentVal)
+              : '';
+
+    if (!raw) {
+      const debug = {
+        llmJsonType: llmJson === null ? 'null' : Array.isArray(llmJson) ? 'array' : typeof llmJson,
+        llmJsonKeys: isRecord(llmJson) ? Object.keys(llmJson) : [],
+        llmNodeJsonType: llmNodeJson === null ? 'null' : Array.isArray(llmNodeJson) ? 'array' : typeof llmNodeJson,
+        llmNodeJsonKeys: isRecord(llmNodeJson) ? Object.keys(llmNodeJson) : [],
+        responseKeys: responseRec ? Object.keys(responseRec) : [],
+        choice0Keys: choice0Rec ? Object.keys(choice0Rec) : [],
+        messageKeys: isRecord(msg) ? Object.keys(msg) : [],
+        contentType:
+          contentVal === null ? 'null' : Array.isArray(contentVal) ? 'array' : typeof contentVal,
+        parsedType: parsedVal === null ? 'null' : Array.isArray(parsedVal) ? 'array' : typeof parsedVal,
+        hasChoiceText: typeof choiceTextVal === 'string' && choiceTextVal.trim().length > 0,
+      };
+      throw new Error(`Mirror description returned empty content. Debug=${JSON.stringify(debug)}`);
     }
 
-    const parsed = tryParseJson(text);
+    const parsed = tryParseJson(raw);
     const normalized = normalizeMirrorOutput(parsed);
     if (!normalized) {
-      throw new Error('Mirror description returned non-JSON or invalid JSON (expected mirror_prompt_v1 with required string keys)');
+      const preview = raw.length > 600 ? `${raw.slice(0, 600)}…(len=${raw.length})` : raw;
+      throw new Error(
+        `Mirror description returned non-JSON or invalid JSON (expected mirror_prompt_v1 with required string keys). raw=${preview}`
+      );
     }
 
     // Autopilot Agent execution resolves the LLM model from `state.model` (seeded from AgentParams.model).

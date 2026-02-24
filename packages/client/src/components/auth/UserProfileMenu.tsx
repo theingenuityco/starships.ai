@@ -93,7 +93,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             variant="ghost"
             size="sm"
             aria-label="Open user menu"
-            className="h-9 w-full justify-start gap-2 rounded-lg pl-2 pr-1.5 text-muted-foreground hover:text-foreground hover:bg-[#2C2C30]"
+            className="h-9 w-full justify-start gap-2 rounded-lg pl-2 pr-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]"
           >
             <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             <span className="min-w-0 flex-1 text-left">

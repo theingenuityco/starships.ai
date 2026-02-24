@@ -414,14 +414,14 @@ export function Navigation(props: NavigationProps) {
           {/* Header – logo, brand, and collapse toggle */}
           <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
             <div
-              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-[#2C2C30] transition-colors"
+              className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
               onClick={handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
               {!isExpanded ? (
-                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-[#2C2C30]">
+                <div className="relative flex h-6 w-6 items-center justify-center rounded-md transition-colors group-hover/navigation:bg-muted/70 dark:group-hover/navigation:bg-[#2C2C30]">
                   <Icon name="sidebar" className="h-4 w-4" aria-hidden />
                   {unreadTotal > 0 ? (
                     <span
@@ -456,7 +456,7 @@ export function Navigation(props: NavigationProps) {
                     router.push(`/ship/${starshipSlug}/notifications`)
                     if (isMobile && onClose) onClose()
                   }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-[#2C2C30] transition-colors"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
                   aria-label={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                   title={unreadTotal > 0 ? `${unreadTotal} unread notifications` : 'Notifications'}
                 >
@@ -472,7 +472,7 @@ export function Navigation(props: NavigationProps) {
                   onClick={() => {
                     collapseSidebar()
                   }}
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-[#2C2C30] transition-colors"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
                   aria-label="Collapse sidebar"
                   title="Collapse sidebar"
                   style={{ cursor: 'w-resize' }}
@@ -537,7 +537,7 @@ export function Navigation(props: NavigationProps) {
                     if (!activeStarshipSlug) return
                     router.push(`/ship/${activeStarshipSlug}/settings/billing`)
                   }}
-                  className="h-7 w-full flex items-center gap-1.5 rounded-lg pl-2 pr-1 text-muted-foreground hover:text-foreground hover:bg-[#2C2C30] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="h-7 w-full flex items-center gap-1.5 rounded-lg pl-2 pr-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30] disabled:opacity-60 disabled:cursor-not-allowed"
                   aria-label="View credits and billing"
                 >
                   <span className="flex-1 text-left text-[11px] font-medium">Credits</span>
@@ -557,7 +557,7 @@ export function Navigation(props: NavigationProps) {
                           if (!activeStarshipSlug) return
                           router.push(`/ship/${activeStarshipSlug}/settings/billing`)
                         }}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-[#2C2C30] hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted/70 dark:hover:bg-[#2C2C30] hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                         aria-label="View credits and billing"
                       >
                         <Icon name="coins" className="h-3 w-3" />

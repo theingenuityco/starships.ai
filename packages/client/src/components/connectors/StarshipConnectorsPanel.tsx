@@ -582,6 +582,11 @@ export function StarshipConnectorsPanel({
 
     if (cardVariant === 'explore') {
       const compact = density === 'compact'
+      const handleHowToClick = () => {
+        if (!demoEmbedUrl) return
+        setActiveDemo({ provider, label, url: demoEmbedUrl })
+      }
+
       const exploreConnectButton = (
         <Button
           variant={isConnected ? 'ghost' : 'ghost'}
@@ -621,6 +626,21 @@ export function StarshipConnectorsPanel({
         </Button>
       ) : null
 
+      const exploreHowToButton =
+        demoEmbedUrl != null
+          ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleHowToClick}
+                className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-7 group min-w-[110px] justify-center shrink-0 text-xs')}
+              >
+                <Icon name="play-circle" className={CONNECTOR_CTA_ICON_CLASS} />
+                How to connect
+              </Button>
+            )
+          : null
+
       if (compact) {
         const CardShell = (
           <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
@@ -641,6 +661,7 @@ export function StarshipConnectorsPanel({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {exploreHowToButton}
                   {exploreDisconnectButton}
                   {!shouldHideConnectButton ? exploreConnectButton : null}
                 </div>
@@ -650,20 +671,7 @@ export function StarshipConnectorsPanel({
                 <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
               ) : null}
 
-              {demoEmbedUrl ? (
-                <div className="mt-1">
-                  <div className="relative w-full overflow-hidden rounded-md bg-black/70 aspect-video">
-                    <iframe
-                      src={demoEmbedUrl}
-                      title={`${label} demo video`}
-                      className="absolute inset-0 h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              ) : null}
+              {/* Video is shown via a separate modal triggered by "How to connect". */}
             </div>
           </div>
         )
@@ -707,22 +715,8 @@ export function StarshipConnectorsPanel({
                 <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
               ) : null}
 
-              {demoEmbedUrl ? (
-                <div className="mt-3">
-                  <div className="relative w-full overflow-hidden rounded-md bg-black/70 aspect-video">
-                    <iframe
-                      src={demoEmbedUrl}
-                      title={`${label} demo video`}
-                      className="absolute inset-0 h-full w-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              ) : null}
-
               <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                {exploreHowToButton}
                 {exploreDisconnectButton}
                 {!shouldHideConnectButton ? exploreConnectButton : null}
               </div>

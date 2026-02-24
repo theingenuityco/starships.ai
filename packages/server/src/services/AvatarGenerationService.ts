@@ -143,7 +143,7 @@ export class AvatarGenerationService {
         bodily_marks: 'rare_max_1_subtle_only_if_implied';
         forbid_render_style_terms: true;
         allow_game_like_colors: true;
-        allow_non_human_skin_tones: true;
+        allow_non_human_skin_tones: false;
         encourage_distinctive_palette: 'vivid_readable';
       };
     };
@@ -230,7 +230,7 @@ export class AvatarGenerationService {
           bodily_marks: 'rare_max_1_subtle_only_if_implied',
           forbid_render_style_terms: true,
           allow_game_like_colors: true,
-          allow_non_human_skin_tones: true,
+          allow_non_human_skin_tones: false,
           encourage_distinctive_palette: 'vivid_readable',
         },
       };

@@ -266,14 +266,7 @@ export class AvatarGenerationService {
       };
 
       const requiredOk =
-        !!genderNorm &&
-        !!out.age &&
-        !!out.face_skin &&
-        !!out.eyes &&
-        !!out.hair &&
-        !!out.outfit &&
-        !!out.apparatus &&
-        !!out.background;
+        !!genderNorm && !!out.age && !!out.face_skin && !!out.eyes && !!out.hair && !!out.outfit && !!out.apparatus && !!out.background;
       return requiredOk ? out : undefined;
     };
 
@@ -343,18 +336,19 @@ export class AvatarGenerationService {
 
     const sanitizeTemplateDelimiters = (s: string): string => s.split('{{').join('{ {').split('}}').join('} }');
 
-    const truncateSystemPrompt = (s: unknown, max = 6000): string => {
+    const sanitizeSystemPrompt = (s: unknown): string => {
       const v = typeof s === 'string' ? s : '';
       if (!v) return '';
-      const truncated = v.length > max ? `${v.slice(0, max)}…` : v;
       // IMPORTANT:
       // Autopilot validates template expressions in ALL strings inside node parameters.
       // Many system prompts contain literal `{{ ... }}` which would be treated as template syntax
       // and can fail validation ("partial template usage is not supported" / "Unexpected token").
       // We want to pass these through literally to the LLM, so we break the `{{` / `}}` sequences.
-      return sanitizeTemplateDelimiters(truncated);
+      //
+      // NOTE: Do NOT truncate; callers expect the full system prompt to be preserved.
+      return sanitizeTemplateDelimiters(v);
     };
-    const systemPrompt = truncateSystemPrompt(options.agentSystemPrompt, 6000);
+    const systemPrompt = sanitizeSystemPrompt(options.agentSystemPrompt);
 
     const agentRoleForInstruction = typeof options.agentRole === 'string' ? options.agentRole.trim() : '';
     const mirrorInstruction = sanitizeTemplateDelimiters(
@@ -516,7 +510,8 @@ export class AvatarGenerationService {
     const msg = (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ?? undefined;
     const contentVal = isRecord(msg) ? (msg as AnyRecord).content : undefined;
     const parsedVal = isRecord(msg) ? (msg as AnyRecord).parsed : undefined;
-    const choiceTextVal = choice0Rec && typeof (choice0Rec as AnyRecord).text === 'string' ? ((choice0Rec as AnyRecord).text as string) : undefined;
+    const choiceTextVal =
+      choice0Rec && typeof (choice0Rec as AnyRecord).text === 'string' ? ((choice0Rec as AnyRecord).text as string) : undefined;
 
     // Structured output providers can return:
     // - message.content as a JSON string (most common)
@@ -543,8 +538,7 @@ export class AvatarGenerationService {
         responseKeys: responseRec ? Object.keys(responseRec) : [],
         choice0Keys: choice0Rec ? Object.keys(choice0Rec) : [],
         messageKeys: isRecord(msg) ? Object.keys(msg) : [],
-        contentType:
-          contentVal === null ? 'null' : Array.isArray(contentVal) ? 'array' : typeof contentVal,
+        contentType: contentVal === null ? 'null' : Array.isArray(contentVal) ? 'array' : typeof contentVal,
         parsedType: parsedVal === null ? 'null' : Array.isArray(parsedVal) ? 'array' : typeof parsedVal,
         hasChoiceText: typeof choiceTextVal === 'string' && choiceTextVal.trim().length > 0,
       };
@@ -574,8 +568,7 @@ export class AvatarGenerationService {
     }
 
     const modeRaw =
-      options.avatarMode ??
-      (env as unknown as { AVATAR_GENERATION_MODE?: AvatarGenerationMode | undefined }).AVATAR_GENERATION_MODE;
+      options.avatarMode ?? (env as unknown as { AVATAR_GENERATION_MODE?: AvatarGenerationMode | undefined }).AVATAR_GENERATION_MODE;
     const avatarMode: AvatarGenerationMode = modeRaw === '2d' || modeRaw === '3d' ? modeRaw : '3d';
     if (avatarMode === '2d') {
       return await this.generateAvatar2D(env, options);
@@ -658,12 +651,6 @@ export class AvatarGenerationService {
           skin_tone: 'natural_only';
           emissive_accents: 'allowed_subtle' | 'allowed';
         };
-        // Starships signature: subtle retro‑future space tech motifs (no text/logos).
-        starships: {
-          motifs: Array<'retro_futurism' | 'sleek_spacefaring' | 'holo_glow_accents' | 'cosmic_palette' | 'clean_silhouette'>;
-          accents: Array<'cyan_magenta_glow' | 'iridescent_edge' | 'soft_bloom'>;
-          forbid_brand_marks: true;
-        };
         neg: string[];
       };
       // "Mirror prompt" (content) lives here: character identity.
@@ -728,10 +715,10 @@ export class AvatarGenerationService {
         task: 'avatar_3d_game_character',
         out: { n: 1, ar: '1:1' },
         render: {
-          style_id: 'starships_loud_hero_v1',
+          style_id: 'generic_game',
           look: 'AAA_game_character',
-          art_dir: 'starships_loud_hero',
-          genre_ref: 'starships',
+          art_dir: 'semi_real_stylized',
+          genre_ref: 'hero_shooter',
           pipeline: 'PBR',
           engine_hint: 'UnrealEngine5',
           lighting: 'hero_rim_keyfill',
@@ -787,20 +774,15 @@ export class AvatarGenerationService {
             fstop: 2.8,
             dof: 'subtle',
           },
-          bg: { type: 'soft_environment', keep_uncluttered: true },
+          bg: { type: 'simple_studio', keep_uncluttered: true },
           palette: {
-            vibe: 'starships_signature',
+            vibe: 'colorful_game',
             saturation: 'medium_high',
             accent: 'neon_subtle',
             hair_color: 'unrestricted',
             eyes_color: 'unrestricted',
             skin_tone: 'natural_only',
             emissive_accents: 'allowed',
-          },
-          starships: {
-            motifs: ['sleek_spacefaring', 'retro_futurism', 'holo_glow_accents', 'cosmic_palette', 'clean_silhouette'],
-            accents: ['cyan_magenta_glow', 'soft_bloom'],
-            forbid_brand_marks: true,
           },
           neg: [
             'no_text',
@@ -1239,13 +1221,13 @@ export class AvatarGenerationService {
     }
 
     const templatePrompt = [
-      'STARSHIPS 3D AVATAR TEMPLATE (apply this style; do NOT keep 2D/anime rendering):',
+      '3D AVATAR TEMPLATE (apply this style; do NOT keep 2D/anime rendering):',
       '- Output: 1 image only, 1:1 aspect ratio, full-bleed (no borders/frames/masks).',
       '- Framing: bust-up mid chest; include head/neck/shoulders/upper chest; exclude hands/arms/full body.',
       '- Look: AAA stylized game character portrait; PBR materials; real-time shading; clean game mesh silhouette; vivid readable palette.',
       '- Lighting: hero rim + key + fill; cinematic but clean; catchlights in eyes.',
       '- Camera: 10° three-quarter view facing viewer-left; gaze viewer-left; 65mm lens feel; subtle DOF.',
-      '- Background: simple soft environment or studio; uncluttered.',
+      '- Background: simple studio; uncluttered;',
       '- Must avoid: any text, logos, watermarks, UI overlays, extra characters.',
       '',
       'TASK:',
@@ -1322,7 +1304,10 @@ export class AvatarGenerationService {
       }
 
       const blueprint = buildBlueprint(messages);
-      const resultItems = await this.withRetry(() => runner.run(blueprint, exec, engineConfig), { attempts: 2, label: 'avatar_migrate_2d_to_3d' });
+      const resultItems = await this.withRetry(() => runner.run(blueprint, exec, engineConfig), {
+        attempts: 2,
+        label: 'avatar_migrate_2d_to_3d',
+      });
       const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
       const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
       if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
@@ -1404,9 +1389,7 @@ export class AvatarGenerationService {
       }
     };
 
-    const normalizeMirrorFor2D = (
-      raw: string | undefined
-    ): { gender?: 'male' | 'female'; normalizedText?: string } => {
+    const normalizeMirrorFor2D = (raw: string | undefined): { gender?: 'male' | 'female'; normalizedText?: string } => {
       const text = typeof raw === 'string' ? raw.trim() : '';
       if (!text) return {};
 
@@ -1473,10 +1456,6 @@ export class AvatarGenerationService {
       '- Eyes placed in the upper third.',
       '- Fixed pose for all avatars: 10° three-quarter view facing viewer-left, with gaze looking to viewer-left (off-camera).',
       '- No extreme angles; no wide-angle distortion.',
-      '',
-      '[BACKGROUND — MUST]',
-      '- Background is a SOLID flat color only: exactly #F3EFE6.',
-      '- No gradients. No patterns. No textures. No vignette. No shadows cast onto background.',
       '',
       '[NO CONTAINERS — MUST]',
       '- The portrait must be drawn directly on the full square canvas.',

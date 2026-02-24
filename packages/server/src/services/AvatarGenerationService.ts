@@ -558,6 +558,250 @@ export class AvatarGenerationService {
     return { description: JSON.stringify(normalized), model: mirrorModel };
   }
 
+  private build3DAvatarJsonPrompt(args: {
+    subjectAvatarPrompt?: string;
+    phase: 'initial' | 'continue';
+    previousAssistantText?: string;
+  }): string {
+    type AvatarPromptSpec = {
+      v: 'agent_avatar_v2';
+      task: 'avatar_3d_game_character' | 'continue_return_image_only';
+      out: { n: 1; ar: '1:1' };
+      render?: {
+        style_id: 'generic_game';
+        look: 'AAA_game_character';
+        art_dir: 'semi_real_stylized';
+        genre_ref: 'hero_shooter';
+        pipeline: 'PBR';
+        engine_hint: 'UnrealEngine5';
+        lighting: 'hero_rim_keyfill';
+        materials: 'stylized_pbr_punchy';
+        geometry: 'clean_game_mesh';
+        shading: 'real_time';
+        framing: {
+          crop: 'bust_up_mid_chest';
+          include: 'head_neck_shoulders_upper_chest';
+          exclude: ['hands', 'forearms', 'full_torso', 'full_body'];
+          padding: 'none_full_bleed';
+          strict: true;
+        };
+        wardrobe_gear: {
+          outfit: {
+            style: 'retro_future_futuristic';
+            neckline: 'visible_collar_or_harness_or_jacket';
+            materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'];
+            color: 'vibrant_accents_medium_high_contrast';
+            details: 'clean_hardware_and_trim';
+          };
+          equipment: {
+            show: '1_to_2_iconic_role_tools';
+            silhouette: 'readable';
+            finish: 'pbr_metal_plastic_glass';
+            emissive: 'allowed';
+            forbid: ['logos', 'text', 'real_world_brand_devices'];
+          };
+        };
+        shaders: {
+          skin: 'subsurface_profile_pbr';
+          hair: 'anisotropic_strands_or_cards';
+          eyes: 'parallax_cornea_catchlights';
+          cloth: 'sheen';
+        };
+        tech: { gi: 'lumen_like'; shadows: 'vsm_like'; aa: 'taa' };
+        post: {
+          tone_map: 'filmic';
+          grade: 'vibrant_lut';
+          bloom: 'strong';
+          chromatic_aberration: 'subtle';
+          vignette: 'none';
+          sharpen: 'subtle';
+          grain: 'none';
+        };
+        camera: {
+          shot: 'bust_up_mid_chest';
+          pose: 'three_quarter';
+          yaw_deg: 10;
+          facing: 'viewer_left';
+          gaze: 'viewer_left';
+          lens_mm: 65;
+          fstop: 2.8;
+          dof: 'subtle';
+        };
+        bg: { type: 'simple_studio'; keep_uncluttered: true };
+        palette: {
+          vibe: 'colorful_game';
+          saturation: 'medium_high';
+          accent: 'neon_subtle';
+          hair_color: 'unrestricted';
+          eyes_color: 'unrestricted';
+          skin_tone: 'natural_only';
+          emissive_accents: 'allowed';
+        };
+        neg: string[];
+      };
+      id?: { mirror?: unknown };
+      safe?: {
+        fictional_only: true;
+        no_real_person: true;
+        no_celebs: true;
+        no_copyrighted_character: true;
+        no_brands: true;
+        no_nsfw: true;
+      };
+      instr?: 'return_1_image_only_no_text';
+      prev?: string;
+    };
+
+    if (args.phase === 'continue') {
+      const continuation: AvatarPromptSpec = {
+        v: 'agent_avatar_v2',
+        task: 'continue_return_image_only',
+        out: { n: 1, ar: '1:1' },
+        instr: 'return_1_image_only_no_text',
+        prev: typeof args.previousAssistantText === 'string' ? args.previousAssistantText : undefined,
+      };
+      return JSON.stringify(continuation, null, 2);
+    }
+
+    const tryParseMirrorJson = (raw: string): unknown => {
+      const s = String(raw || '').trim();
+      if (!s) return undefined;
+      // Only attempt JSON parsing for obvious JSON-like strings.
+      if (!s.startsWith('{') && !s.startsWith('[')) return undefined;
+      try {
+        return JSON.parse(s);
+      } catch {
+        const start = s.indexOf('{');
+        const end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+          const inner = s.slice(start, end + 1);
+          try {
+            return JSON.parse(inner);
+          } catch {
+            return undefined;
+          }
+        }
+        return undefined;
+      }
+    };
+
+    const mirrorValue: unknown = (() => {
+      const raw = args.subjectAvatarPrompt;
+      if (typeof raw !== 'string') return undefined;
+      const t = raw.trim();
+      if (!t) return undefined;
+      return tryParseMirrorJson(t) ?? t;
+    })();
+
+    const spec: AvatarPromptSpec = {
+      v: 'agent_avatar_v2',
+      task: 'avatar_3d_game_character',
+      out: { n: 1, ar: '1:1' },
+      render: {
+        style_id: 'generic_game',
+        look: 'AAA_game_character',
+        art_dir: 'semi_real_stylized',
+        genre_ref: 'hero_shooter',
+        pipeline: 'PBR',
+        engine_hint: 'UnrealEngine5',
+        lighting: 'hero_rim_keyfill',
+        materials: 'stylized_pbr_punchy',
+        geometry: 'clean_game_mesh',
+        shading: 'real_time',
+        framing: {
+          crop: 'bust_up_mid_chest',
+          include: 'head_neck_shoulders_upper_chest',
+          exclude: ['hands', 'forearms', 'full_torso', 'full_body'],
+          padding: 'none_full_bleed',
+          strict: true,
+        },
+        wardrobe_gear: {
+          outfit: {
+            style: 'retro_future_futuristic',
+            neckline: 'visible_collar_or_harness_or_jacket',
+            materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
+            color: 'vibrant_accents_medium_high_contrast',
+            details: 'clean_hardware_and_trim',
+          },
+          equipment: {
+            show: '1_to_2_iconic_role_tools',
+            silhouette: 'readable',
+            finish: 'pbr_metal_plastic_glass',
+            emissive: 'allowed',
+            forbid: ['logos', 'text', 'real_world_brand_devices'],
+          },
+        },
+        shaders: {
+          skin: 'subsurface_profile_pbr',
+          hair: 'anisotropic_strands_or_cards',
+          eyes: 'parallax_cornea_catchlights',
+          cloth: 'sheen',
+        },
+        tech: { gi: 'lumen_like', shadows: 'vsm_like', aa: 'taa' },
+        post: {
+          tone_map: 'filmic',
+          grade: 'vibrant_lut',
+          bloom: 'strong',
+          chromatic_aberration: 'subtle',
+          vignette: 'none',
+          sharpen: 'subtle',
+          grain: 'none',
+        },
+        camera: {
+          shot: 'bust_up_mid_chest',
+          pose: 'three_quarter',
+          yaw_deg: 10,
+          facing: 'viewer_left',
+          gaze: 'viewer_left',
+          lens_mm: 65,
+          fstop: 2.8,
+          dof: 'subtle',
+        },
+        bg: { type: 'simple_studio', keep_uncluttered: true },
+        palette: {
+          vibe: 'colorful_game',
+          saturation: 'medium_high',
+          accent: 'neon_subtle',
+          hair_color: 'unrestricted',
+          eyes_color: 'unrestricted',
+          skin_tone: 'natural_only',
+          emissive_accents: 'allowed',
+        },
+        neg: [
+          'no_text',
+          'no_logos',
+          'no_watermark',
+          'no_frame_border',
+          'no_ui_overlay',
+          'no_extra_characters',
+          'no_photoreal_real_person_likeness',
+          // Hard framing constraints (repeat in negatives for better compliance).
+          'no_hands',
+          'no_arms',
+          'no_forearms',
+          'no_elbows',
+          'no_full_torso',
+          'no_full_body',
+          'tight_bust_crop_mid_chest',
+        ],
+      },
+      ...(typeof mirrorValue !== 'undefined' ? { id: { mirror: mirrorValue } } : {}),
+      safe: {
+        fictional_only: true,
+        no_real_person: true,
+        no_celebs: true,
+        no_copyrighted_character: true,
+        no_brands: true,
+        no_nsfw: true,
+      },
+    };
+
+    // Defensive: ensure we only ever send valid JSON to the image model.
+    const json = JSON.stringify(spec, null, 2);
+    JSON.parse(json);
+    return json;
+  }
+
   /**
    * Generate a 1:1 avatar for an agent-like entity.
    */
@@ -576,252 +820,7 @@ export class AvatarGenerationService {
 
     const model = 'google/gemini-3-pro-image-preview';
 
-    type AvatarPromptSpec = {
-      v: 'agent_avatar_v2';
-      task: 'avatar_3d_game_character';
-      out: { n: 1; ar: '1:1' };
-      // "Template prompt" (style) lives here: concise, technical, 3D/game focused.
-      render: {
-        style_id: 'starships_loud_hero_v1' | 'generic_game';
-        look: 'AAA_game_character' | 'stylized_game_character';
-        art_dir: 'starships_loud_hero' | 'starships_signature' | 'semi_real_stylized' | 'realistic' | 'toon_stylized';
-        genre_ref: 'starships' | 'hero_shooter' | 'rpg' | 'sci_fi' | 'fantasy' | 'modern';
-        pipeline: 'PBR';
-        engine_hint: 'UnrealEngine5' | 'Unity_HDRP' | 'offline_renderer';
-        lighting: 'studio_keyfillrim' | 'cinematic_soft' | 'neutral_hdr' | 'hero_rim_keyfill';
-        materials: 'high_quality_surfaces' | 'matte_stylized' | 'stylized_pbr_punchy';
-        geometry: 'clean_game_mesh' | 'highpoly_bake';
-        shading: 'real_time' | 'offline';
-        framing: {
-          crop: 'bust_up_mid_chest';
-          include: 'head_neck_shoulders_upper_chest';
-          exclude: Array<'hands' | 'forearms' | 'full_torso' | 'full_body'>;
-          padding: 'none_full_bleed';
-          strict: true;
-        };
-        wardrobe_gear: {
-          outfit: {
-            style: 'retro_future_futuristic';
-            neckline: 'visible_collar_or_harness_or_jacket';
-            materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
-            color: 'vibrant_accents_medium_high_contrast';
-            details: 'clean_hardware_and_trim';
-          };
-          equipment: {
-            show: '1_to_2_iconic_role_tools';
-            silhouette: 'readable';
-            finish: 'pbr_metal_plastic_glass';
-            emissive: 'allowed';
-            forbid: Array<'logos' | 'text' | 'real_world_brand_devices'>;
-          };
-        };
-        shaders: {
-          skin: 'subsurface_profile_pbr';
-          hair: 'anisotropic_strands_or_cards';
-          eyes: 'parallax_cornea_catchlights';
-          cloth: 'sheen';
-        };
-        tech: { gi: 'lumen_like' | 'baked'; shadows: 'vsm_like'; aa: 'taa' | 'fxaa' };
-        post: {
-          tone_map: 'filmic';
-          grade: 'neutral' | 'teal_orange_subtle' | 'vibrant_lut';
-          bloom: 'subtle' | 'medium' | 'strong';
-          chromatic_aberration: 'none' | 'subtle';
-          vignette: 'none' | 'subtle';
-          sharpen: 'subtle';
-          grain: 'none' | 'subtle';
-        };
-        camera: {
-          shot: 'bust_up_mid_chest';
-          pose: 'three_quarter';
-          yaw_deg: number;
-          facing: 'viewer_left';
-          gaze: 'viewer_left';
-          lens_mm: number;
-          fstop: number;
-          dof: 'subtle';
-        };
-        bg: { type: 'simple_studio' | 'soft_environment'; keep_uncluttered: true };
-        palette: {
-          vibe: 'starships_signature' | 'colorful_game' | 'muted_cinematic';
-          saturation: 'medium_high' | 'balanced' | 'high';
-          accent: 'neon_allowed' | 'neon_subtle';
-          hair_color: 'unrestricted';
-          eyes_color: 'unrestricted';
-          skin_tone: 'natural_only';
-          emissive_accents: 'allowed_subtle' | 'allowed';
-        };
-        neg: string[];
-      };
-      // "Mirror prompt" (content) lives here: character identity.
-      id: {
-        mirror?: unknown;
-      };
-      safe: {
-        fictional_only: true;
-        no_real_person: true;
-        no_celebs: true;
-        no_copyrighted_character: true;
-        no_brands: true;
-        no_nsfw: true;
-      };
-    };
-
-    const buildAvatarJsonPrompt = (args: { phase: 'initial' | 'continue'; previousAssistantText?: string }): string => {
-      if (args.phase === 'continue') {
-        const continuation = {
-          v: 'agent_avatar_v2',
-          task: 'continue_return_image_only',
-          out: { n: 1, ar: '1:1' },
-          // Some providers need a reminder on retry; keep it short and JSON-only.
-          instr: 'return_1_image_only_no_text',
-          prev: typeof args.previousAssistantText === 'string' ? args.previousAssistantText : undefined,
-        } as const;
-        return JSON.stringify(continuation, null, 2);
-      }
-
-      const tryParseMirrorJson = (raw: string): unknown => {
-        const s = String(raw || '').trim();
-        if (!s) return undefined;
-        // Only attempt JSON parsing for obvious JSON-like strings.
-        if (!s.startsWith('{') && !s.startsWith('[')) return undefined;
-        try {
-          return JSON.parse(s);
-        } catch {
-          const start = s.indexOf('{');
-          const end = s.lastIndexOf('}');
-          if (start >= 0 && end > start) {
-            const inner = s.slice(start, end + 1);
-            try {
-              return JSON.parse(inner);
-            } catch {
-              return undefined;
-            }
-          }
-          return undefined;
-        }
-      };
-
-      const mirrorValue: unknown = (() => {
-        const raw = options.subjectAvatarPrompt;
-        if (typeof raw !== 'string') return undefined;
-        const t = raw.trim();
-        if (!t) return undefined;
-        return tryParseMirrorJson(t) ?? t;
-      })();
-
-      const spec: AvatarPromptSpec = {
-        v: 'agent_avatar_v2',
-        task: 'avatar_3d_game_character',
-        out: { n: 1, ar: '1:1' },
-        render: {
-          style_id: 'generic_game',
-          look: 'AAA_game_character',
-          art_dir: 'semi_real_stylized',
-          genre_ref: 'hero_shooter',
-          pipeline: 'PBR',
-          engine_hint: 'UnrealEngine5',
-          lighting: 'hero_rim_keyfill',
-          materials: 'stylized_pbr_punchy',
-          geometry: 'clean_game_mesh',
-          shading: 'real_time',
-          framing: {
-            crop: 'bust_up_mid_chest',
-            include: 'head_neck_shoulders_upper_chest',
-            exclude: ['hands', 'forearms', 'full_torso', 'full_body'],
-            padding: 'none_full_bleed',
-            strict: true,
-          },
-          wardrobe_gear: {
-            outfit: {
-              style: 'retro_future_futuristic',
-              neckline: 'visible_collar_or_harness_or_jacket',
-              materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
-              color: 'vibrant_accents_medium_high_contrast',
-              details: 'clean_hardware_and_trim',
-            },
-            equipment: {
-              show: '1_to_2_iconic_role_tools',
-              silhouette: 'readable',
-              finish: 'pbr_metal_plastic_glass',
-              emissive: 'allowed',
-              forbid: ['logos', 'text', 'real_world_brand_devices'],
-            },
-          },
-          shaders: {
-            skin: 'subsurface_profile_pbr',
-            hair: 'anisotropic_strands_or_cards',
-            eyes: 'parallax_cornea_catchlights',
-            cloth: 'sheen',
-          },
-          tech: { gi: 'lumen_like', shadows: 'vsm_like', aa: 'taa' },
-          post: {
-            tone_map: 'filmic',
-            grade: 'vibrant_lut',
-            bloom: 'strong',
-            chromatic_aberration: 'subtle',
-            vignette: 'none',
-            sharpen: 'subtle',
-            grain: 'none',
-          },
-          camera: {
-            shot: 'bust_up_mid_chest',
-            pose: 'three_quarter',
-            yaw_deg: 10,
-            facing: 'viewer_left',
-            gaze: 'viewer_left',
-            lens_mm: 65,
-            fstop: 2.8,
-            dof: 'subtle',
-          },
-          bg: { type: 'simple_studio', keep_uncluttered: true },
-          palette: {
-            vibe: 'colorful_game',
-            saturation: 'medium_high',
-            accent: 'neon_subtle',
-            hair_color: 'unrestricted',
-            eyes_color: 'unrestricted',
-            skin_tone: 'natural_only',
-            emissive_accents: 'allowed',
-          },
-          neg: [
-            'no_text',
-            'no_logos',
-            'no_watermark',
-            'no_frame_border',
-            'no_ui_overlay',
-            'no_extra_characters',
-            'no_photoreal_real_person_likeness',
-            // Hard framing constraints (repeat in negatives for better compliance).
-            'no_hands',
-            'no_arms',
-            'no_forearms',
-            'no_elbows',
-            'no_full_torso',
-            'no_full_body',
-            'tight_bust_crop_mid_chest',
-          ],
-        },
-        id: {
-          ...(typeof mirrorValue !== 'undefined' ? { mirror: mirrorValue } : {}),
-        },
-        safe: {
-          fictional_only: true,
-          no_real_person: true,
-          no_celebs: true,
-          no_copyrighted_character: true,
-          no_brands: true,
-          no_nsfw: true,
-        },
-      };
-
-      // Defensive: ensure we only ever send valid JSON to the image model.
-      const json = JSON.stringify(spec, null, 2);
-      JSON.parse(json);
-      return json;
-    };
-
-    const userJson = buildAvatarJsonPrompt({ phase: 'initial' });
+    const userJson = this.build3DAvatarJsonPrompt({ subjectAvatarPrompt: options.subjectAvatarPrompt, phase: 'initial' });
 
     // Autopilot's LLM node returns an aggregated LLMResponse, but defensively handle
     // variants where the response may be nested or where only a streamed "delta" exists.
@@ -991,7 +990,14 @@ export class AvatarGenerationService {
       const messages: Array<{ role: string; content: string }> = [{ role: 'user', content: userJson }];
       if (attempt > 1) {
         // Keep the follow-up JSON-only as well (do not inject raw assistant text as an assistant message).
-        messages.push({ role: 'user', content: buildAvatarJsonPrompt({ phase: 'continue', previousAssistantText: prevAssistantText }) });
+        messages.push({
+          role: 'user',
+          content: this.build3DAvatarJsonPrompt({
+            subjectAvatarPrompt: options.subjectAvatarPrompt,
+            phase: 'continue',
+            previousAssistantText: prevAssistantText,
+          }),
+        });
       }
 
       const blueprint = buildBlueprint(messages);
@@ -1220,26 +1226,9 @@ export class AvatarGenerationService {
       throw new Error('referenceImageUrl must be a resolved http(s) URL');
     }
 
-    const templatePrompt = [
-      '3D AVATAR TEMPLATE (apply this style; do NOT keep 2D/anime rendering):',
-      '- Output: 1 image only, 1:1 aspect ratio, full-bleed (no borders/frames/masks).',
-      '- Framing: bust-up mid chest; include head/neck/shoulders/upper chest; exclude hands/arms/full body.',
-      '- Look: AAA stylized game character portrait; PBR materials; real-time shading; clean game mesh silhouette; vivid readable palette.',
-      '- Lighting: hero rim + key + fill; cinematic but clean; catchlights in eyes.',
-      '- Camera: 10° three-quarter view facing viewer-left; gaze viewer-left; 65mm lens feel; subtle DOF.',
-      '- Background: simple studio; uncluttered;',
-      '- Must avoid: any text, logos, watermarks, UI overlays, extra characters.',
-      '',
-      'TASK:',
-      '- Use the reference image ONLY to preserve the same character identity (face, hair, distinctive features).',
-      '- Re-render that character into the 3D template above (style migration).',
-      '',
-      'AGENT CONTEXT (optional):',
-      `- Name: ${options.subjectName}`,
-      options.subjectDescription ? `- Description: ${options.subjectDescription}` : undefined,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    // Use the EXACT same 3D JSON prompt template as normal 3D avatar generation.
+    // For migration we omit the mirror prompt (template-only) and provide the old avatar as an image reference.
+    const userJson = this.build3DAvatarJsonPrompt({ phase: 'initial' });
 
     const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
     const baseConfig = {
@@ -1264,14 +1253,16 @@ export class AvatarGenerationService {
           ref: 'llm_1',
           type: 'llm',
           name: 'Migrate avatar (2D→3D)',
-          description: 'Generate 3D avatar image using reference image + template prompt',
+          description: 'Generate 3D avatar image using reference image + 3D JSON template',
           parameters: {
             model,
             messages,
-            modalities: ['text', 'image'],
+            // OpenRouter image generation expects both modalities present.
+            modalities: ['image', 'text'],
             imageConfig: { aspect_ratio: '1:1', num_images: 1 },
             maxTokens: 256,
-            temperature: 0.9,
+            // Match the standard 3D avatar generation temperature.
+            temperature: 1.1,
             stream: false,
           },
         },
@@ -1285,21 +1276,29 @@ export class AvatarGenerationService {
     });
 
     let lastDebug: Record<string, unknown> | undefined;
+    let prevAssistantText: string | undefined;
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       const messages = [
         {
           role: 'user',
           content: [
-            { type: 'text', text: templatePrompt },
+            { type: 'text', text: userJson },
             { type: 'image_url', image_url: { url: referenceImageUrl } },
           ],
         },
       ];
       if (attempt > 1) {
+        const continuationJson = this.build3DAvatarJsonPrompt({
+          phase: 'continue',
+          previousAssistantText: prevAssistantText,
+        });
         messages.push({
           role: 'user',
-          content: [{ type: 'text', text: 'Return exactly 1 image only. No text.' }],
+          content: [
+            { type: 'text', text: continuationJson },
+            { type: 'image_url', image_url: { url: referenceImageUrl } },
+          ],
         });
       }
 
@@ -1339,6 +1338,7 @@ export class AvatarGenerationService {
 
       const message = msgCandidate;
       const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
+      prevAssistantText = typeof text === 'string' ? text : prevAssistantText;
 
       let firstUrl: string | undefined = extractFirstImageUrl(message);
       if ((!firstUrl || typeof firstUrl !== 'string') && isRecord(message) && Array.isArray(message.content)) {

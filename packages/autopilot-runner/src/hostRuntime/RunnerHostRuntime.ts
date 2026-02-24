@@ -1,6 +1,10 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
 import type {
   ConnectorEndpointV2,
+  ConnectorHttpEndpointV2,
+  ConnectorSqlEndpointV2,
+  ConnectorSessionV2,
+  ConnectorDbSessionV2,
   ConnectorTemplateRuntimeFieldsV2,
   ConnectorQueryParamMapping,
   ExprString,
@@ -12,15 +16,21 @@ import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
 import { invokeAzureAiFoundry } from './azure-ai-foundry';
+import { Pool } from 'pg';
+import type { FieldDef } from 'pg';
+import { lookup } from 'node:dns/promises';
+import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
+
+function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
+  return (endpoint as { kind?: unknown }).kind === 'sql';
+}
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
  *
  * Sessions carry injected auth headers (never exposed to workflows).
  */
-export interface ConnectorSession {
-  headers?: Record<string, string>;
-}
+export type ConnectorSession = ConnectorSessionV2;
 
 /**
  * LLM runtime configuration passed from the embedding host.
@@ -124,6 +134,82 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const connectorSessions = options.connectorSessions ?? {};
   const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
+
+  // Best-effort DB pool cache (per-process).
+  const pgPools = new Map<string, Pool>();
+  const getPgPool = (db: ConnectorDbSessionV2): Pool => {
+    const key = JSON.stringify({
+      driver: db.driver,
+      host: db.host,
+      port: db.port,
+      database: db.database,
+      user: db.user,
+      password: db.password ?? '',
+      ssl: Boolean(db.ssl),
+      sslRejectUnauthorized: db.sslRejectUnauthorized === undefined ? undefined : Boolean(db.sslRejectUnauthorized),
+    });
+    const existing = pgPools.get(key);
+    if (existing) return existing;
+
+    const ssl =
+      db.ssl === true
+        ? {
+            rejectUnauthorized: db.sslRejectUnauthorized !== false,
+          }
+        : db.ssl === false
+          ? false
+          : undefined;
+
+    const pool = new Pool({
+      host: db.host,
+      port: db.port,
+      database: db.database,
+      user: db.user,
+      password: db.password,
+      ssl,
+      max: 3,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    });
+    pgPools.set(key, pool);
+    return pool;
+  };
+
+  const assertDbHostAllowed = async (host: string): Promise<void> => {
+    const h = host.trim();
+    if (!h) throw new Error('DB host is required');
+    if (h.toLowerCase() === 'localhost' || h.toLowerCase().endsWith('.localhost')) {
+      throw new Error('DB host is not allowed');
+    }
+
+    const allowPrivate = process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === 'true' || process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === '1';
+    const allowlistRaw = process.env.CONNECTOR_DB_ALLOWED_HOSTS ?? '';
+    const allowlist = allowlistRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (allowlist.length > 0 && !hostMatchesAllowlist(h, allowlist)) {
+      throw new Error('DB host is not in allowlist');
+    }
+
+    // If host is a literal IP, enforce private checks directly.
+    if (isPrivateIp(h)) {
+      if (!allowPrivate) throw new Error('DB host resolves to a private network and is blocked by policy');
+      return;
+    }
+
+    // Best-effort DNS resolution to catch private endpoints behind hostnames.
+    try {
+      const records = await lookup(h, { all: true });
+      for (const r of records) {
+        if (isPrivateIp(r.address) && !allowPrivate) {
+          throw new Error('DB host resolves to a private network and is blocked by policy');
+        }
+      }
+    } catch (e) {
+      // If DNS lookup fails, fall back to the allowlist result (if configured),
+      // otherwise let the connection attempt fail with a clearer error.
+      if (allowlist.length > 0) throw e;
+    }
+  };
+
 
   // Initialize clients lazily or once
   let _bedrockClient: BedrockRuntimeClient | null = null;
@@ -465,15 +551,101 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
     const ctx = { args, runtimeEnv, metadata, vars };
 
-    const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
+    // SQL endpoints (native DB transport)
+    if (isSqlEndpoint(endpoint)) {
+      const e = endpoint;
+      if (String(e.driver || '').trim().toLowerCase() !== 'postgres') {
+        throw new Error(`Unsupported SQL driver for connector "${c}": ${String(e.driver || '')}`);
+      }
+
+      const session = connectorSessions[c] as ConnectorSession | undefined;
+      const db = session?.db;
+      if (!db) {
+        throw new Error(`Connector "${c}" does not have a DB session (not connected or missing db config)`);
+      }
+
+      await assertDbHostAllowed(db.host);
+
+      const sqlRaw = evalTemplate(e.sql, ctx);
+      const sql = ensureSingleStatement(String(sqlRaw ?? ''));
+      if (!sql.trim()) throw new Error(`Empty SQL for connector "${c}" action "${a}"`);
+
+      const readOnly = e.readOnly !== false;
+      if (readOnly && !isReadOnlyStatement(sql)) {
+        throw new Error('SQL statement is not allowed (read-only policy)');
+      }
+
+      const mode: 'query' | 'execute' = e.mode === 'execute' ? 'execute' : 'query';
+      const rowLimitHint = typeof e.rowLimit === 'number' && Number.isFinite(e.rowLimit) ? Math.max(1, Math.floor(e.rowLimit)) : null;
+      const maxRows = Math.min(rowLimitHint ?? 1000, 5000);
+
+      const argsRec = args as Record<string, unknown>;
+      const paramsRaw = argsRec.params;
+      const params: unknown[] = paramsRaw === undefined ? [] : Array.isArray(paramsRaw) ? paramsRaw : (() => { throw new Error('args.params must be an array when provided'); })();
+
+      const pool = getPgPool(db);
+
+      // Ensure timeouts are bounded and safe.
+      const effectiveTimeoutMs =
+        typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? Math.min(120_000, Math.floor(timeoutMs))
+          : typeof e.timeoutMs === 'number' && Number.isFinite(e.timeoutMs) && e.timeoutMs > 0
+            ? Math.min(120_000, Math.floor(e.timeoutMs))
+            : 30_000;
+
+      const safeUrl = `sql:postgres://${encodeURIComponent(db.host)}:${encodeURIComponent(String(db.port))}/${encodeURIComponent(db.database)}`;
+
+      const client = await pool.connect();
+      try {
+        // Apply statement timeout for this session.
+        // Note: statement_timeout is per-connection; we reset defensively for every call.
+        await client.query(`SET statement_timeout = ${effectiveTimeoutMs}`);
+
+        // Best-effort: cap query result size by truncating rows array (does not stop the server from producing more).
+        // For strict limits, prefer writing templates with LIMIT, or add a gateway in front.
+        const startedAt = Date.now();
+        const result =
+          mode === 'execute'
+            ? await client.query({ text: sql, values: params })
+            : await client.query({ text: sql, values: params });
+        const elapsedMs = Date.now() - startedAt;
+        void elapsedMs;
+
+        const fields = Array.isArray(result.fields)
+          ? (result.fields as FieldDef[]).map((f: FieldDef) => ({ name: f.name, dataTypeId: f.dataTypeID }))
+          : [];
+        const rows = Array.isArray(result.rows) ? result.rows.slice(0, maxRows) : [];
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: {
+            driver: 'postgres',
+            command: result.command,
+            rowCount: typeof result.rowCount === 'number' ? result.rowCount : null,
+            fields,
+            rows,
+            truncated: Array.isArray(result.rows) ? result.rows.length > rows.length : false,
+          },
+          url: safeUrl,
+        };
+      } finally {
+        client.release();
+      }
+    }
+
+    // HTTP endpoints (existing behavior)
+    const httpEndpoint: ConnectorHttpEndpointV2 = endpoint;
+    const baseUrlRaw = httpEndpoint.baseUrlOverride || tpl.baseUrl;
     const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();
     if (!/^https?:\/\//i.test(baseUrlEvaluated)) {
       throw new Error(`Invalid baseUrl for connector "${c}": must be absolute http(s) URL`);
     }
 
     // Resolve path variables
-    const pathVars: Record<string, ExprString> = endpoint.mapping?.path ?? {};
-    const resolvedPath = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
+    const pathVars: Record<string, ExprString> = httpEndpoint.mapping?.path ?? {};
+    const resolvedPath = String(httpEndpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
       const key = String(name);
       const expr = pathVars[key];
       const val = expr !== undefined ? evalTemplate(expr, ctx) : args[key];
@@ -488,19 +660,19 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // Build headers (sessions first, then mapping overrides)
     const sessionHeaders = connectorSessions[c]?.headers ?? {};
     const headers: Record<string, unknown> = { ...sessionHeaders };
-    if (endpoint.mapping?.headers) {
-      for (const [k, v] of Object.entries(endpoint.mapping.headers)) {
+    if (httpEndpoint.mapping?.headers) {
+      for (const [k, v] of Object.entries(httpEndpoint.mapping.headers)) {
         const out = evalTemplate(v, ctx);
         headers[k] = out;
       }
     }
 
     // Build query/body based on mapping or requestStyle
-    const method: HttpMethod = endpoint.method;
+    const method: HttpMethod = httpEndpoint.method;
     let finalUrl = url;
     let body: unknown = undefined;
 
-    const mapping = endpoint.mapping;
+    const mapping = httpEndpoint.mapping;
     if (mapping?.query) {
       const defaultEncoding: QueryParamEncoding = mapping.queryEncoding ?? 'standard';
       const parts: string[] = [];

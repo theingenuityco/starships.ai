@@ -53,7 +53,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // Avatar preview/regenerate modal
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false)
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState<boolean>(false)
-  const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | null>(null)
+  const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | 'migrate_2d_to_3d' | null>(null)
   const [avatarStyleMode, setAvatarStyleMode] = useState<'2d' | '3d'>('3d')
 
   // Autofocus the conversation input when the page loads (and conversation is present)
@@ -270,7 +270,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   const canRegenerateAvatar = !!existingAgent?.id
 
-  const handleRegenerateAvatar = async (mode: 'avatar_only' | 'full_chain') => {
+  const handleRegenerateAvatar = async (mode: 'avatar_only' | 'full_chain' | 'migrate_2d_to_3d') => {
     if (!existingAgent?.id) return
     try {
       setIsRegeneratingAvatar(true)
@@ -278,7 +278,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode, avatarMode: avatarStyleMode })
       const suffix = avatarStyleMode === '2d' ? ' (2D)' : ' (3D)'
       toast.success(
-        (mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated') + suffix
+        (mode === 'migrate_2d_to_3d'
+          ? 'Avatar migrated to 3D'
+          : mode === 'full_chain'
+            ? 'Avatar reset & regenerated'
+            : headerAvatarUrl
+              ? 'Avatar regenerated'
+              : 'Avatar generated') + suffix
       )
       // Refresh agent + attachments
       await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
@@ -337,7 +343,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
                       <LoadingSpinner size={28} className="text-foreground" label="Regenerating avatar" />
                       <div className="mt-2 text-xs font-medium text-foreground/80">
-                        {avatarRegenMode === 'full_chain' ? 'Resetting & generating…' : headerAvatarUrl ? 'Regenerating…' : 'Generating…'}
+                        {avatarRegenMode === 'migrate_2d_to_3d'
+                          ? 'Migrating to 3D…'
+                          : avatarRegenMode === 'full_chain'
+                            ? 'Resetting & generating…'
+                            : headerAvatarUrl
+                              ? 'Regenerating…'
+                              : 'Generating…'}
                       </div>
                     </div>
                   )}
@@ -372,6 +384,15 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <Button variant="outline" onClick={() => setIsAvatarModalOpen(false)} disabled={isRegeneratingAvatar}>
                   Close
                 </Button>
+                {avatarStyleMode === '3d' && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => void handleRegenerateAvatar('migrate_2d_to_3d')}
+                    disabled={!canRegenerateAvatar || isRegeneratingAvatar || !headerAvatarAttachmentId}
+                  >
+                    {isRegeneratingAvatar && avatarRegenMode === 'migrate_2d_to_3d' ? 'Migrating…' : 'Migrate 2D → 3D'}
+                  </Button>
+                )}
                 {isInstanceAdmin && (
                   <Button variant="outline" onClick={() => void handleRegenerateAvatar('full_chain')} disabled={!canRegenerateAvatar || isRegeneratingAvatar}>
                     {isRegeneratingAvatar && avatarRegenMode === 'full_chain' ? 'Resetting…' : 'Reset & Generate'}

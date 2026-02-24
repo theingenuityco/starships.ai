@@ -1116,8 +1116,282 @@ export class AvatarGenerationService {
     throw new Error(`Image generation returned no images. Debug: ${JSON.stringify(lastDebug)}`);
   }
 
+  /**
+   * Generate a 3D avatar using a reference image (e.g. migrate a legacy 2D avatar to 3D).
+   *
+   * IMPORTANT: This does NOT use the mirror prompt. It uses:
+   * - the 3D style template prompt (text)
+   * - the previous avatar image as an identity reference (image)
+   */
+  async generateAvatar3DFromReference(options: {
+    subjectName: string;
+    subjectDescription?: string;
+    starshipId: string;
+    referenceImageUrl: string;
+    runtimeEnv?: Record<string, unknown>;
+    engineConfigFromHost?: Record<string, unknown>;
+  }): Promise<AvatarGenerationResult> {
+    const env = getEnvConfig();
+    if (!env.OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY not configured on server');
+    }
+
+    const model = 'google/gemini-3-pro-image-preview';
+
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const unwrapResponse = (value: unknown): unknown => {
+      if (!isRecord(value)) return value;
+      const topChoices = value.choices;
+      if (Array.isArray(topChoices)) return value;
+      for (const key of ['response', 'data', 'result'] as const) {
+        const nested = value[key];
+        if (isRecord(nested) && Array.isArray(nested.choices)) return nested;
+      }
+      return value;
+    };
+
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
+
+    const extractNodeErrorFromExecutionResults = (value: unknown, nodeRef: string): string | undefined => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        const err = (first as Record<string, unknown>).error;
+        return typeof err === 'string' && err.trim().length > 0 ? err.trim() : undefined;
+      }
+      return undefined;
+    };
+
+    const extractFirstImageUrl = (msg: unknown): string | undefined => {
+      if (!isRecord(msg)) return undefined;
+
+      const readUrl = (imageUrlObj: unknown): string | undefined => {
+        if (!isRecord(imageUrlObj)) return undefined;
+        const url = (imageUrlObj as AnyRecord).url;
+        return typeof url === 'string' && url.length > 0 ? url : undefined;
+      };
+
+      const imgs = (msg as AnyRecord).images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        for (const it of imgs) {
+          if (!isRecord(it)) continue;
+          const url =
+            readUrl((it as AnyRecord).image_url) ??
+            readUrl((it as AnyRecord).imageUrl) ??
+            (typeof (it as AnyRecord).url === 'string' ? ((it as AnyRecord).url as string) : undefined);
+          if (url) return url;
+        }
+      }
+
+      const contentVal = (msg as AnyRecord).content;
+      if (Array.isArray(contentVal) && contentVal.length > 0) {
+        for (const part of contentVal) {
+          if (!isRecord(part)) continue;
+          if ((part as AnyRecord).type !== 'image_url') continue;
+          const url = readUrl((part as AnyRecord).image_url) ?? readUrl((part as AnyRecord).imageUrl);
+          if (url) return url;
+        }
+      }
+
+      return undefined;
+    };
+
+    const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
+      try {
+        const s = JSON.stringify(value, (_k, v) => {
+          if (typeof v === 'string') {
+            if (v.startsWith('data:image/')) return `<data:image/... len=${v.length}>`;
+            if (v.length > 800) return `${v.slice(0, 800)}…(len=${v.length})`;
+          }
+          return v;
+        });
+        if (typeof s !== 'string') return String(s);
+        return s.length > maxChars ? `${s.slice(0, maxChars)}…(len=${s.length})` : s;
+      } catch (err) {
+        return `[unstringifiable:${err instanceof Error ? err.message : String(err)}]`;
+      }
+    };
+
+    const referenceImageUrl = String(options.referenceImageUrl || '').trim();
+    if (!/^https?:\/\//.test(referenceImageUrl)) {
+      throw new Error('referenceImageUrl must be a resolved http(s) URL');
+    }
+
+    const templatePrompt = [
+      'STARSHIPS 3D AVATAR TEMPLATE (apply this style; do NOT keep 2D/anime rendering):',
+      '- Output: 1 image only, 1:1 aspect ratio, full-bleed (no borders/frames/masks).',
+      '- Framing: bust-up mid chest; include head/neck/shoulders/upper chest; exclude hands/arms/full body.',
+      '- Look: AAA stylized game character portrait; PBR materials; real-time shading; clean game mesh silhouette; vivid readable palette.',
+      '- Lighting: hero rim + key + fill; cinematic but clean; catchlights in eyes.',
+      '- Camera: 10° three-quarter view facing viewer-left; gaze viewer-left; 65mm lens feel; subtle DOF.',
+      '- Background: simple soft environment or studio; uncluttered.',
+      '- Must avoid: any text, logos, watermarks, UI overlays, extra characters.',
+      '',
+      'TASK:',
+      '- Use the reference image ONLY to preserve the same character identity (face, hair, distinctive features).',
+      '- Re-render that character into the 3D template above (style migration).',
+      '',
+      'AGENT CONTEXT (optional):',
+      `- Name: ${options.subjectName}`,
+      options.subjectDescription ? `- Description: ${options.subjectDescription}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
+    const baseConfig = {
+      runtimeEnv,
+      llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
+      failOnNodeError: true,
+    };
+    const engineConfig = {
+      ...baseConfig,
+      ...(options.engineConfigFromHost ?? {}),
+      runtimeEnv: (options.engineConfigFromHost?.runtimeEnv as Record<string, unknown>) ?? runtimeEnv,
+    } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
+
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const exec = ExecutionItemUtils.createExecution();
+    exec.state = { ...(exec.state ?? {}), starshipId: options.starshipId };
+
+    const buildBlueprint = (messages: unknown): Blueprint => ({
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+        {
+          ref: 'llm_1',
+          type: 'llm',
+          name: 'Migrate avatar (2D→3D)',
+          description: 'Generate 3D avatar image using reference image + template prompt',
+          parameters: {
+            model,
+            messages,
+            modalities: ['text', 'image'],
+            imageConfig: { aspect_ratio: '1:1', num_images: 1 },
+            maxTokens: 256,
+            temperature: 0.9,
+            stream: false,
+          },
+        },
+        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+      ],
+      edges: [
+        { ref: 'e1', from: 'start_1', to: 'llm_1' },
+        { ref: 'e2', from: 'llm_1', to: 'end_1' },
+      ],
+      metadata: {},
+    });
+
+    let lastDebug: Record<string, unknown> | undefined;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const messages = [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: templatePrompt },
+            { type: 'image_url', image_url: { url: referenceImageUrl } },
+          ],
+        },
+      ];
+      if (attempt > 1) {
+        messages.push({
+          role: 'user',
+          content: [{ type: 'text', text: 'Return exactly 1 image only. No text.' }],
+        });
+      }
+
+      const blueprint = buildBlueprint(messages);
+      const resultItems = await this.withRetry(() => runner.run(blueprint, exec, engineConfig), { attempts: 2, label: 'avatar_migrate_2d_to_3d' });
+      const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
+      const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
+      if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
+        throw new Error(`Avatar migration (2D→3D) LLM node failed: ${firstError}`);
+      }
+
+      let llmNodeJson: unknown = llmJson;
+      if (Array.isArray(llmJson)) {
+        const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+        if (typeof extracted === 'undefined') {
+          const nodeError = extractNodeErrorFromExecutionResults(llmJson, 'llm_1');
+          if (nodeError) throw new Error(`Avatar migration (2D→3D) LLM node failed: ${nodeError}`);
+        } else {
+          llmNodeJson = extracted;
+        }
+      }
+
+      const response = unwrapResponse(llmNodeJson);
+      const responseRec = isRecord(response) ? response : undefined;
+      const choices = responseRec?.choices;
+      const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+      const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+
+      const msgCandidate =
+        (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ??
+        (choice0Rec && isRecord(choice0Rec.delta) ? (choice0Rec.delta as AnyRecord) : undefined) ??
+        choice0Rec ??
+        undefined;
+
+      const message = msgCandidate;
+      const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
+
+      let firstUrl: string | undefined = extractFirstImageUrl(message);
+      if ((!firstUrl || typeof firstUrl !== 'string') && isRecord(message) && Array.isArray(message.content)) {
+        const parts = message.content as unknown[];
+        const imgPart = parts.find((p) => {
+          if (!isRecord(p)) return false;
+          if (p.type !== 'image_url') return false;
+          if (!isRecord(p.image_url)) return false;
+          return typeof p.image_url.url === 'string';
+        }) as AnyRecord | undefined;
+        if (imgPart && isRecord(imgPart.image_url) && typeof imgPart.image_url.url === 'string') {
+          firstUrl = imgPart.image_url.url;
+        }
+      }
+
+      if (typeof firstUrl === 'string' && firstUrl.length > 0) {
+        const decoded = this.decodeDataUrl(firstUrl);
+        const optimized = await this.optimizeAvatarImage(decoded);
+        const dataUrl = `data:${optimized.mimeType};base64,${optimized.buffer.toString('base64')}`;
+        return { dataUrl, mimeType: optimized.mimeType, buffer: optimized.buffer, ...(text ? { text } : {}), model };
+      }
+
+      lastDebug = {
+        attemptedModel: model,
+        attempt,
+        referenceImageUrl: referenceImageUrl.slice(0, 120),
+        llmJsonType: llmJson === null ? 'null' : Array.isArray(llmJson) ? 'array' : typeof llmJson,
+        llmNodeJsonType: llmNodeJson === null ? 'null' : Array.isArray(llmNodeJson) ? 'array' : typeof llmNodeJson,
+        responsePreview: safeStringifyForDebug(response),
+      };
+    }
+
+    throw new Error(`Avatar migration (2D→3D) returned no images. Debug: ${JSON.stringify(lastDebug)}`);
+  }
+
   private async generateAvatar2D(env: ReturnType<typeof getEnvConfig>, options: GenerateAvatarOptions): Promise<AvatarGenerationResult> {
-    const model = 'google/gemini-2.5-flash-image';
+    // Keep the same model id as 3D generation; only the prompting differs.
+    const model = 'google/gemini-3-pro-image-preview';
 
     type AnyRecord = Record<string, unknown>;
     const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -165,7 +165,7 @@ export class AvatarGenerationService {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
         extra_text: 'forbidden';
-        required_keys: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
+        required_keys: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
       };
       rules: {
         fictional_original: true;
@@ -191,6 +191,11 @@ export class AvatarGenerationService {
        * Keep it concrete + visual (silhouette/shape), non-medical, and non-sexualized.
        */
       physique: string;
+      /**
+       * Non-sexualized bust/chest fullness for bust-up avatars.
+       * For male characters this is typically "flat".
+       */
+      bust_size: 'flat' | 'small' | 'medium' | 'full';
       face_skin: string;
       eyes: string;
       hair: string;
@@ -228,6 +233,10 @@ export class AvatarGenerationService {
       const gender = typeof genderRaw === 'string' ? (genderRaw.trim().toLowerCase() as string) : '';
       const genderNorm = gender === 'male' || gender === 'female' ? (gender as 'male' | 'female') : undefined;
 
+      const bustRaw = value['bust_size'];
+      const bust = typeof bustRaw === 'string' ? bustRaw.trim().toLowerCase() : '';
+      const bustNorm = bust === 'flat' || bust === 'small' || bust === 'medium' || bust === 'full' ? (bust as MirrorPromptOutput['bust_size']) : undefined;
+
       const getStr = (k: keyof Omit<MirrorPromptOutput, 'v'>): string | undefined => {
         const v = value[k as string];
         if (typeof v !== 'string') return undefined;
@@ -241,6 +250,7 @@ export class AvatarGenerationService {
         gender: genderNorm as 'male' | 'female',
         age: getStr('age') ?? '',
         physique: getStr('physique') ?? '',
+        bust_size: bustNorm ?? 'flat',
         face_skin: getStr('face_skin') ?? '',
         eyes: getStr('eyes') ?? '',
         hair: getStr('hair') ?? '',
@@ -253,6 +263,7 @@ export class AvatarGenerationService {
         !!genderNorm &&
         !!out.age &&
         !!out.physique &&
+        !!bustNorm &&
         !!out.face_skin &&
         !!out.eyes &&
         !!out.hair &&
@@ -306,7 +317,7 @@ export class AvatarGenerationService {
           format: 'json_object_only',
           schema_id: 'mirror_prompt_v1',
           extra_text: 'forbidden',
-          required_keys: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+          required_keys: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
         },
         rules: {
           fictional_original: true,
@@ -357,6 +368,7 @@ export class AvatarGenerationService {
             gender: { type: 'string', enum: ['male', 'female'] },
             age: { type: 'string' },
             physique: { type: 'string' },
+            bust_size: { type: 'string', enum: ['flat', 'small', 'medium', 'full'] },
             face_skin: { type: 'string' },
             eyes: { type: 'string' },
             hair: { type: 'string' },
@@ -364,7 +376,7 @@ export class AvatarGenerationService {
             apparatus: { type: 'string' },
             background: { type: 'string' },
           },
-          required: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+          required: ['gender', 'age', 'physique', 'bust_size', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
         },
       },
     } as Record<string, unknown>;

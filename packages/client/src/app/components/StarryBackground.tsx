@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
+import type React from 'react'
 
 // Generate random star positions
 function generateStars(count: number, maxWidth: number, maxHeight: number) {
@@ -10,7 +11,13 @@ function generateStars(count: number, maxWidth: number, maxHeight: number) {
   }))
 }
 
-export default function StarryBackground() {
+type StarryBackgroundProps = {
+  className?: string
+  style?: React.CSSProperties
+  position?: 'fixed' | 'absolute'
+}
+
+export default function StarryBackground(props: StarryBackgroundProps) {
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -41,9 +48,11 @@ export default function StarryBackground() {
     return null
   }
 
+  const positionClass = props.position === 'absolute' ? 'absolute' : 'fixed'
+
   return (
     <>
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className={`${positionClass} inset-0 pointer-events-none z-0 ${props.className ?? ''}`.trim()} style={props.style}>
         {/* Stars layer 1 - Small stars */}
         <div className="stars-small" style={{ boxShadow: smallStarsShadow }} />
         {/* Stars layer 2 - Medium stars */}

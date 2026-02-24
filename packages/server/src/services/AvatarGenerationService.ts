@@ -161,7 +161,7 @@ export class AvatarGenerationService {
       character_design_guidance: {
         palette: 'very_vibrant_complementary_accents';
         contrast: 'high_value_separation';
-        hair_color: 'unrestricted';
+        hair_color: 'any color';
         skin_tone: 'natural_only';
         female_physique_bias?: {
           apply_when_gender: 'female';
@@ -286,7 +286,7 @@ export class AvatarGenerationService {
         character_design_guidance: {
           palette: 'very_vibrant_complementary_accents',
           contrast: 'high_value_separation',
-          hair_color: 'unrestricted',
+          hair_color: 'any color',
           skin_tone: 'natural_only',
           // Subtle, non-sexualized bias for female characters (express via general upper-body silhouette).
           female_physique_bias: {
@@ -646,8 +646,8 @@ export class AvatarGenerationService {
           vibe: 'colorful_game';
           saturation: 'medium_high';
           accent: 'neon_subtle';
-          hair_color: 'unrestricted';
-          eyes_color: 'unrestricted';
+          hair_color: 'any color';
+          eyes_color: 'any color';
           skin_tone: 'natural_only';
           emissive_accents: 'allowed';
         };
@@ -789,8 +789,8 @@ export class AvatarGenerationService {
           vibe: 'colorful_game',
           saturation: 'medium_high',
           accent: 'neon_subtle',
-          hair_color: 'unrestricted',
-          eyes_color: 'unrestricted',
+          hair_color: 'any color',
+          eyes_color: 'any color',
           skin_tone: 'natural_only',
           emissive_accents: 'allowed',
         },

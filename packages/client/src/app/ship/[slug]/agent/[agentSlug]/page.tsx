@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/primitives/LoadingSpinner'
 
@@ -53,6 +54,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false)
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState<boolean>(false)
   const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | null>(null)
+  const [avatarStyleMode, setAvatarStyleMode] = useState<'2d' | '3d'>('3d')
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -273,8 +275,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     try {
       setIsRegeneratingAvatar(true)
       setAvatarRegenMode(mode)
-      await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode })
-      toast.success(mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated')
+      await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode, avatarMode: avatarStyleMode })
+      const suffix = avatarStyleMode === '2d' ? ' (2D)' : ' (3D)'
+      toast.success(
+        (mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated') + suffix
+      )
       // Refresh agent + attachments
       await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
       await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
@@ -338,6 +343,30 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                   )}
                 </div>
               </div>
+
+              {canRegenerateAvatar && (
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 px-4 py-3">
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium">Avatar style</div>
+                    <div className="text-xs text-muted-foreground">2D = anime • 3D = game character</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={avatarStyleMode === '2d' ? 'text-sm font-semibold text-foreground' : 'text-sm text-muted-foreground'}>
+                      2D
+                    </span>
+                    <Switch
+                      size="sm"
+                      checked={avatarStyleMode === '3d'}
+                      onCheckedChange={checked => setAvatarStyleMode(checked ? '3d' : '2d')}
+                      disabled={isRegeneratingAvatar}
+                      aria-label="Toggle avatar style between 2D and 3D"
+                    />
+                    <span className={avatarStyleMode === '3d' ? 'text-sm font-semibold text-foreground' : 'text-sm text-muted-foreground'}>
+                      3D
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button variant="outline" onClick={() => setIsAvatarModalOpen(false)} disabled={isRegeneratingAvatar}>

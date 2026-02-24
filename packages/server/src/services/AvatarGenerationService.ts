@@ -138,15 +138,19 @@ export class AvatarGenerationService {
       // Character-design guidance (NOT rendering jargon): push a loud, readable game-character look.
       character_design_guidance: {
         silhouette: 'bold_readable';
-        proportions: 'slightly_exaggerated_hero';
-        palette: 'vibrant_complementary_accents';
+        proportions: 'exaggerated_hero_readable';
+        feature_exaggeration: {
+          enabled: true;
+          targets: Array<'eyes' | 'brows' | 'jawline' | 'cheekbones' | 'nose_shape' | 'hair_shape'>;
+        };
+        palette: 'very_vibrant_complementary_accents';
         contrast: 'high_value_separation';
-        hair_color: 'allowed_unusual';
+        hair_color: 'neon_full_spectrum_vivid';
         skin_tone: 'natural_only';
         wardrobe: {
           fashion: 'futuristic';
           materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
-          color_rule: 'high_saturation_accent_blocks';
+          color_rule: 'vibrant_accents_not_overpowering';
           readability: 'large_shapes_clear_silhouette';
           visibility: 'upper_body_only_bust_crop';
         };
@@ -157,13 +161,18 @@ export class AvatarGenerationService {
           effects: 'subtle_glow_allowed';
           forbid: Array<'brand_names' | 'logos' | 'text' | 'real_world_gun_model'>;
         };
+        specificity: {
+          level: 'high';
+          style: 'concrete_visual_terms';
+          avoid: Array<'vague_adjectives_only' | 'metaphors_without_visuals'>;
+        };
         forbid: Array<'render_terms' | 'camera_terms' | 'engine_terms' | 'game_names'>;
       };
       out: {
         format: 'json_object_only';
         schema_id: 'mirror_prompt_v1';
         extra_text: 'forbidden';
-        required_keys: ['age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
+        required_keys: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'];
       };
       rules: {
         fictional_original: true;
@@ -183,7 +192,13 @@ export class AvatarGenerationService {
 
     type MirrorPromptOutput = {
       v: 'mirror_prompt_v1';
+      gender: 'male' | 'female';
       age: string;
+      /**
+       * Upper-body physique only (bust-up framing): shoulders, neck, upper chest, build/posture.
+       * Keep it concrete + visual (silhouette/shape), non-medical, and non-sexualized.
+       */
+      physique: string;
       face_skin: string;
       eyes: string;
       hair: string;
@@ -217,6 +232,11 @@ export class AvatarGenerationService {
 
     const normalizeMirrorOutput = (value: unknown): MirrorPromptOutput | undefined => {
       if (!isRecord(value)) return undefined;
+      const genderRaw = value['gender'];
+      const gender = typeof genderRaw === 'string' ? (genderRaw.trim().toLowerCase() as string) : '';
+      const genderNorm =
+        gender === 'male' || gender === 'female' || gender === 'nonbinary' ? (gender as 'male' | 'female' | 'nonbinary') : undefined;
+
       const getStr = (k: keyof Omit<MirrorPromptOutput, 'v'>): string | undefined => {
         const v = value[k as string];
         if (typeof v !== 'string') return undefined;
@@ -227,7 +247,9 @@ export class AvatarGenerationService {
 
       const out: MirrorPromptOutput = {
         v: 'mirror_prompt_v1',
+        gender: genderNorm as 'male' | 'female',
         age: getStr('age') ?? '',
+        physique: getStr('physique') ?? '',
         face_skin: getStr('face_skin') ?? '',
         eyes: getStr('eyes') ?? '',
         hair: getStr('hair') ?? '',
@@ -237,7 +259,15 @@ export class AvatarGenerationService {
       };
 
       const requiredOk =
-        !!out.age && !!out.face_skin && !!out.eyes && !!out.hair && !!out.outfit && !!out.apparatus && !!out.background;
+        !!genderNorm &&
+        !!out.age &&
+        !!out.physique &&
+        !!out.face_skin &&
+        !!out.eyes &&
+        !!out.hair &&
+        !!out.outfit &&
+        !!out.apparatus &&
+        !!out.background;
       return requiredOk ? out : undefined;
     };
 
@@ -256,15 +286,19 @@ export class AvatarGenerationService {
         },
         character_design_guidance: {
           silhouette: 'bold_readable',
-          proportions: 'slightly_exaggerated_hero',
-          palette: 'vibrant_complementary_accents',
+          proportions: 'exaggerated_hero_readable',
+          feature_exaggeration: {
+            enabled: true,
+            targets: ['eyes', 'brows', 'jawline', 'cheekbones', 'nose_shape', 'hair_shape'],
+          },
+          palette: 'very_vibrant_complementary_accents',
           contrast: 'high_value_separation',
-          hair_color: 'allowed_unusual',
+          hair_color: 'neon_full_spectrum_vivid',
           skin_tone: 'natural_only',
           wardrobe: {
             fashion: 'futuristic',
             materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
-            color_rule: 'high_saturation_accent_blocks',
+            color_rule: 'vibrant_accents_not_overpowering',
             readability: 'large_shapes_clear_silhouette',
             visibility: 'upper_body_only_bust_crop',
           },
@@ -275,13 +309,18 @@ export class AvatarGenerationService {
             effects: 'subtle_glow_allowed',
             forbid: ['brand_names', 'logos', 'text', 'real_world_gun_model'],
           },
+          specificity: {
+            level: 'high',
+            style: 'concrete_visual_terms',
+            avoid: ['vague_adjectives_only', 'metaphors_without_visuals'],
+          },
           forbid: ['render_terms', 'camera_terms', 'engine_terms', 'game_names'],
         },
         out: {
           format: 'json_object_only',
           schema_id: 'mirror_prompt_v1',
           extra_text: 'forbidden',
-          required_keys: ['age', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
+          required_keys: ['gender', 'age', 'physique', 'face_skin', 'eyes', 'hair', 'outfit', 'apparatus', 'background'],
         },
         rules: {
           fictional_original: true,
@@ -452,9 +491,7 @@ export class AvatarGenerationService {
     const parsed = tryParseJson(text);
     const normalized = normalizeMirrorOutput(parsed);
     if (!normalized) {
-      throw new Error(
-        'Mirror description returned non-JSON or invalid JSON (expected mirror_prompt_v1 with required string keys)'
-      );
+      throw new Error('Mirror description returned non-JSON or invalid JSON (expected mirror_prompt_v1 with required string keys)');
     }
 
     // Autopilot Agent execution resolves the LLM model from `state.model` (seeded from AgentParams.model).
@@ -493,12 +530,7 @@ export class AvatarGenerationService {
       render: {
         style_id: 'starships_loud_hero_v1' | 'generic_game';
         look: 'AAA_game_character' | 'stylized_game_character';
-        art_dir:
-          | 'starships_loud_hero'
-          | 'starships_signature'
-          | 'semi_real_stylized'
-          | 'realistic'
-          | 'toon_stylized';
+        art_dir: 'starships_loud_hero' | 'starships_signature' | 'semi_real_stylized' | 'realistic' | 'toon_stylized';
         genre_ref: 'starships' | 'hero_shooter' | 'rpg' | 'sci_fi' | 'fantasy' | 'modern';
         pipeline: 'PBR';
         engine_hint: 'UnrealEngine5' | 'Unity_HDRP' | 'offline_renderer';
@@ -518,8 +550,8 @@ export class AvatarGenerationService {
             style: 'retro_future_futuristic';
             neckline: 'visible_collar_or_harness_or_jacket';
             materials: Array<'tech_fabric' | 'synthetic_leather' | 'iridescent_trim' | 'metal_accents'>;
-            color: 'vivid_accent_blocks_high_contrast';
-            details: 'panel_lines_hardware_clasps_emissive_piping_subtle';
+            color: 'vibrant_accents_medium_high_contrast';
+            details: 'clean_hardware_and_trim';
           };
           equipment: {
             show: '1_to_2_iconic_role_tools';
@@ -539,7 +571,7 @@ export class AvatarGenerationService {
         post: {
           tone_map: 'filmic';
           grade: 'neutral' | 'teal_orange_subtle' | 'vibrant_lut';
-          bloom: 'subtle' | 'medium';
+          bloom: 'subtle' | 'medium' | 'strong';
           chromatic_aberration: 'none' | 'subtle';
           vignette: 'none' | 'subtle';
           sharpen: 'subtle';
@@ -561,6 +593,7 @@ export class AvatarGenerationService {
           saturation: 'medium_high' | 'balanced' | 'high';
           accent: 'neon_allowed' | 'neon_subtle';
           hair_color: 'unrestricted';
+          hair_color_spectrum: 'vivid_neon_full_spectrum' | 'natural_only';
           skin_tone: 'natural_only';
           emissive_accents: 'allowed_subtle' | 'allowed';
         };
@@ -586,10 +619,7 @@ export class AvatarGenerationService {
       };
     };
 
-    const buildAvatarJsonPrompt = (args: {
-      phase: 'initial' | 'continue';
-      previousAssistantText?: string;
-    }): string => {
+    const buildAvatarJsonPrompt = (args: { phase: 'initial' | 'continue'; previousAssistantText?: string }): string => {
       if (args.phase === 'continue') {
         const continuation = {
           v: 'agent_avatar_v2',
@@ -633,7 +663,6 @@ export class AvatarGenerationService {
       })();
 
       const spec: AvatarPromptSpec = {
-
         v: 'agent_avatar_v2',
         task: 'avatar_3d_game_character',
         out: { n: 1, ar: '1:1' },
@@ -660,8 +689,8 @@ export class AvatarGenerationService {
               style: 'retro_future_futuristic',
               neckline: 'visible_collar_or_harness_or_jacket',
               materials: ['tech_fabric', 'synthetic_leather', 'iridescent_trim', 'metal_accents'],
-              color: 'vivid_accent_blocks_high_contrast',
-              details: 'panel_lines_hardware_clasps_emissive_piping_subtle',
+              color: 'vibrant_accents_medium_high_contrast',
+              details: 'clean_hardware_and_trim',
             },
             equipment: {
               show: '1_to_2_iconic_role_tools',
@@ -681,7 +710,7 @@ export class AvatarGenerationService {
           post: {
             tone_map: 'filmic',
             grade: 'vibrant_lut',
-            bloom: 'medium',
+            bloom: 'strong',
             chromatic_aberration: 'subtle',
             vignette: 'none',
             sharpen: 'subtle',
@@ -700,9 +729,10 @@ export class AvatarGenerationService {
           bg: { type: 'soft_environment', keep_uncluttered: true },
           palette: {
             vibe: 'starships_signature',
-            saturation: 'high',
-            accent: 'neon_allowed',
+            saturation: 'medium_high',
+            accent: 'neon_subtle',
             hair_color: 'unrestricted',
+            hair_color_spectrum: 'vivid_neon_full_spectrum',
             skin_tone: 'natural_only',
             emissive_accents: 'allowed',
           },

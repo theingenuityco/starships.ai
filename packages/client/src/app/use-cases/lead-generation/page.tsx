@@ -5,8 +5,8 @@ import { PublicFooter } from '@/app/components/PublicFooter'
 import StarryBackground from '@/app/components/StarryBackground'
 import { StarTheme } from '@/components/theme-context'
 import { USE_CASES_BY_SLUG } from '@/app/use-cases/use-cases.data'
-import { UseCaseHero } from '@/app/use-cases/components/UseCaseHero'
 import { UseCaseSections } from '@/app/use-cases/components/UseCaseSections'
+import { LeadGenerationHero } from '@/app/use-cases/lead-generation/LeadGenerationHero'
 
 export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
@@ -76,7 +76,7 @@ export default function LeadGenerationUseCasePage() {
 
           <main className="pb-12 sm:pb-16">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10">
-              <UseCaseHero useCase={useCase} />
+              <LeadGenerationHero useCase={useCase} />
               <UseCaseSections useCase={useCase} />
             </div>
           </main>

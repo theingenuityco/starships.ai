@@ -1,13 +1,22 @@
-import type { ConnectorProvider, ConnectorTemplateRuntimeFieldsV2, SecretRef } from '@starships/protocol';
+import type {
+  ConnectorDbSessionV2,
+  ConnectorHttpEndpointV2,
+  ConnectorProvider,
+  ConnectorSessionV2,
+  ConnectorSqlEndpointV2,
+  ConnectorTemplateRuntimeFieldsV2,
+  HttpMethod,
+  JsonSchemaObject,
+  RequestStyle,
+  SecretRef,
+} from '@starships/protocol';
 import { ConnectorRepository, ConnectorTemplateActionRepository, ConnectorTemplateRepository } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
 import { generateJWT } from '@/utils/jwt';
 import { buildBasicAuthHeaderValue } from '@/utils/basicAuth';
 
-export interface ConnectorSession {
-  headers: Record<string, string>;
-}
+export type ConnectorSession = ConnectorSessionV2;
 
 export interface ConnectorActionSessionBundle {
   connectorTemplates: Record<string, ConnectorTemplateRuntimeFieldsV2>;
@@ -35,6 +44,73 @@ export class ConnectorActionSessionService {
     return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
   }
 
+  private coerceBool(v: unknown): boolean | undefined {
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v !== 0;
+    if (typeof v === 'string') {
+      const s = v.trim().toLowerCase();
+      if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true;
+      if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false;
+    }
+    return undefined;
+  }
+
+  private coerceInt(v: unknown): number | undefined {
+    if (typeof v === 'number' && Number.isFinite(v)) return Math.floor(v);
+    if (typeof v === 'string' && v.trim()) {
+      const n = Number(v.trim());
+      if (Number.isFinite(n)) return Math.floor(n);
+    }
+    return undefined;
+  }
+
+  private coerceNonEmptyString(v: unknown): string | undefined {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+    return undefined;
+  }
+
+  private buildPostgresDbSession(args: {
+    metadata: Record<string, unknown>;
+    user: string;
+    password?: string;
+  }): ConnectorDbSessionV2 | null {
+    const md = args.metadata ?? {};
+    const host =
+      this.coerceNonEmptyString(md.host) ??
+      this.coerceNonEmptyString(md.hostname) ??
+      this.coerceNonEmptyString(md.pgHost) ??
+      this.coerceNonEmptyString(md.postgresHost);
+    const port = this.coerceInt(md.port ?? md.pgPort ?? md.postgresPort) ?? 5432;
+    const database =
+      this.coerceNonEmptyString(md.database) ??
+      this.coerceNonEmptyString(md.db) ??
+      this.coerceNonEmptyString(md.pgDatabase) ??
+      this.coerceNonEmptyString(md.postgresDatabase);
+
+    if (!host || !database) return null;
+
+    const ssl = this.coerceBool(md.ssl ?? md.pgSsl ?? md.postgresSsl);
+    const sslRejectUnauthorized = this.coerceBool(
+      md.sslRejectUnauthorized ?? md.pgSslRejectUnauthorized ?? md.postgresSslRejectUnauthorized
+    );
+
+    return {
+      driver: 'postgres',
+      host,
+      port,
+      database,
+      user: args.user,
+      ...(args.password ? { password: args.password } : {}),
+      ...(ssl !== undefined ? { ssl } : {}),
+      ...(sslRejectUnauthorized !== undefined ? { sslRejectUnauthorized } : {}),
+    };
+  }
+
+  private isJsonObject(v: unknown): v is JsonSchemaObject {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
+  }
+
   async build(starshipId: string, authUserId: string): Promise<ConnectorActionSessionBundle> {
     const templates = await this.templateRepo.list();
     const connectorRows = await this.connectorRepo.findByStarship(starshipId);
@@ -48,18 +124,47 @@ export class ConnectorActionSessionService {
     const endpointsByTemplateId = new Map<string, ConnectorTemplateRuntimeFieldsV2['endpoints']>();
     for (const row of actionRows) {
       const list = endpointsByTemplateId.get(row.template_id) ?? [];
-      list.push({
-        name: row.action_name,
-        description: row.description ?? undefined,
-        method: row.method as any,
-        path: row.path,
-        baseUrlOverride: row.base_url_override ?? undefined,
-        parameters: (row.parameters_json as any) ?? undefined,
-        requestStyle: (row.request_style as any) ?? undefined,
-        mapping: (row.mapping_json as any) ?? undefined,
-        response: (row.response_json as any) ?? undefined,
-        timeoutMs: row.timeout_ms ?? undefined,
-      });
+      const kind = String(row.kind ?? 'http')
+        .trim()
+        .toLowerCase();
+
+      const parameters = this.isJsonObject(row.parameters_json) ? row.parameters_json : undefined;
+      const response = this.isJsonObject(row.response_json) ? row.response_json : undefined;
+
+      if (kind === 'sql') {
+        const endpoint: ConnectorSqlEndpointV2 = {
+          kind: 'sql',
+          name: row.action_name,
+          description: row.description ?? undefined,
+          driver: typeof row.driver === 'string' && row.driver.trim() ? row.driver.trim() : 'postgres',
+          sql: typeof row.sql_text === 'string' ? row.sql_text : '',
+          mode: row.sql_mode === 'execute' || row.sql_mode === 'query' ? row.sql_mode : undefined,
+          rowLimit: typeof row.row_limit === 'number' ? row.row_limit : undefined,
+          readOnly: typeof row.read_only === 'boolean' ? row.read_only : undefined,
+          parameters,
+          response,
+          timeoutMs: row.timeout_ms ?? undefined,
+        };
+        list.push(endpoint);
+      } else {
+        const mapping = this.isJsonObject(row.mapping_json)
+          ? (row.mapping_json as unknown as ConnectorHttpEndpointV2['mapping'])
+          : undefined;
+        const requestStyle = row.request_style ? (row.request_style as RequestStyle) : undefined;
+        const endpoint: ConnectorHttpEndpointV2 = {
+          name: row.action_name,
+          description: row.description ?? undefined,
+          method: row.method as HttpMethod,
+          path: row.path,
+          baseUrlOverride: row.base_url_override ?? undefined,
+          parameters,
+          requestStyle,
+          mapping,
+          response,
+          timeoutMs: row.timeout_ms ?? undefined,
+        };
+        list.push(endpoint);
+      }
       endpointsByTemplateId.set(row.template_id, list);
     }
 
@@ -85,6 +190,7 @@ export class ConnectorActionSessionService {
 
       const auth = runtimeTemplate.auth;
       const type = auth.type;
+      const hasSqlEndpoints = Array.isArray(runtimeTemplate.endpoints) ? runtimeTemplate.endpoints.some((e) => e.kind === 'sql') : false;
 
       // Internal connector: always available.
       if (type === 'platform_jwt') {
@@ -144,11 +250,22 @@ export class ConnectorActionSessionService {
         // If passwordRef is provided but missing/blank, don't expose a session (connector isn't ready).
         if (auth.passwordRef && password === undefined) continue;
 
-        const headerName =
-          typeof auth.headerName === 'string' && auth.headerName.trim() ? auth.headerName.trim() : 'Authorization';
-        connectorSessions[provider] = {
-          headers: { [headerName]: buildBasicAuthHeaderValue(username, password ?? '') },
-        };
+        const headerName = typeof auth.headerName === 'string' && auth.headerName.trim() ? auth.headerName.trim() : 'Authorization';
+        const headers = { [headerName]: buildBasicAuthHeaderValue(username, password ?? '') };
+
+        // For SQL-capable connectors, also pass a db session alongside headers.
+        if (hasSqlEndpoints) {
+          const db = this.buildPostgresDbSession({
+            metadata: connectorMetadata[provider] ?? {},
+            user: username,
+            password: password ?? undefined,
+          });
+          if (!db) continue;
+          connectorSessions[provider] = { headers, db };
+          continue;
+        }
+
+        connectorSessions[provider] = { headers };
         continue;
       }
     }

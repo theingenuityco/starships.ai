@@ -19,6 +19,7 @@
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
+    "test": "jest",
     "gen": "buf generate"
   },
   "dependencies": {
@@ -28,10 +29,15 @@
     "@connectrpc/connect-node": "^2.0.0",
     "@starships/autopilot": "workspace:*",
     "@starships/protocol": "workspace:*",
-    "openai": "^6.10.0"
+    "openai": "^6.10.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.6",
+    "@types/pg": "^8.15.6",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

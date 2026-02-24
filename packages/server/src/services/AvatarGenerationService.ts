@@ -569,7 +569,7 @@ export class AvatarGenerationService {
       out: { n: 1; ar: '1:1' };
       render?: {
         style_id: 'generic_game';
-        look: 'AAA_game_character';
+        look: 'AAA_game_character' | 'stylized_game_character';
         art_dir: 'semi_real_stylized';
         genre_ref: 'hero_shooter';
         pipeline: 'PBR';
@@ -578,6 +578,19 @@ export class AvatarGenerationService {
         materials: 'stylized_pbr_punchy';
         geometry: 'clean_game_mesh';
         shading: 'real_time';
+        // Anime-leaning stylization details (kept generic; identity comes from mirror/reference).
+        character_style?: {
+          face: {
+            proportions: 'anime_leaning_realistic_3d';
+            eyes: 'large_expressive_almond_with_clean_eyeliner';
+            nose_mouth: 'simplified_clean';
+            skin: 'very_smooth_minimal_microdetail';
+            makeup: 'subtle_clean_not_heavy';
+          };
+          hair: {
+            finish: 'smooth_glossy_groomed';
+          };
+        };
         framing: {
           crop: 'bust_up_mid_chest';
           include: 'head_neck_shoulders_upper_chest';
@@ -611,8 +624,8 @@ export class AvatarGenerationService {
         post: {
           tone_map: 'filmic';
           grade: 'vibrant_lut';
-          bloom: 'strong';
-          chromatic_aberration: 'subtle';
+          bloom: 'medium';
+          chromatic_aberration: 'none';
           vignette: 'none';
           sharpen: 'subtle';
           grain: 'none';
@@ -628,7 +641,7 @@ export class AvatarGenerationService {
           dof: 'subtle';
         };
         // Prefer a soft environment over a flat studio backdrop.
-        bg: { type: 'soft_environment'; keep_uncluttered: true };
+        bg: { type: 'soft_environment'; keep_uncluttered: true; vibe: 'modern_office_soft_bokeh_not_solid' };
         palette: {
           vibe: 'colorful_game';
           saturation: 'medium_high';
@@ -700,7 +713,7 @@ export class AvatarGenerationService {
       out: { n: 1, ar: '1:1' },
       render: {
         style_id: 'generic_game',
-        look: 'AAA_game_character',
+        look: 'stylized_game_character',
         art_dir: 'semi_real_stylized',
         genre_ref: 'hero_shooter',
         pipeline: 'PBR',
@@ -709,6 +722,18 @@ export class AvatarGenerationService {
         materials: 'stylized_pbr_punchy',
         geometry: 'clean_game_mesh',
         shading: 'real_time',
+        character_style: {
+          face: {
+            proportions: 'anime_leaning_realistic_3d',
+            eyes: 'large_expressive_almond_with_clean_eyeliner',
+            nose_mouth: 'simplified_clean',
+            skin: 'very_smooth_minimal_microdetail',
+            makeup: 'subtle_clean_not_heavy',
+          },
+          hair: {
+            finish: 'smooth_glossy_groomed',
+          },
+        },
         framing: {
           crop: 'bust_up_mid_chest',
           include: 'head_neck_shoulders_upper_chest',
@@ -742,8 +767,8 @@ export class AvatarGenerationService {
         post: {
           tone_map: 'filmic',
           grade: 'vibrant_lut',
-          bloom: 'strong',
-          chromatic_aberration: 'subtle',
+          bloom: 'medium',
+          chromatic_aberration: 'none',
           vignette: 'none',
           sharpen: 'subtle',
           grain: 'none',
@@ -759,7 +784,7 @@ export class AvatarGenerationService {
           dof: 'subtle',
         },
         // Prefer a soft environment over a flat studio backdrop.
-        bg: { type: 'soft_environment', keep_uncluttered: true },
+        bg: { type: 'soft_environment', keep_uncluttered: true, vibe: 'modern_office_soft_bokeh_not_solid' },
         palette: {
           vibe: 'colorful_game',
           saturation: 'medium_high',
@@ -777,6 +802,17 @@ export class AvatarGenerationService {
           'no_ui_overlay',
           'no_extra_characters',
           'no_photoreal_real_person_likeness',
+          // Keep the "stylized 3D anime-leaning" look (avoid drifting to realism or 2D).
+          'no_hyperreal_skin_pores',
+          'no_skin_microtexture',
+          'no_gritty_realism',
+          'no_heavy_makeup',
+          'no_chibi',
+          'no_flat_2d_anime',
+          'no_cartoon_lineart',
+          // Avoid flat/solid backgrounds; prefer soft bokeh environment.
+          'no_solid_color_background',
+          'no_flat_backdrop',
           // Hard framing constraints (repeat in negatives for better compliance).
           'no_hands',
           'no_arms',

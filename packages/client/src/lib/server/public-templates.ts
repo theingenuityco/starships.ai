@@ -17,9 +17,9 @@ function firstForwardedValue(value: string | null | undefined): string {
   return String(first || '').trim()
 }
 
-function getRequestBaseUrl(): string | null {
+async function getRequestBaseUrl(): Promise<string | null> {
   try {
-    const h = headers()
+    const h = await headers()
     const host = firstForwardedValue(h.get('x-forwarded-host')) || firstForwardedValue(h.get('host'))
     if (!host) return null
 
@@ -32,7 +32,7 @@ function getRequestBaseUrl(): string | null {
   }
 }
 
-function getPublicBaseUrl(): string {
+async function getPublicBaseUrl(): Promise<string> {
   // Public marketing pages should fetch from the *public* origin so the HTML
   // they generate is consistent with what the browser can reach.
   // (Using SERVER_URL can succeed server-side, but the browser may not have the same routing.)
@@ -41,7 +41,7 @@ function getPublicBaseUrl(): string {
   if (fromPublicEnv) return fromPublicEnv
 
   // Runtime fallback: infer the origin from the request (works behind proxies/CDNs).
-  const fromRequest = getRequestBaseUrl()
+  const fromRequest = await getRequestBaseUrl()
   if (fromRequest) return normalizeBaseUrl(fromRequest)
 
   // Fallback: Next in a monorepo can fail to load the root `.env` depending on how it’s started.
@@ -112,7 +112,7 @@ export async function fetchPublicAgentTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<AgentTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
 
     const u = new URL('/api/v1/agent-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -140,7 +140,7 @@ export async function fetchPublicAgentTemplates(args?: {
 
 export async function fetchPublicAgentTemplateBySlug(args: { slug: string; revalidateSeconds?: number }): Promise<AgentTemplateModel | null> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const slug = String(args.slug || '').trim()
     if (!slug) return null
 
@@ -172,7 +172,7 @@ export async function fetchPublicAgentTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<AgentTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -210,7 +210,7 @@ export async function fetchPublicToolTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<ToolTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
 
     const u = new URL('/api/v1/tool-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -308,7 +308,7 @@ export async function fetchPublicToolTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ToolTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -337,7 +337,7 @@ export async function fetchPublicToolTemplatesPage(args: {
 
 export async function fetchPublicConnectorCatalog(args?: { revalidateSeconds?: number }): Promise<ConnectorCatalogItem[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const u = new URL('/api/v1/connectors/catalog', base)
 
     const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
@@ -361,7 +361,7 @@ export async function fetchPublicConnectorCatalogPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ConnectorCatalogItem>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 

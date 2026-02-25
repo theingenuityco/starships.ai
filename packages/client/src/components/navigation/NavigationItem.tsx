@@ -158,7 +158,7 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
       <TooltipTrigger asChild className="cursor-pointer">
         {content}
       </TooltipTrigger>
-      <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12} style={{ zIndex: 1001 }}>
+      <TooltipContent side="right" sideOffset={12} className="bg-card text-foreground border border-border/40 shadow-lg">
         {label}
       </TooltipContent>
     </Tooltip>

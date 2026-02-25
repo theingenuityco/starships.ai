@@ -62,7 +62,7 @@ export function WidgetPalettePanel() {
   }, [filtered])
 
   return (
-    <div className="flex min-h-0 flex-col gap-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Drag to canvas</div>
       <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search widgets…" />
 

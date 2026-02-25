@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { WidgetInstanceNode } from '@starships/protocol'
 
 import { WidgetPalettePanel } from './WidgetPalettePanel'
@@ -18,13 +18,20 @@ export function LeftSidebarPanel(props: { root: WidgetInstanceNode; selectedId: 
         <CardTitle className="text-sm">Builder</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 flex-1 min-h-0 overflow-hidden flex flex-col gap-3">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <WidgetPalettePanel />
-        </div>
-        <Separator />
-        <div className="flex-1 min-h-0 overflow-auto">
-          <ViewTreePanel root={root} selectedId={selectedId} onSelect={onSelect} />
-        </div>
+        <Tabs defaultValue="catalog" className="flex flex-1 min-h-0 flex-col">
+          <TabsList className="w-fit self-start justify-start">
+            <TabsTrigger value="catalog">Catalog</TabsTrigger>
+            <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="catalog" className="flex-1 min-h-0 overflow-hidden">
+            <WidgetPalettePanel />
+          </TabsContent>
+
+          <TabsContent value="hierarchy" className="flex-1 min-h-0 overflow-auto">
+            <ViewTreePanel root={root} selectedId={selectedId} onSelect={onSelect} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )

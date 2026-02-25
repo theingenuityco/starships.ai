@@ -52,8 +52,8 @@ const StarshipRailItem = memo(
             <span className="text-[10px] font-semibold">{getInitials(starship.name)}</span>
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
-          <p className="text-sm font-medium">{starship.name}</p>
+        <TooltipContent side="right" sideOffset={10} className="bg-card text-foreground border border-border/40 shadow-lg">
+          {starship.name}
         </TooltipContent>
       </Tooltip>
     )
@@ -102,13 +102,13 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             type="button"
             onClick={handleTopLogoClick}
             className={[
-              'group relative flex h-9 w-9 items-center justify-center rounded-xl border transition-all',
-              'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
+              // Clickable, but not a "button container" (no border/bg box).
+              'group relative flex h-9 w-9 items-center justify-center text-muted-foreground transition-colors',
+              'hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             ].join(' ')}
             aria-label="Home"
             title="Home"
           >
-            <span className="absolute -left-2 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
             <StarshipsLogo
               width={18}
               height={18}
@@ -121,8 +121,8 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             />
           </button>
         </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
-          <p className="text-sm font-medium">Home</p>
+        <TooltipContent side="right" sideOffset={10} className="bg-card text-foreground border border-border/40 shadow-lg">
+          Home
         </TooltipContent>
       </Tooltip>
 
@@ -155,8 +155,8 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
               <Icon name="store" className="h-4 w-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
-            <p className="text-sm font-medium">Explore agents</p>
+          <TooltipContent side="right" sideOffset={10} className="bg-card text-foreground border border-border/40 shadow-lg">
+            Explore agents
           </TooltipContent>
         </Tooltip>
       </div>

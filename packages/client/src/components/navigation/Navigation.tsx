@@ -565,8 +565,8 @@ export function Navigation(props: NavigationProps) {
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
-                      className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                       sideOffset={10}
+                      className="bg-card text-foreground border border-border/40 shadow-lg"
                     >
                         <div className="flex items-center gap-2">
                           <span className="font-medium">Credits</span>
@@ -591,8 +591,8 @@ export function Navigation(props: NavigationProps) {
                   </TooltipTrigger>
                   <TooltipContent
                     side="right"
-                    className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                     sideOffset={10}
+                    className="bg-card text-foreground border border-border/40 shadow-lg"
                   >
                     Account
                   </TooltipContent>

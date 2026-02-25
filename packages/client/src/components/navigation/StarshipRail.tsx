@@ -30,7 +30,7 @@ const StarshipRailItem = memo(
             type="button"
             onClick={() => onSelect(starship)}
             className={[
-              'group relative flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
+              'group relative flex h-9 w-9 items-center justify-center rounded-xl border transition-all',
               isActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
             ].join(' ')}
             aria-label={`Switch to ${starship.name}${hasUnread ? ' (has unread notifications)' : ''}`}
@@ -40,7 +40,7 @@ const StarshipRailItem = memo(
             <span
               className={[
                 'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
-                isActive ? 'h-6 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
+                isActive ? 'h-5 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
               ].join(' ')}
             />
 
@@ -49,7 +49,7 @@ const StarshipRailItem = memo(
               <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm" aria-label="Unread notifications" title="Unread notifications" />
             ) : null}
 
-            <span className="text-xs font-semibold">{getInitials(starship.name)}</span>
+            <span className="text-[10px] font-semibold">{getInitials(starship.name)}</span>
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">
@@ -94,7 +94,7 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
   const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
 
   return (
-    <div className="flex h-full w-[72px] flex-col items-center gap-2 bg-card pt-4 pb-3" aria-label="Starship switcher">
+    <div className="flex h-full w-16 flex-col items-center gap-1.5 bg-card pt-3 pb-2.5" aria-label="Starship switcher">
       {/* Top logo – same sizing as rail items for clean alignment */}
       <Tooltip delayDuration={250}>
         <TooltipTrigger asChild>
@@ -102,7 +102,7 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             type="button"
             onClick={handleTopLogoClick}
             className={[
-              'group relative flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
+              'group relative flex h-9 w-9 items-center justify-center rounded-xl border transition-all',
               'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
             ].join(' ')}
             aria-label="Home"
@@ -110,8 +110,8 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
           >
             <span className="absolute -left-2 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
             <StarshipsLogo
-              width={22}
-              height={22}
+              width={18}
+              height={18}
               className="text-current"
               gradientId="rail-top-gradient"
               triggerAnimation={logoTrigger}
@@ -127,7 +127,7 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
       </Tooltip>
 
       {/* Scrollable starships + marketplace – spacing matches Discord-style rail */}
-      <div className="flex w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-3 pt-1 pb-2 custom-scrollbar">
+      <div className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overflow-x-visible px-2 pt-1 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
@@ -139,20 +139,20 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             <button
               type="button"
               onClick={() => router.push('/explore/agents')}
-            className={[
-              'group relative mt-1 flex h-11 w-11 items-center justify-center rounded-2xl border transition-all',
-              isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
-            ].join(' ')}
-            aria-label="Explore agents"
-            aria-current={isMarketplaceActive ? 'page' : undefined}
-          >
-            <span
               className={[
-                'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
-                isMarketplaceActive ? 'h-6 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
+                'group relative mt-1 flex h-9 w-9 items-center justify-center rounded-xl border transition-all',
+                isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
               ].join(' ')}
-            />
-            <Icon name="store" className="h-5 w-5" />
+              aria-label="Explore agents"
+              aria-current={isMarketplaceActive ? 'page' : undefined}
+            >
+              <span
+                className={[
+                  'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
+                  isMarketplaceActive ? 'h-5 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
+                ].join(' ')}
+              />
+              <Icon name="store" className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover text-popover-foreground shadow-lg">

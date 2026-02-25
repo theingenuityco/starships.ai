@@ -39,7 +39,8 @@ export default function ViewsIndexPage() {
       name: 'New view',
       description: 'A saved screen.',
       starshipId,
-      root: { id: 'root', type: 'Box', props: {}, children: [] },
+      // Let the server generate a valid nanoid() for the root instance ID.
+      root: { type: 'Box', props: {}, children: [] },
     }
     const created = await createView.mutateAsync(payload)
     router.push(`/ship/${encodeURIComponent(slug)}/views/${encodeURIComponent(created.id)}`)

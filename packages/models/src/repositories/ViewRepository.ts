@@ -172,8 +172,16 @@ export class ViewRepository extends BaseRepository {
         }
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-        const limitClause = params.limit ? `LIMIT ${params.limit}` : '';
-        const offsetClause = params.offset ? `OFFSET ${params.offset}` : '';
+        // IMPORTANT: Always parameterize to avoid SQL injection patterns (even when validated upstream).
+        // Preserve legacy behavior: only apply LIMIT/OFFSET when > 0 (ignore 0).
+        const limit = params.limit == null ? null : Math.max(0, toFiniteInt(params.limit, 0));
+        const offset = params.offset == null ? null : Math.max(0, toFiniteInt(params.offset, 0));
+
+        const limitClause = typeof limit === 'number' && limit > 0 ? `LIMIT $${paramIndex++}` : '';
+        if (typeof limit === 'number' && limit > 0) values.push(limit);
+
+        const offsetClause = typeof offset === 'number' && offset > 0 ? `OFFSET $${paramIndex++}` : '';
+        if (typeof offset === 'number' && offset > 0) values.push(offset);
 
         const connection = this.getConnection();
         const records = await connection.query<Record<string, unknown>>(
@@ -195,11 +203,6 @@ export class ViewRepository extends BaseRepository {
   async update(id: string, data: UpdateViewRequest): Promise<ViewModel> {
     return this.executeWithErrorHandling(
       async () => {
-        const existing = await this.findById(id);
-        if (!existing) {
-          throw new NotFoundError('View', id);
-        }
-
         const updatedAt = new Date().toISOString();
         const layout = data.layout !== undefined ? normalizeLayout(data.layout) : undefined;
 
@@ -234,9 +237,12 @@ export class ViewRepository extends BaseRepository {
         values.push(id);
 
         const connection = this.getConnection();
-        await connection.query(`UPDATE views SET ${updates.join(', ')} WHERE id = $${paramIndex}`, values);
-
-        return (await this.findById(id)) as ViewModel;
+        const record = await connection.queryOne<Record<string, unknown>>(
+          `UPDATE views SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+          values
+        );
+        if (!record) throw new NotFoundError('View', id);
+        return fromDatabase(ViewEntity, record);
       },
       'update',
       'View',

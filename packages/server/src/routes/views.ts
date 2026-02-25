@@ -143,31 +143,6 @@ router.get('/starships/:starshipId/views', jwtAuthMiddleware, async (req: Reques
 });
 
 /**
- * GET /api/v1/views/:id
- * Get view by ID (requires access to the owning starship)
- */
-router.get('/views/:id', jwtAuthMiddleware, async (req: Request, res: Response) => {
-  const idValidated = validateData(IdSchema, req.params.id, res, 'validate view ID');
-  if (!idValidated) return;
-
-  try {
-    const userId = req.user!.id;
-    const viewRepo = new ViewRepository();
-    const view = await viewRepo.findById(idValidated);
-
-    if (!view) {
-      return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
-    }
-
-    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
-
-    return sendSuccess(res, view);
-  } catch (error) {
-    return handleError(error, res, 'fetch view');
-  }
-});
-
-/**
  * GET /api/v1/views/slug/:slug
  * Get view by slug (requires starshipId query param)
  */
@@ -194,6 +169,31 @@ router.get('/views/slug/:slug', jwtAuthMiddleware, async (req: Request, res: Res
     return sendSuccess(res, view);
   } catch (error) {
     return handleError(error, res, 'fetch view by slug');
+  }
+});
+
+/**
+ * GET /api/v1/views/:id
+ * Get view by ID (requires access to the owning starship)
+ */
+router.get('/views/:id', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  const idValidated = validateData(IdSchema, req.params.id, res, 'validate view ID');
+  if (!idValidated) return;
+
+  try {
+    const userId = req.user!.id;
+    const viewRepo = new ViewRepository();
+    const view = await viewRepo.findById(idValidated);
+
+    if (!view) {
+      return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
+    }
+
+    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
+
+    return sendSuccess(res, view);
+  } catch (error) {
+    return handleError(error, res, 'fetch view');
   }
 });
 

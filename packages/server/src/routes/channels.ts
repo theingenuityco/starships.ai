@@ -7,7 +7,7 @@ import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ChannelRepository, ConversationMemberRepository, ConversationNotificationPrefRepository, getConnection } from '@starships/models';
+import { ChannelRepository, ConversationMemberRepository, ConversationNotificationPrefRepository, ViewRepository, getConnection } from '@starships/models';
 import type { ChannelModel } from '@starships/protocol';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
@@ -62,6 +62,7 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       is_private: boolean;
       channel_type?: string | null;
       topic: string | null;
+      attached_view_id?: string | null;
       created_at: string;
       updated_at: string;
       conversation_created_at: string;
@@ -104,6 +105,7 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
           ? 'forum'
           : 'chat',
       topic: r.topic ?? null,
+      attachedViewId: (r as any).attached_view_id ?? null,
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),
     }));
@@ -227,6 +229,7 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
           .optional(),
         isPrivate: z.boolean().optional(),
         topic: z.string().max(2000).optional().nullable(),
+        attachedViewId: IdSchema.optional().nullable(),
       }),
       req.body,
       res,
@@ -248,6 +251,25 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     const nextName = body.name !== undefined ? String(body.name) : undefined;
     const nextIsPrivate = body.isPrivate !== undefined ? Boolean(body.isPrivate) : undefined;
     const nextTopic = body.topic !== undefined ? (body.topic ?? null) : undefined;
+    const nextAttachedViewId = body.attachedViewId !== undefined ? (body.attachedViewId ? String(body.attachedViewId) : null) : undefined;
+
+    // Validate attached view belongs to this starship (if provided and non-null).
+    if (nextAttachedViewId !== undefined && nextAttachedViewId !== null) {
+      const viewRepo = new ViewRepository();
+      const view = await viewRepo.findById(nextAttachedViewId);
+      if (!view) {
+        sendError(res, 'VALIDATION_ERROR', 'Attached view not found', 400, { attachedViewId: nextAttachedViewId });
+        return;
+      }
+      if (String(view.starshipId) !== String(channel.starshipId)) {
+        sendError(res, 'VALIDATION_ERROR', 'Attached view must belong to the same starship as the channel', 400, {
+          attachedViewId: nextAttachedViewId,
+          channelStarshipId: channel.starshipId,
+          viewStarshipId: view.starshipId,
+        });
+        return;
+      }
+    }
 
     // Update the channels row.
     const setParts: string[] = [];
@@ -264,6 +286,10 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     if (nextTopic !== undefined) {
       setParts.push(`topic = $${i++}`);
       values.push(nextTopic);
+    }
+    if (nextAttachedViewId !== undefined) {
+      setParts.push(`attached_view_id = $${i++}`);
+      values.push(nextAttachedViewId);
     }
     // Always bump updated_at.
     setParts.push(`updated_at = NOW()`);
@@ -321,6 +347,7 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
           ? 'forum'
           : 'chat',
       topic: updatedRow.topic ?? null,
+      attachedViewId: (updatedRow as any).attached_view_id ?? null,
       createdAt: String(updatedRow.created_at),
       updatedAt: String(updatedRow.updated_at),
     };

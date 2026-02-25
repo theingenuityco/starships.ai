@@ -69,7 +69,9 @@ export function InspectorPanel(props: {
   }, [selectedNode?.id])
 
   function defaultScriptId(eventName: string): string {
-    const base = String(selectedNode?.id ?? 'node').slice(0, 10).replace(/[^a-z0-9_-]/gi, '')
+    const base = String(selectedNode?.id ?? 'node')
+      .slice(0, 10)
+      .replace(/[^a-z0-9_-]/gi, '')
     const ev = String(eventName || 'event').replace(/[^a-z0-9_-]/gi, '_')
     return `script_${base}_${ev}`.slice(0, 30)
   }
@@ -88,11 +90,7 @@ export function InspectorPanel(props: {
       return (
         <div key={field.path} className="flex flex-col gap-2">
           <label className="text-xs font-medium">{field.label}</label>
-          <Input
-            value={raw == null ? '' : String(raw)}
-            placeholder={field.placeholder}
-            onChange={e => onSetProp(field.path, e.target.value)}
-          />
+          <Input value={raw == null ? '' : String(raw)} placeholder={field.placeholder} onChange={e => onSetProp(field.path, e.target.value)} />
         </div>
       )
     }
@@ -101,12 +99,7 @@ export function InspectorPanel(props: {
       return (
         <div key={field.path} className="flex flex-col gap-2">
           <label className="text-xs font-medium">{field.label}</label>
-          <Textarea
-            value={raw == null ? '' : String(raw)}
-            placeholder={field.placeholder}
-            rows={field.rows ?? 4}
-            onChange={e => onSetProp(field.path, e.target.value)}
-          />
+          <Textarea value={raw == null ? '' : String(raw)} placeholder={field.placeholder} rows={field.rows ?? 4} onChange={e => onSetProp(field.path, e.target.value)} />
         </div>
       )
     }
@@ -153,7 +146,7 @@ export function InspectorPanel(props: {
           <label className="text-xs font-medium">{field.label}</label>
           <Select
             value={cur}
-            onValueChange={(val) => {
+            onValueChange={val => {
               if (val === '' || val === '__default__') return onSetProp(field.path, undefined)
               onSetProp(field.path, val)
             }}
@@ -239,9 +232,7 @@ export function InspectorPanel(props: {
                         </div>
                       </div>
                     ))}
-                    {!selectedNode?.bindings || !Object.keys(selectedNode.bindings as any).length ? (
-                      <div className="text-sm text-muted-foreground">No bindings.</div>
-                    ) : null}
+                    {!selectedNode?.bindings || !Object.keys(selectedNode.bindings as any).length ? <div className="text-sm text-muted-foreground">No bindings.</div> : null}
                   </div>
 
                   <div className="rounded-md border border-border/60 p-3 flex flex-col gap-3">
@@ -253,7 +244,7 @@ export function InspectorPanel(props: {
 
                     <div className="flex flex-col gap-2">
                       <label className="text-[11px] text-muted-foreground">Kind</label>
-                      <Select value={newBindingKind} onValueChange={(v) => setNewBindingKind(v === 'query' ? 'query' : 'state')}>
+                      <Select value={newBindingKind} onValueChange={v => setNewBindingKind(v === 'query' ? 'query' : 'state')}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -312,11 +303,11 @@ export function InspectorPanel(props: {
                   {!events.length ? (
                     <div className="text-sm text-muted-foreground">No events defined for this widget yet.</div>
                   ) : (
-                    events.map((eventName) => {
+                    events.map(eventName => {
                       const cur = getExistingHandler(eventName)
                       const kind = cur?.kind === 'actions' || cur?.kind === 'script' ? cur.kind : 'none'
 
-                      const actions = kind === 'actions' ? ((cur as any).actions as ViewRuntimeActionRequest[]) ?? [] : []
+                      const actions = kind === 'actions' ? (((cur as any).actions as ViewRuntimeActionRequest[]) ?? []) : []
                       const defaultActionsJson = JSON.stringify(actions, null, 2)
                       const actionsJson = actionsJsonDraft[eventName] ?? defaultActionsJson
 
@@ -335,7 +326,7 @@ export function InspectorPanel(props: {
                             </div>
                             <Select
                               value={kind}
-                              onValueChange={(v) => {
+                              onValueChange={v => {
                                 if (v === 'none') return onSetHandler(eventName, null)
                                 if (v === 'actions') return onSetHandler(eventName, { kind: 'actions', actions: [] })
                                 if (v === 'script') {
@@ -361,12 +352,13 @@ export function InspectorPanel(props: {
                               <label className="text-[11px] text-muted-foreground">Actions (JSON array)</label>
                               <Textarea
                                 value={actionsJson}
-                                onChange={(e) => setActionsJsonDraft((s) => ({ ...s, [eventName]: e.target.value }))}
+                                onChange={e => setActionsJsonDraft(s => ({ ...s, [eventName]: e.target.value }))}
                                 onBlur={() => onSetActionsHandlerJson(eventName, actionsJsonDraft[eventName] ?? defaultActionsJson)}
                                 className="font-mono text-xs min-h-[160px]"
                               />
                               <div className="text-[11px] text-muted-foreground">
-                                Supported action types: <span className="font-mono">set_state</span>, <span className="font-mono">run_workflow</span>, <span className="font-mono">patch_props</span>, <span className="font-mono">patch_root</span>.
+                                Supported action types: <span className="font-mono">set_state</span>, <span className="font-mono">run_workflow</span>, <span className="font-mono">patch_props</span>,{' '}
+                                <span className="font-mono">patch_root</span>.
                               </div>
                             </div>
                           ) : null}
@@ -378,8 +370,8 @@ export function InspectorPanel(props: {
                                   <label className="text-[11px] text-muted-foreground">Script id</label>
                                   <Input
                                     value={draft.scriptId}
-                                    onChange={(e) =>
-                                      setScriptDraftByEvent((s) => ({
+                                    onChange={e =>
+                                      setScriptDraftByEvent(s => ({
                                         ...s,
                                         [eventName]: { ...draft, scriptId: e.target.value },
                                       }))
@@ -390,8 +382,8 @@ export function InspectorPanel(props: {
                                   <label className="text-[11px] text-muted-foreground">Entrypoint (optional)</label>
                                   <Input
                                     value={draft.entrypoint}
-                                    onChange={(e) =>
-                                      setScriptDraftByEvent((s) => ({
+                                    onChange={e =>
+                                      setScriptDraftByEvent(s => ({
                                         ...s,
                                         [eventName]: { ...draft, entrypoint: e.target.value },
                                       }))
@@ -428,8 +420,8 @@ export function InspectorPanel(props: {
                                     height="240px"
                                     defaultLanguage="javascript"
                                     value={draft.source}
-                                    onChange={(v) =>
-                                      setScriptDraftByEvent((s) => ({
+                                    onChange={v =>
+                                      setScriptDraftByEvent(s => ({
                                         ...s,
                                         [eventName]: { ...draft, source: String(v ?? '') },
                                       }))
@@ -482,4 +474,3 @@ export function InspectorPanel(props: {
     </Card>
   )
 }
-

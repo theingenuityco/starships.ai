@@ -4,6 +4,7 @@ import React from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { WIDGET_DEFINITIONS, type WidgetDefinition } from '@/components/widgets/widgetDefinitions'
 
@@ -61,28 +62,30 @@ export function WidgetPalettePanel() {
   }, [filtered])
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-col gap-3">
       <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Drag to canvas</div>
       <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search widgets…" />
 
       {!filtered.length ? (
         <div className="text-sm text-muted-foreground py-6">No widgets match.</div>
       ) : (
-        <div className="flex flex-col gap-4">
-          {grouped.map(([category, items]) => (
-            <div key={category} className="flex flex-col gap-2">
-              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{category}</div>
-              <div className="flex flex-col gap-2">
-                {items
-                  .slice()
-                  .sort((a, b) => a.label.localeCompare(b.label))
-                  .map(def => (
-                    <PaletteItem key={def.type} def={def} />
-                  ))}
+        <ScrollArea className="min-h-0 flex-1 pr-2">
+          <div className="flex flex-col gap-4 pb-2">
+            {grouped.map(([category, items]) => (
+              <div key={category} className="flex flex-col gap-2">
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{category}</div>
+                <div className="flex flex-col gap-2">
+                  {items
+                    .slice()
+                    .sort((a, b) => a.label.localeCompare(b.label))
+                    .map(def => (
+                      <PaletteItem key={def.type} def={def} />
+                    ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       )}
     </div>
   )

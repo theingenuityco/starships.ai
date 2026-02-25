@@ -18,7 +18,7 @@ export function LeftSidebarPanel(props: { root: WidgetInstanceNode; selectedId: 
         <CardTitle className="text-sm">Builder</CardTitle>
       </CardHeader>
       <CardContent className="pt-0 min-h-0 overflow-hidden flex flex-col gap-3">
-        <div className="flex-1 min-h-0 overflow-auto">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <WidgetPalettePanel />
         </div>
         <Separator />

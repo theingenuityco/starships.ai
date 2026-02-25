@@ -187,20 +187,18 @@ export function Navigation(props: NavigationProps) {
         isInstalledRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
-        isWidgetsRoute: false,
-          isViewsRoute: false,
+        isViewsRoute: false,
       }
     }
     return {
       isInstalledRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
-      isWidgetsRoute: pathname.startsWith(`/ship/${starshipSlug}/widgets`),
-        isViewsRoute: pathname.startsWith(`/ship/${starshipSlug}/views`),
+      isViewsRoute: pathname.startsWith(`/ship/${starshipSlug}/views`),
     }
   }, [pathname, starshipSlug])
 
-  const { isInstalledRoute, isSchedulesRoute, isMembersRoute, isWidgetsRoute, isViewsRoute } = routeChecks
+  const { isInstalledRoute, isSchedulesRoute, isMembersRoute, isViewsRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -340,12 +338,6 @@ export function Navigation(props: NavigationProps) {
               label: 'Views',
               icon: 'bar-chart',
               isActive: isViewsRoute,
-            },
-            {
-              href: `/ship/${starshipSlug}/widgets`,
-              label: 'Widgets',
-              icon: 'bar-chart',
-              isActive: isWidgetsRoute,
             },
           ]
         : []),

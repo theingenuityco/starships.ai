@@ -527,7 +527,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
         <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
-          <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-col gap-0 w-full">
             {isAuthenticated && starshipData?.id && canManageBilling ? (
               isExpanded ? (
                 <button
@@ -565,8 +565,8 @@ export function Navigation(props: NavigationProps) {
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
-                      className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                       sideOffset={10}
+                      className="bg-card text-foreground border border-border/40 shadow-lg"
                     >
                         <div className="flex items-center gap-2">
                           <span className="font-medium">Credits</span>
@@ -591,8 +591,8 @@ export function Navigation(props: NavigationProps) {
                   </TooltipTrigger>
                   <TooltipContent
                     side="right"
-                    className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]"
                     sideOffset={10}
+                    className="bg-card text-foreground border border-border/40 shadow-lg"
                   >
                     Account
                   </TooltipContent>

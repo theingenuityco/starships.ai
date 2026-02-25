@@ -1,8 +1,8 @@
 import HomePageClient from './home-page-client'
 import { fetchPublicAgentTemplates, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 
-// Public marketing page: cacheable + safe to serve from edge/CDN.
-export const dynamic = 'force-static'
+// Public marketing page: rendered on-demand (avoid build-time API dependency).
+export const dynamic = 'force-dynamic'
 export const revalidate = 3600 // 1 hour
 
 export default async function HomePage() {

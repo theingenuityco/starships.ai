@@ -39,8 +39,8 @@ function joinUrl(base: string, path: string): string {
   return `${base}${p === '/' ? '' : p}`
 }
 
-// Sitemaps should be static + cached (refreshed via ISR).
-export const dynamic = 'force-static'
+// Sitemaps are cached, but rendered on-demand (avoid build-time API dependency).
+export const dynamic = 'force-dynamic'
 export const revalidate = 86400 // 24 hours
 
 /**

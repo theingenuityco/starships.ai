@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { ApiResponse, ApiResponseMeta, AgentTemplateModel, ConnectorCatalogResponse, ConnectorCatalogItem, ToolTemplateModel } from '@starships/protocol'
 import { getPublicEnvConfig } from '@starships/env/public'
+import { headers } from 'next/headers'
 
 function normalizeBaseUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '')
@@ -9,13 +10,39 @@ function normalizeBaseUrl(value: string): string {
 
 let didWarnPublicUrlFallback = false
 
-function getPublicBaseUrl(): string {
+function firstForwardedValue(value: string | null | undefined): string {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const first = raw.split(',')[0]
+  return String(first || '').trim()
+}
+
+async function getRequestBaseUrl(): Promise<string | null> {
+  try {
+    const h = await headers()
+    const host = firstForwardedValue(h.get('x-forwarded-host')) || firstForwardedValue(h.get('host'))
+    if (!host) return null
+
+    const proto = firstForwardedValue(h.get('x-forwarded-proto')) || 'https'
+    const safeProto = proto === 'http' || proto === 'https' ? proto : 'https'
+    return `${safeProto}://${host}`
+  } catch {
+    // No request context (e.g. build-time or static generation).
+    return null
+  }
+}
+
+async function getPublicBaseUrl(): Promise<string> {
   // Public marketing pages should fetch from the *public* origin so the HTML
   // they generate is consistent with what the browser can reach.
   // (Using SERVER_URL can succeed server-side, but the browser may not have the same routing.)
   const { PUBLIC_URL } = getPublicEnvConfig()
   const fromPublicEnv = normalizeBaseUrl(PUBLIC_URL || '')
   if (fromPublicEnv) return fromPublicEnv
+
+  // Runtime fallback: infer the origin from the request (works behind proxies/CDNs).
+  const fromRequest = await getRequestBaseUrl()
+  if (fromRequest) return normalizeBaseUrl(fromRequest)
 
   // Fallback: Next in a monorepo can fail to load the root `.env` depending on how it’s started.
   // In `pnpm dev`, we always start the reverse proxy on PROXY_PORT (default 8080), which exposes `/api/*`
@@ -85,7 +112,7 @@ export async function fetchPublicAgentTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<AgentTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
 
     const u = new URL('/api/v1/agent-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -113,7 +140,7 @@ export async function fetchPublicAgentTemplates(args?: {
 
 export async function fetchPublicAgentTemplateBySlug(args: { slug: string; revalidateSeconds?: number }): Promise<AgentTemplateModel | null> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const slug = String(args.slug || '').trim()
     if (!slug) return null
 
@@ -145,7 +172,7 @@ export async function fetchPublicAgentTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<AgentTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -183,7 +210,7 @@ export async function fetchPublicToolTemplates(args?: {
   revalidateSeconds?: number
 }): Promise<ToolTemplateModel[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
 
     const u = new URL('/api/v1/tool-templates', base)
     if (args?.category) u.searchParams.set('category', args.category)
@@ -281,7 +308,7 @@ export async function fetchPublicToolTemplatesPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ToolTemplateModel>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 
@@ -310,7 +337,7 @@ export async function fetchPublicToolTemplatesPage(args: {
 
 export async function fetchPublicConnectorCatalog(args?: { revalidateSeconds?: number }): Promise<ConnectorCatalogItem[]> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const u = new URL('/api/v1/connectors/catalog', base)
 
     const json = await fetchJson<ApiResponse<ConnectorCatalogResponse>>(u.toString(), {
@@ -334,7 +361,7 @@ export async function fetchPublicConnectorCatalogPage(args: {
   revalidateSeconds?: number
 }): Promise<PaginatedPublicResult<ConnectorCatalogItem>> {
   try {
-    const base = getPublicBaseUrl()
+    const base = await getPublicBaseUrl()
     const page = Number.isFinite(args.page) ? Math.max(1, Math.floor(args.page)) : 1
     const limit = Number.isFinite(args.limit) ? Math.max(1, Math.floor(args.limit)) : 24
 

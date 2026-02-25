@@ -17,8 +17,7 @@ import { toast } from 'sonner'
 
 import { DesignCanvas } from './DesignCanvas'
 import { InspectorPanel } from './InspectorPanel/InspectorPanel'
-import { ViewTreePanel } from './ViewTreePanel'
-import { WidgetPalettePanel } from './WidgetPalettePanel'
+import { LeftSidebarPanel } from './LeftSidebarPanel'
 import { useViewEditorStore } from './store/viewEditorStore'
 import { countNodes, findNode, getChildIndex, getParentId, maxDepth } from './treeOps'
 
@@ -65,7 +64,6 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
   const setSelectedActionsHandlerFromJson = useViewEditorStore(s => s.setSelectedActionsHandlerFromJson)
   const ensureScript = useViewEditorStore(s => s.ensureScript)
   const upsertScript = useViewEditorStore(s => s.upsertScript)
-  const addChildToSelected = useViewEditorStore(s => s.addChildToSelected)
   const insertChild = useViewEditorStore(s => s.insertChild)
   const moveExistingNode = useViewEditorStore(s => s.moveExistingNode)
   const reorderChildren = useViewEditorStore(s => s.reorderChildren)
@@ -97,6 +95,20 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
     },
     { enableOnFormTags: true },
     [canRedo, redo]
+  )
+
+  useHotkeys(
+    'backspace,delete',
+    (e) => {
+      const target = e.target as any
+      const tag = typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : ''
+      const isEditable = tag === 'input' || tag === 'textarea' || Boolean(target?.isContentEditable)
+      if (isEditable) return
+      e.preventDefault()
+      deleteSelected()
+    },
+    {},
+    [deleteSelected]
   )
 
   const selectedNode = React.useMemo(() => (draftRoot && selectedId ? findNode(draftRoot, selectedId) : null), [draftRoot, selectedId])
@@ -251,15 +263,6 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
     markSaved()
   }
 
-  function onAddChild() {
-    const child: WidgetInstanceNode = { id: makeId(), type: 'Text', props: { text: 'New node' }, children: [] }
-    addChildToSelected(child)
-  }
-
-  function onDeleteSelected() {
-    deleteSelected()
-  }
-
   const headerHref = `/ship/${encodeURIComponent(slug)}/views/${encodeURIComponent(viewId)}`
 
   if (!draftRoot) {
@@ -317,21 +320,7 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
           <div className="h-full grid grid-cols-12 gap-4 min-h-0">
             <div className="col-span-3 min-h-0">
-              <div className="h-full min-h-0 flex flex-col gap-4">
-                <div className="flex-1 min-h-0">
-                  <WidgetPalettePanel />
-                </div>
-                <div className="flex-1 min-h-0">
-                  <ViewTreePanel
-                    root={draftRoot}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    onAddChild={onAddChild}
-                    onDeleteSelected={onDeleteSelected}
-                    disableDelete={String(selectedId) === String(draftRoot.id)}
-                  />
-                </div>
-              </div>
+              <LeftSidebarPanel root={draftRoot} selectedId={selectedId} onSelect={setSelectedId} />
             </div>
 
             <div className="col-span-6 min-h-0">

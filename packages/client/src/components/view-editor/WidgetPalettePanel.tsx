@@ -3,7 +3,6 @@
 import React from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { WIDGET_DEFINITIONS, type WidgetDefinition } from '@/components/widgets/widgetDefinitions'
@@ -62,34 +61,30 @@ export function WidgetPalettePanel() {
   }, [filtered])
 
   return (
-    <Card className="h-full border-border/60">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Palette</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 min-h-0 overflow-auto flex flex-col gap-3">
-        <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search widgets…" />
+    <div className="flex flex-col gap-3">
+      <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Drag to canvas</div>
+      <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search widgets…" />
 
-        {!filtered.length ? (
-          <div className="text-sm text-muted-foreground py-6">No widgets match.</div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {grouped.map(([category, items]) => (
-              <div key={category} className="flex flex-col gap-2">
-                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{category}</div>
-                <div className="flex flex-col gap-2">
-                  {items
-                    .slice()
-                    .sort((a, b) => a.label.localeCompare(b.label))
-                    .map(def => (
-                      <PaletteItem key={def.type} def={def} />
-                    ))}
-                </div>
+      {!filtered.length ? (
+        <div className="text-sm text-muted-foreground py-6">No widgets match.</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {grouped.map(([category, items]) => (
+            <div key={category} className="flex flex-col gap-2">
+              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{category}</div>
+              <div className="flex flex-col gap-2">
+                {items
+                  .slice()
+                  .sort((a, b) => a.label.localeCompare(b.label))
+                  .map(def => (
+                    <PaletteItem key={def.type} def={def} />
+                  ))}
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

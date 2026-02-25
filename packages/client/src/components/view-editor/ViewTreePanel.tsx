@@ -2,9 +2,6 @@
 
 import React from 'react'
 
-import Icon from '@/components/primitives/Icon'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { WidgetInstanceNode } from '@starships/protocol'
 
 function TreeNode(props: { node: WidgetInstanceNode; selectedId: string; onSelect: (id: string) => void; depth?: number }) {
@@ -43,31 +40,15 @@ export function ViewTreePanel(props: {
   root: WidgetInstanceNode
   selectedId: string
   onSelect: (id: string) => void
-  onAddChild: () => void
-  onDeleteSelected: () => void
-  disableDelete: boolean
 }) {
-  const { root, selectedId, onSelect, onAddChild, onDeleteSelected, disableDelete } = props
+  const { root, selectedId, onSelect } = props
 
   return (
-    <Card className="h-full border-border/60">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm">Tree</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 min-h-0 overflow-auto flex flex-col gap-2">
-        <TreeNode node={root} selectedId={selectedId} onSelect={onSelect} />
-        <div className="pt-2 flex flex-col gap-2">
-          <Button variant="outline" size="sm" onClick={onAddChild}>
-            <Icon name="plus" className="h-4 w-4 mr-1.5" />
-            Add child
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDeleteSelected} disabled={disableDelete}>
-            <Icon name="trash" className="h-4 w-4 mr-1.5" />
-            Delete
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-2">
+      <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Hierarchy</div>
+      <TreeNode node={root} selectedId={selectedId} onSelect={onSelect} />
+      <div className="text-[11px] text-muted-foreground">Tip: drag widgets from the palette onto containers in the canvas.</div>
+    </div>
   )
 }
 

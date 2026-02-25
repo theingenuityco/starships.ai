@@ -199,6 +199,66 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
 });
 
 /**
+ * GET /channels/:channelId
+ *
+ * Returns a conversation-backed channel by its conversation id.
+ *
+ * Notes:
+ * - `channelId` is the backing conversation id (channels.conversation_id).
+ * - For private channels, membership is enforced (owner/admin bypass supported).
+ */
+router.get('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    // Resolve starshipId from authoritative conversation row (defense-in-depth).
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.channelId]);
+    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.channelId });
+      return;
+    }
+
+    // Fail closed if channel row starship_id ever diverges from the conversation.
+    if (String(channel.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this channel', 403, { channelId: params.channelId });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: params.channelId,
+        conversationStarshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    sendSuccess(res, { channel }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching channel');
+  }
+});
+
+/**
  * PATCH /channels/:channelId
  *
  * Updates a conversation-backed channel. MVP policy: starship owner/instance-admin only.

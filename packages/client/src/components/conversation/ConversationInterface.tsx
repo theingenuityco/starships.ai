@@ -29,7 +29,6 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
@@ -972,8 +971,26 @@ export function ConversationInterface({
                   isChannelConversation && currentConversationId ? (
                     <div className="flex items-center gap-2">
                       {currentChannelAttachedViewId && starshipSlug ? (
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/views/${encodeURIComponent(currentChannelAttachedViewId)}`}>Open view</Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            try {
+                              const next = new URLSearchParams(searchParams?.toString() || '')
+                              const cur = String(next.get('view') || '').trim()
+                              // Toggle: if a side pane is open, close it; otherwise open the attached-view pane.
+                              if (cur) next.delete('view')
+                              else next.set('view', 'attached')
+                              // Single-pane UX: opening view closes thread (and vice versa).
+                              next.delete('thread')
+                              const qs = next.toString()
+                              router.push(qs ? `${pathname}?${qs}` : pathname)
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                        >
+                          {String(searchParams?.get('view') || '').trim() ? 'Close view' : 'Open view'}
                         </Button>
                       ) : null}
                       <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />

@@ -2,13 +2,7 @@
 
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { StatCard } from './StatCard'
-import { DataTable } from './DataTable'
-import { MetricGrid } from './MetricGrid'
-import { AreaChart, BarChart, DonutChart, LineChart, PieChart, RadarChart, RadialChart } from './charts'
-import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
-import { AgentSuggestionCard } from './AgentSuggestionCard'
-import { StarshipDetails } from './StarshipDetails'
+import { WIDGET_REGISTRY } from './widgetRegistry'
 
 export interface InlineWidgetConfig {
   id?: string
@@ -22,22 +16,6 @@ export interface InlineWidgetRendererProps {
   compactMode?: boolean
 }
 
-const WIDGET_MAP: Record<string, React.ComponentType<any>> = {
-  StatCard,
-  DataTable,
-  MetricGrid,
-  BarChart,
-  LineChart,
-  AreaChart,
-  PieChart,
-  DonutChart,
-  RadarChart,
-  RadialChart,
-  ConnectorSuggestionCard,
-  AgentSuggestionCard,
-  StarshipDetails,
-}
-
 /**
  * InlineWidgetRenderer - Renders widgets in chat context with compact styling
  *
@@ -47,7 +25,7 @@ const WIDGET_MAP: Record<string, React.ComponentType<any>> = {
  * - Optimized for conversation message context
  */
 export function InlineWidgetRenderer({ widget, className = '', compactMode = true }: InlineWidgetRendererProps): React.JSX.Element {
-  const Component = WIDGET_MAP[widget.widgetType]
+  const Component = WIDGET_REGISTRY[widget.widgetType]
 
   if (!Component) {
     return (
@@ -55,7 +33,7 @@ export function InlineWidgetRenderer({ widget, className = '', compactMode = tru
         <p className="text-sm text-red-600 dark:text-red-400">
           Unknown widget type: <code className="font-mono">{widget.widgetType}</code>
         </p>
-        <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_MAP).join(', ')}</p>
+        <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_REGISTRY).join(', ')}</p>
       </div>
     )
   }

@@ -271,11 +271,19 @@ export function useCreateChannel() {
 export function useUpdateChannel() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { starshipId: string; channelId: string; name?: string; isPrivate?: boolean; topic?: string | null }): Promise<ChannelModel> => {
+    mutationFn: async (args: {
+      starshipId: string
+      channelId: string
+      name?: string
+      isPrivate?: boolean
+      topic?: string | null
+      attachedViewId?: string | null
+    }): Promise<ChannelModel> => {
       const response: FetchResponse<ApiResponse<{ channel: ChannelModel }>> = await api.patch(`/api/v1/channels/${encodeURIComponent(args.channelId)}`, {
         ...(args.name !== undefined ? { name: args.name } : null),
         ...(args.isPrivate !== undefined ? { isPrivate: args.isPrivate } : null),
         ...(args.topic !== undefined ? { topic: args.topic } : null),
+        ...(args.attachedViewId !== undefined ? { attachedViewId: args.attachedViewId } : null),
       })
       return response.data.data.channel
     },

@@ -131,11 +131,8 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
     const overData = ev.over?.data.current as any
 
     try {
-      if (data?.kind === 'new' && typeof data.widgetType === 'string' && overData?.kind === 'container') {
+      if (data?.kind === 'new' && typeof data.widgetType === 'string' && draftRoot) {
         const widgetType = String(data.widgetType)
-        const parentId = String(overData.nodeId || '')
-        if (!parentId) return
-
         const def = getWidgetDefinition(widgetType)
         const child: WidgetInstanceNode = {
           id: makeId(),
@@ -143,7 +140,38 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
           props: cloneDefaults(def?.defaultProps ?? {}),
           ...(def?.acceptsChildren ? { children: [] } : null),
         }
-        insertChild(parentId, child)
+
+        // Preferred: drop directly onto a container droppable.
+        if (overData?.kind === 'container') {
+          const parentId = String(overData.nodeId || '')
+          if (!parentId) return
+          insertChild(parentId, child)
+          return
+        }
+
+        // Common case: we are "over" an existing node (sortable droppable).
+        if (overData?.kind === 'existing' && typeof overData.nodeId === 'string') {
+          const overNodeId = String(overData.nodeId || '')
+          if (!overNodeId) return
+
+          const overNode = findNode(draftRoot, overNodeId)
+          const overDef = getWidgetDefinition(overNode?.type)
+
+          // If the node under cursor is a container, append into it.
+          if (overNode && (overDef?.acceptsChildren ?? Array.isArray(overNode.children))) {
+            insertChild(overNodeId, child)
+            return
+          }
+
+          // Otherwise insert into its parent, before the hovered node.
+          const parentId = getParentId(draftRoot, overNodeId)
+          if (!parentId) return
+          const idx = getChildIndex(draftRoot, parentId, overNodeId)
+          insertChild(parentId, child, idx >= 0 ? idx : undefined)
+          return
+        }
+
+        // If we couldn't resolve a target, ignore.
         return
       }
 

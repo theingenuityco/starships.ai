@@ -103,15 +103,15 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
             onClick={handleTopLogoClick}
             className={[
               // Clickable, but not a "button container" (no border/bg box).
-              'group relative flex h-9 w-9 items-center justify-center text-muted-foreground transition-colors',
+              'group relative flex h-10 w-10 items-center justify-center text-muted-foreground transition-colors',
               'hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             ].join(' ')}
             aria-label="Home"
             title="Home"
           >
             <StarshipsLogo
-              width={18}
-              height={18}
+              width={24}
+              height={24}
               className="text-current"
               gradientId="rail-top-gradient"
               triggerAnimation={logoTrigger}

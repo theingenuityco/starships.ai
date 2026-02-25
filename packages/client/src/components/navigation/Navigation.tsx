@@ -527,7 +527,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
         <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
-          <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-col gap-0 w-full">
             {isAuthenticated && starshipData?.id && canManageBilling ? (
               isExpanded ? (
                 <button

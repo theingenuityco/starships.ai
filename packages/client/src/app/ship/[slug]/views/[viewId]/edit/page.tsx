@@ -13,15 +13,24 @@ import { WidgetTreeRenderer } from '@/components/widgets'
 import { DynamicViewRenderer } from '@/components/views/DynamicViewRenderer'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useUpdateView, useView } from '@/hooks/useViews'
+import { generateId } from '@/lib/utils'
 import type { ViewRuntimeConfig, WidgetInstanceNode } from '@starships/protocol'
 
+const WIDGET_INSTANCE_ID_RE = /^[a-z0-9_-]{10,30}$/i
+
 function makeId(): string {
-  try {
-    // browsers
-    const anyCrypto: any = globalThis.crypto
-    if (anyCrypto?.randomUUID) return anyCrypto.randomUUID()
-  } catch {}
-  return `node_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  // Match server-side IdSchema: 10-30 chars, url-safe (nanoid-like).
+  // `generateId()` already yields lowercase base36 + timestamp; clamp just in case.
+  let id = String(generateId() || '').trim()
+  if (id.length > 30) id = id.slice(0, 30)
+  if (id.length < 10) id = id.padEnd(10, '0')
+  if (WIDGET_INSTANCE_ID_RE.test(id)) return id
+
+  // Fallback: strip any unexpected chars and re-clamp.
+  id = id.replace(/[^a-z0-9_-]/gi, '')
+  if (id.length > 30) id = id.slice(0, 30)
+  if (id.length < 10) id = (id + String(generateId() || '')).replace(/[^a-z0-9_-]/gi, '').slice(0, 10).padEnd(10, '0')
+  return id || '0000000000'
 }
 
 function findNode(root: WidgetInstanceNode, id: string): WidgetInstanceNode | null {

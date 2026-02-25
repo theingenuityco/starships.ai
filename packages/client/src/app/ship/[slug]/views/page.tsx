@@ -10,22 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useCreateView, useStarshipViews } from '@/hooks/useViews'
-import { useStarshipWidgets } from '@/hooks/useWidgets'
 import { cn } from '@/lib/utils'
 
-import type { CreateViewRequest, ViewLayoutInput } from '@starships/protocol'
-
-function buildSequentialLayout(widgetIds: string[], cols: number): ViewLayoutInput {
-  const safeCols = Math.max(1, Math.min(12, Math.floor(cols || 3)))
-  return {
-    cols: safeCols,
-    items: widgetIds.map((widgetId, idx) => {
-      const row = Math.floor(idx / safeCols)
-      const col = idx % safeCols
-      return { widgetId, row, col, colSpan: 1, rowSpan: 1 }
-    }),
-  }
-}
+import type { CreateViewRequest } from '@starships/protocol'
 
 export default function ViewsIndexPage() {
   const router = useRouter()
@@ -36,7 +23,6 @@ export default function ViewsIndexPage() {
   const starshipId = starship?.id ? String(starship.id) : ''
 
   const { data: views = [], isLoading: viewsLoading } = useStarshipViews(starshipId, Boolean(starshipId))
-  const { data: widgets = [], isLoading: widgetsLoading } = useStarshipWidgets(starshipId, Boolean(starshipId))
 
   const createView = useCreateView()
 
@@ -46,29 +32,14 @@ export default function ViewsIndexPage() {
   }, [views])
 
   const canCreate = Boolean(starshipId) && !createView.isPending
-  const canCreateFromWidgets = Boolean(starshipId) && !widgetsLoading && widgets.length > 0 && canCreate
 
   async function onCreateEmpty() {
     if (!canCreate) return
     const payload: CreateViewRequest = {
       name: 'New view',
-      description: 'A saved grid layout of widgets.',
+      description: 'A saved screen.',
       starshipId,
-      layout: { cols: 3, items: [] },
-    }
-    const created = await createView.mutateAsync(payload)
-    router.push(`/ship/${encodeURIComponent(slug)}/views/${encodeURIComponent(created.id)}`)
-  }
-
-  async function onCreateFromAllWidgets() {
-    if (!canCreateFromWidgets) return
-    const widgetIds = widgets.map(w => String(w.id)).filter(Boolean)
-    const layout = buildSequentialLayout(widgetIds, 3)
-    const payload: CreateViewRequest = {
-      name: 'All widgets',
-      description: 'Auto-generated view showing all widgets for this starship.',
-      starshipId,
-      layout,
+      root: { id: 'root', type: 'Box', props: {}, children: [] },
     }
     const created = await createView.mutateAsync(payload)
     router.push(`/ship/${encodeURIComponent(slug)}/views/${encodeURIComponent(created.id)}`)
@@ -93,7 +64,7 @@ export default function ViewsIndexPage() {
                   </div>
                   <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
                     <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
-                      Saved grid layouts of widgets (fixed columns, infinite rows).
+                      Saved screens (root widget trees).
                     </span>
                   </div>
                 </div>
@@ -104,10 +75,6 @@ export default function ViewsIndexPage() {
               <Button variant="outline" size="sm" onClick={onCreateEmpty} disabled={!canCreate}>
                 <Icon name="plus" className="h-4 w-4 mr-1.5" />
                 New view
-              </Button>
-              <Button variant="default" size="sm" onClick={onCreateFromAllWidgets} disabled={!canCreateFromWidgets}>
-                <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
-                All widgets
               </Button>
             </div>
           </div>
@@ -134,18 +101,13 @@ export default function ViewsIndexPage() {
             <Card className="border-border/60">
               <CardHeader>
                 <CardTitle className="text-base">No views yet</CardTitle>
-                <CardDescription>Create a view to persist a widget grid layout.</CardDescription>
+                <CardDescription>Create a view to persist a screen.</CardDescription>
               </CardHeader>
               <CardContent className="pt-0 flex flex-col sm:flex-row gap-2">
                 <Button onClick={onCreateEmpty} disabled={!canCreate} variant="outline">
                   <Icon name="plus" className="h-4 w-4 mr-1.5" />
                   New view
                 </Button>
-                <Button onClick={onCreateFromAllWidgets} disabled={!canCreateFromWidgets}>
-                  <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
-                  Create “All widgets”
-                </Button>
-                {widgetsLoading ? <span className="text-xs text-muted-foreground self-center">Loading widgets…</span> : null}
               </CardContent>
             </Card>
           ) : (
@@ -165,7 +127,7 @@ export default function ViewsIndexPage() {
                     </CardHeader>
                     <CardContent className="pt-0 flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
-                        {v.layout?.cols ?? 3} cols · {Array.isArray(v.layout?.items) ? v.layout.items.length : 0} widgets
+                        v{Number.isFinite(v.version) ? v.version : 1}
                       </div>
                       <Button asChild variant="outline" size="sm">
                         <Link href={href}>

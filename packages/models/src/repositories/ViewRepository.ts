@@ -1,4 +1,4 @@
-import type { CreateViewRequest, UpdateViewRequest, ViewModel, ViewSearchParams, ViewLayout } from '@starships/protocol';
+import type { CreateViewRequest, UpdateViewRequest, ViewModel, ViewRuntimeConfig, ViewSearchParams, WidgetInstanceNode } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { ViewEntity } from '@/entities/ViewEntity';
 import { NotFoundError } from '@starships/errors';
@@ -18,41 +18,50 @@ function toFiniteInt(value: unknown, fallback: number): number {
   return Math.floor(n);
 }
 
-function normalizeLayout(input: unknown): ViewLayout {
-  if (!isRecord(input)) return { cols: 3, items: [] };
-  const cols = Math.max(1, toFiniteInt(input.cols, 3));
-  const itemsRaw = input.items;
-  const items = Array.isArray(itemsRaw) ? itemsRaw : [];
-  // Ensure each item has an id (nanoid) for stable client rendering.
-  const normalizedItems = items
-    .map((item) => {
-      if (!isRecord(item)) return null;
-      const idRaw = item.id;
-      const widgetIdRaw = item.widgetId;
-      const id = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : nanoid();
-      const widgetId = typeof widgetIdRaw === 'string' ? widgetIdRaw : '';
-      const col = Math.max(0, toFiniteInt(item.col, 0));
-      const row = Math.max(0, toFiniteInt(item.row, 0));
+function normalizeRuntimeConfig(input: unknown): ViewRuntimeConfig {
+  if (!isRecord(input)) return {};
+  return input as unknown as ViewRuntimeConfig;
+}
 
-      const colSpanVal = item.colSpan;
-      const rowSpanVal = item.rowSpan;
-      const colSpan = colSpanVal == null ? undefined : Math.max(1, toFiniteInt(colSpanVal, 1));
-      const rowSpan = rowSpanVal == null ? undefined : Math.max(1, toFiniteInt(rowSpanVal, 1));
+function normalizeRoot(input: unknown, opts?: { maxDepth?: number; maxNodes?: number }): WidgetInstanceNode {
+  const maxDepth = typeof opts?.maxDepth === 'number' && opts.maxDepth > 0 ? Math.floor(opts.maxDepth) : 32;
+  const maxNodes = typeof opts?.maxNodes === 'number' && opts.maxNodes > 0 ? Math.floor(opts.maxNodes) : 2_000;
 
-      return {
-        id,
-        widgetId,
-        col,
-        row,
-        ...(colSpan !== undefined ? { colSpan } : null),
-        ...(rowSpan !== undefined ? { rowSpan } : null),
-      };
-    })
-    .filter((it): it is ViewLayout['items'][number] => Boolean(it))
-    // Keep only items with a plausible widgetId; deeper validation happens at API boundary.
-    .filter((it) => typeof it.widgetId === 'string' && it.widgetId.trim().length > 0);
+  let seen = 0;
 
-  return { cols, items: normalizedItems };
+  function norm(node: unknown, depth: number): WidgetInstanceNode {
+    if (depth > maxDepth) {
+      return { id: nanoid(), type: 'Box', props: { error: 'max_depth_exceeded' }, children: [] };
+    }
+    if (seen++ > maxNodes) {
+      return { id: nanoid(), type: 'Box', props: { error: 'max_nodes_exceeded' }, children: [] };
+    }
+    const rec = isRecord(node) ? node : {};
+    const idRaw = rec.id;
+    const typeRaw = rec.type;
+    const propsRaw = rec.props;
+    const childrenRaw = rec.children;
+
+    const id = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : nanoid();
+    const type = typeof typeRaw === 'string' && typeRaw.trim() ? typeRaw.trim() : 'Box';
+    const props = isRecord(propsRaw) ? propsRaw : {};
+    const children = Array.isArray(childrenRaw) ? childrenRaw.map((c) => norm(c, depth + 1)) : undefined;
+
+    const out: WidgetInstanceNode = {
+      id,
+      type,
+      props,
+      ...(children ? { children } : null),
+    };
+
+    if (isRecord(rec.bindings)) (out as any).bindings = rec.bindings;
+    if (isRecord(rec.handlers)) (out as any).handlers = rec.handlers;
+    if (isRecord(rec.permissions)) (out as any).permissions = rec.permissions;
+
+    return out;
+  }
+
+  return norm(input, 0);
 }
 
 export class ViewRepository extends BaseRepository {
@@ -74,14 +83,18 @@ export class ViewRepository extends BaseRepository {
               { fallbackBase: 'view', maxLength: 100 }
             );
 
-        const layout = normalizeLayout(data.layout);
+        const root = normalizeRoot(data.root ?? { id: 'root', type: 'Box', props: {}, children: [] });
+        const runtimeConfig = normalizeRuntimeConfig(data.runtimeConfig);
+        const version = 1;
 
         const viewData: ViewModel = {
           id,
           name: data.name,
           slug,
           description: data.description,
-          layout,
+          root,
+          runtimeConfig,
+          version,
           starshipId: data.starshipId,
           createdAt: now,
           updatedAt: now,
@@ -95,16 +108,18 @@ export class ViewRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
           `INSERT INTO views (
-            id, name, slug, description, layout,
+            id, name, slug, description, root, runtime_config, version,
             starship_id, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *`,
           [
             databaseFormat.id,
             databaseFormat.name,
             databaseFormat.slug,
             databaseFormat.description,
-            JSON.stringify(databaseFormat.layout),
+            JSON.stringify(databaseFormat.root),
+            JSON.stringify(databaseFormat.runtime_config),
+            databaseFormat.version,
             databaseFormat.starship_id,
             databaseFormat.created_at,
             databaseFormat.updated_at,
@@ -204,12 +219,16 @@ export class ViewRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const updatedAt = new Date().toISOString();
-        const layout = data.layout !== undefined ? normalizeLayout(data.layout) : undefined;
+        const root = data.root !== undefined ? normalizeRoot(data.root) : undefined;
+        const runtimeConfig = data.runtimeConfig !== undefined ? normalizeRuntimeConfig(data.runtimeConfig) : undefined;
+        const version = data.version !== undefined ? Math.max(1, toFiniteInt(data.version, 1)) : undefined;
 
         const updatedData: Partial<ViewModel> = {
           ...(data.name !== undefined ? { name: data.name } : null),
           ...(data.description !== undefined ? { description: data.description } : null),
-          ...(layout !== undefined ? { layout } : null),
+          ...(root !== undefined ? { root } : null),
+          ...(runtimeConfig !== undefined ? { runtimeConfig } : null),
+          ...(version !== undefined ? { version } : null),
           updatedAt,
         };
 
@@ -227,9 +246,17 @@ export class ViewRepository extends BaseRepository {
           updates.push(`description = $${paramIndex++}`);
           values.push(data.description);
         }
-        if (layout !== undefined) {
-          updates.push(`layout = $${paramIndex++}`);
-          values.push(JSON.stringify(layout));
+        if (root !== undefined) {
+          updates.push(`root = $${paramIndex++}`);
+          values.push(JSON.stringify(root));
+        }
+        if (runtimeConfig !== undefined) {
+          updates.push(`runtime_config = $${paramIndex++}`);
+          values.push(JSON.stringify(runtimeConfig));
+        }
+        if (version !== undefined) {
+          updates.push(`version = $${paramIndex++}`);
+          values.push(version);
         }
 
         updates.push(`updated_at = $${paramIndex++}`);

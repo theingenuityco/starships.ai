@@ -15,7 +15,7 @@ export default function ViewEditorPage() {
   const view = viewQuery.data
 
   return (
-    <div className="flex-1 min-h-0 overflow-hidden">
+    <div className="h-full min-h-0 overflow-hidden">
       {viewQuery.isLoading ? (
         <div className="flex items-center justify-center py-10">
           <p className="text-sm text-muted-foreground">Loading…</p>

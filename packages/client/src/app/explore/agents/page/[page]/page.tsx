@@ -4,8 +4,8 @@ import { notFound, redirect } from 'next/navigation'
 import MarketplacePageClient from '@/app/marketplace/MarketplacePageClient'
 import { fetchPublicAgentTemplatesPage, fetchPublicConnectorCatalogPage, fetchPublicToolTemplatesPage } from '@/lib/server/public-templates'
 
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
+// Public marketing page: rendered on-demand (avoid build-time API dependency).
+export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 export const revalidate = 3600 // 1 hour
 

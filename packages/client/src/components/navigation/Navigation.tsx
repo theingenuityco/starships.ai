@@ -187,18 +187,16 @@ export function Navigation(props: NavigationProps) {
         isInstalledRoute: false,
         isSchedulesRoute: false,
         isMembersRoute: false,
-        isViewsRoute: false,
       }
     }
     return {
       isInstalledRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
       isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
-      isViewsRoute: pathname.startsWith(`/ship/${starshipSlug}/views`),
     }
   }, [pathname, starshipSlug])
 
-  const { isInstalledRoute, isSchedulesRoute, isMembersRoute, isViewsRoute } = routeChecks
+  const { isInstalledRoute, isSchedulesRoute, isMembersRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -332,12 +330,6 @@ export function Navigation(props: NavigationProps) {
               label: 'Schedules',
               icon: 'clock',
               isActive: isSchedulesRoute,
-            },
-            {
-              href: `/ship/${starshipSlug}/views`,
-              label: 'Views',
-              icon: 'bar-chart',
-              isActive: isViewsRoute,
             },
           ]
         : []),

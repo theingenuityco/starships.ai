@@ -27,7 +27,7 @@ export async function up(client: Client): Promise<void> {
       -- Indexes for performance
       CREATE INDEX IF NOT EXISTS idx_views_starship_id ON views(starship_id);
       CREATE INDEX IF NOT EXISTS idx_views_slug ON views(slug);
-      CREATE INDEX IF NOT EXISTS idx_views_starship_slug ON views(starship_id, slug);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_views_starship_slug ON views(starship_id, slug);
       CREATE INDEX IF NOT EXISTS idx_views_layout ON views USING GIN(layout);
     `);
 

@@ -99,13 +99,13 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       name: String(r.name),
       isPrivate: Boolean(r.is_private),
       channelType:
-        String((r as any).channel_type || 'chat')
+        String(r.channel_type || 'chat')
           .trim()
           .toLowerCase() === 'forum'
           ? 'forum'
           : 'chat',
       topic: r.topic ?? null,
-      attachedViewId: (r as any).attached_view_id ?? null,
+      attachedViewId: r.attached_view_id ?? null,
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),
     }));
@@ -302,7 +302,18 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     `;
     values.push(channel.conversationId);
 
-    const updatedRow = await conn.queryOne<Record<string, any>>(sql, values);
+    const updatedRow = await conn.queryOne<{
+      conversation_id: string;
+      starship_id: string;
+      slug: string;
+      name: string;
+      is_private: boolean;
+      channel_type: string | null;
+      topic: string | null;
+      attached_view_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(sql, values);
     if (!updatedRow) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update channel', 500);
       return;
@@ -341,13 +352,13 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
       name: String(updatedRow.name),
       isPrivate: Boolean(updatedRow.is_private),
       channelType:
-        String((updatedRow as any).channel_type || 'chat')
+        String(updatedRow.channel_type || 'chat')
           .trim()
           .toLowerCase() === 'forum'
           ? 'forum'
           : 'chat',
       topic: updatedRow.topic ?? null,
-      attachedViewId: (updatedRow as any).attached_view_id ?? null,
+      attachedViewId: updatedRow.attached_view_id ?? null,
       createdAt: String(updatedRow.created_at),
       updatedAt: String(updatedRow.updated_at),
     };

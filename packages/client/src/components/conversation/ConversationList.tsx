@@ -5,7 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { useCreateChannel, useDeleteChannel, useStarshipChannels, useStarshipDirectMessages, useUpdateChannel, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useNotificationsStream, useUnreadByConversationIds } from '@/hooks/useNotifications'
 import { cn } from '@/lib/utils'
-import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
+import type { AgentModel, ChannelModel, ConversationModel, ViewModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
@@ -120,7 +120,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
-  const { data: viewsData = [], isLoading: viewsLoading } = useStarshipViews(starshipId, true)
+  const { data: viewsData, isLoading: viewsLoading } = useStarshipViews(starshipId, true)
   const activeConversationIdForNotifications = useMemo(() => {
     // 1) /ship/:slug/conversations/:conversationId
     const byRoute = typeof currentConversationId === 'string' ? String(currentConversationId).trim() : ''
@@ -236,13 +236,13 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
   const { data: starship } = useStarship(starshipId, true)
   const canManageChannels = Boolean(user?.id && starship?.ownerId && (isInstanceAdmin === true || String(starship.ownerId) === String(user.id)))
   const viewsForSelect = useMemo(() => {
-    const list = Array.isArray(viewsData) ? (viewsData as any[]) : []
+    const list: ViewModel[] = Array.isArray(viewsData) ? viewsData : []
     return list
       .map(v => ({
-        id: String((v as any)?.id || '').trim(),
-        name: String((v as any)?.name || '').trim() || String((v as any)?.slug || '').trim() || 'Untitled view',
+        id: String(v.id || '').trim(),
+        name: String(v.name || '').trim() || String(v.slug || '').trim() || 'Untitled view',
       }))
-      .filter(v => v.id)
+      .filter((v): v is { id: string; name: string } => Boolean(v.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [viewsData])
   const [searchQuery, setSearchQuery] = useState('')
@@ -274,7 +274,7 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
         .trim()
         .toLowerCase()
 
-    const defaultIndex = channels.findIndex(ch => normalize((ch as any)?.slug) === DEFAULT_CHANNEL_SLUG)
+    const defaultIndex = channels.findIndex(ch => normalize(ch.slug) === DEFAULT_CHANNEL_SLUG)
     if (defaultIndex <= 0) return channels
 
     const defaultChannel = channels[defaultIndex]
@@ -284,10 +284,9 @@ export const ConversationList = memo(function ConversationList({ starshipId, sta
   const openEditChannel = (ch: ChannelModel) => {
     setEditChannel(ch)
     setEditChannelName(String(ch.name || ''))
-    setEditChannelPrivate(Boolean((ch as any).isPrivate))
-    setEditChannelTopic(typeof (ch as any).topic === 'string' ? String((ch as any).topic) : '')
-    const attached = (ch as any)?.attachedViewId
-    const id = typeof attached === 'string' ? attached.trim() : ''
+    setEditChannelPrivate(Boolean(ch.isPrivate))
+    setEditChannelTopic(typeof ch.topic === 'string' ? String(ch.topic) : '')
+    const id = typeof ch.attachedViewId === 'string' ? ch.attachedViewId.trim() : ''
     setEditChannelAttachedViewId(id ? id : NONE_VIEW_VALUE)
   }
 

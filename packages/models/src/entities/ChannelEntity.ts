@@ -48,6 +48,12 @@ export class ChannelEntity implements ChannelModel {
   topic?: string | null;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  attachedViewId?: string | null;
+
+  @Expose()
   @IsISO8601()
   createdAt!: string;
 
@@ -71,6 +77,7 @@ export class ChannelEntity implements ChannelModel {
         isPrivate: Boolean(dataRecord.isPrivate),
         channelType: (dataRecord.channelType as 'chat' | 'forum' | undefined) ?? 'chat',
         topic: (dataRecord.topic as string | null | undefined) ?? null,
+        attachedViewId: (dataRecord.attachedViewId as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
       });

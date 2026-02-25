@@ -51,6 +51,7 @@ export * from './domains/openrouter';
 export * from './domains/promo';
 export * from './domains/schedule';
 export * from './domains/widget';
+export * from './domains/view';
 
 // Export API contracts
 export * from './contracts/api-response';

@@ -19,19 +19,23 @@ export function DesignCanvas(props: {
   const [hoveredId, setHoveredId] = React.useState<string | null>(null)
 
   return (
-    <Card className="h-full border-border/60">
-      <CardHeader className="pb-3">
+    <Card className="h-full min-h-0 border-border/60 flex flex-col">
+      <CardHeader className="pb-3 shrink-0">
         <CardTitle className="text-sm">{mode === 'preview' ? 'Preview' : 'Canvas'}</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 min-h-0 overflow-auto">
+      <CardContent className="pt-0 flex-1 min-h-0 overflow-hidden">
         {mode === 'preview' ? (
           view ? (
-            <DynamicViewRenderer view={{ ...view, root: draftRoot, runtimeConfig: draftRuntimeConfig }} />
+            <div className="h-full min-h-0 overflow-hidden">
+              <DynamicViewRenderer view={{ ...view, root: draftRoot, runtimeConfig: draftRuntimeConfig }} />
+            </div>
           ) : (
             <div className="py-6 text-sm text-muted-foreground">Preview unavailable (view not loaded).</div>
           )
         ) : (
-          <DesignWidgetTreeRenderer node={draftRoot} selectedId={selectedId} hoveredId={hoveredId} onHover={setHoveredId} onSelect={onSelect} />
+          <div className="h-full min-h-0 overflow-auto">
+            <DesignWidgetTreeRenderer node={draftRoot} selectedId={selectedId} hoveredId={hoveredId} onHover={setHoveredId} onSelect={onSelect} />
+          </div>
         )}
       </CardContent>
     </Card>

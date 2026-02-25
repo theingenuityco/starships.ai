@@ -274,7 +274,7 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
   }
 
   return (
-    <div className="relative flex flex-col min-h-full min-w-0">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
         <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="flex items-center justify-between gap-3">

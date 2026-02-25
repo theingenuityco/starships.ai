@@ -170,11 +170,11 @@ export function InspectorPanel(props: {
   }
 
   return (
-    <Card className="h-full border-border/60">
-      <CardHeader className="pb-3">
+    <Card className="h-full min-h-0 border-border/60 flex flex-col">
+      <CardHeader className="pb-3 shrink-0">
         <CardTitle className="text-sm">Inspector</CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 min-h-0 overflow-auto flex flex-col gap-3">
+      <CardContent className="pt-0 flex-1 min-h-0 overflow-auto flex flex-col gap-3">
         {!selectedNode ? (
           <div className="py-6 text-sm text-muted-foreground">Select a node to edit.</div>
         ) : (

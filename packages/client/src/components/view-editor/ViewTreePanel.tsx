@@ -10,19 +10,20 @@ function TreeNode(props: { node: WidgetInstanceNode; selectedId: string; onSelec
   const children = Array.isArray(node.children) ? node.children : []
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" style={{ paddingLeft: depth * 10 }}>
       <button
         type="button"
         className={[
-          'w-full text-left rounded-md px-2 py-1 text-xs font-mono border transition-colors',
+          'w-full min-w-0 overflow-hidden text-left rounded-md px-2 py-1 text-xs font-mono border transition-colors',
           isSelected ? 'bg-primary/10 border-primary/30 text-foreground' : 'bg-transparent border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/40',
         ].join(' ')}
-        style={{ marginLeft: depth * 10 }}
         onClick={() => onSelect(String(node.id))}
         title={String(node.id)}
       >
-        <span className="font-semibold">{node.type}</span>
-        <span className="ml-2 opacity-70">{String(node.id).slice(0, 10)}</span>
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span className="font-semibold truncate">{node.type}</span>
+          <span className="opacity-70 shrink-0">{String(node.id).slice(0, 10)}</span>
+        </span>
       </button>
 
       {children.length ? (

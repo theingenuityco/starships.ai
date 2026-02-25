@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
-import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
+import type { AgentModel, ChannelModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
 import { Button } from '@/components/ui/button'
 
 interface ConversationInterfaceProps {
@@ -285,9 +285,8 @@ export function ConversationInterface({
   const isChannelConversation = useMemo(() => {
     const cid = String(currentConversationId || '')
     if (!cid) return false
-    const chans = (starshipChannelsData as any)?.channels
-    if (!Array.isArray(chans)) return false
-    return chans.some((c: any) => String(c?.conversationId || '') === cid)
+    const chans = starshipChannelsData?.channels ?? []
+    return chans.some((c: ChannelModel) => String(c.conversationId || '') === cid)
   }, [starshipChannelsData, currentConversationId])
 
   // In draft DM mode, lock the agent selection to the DM target agent (if applicable).
@@ -306,25 +305,23 @@ export function ConversationInterface({
   const currentChannel = useMemo(() => {
     const cid = String(currentConversationId || '')
     if (!cid) return null
-    const chans = (starshipChannelsData as any)?.channels
-    if (!Array.isArray(chans)) return null
-    return chans.find((c: any) => String(c?.conversationId || '') === cid) || null
+    const chans = starshipChannelsData?.channels ?? []
+    return chans.find((c: ChannelModel) => String(c.conversationId || '') === cid) || null
   }, [starshipChannelsData, currentConversationId])
 
   const currentChannelAttachedViewId = useMemo(() => {
-    const raw = (currentChannel as any)?.attachedViewId
+    const raw = currentChannel?.attachedViewId
     const id = typeof raw === 'string' ? raw.trim() : ''
-    return id || null
+    return id.length > 0 ? id : null
   }, [currentChannel])
 
   const isCurrentChannelPrivate = useMemo(() => {
     if (!currentChannel) return false
-    return Boolean((currentChannel as any)?.isPrivate)
+    return Boolean(currentChannel.isPrivate)
   }, [currentChannel])
 
   const isForumChannel = useMemo(() => {
-    const t = typeof (currentChannel as any)?.channelType === 'string' ? String((currentChannel as any).channelType) : ''
-    return t.trim().toLowerCase() === 'forum'
+    return currentChannel?.channelType === 'forum'
   }, [currentChannel])
 
   // Child conversation approvals: if any child conversation is awaiting tool approval,
@@ -943,9 +940,9 @@ export function ConversationInterface({
         <ForumChannelView
           starshipId={starshipId}
           channelConversationId={currentConversationId}
-          channelSlug={typeof (currentChannel as any)?.slug === 'string' ? String((currentChannel as any).slug) : null}
-          channelName={typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null}
-          channelIsPrivate={Boolean((currentChannel as any)?.isPrivate)}
+          channelSlug={currentChannel?.slug ?? null}
+          channelName={currentChannel?.name ?? null}
+          channelIsPrivate={Boolean(currentChannel?.isPrivate)}
           starshipSlug={starshipSlug ?? null}
           onCreateDraftThread={() => {
             // Open a draft thread in the thread pane without persisting a conversation yet.
@@ -1066,7 +1063,7 @@ export function ConversationInterface({
                 <ConversationMessageList
                   conversationId={currentConversationId}
                   starshipId={starshipId}
-                  channelName={isChannelConversation ? (typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null) : null}
+                  channelName={isChannelConversation ? (currentChannel?.name ?? null) : null}
                   emptyHeroTitleOverride={
                     draftDm && !currentConversationId
                       ? draftDm.dmType === 'user_agent'

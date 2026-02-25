@@ -12,6 +12,11 @@ export interface Channel {
   isPrivate: boolean;
   topic?: string | null;
   /**
+   * Optional view attached/pinned to this channel (e.g. a dashboard layout).
+   * Null/undefined means no attached view.
+   */
+  attachedViewId?: string | null;
+  /**
    * Optional on create; defaults to `chat` server-side.
    * `forum` channels render as thread/card indexes (Discord-forum style).
    */

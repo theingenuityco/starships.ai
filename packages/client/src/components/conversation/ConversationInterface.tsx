@@ -29,11 +29,13 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
 import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
+import { Button } from '@/components/ui/button'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -308,6 +310,12 @@ export function ConversationInterface({
     if (!Array.isArray(chans)) return null
     return chans.find((c: any) => String(c?.conversationId || '') === cid) || null
   }, [starshipChannelsData, currentConversationId])
+
+  const currentChannelAttachedViewId = useMemo(() => {
+    const raw = (currentChannel as any)?.attachedViewId
+    const id = typeof raw === 'string' ? raw.trim() : ''
+    return id || null
+  }, [currentChannel])
 
   const isCurrentChannelPrivate = useMemo(() => {
     if (!currentChannel) return false
@@ -965,7 +973,14 @@ export function ConversationInterface({
                 starshipId={starshipId}
                 titleRightSlot={
                   isChannelConversation && currentConversationId ? (
-                    <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />
+                    <div className="flex items-center gap-2">
+                      {currentChannelAttachedViewId && starshipSlug ? (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/views/${encodeURIComponent(currentChannelAttachedViewId)}`}>Open view</Link>
+                        </Button>
+                      ) : null}
+                      <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />
+                    </div>
                   ) : null
                 }
                 titlePrefix={

@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 
 // Mocks must be declared before importing the router under test.
 const createMessageMock = jest.fn();
@@ -66,6 +67,46 @@ jest.mock('@/services/NotificationStreamBus', () => {
 
 import messageRoutes from '@/routes/messages';
 
+async function httpJson(args: { port: number; path: string; method: string; body?: unknown; timeoutMs?: number }): Promise<{
+  status: number;
+  bodyText: string;
+}> {
+  const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 5000;
+  const payload = args.body === undefined ? undefined : JSON.stringify(args.body);
+
+  return await new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: args.port,
+        path: args.path,
+        method: args.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : null),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(String(c))));
+        res.on('end', () => {
+          resolve({
+            status: typeof res.statusCode === 'number' ? res.statusCode : 0,
+            bodyText: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`request timed out after ${timeoutMs}ms`));
+    });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
 describe('POST /messages (persist-only) attachments', () => {
   beforeEach(() => {
     createMessageMock.mockReset();
@@ -93,21 +134,25 @@ describe('POST /messages (persist-only) attachments', () => {
     app.use(express.json());
     app.use('/api/v1', messageRoutes);
 
-    const server = app.listen(0);
-    const port = (server.address() as any).port as number;
+    const server = http.createServer(app);
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/v1/messages`, {
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as { port?: number } | null)?.port;
+      if (!port) throw new Error('Failed to bind ephemeral port for test server');
+
+      const res = await httpJson({
+        port,
+        path: '/api/v1/messages',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           role: 'user',
           content: 'hello',
           starshipId,
           conversationId,
           messageType: 'user_input',
           attachmentIds,
-        }),
+        },
       });
 
       expect(res.status).toBe(201);

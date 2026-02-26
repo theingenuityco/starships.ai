@@ -71,36 +71,25 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1 ${
+      className={cn(
+        // Match compact channel/DM row styling in the sidebar.
+        'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
         special
-          ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
+          ? 'text-primary border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
           : isActive
             ? 'text-primary bg-primary/10 border-transparent'
             : hasBadge
-              ? 'text-foreground border-transparent hover:text-foreground hover:bg-muted'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-      }`}
+              ? 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+      )}
       style={{
         justifyContent: 'flex-start',
-        transition: 'background-color 0.15s ease',
         cursor: 'pointer',
         minHeight: '28px',
+        transition: 'background-color 0.15s ease',
       }}
     >
       {StableIcon}
-      {hasBadge ? (
-        expanded ? (
-          <span
-            className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold"
-            aria-label={badgeLabel}
-            title={badgeLabel}
-          >
-            {badgeCount > 99 ? '99+' : String(badgeCount)}
-          </span>
-        ) : (
-          <span className="pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm" aria-label={badgeLabel} title={badgeLabel} />
-        )
-      ) : null}
       <AnimatePresence mode="wait">
         {expanded && (
           <motion.span
@@ -108,12 +97,34 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className={cn('whitespace-nowrap pointer-events-none ml-1', hasBadge ? 'font-bold' : 'font-medium')}
+            className={cn(
+              'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1',
+              // Color is controlled by the row container; keep only weight here.
+              isActive ? 'font-medium' : hasBadge ? 'font-bold' : 'font-medium'
+            )}
           >
             {label}
           </motion.span>
         )}
       </AnimatePresence>
+
+      {hasBadge ? (
+        expanded ? (
+          <span
+            className="ml-1 inline-flex items-center justify-center min-w-[14px] h-[14px] px-1 rounded-full bg-red-500/90 dark:bg-red-400/90 text-white text-[9px] leading-none font-semibold"
+            aria-label={badgeLabel}
+            title={badgeLabel}
+          >
+            {badgeCount > 99 ? '99+' : String(badgeCount)}
+          </span>
+        ) : (
+          <span
+            className="pointer-events-none absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500/90 dark:bg-red-400/90 shadow-sm"
+            aria-label={badgeLabel}
+            title={badgeLabel}
+          />
+        )
+      ) : null}
       {showLabels && !expanded && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -147,7 +158,7 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
       <TooltipTrigger asChild className="cursor-pointer">
         {content}
       </TooltipTrigger>
-      <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12} style={{ zIndex: 1001 }}>
+      <TooltipContent side="right" sideOffset={12} className="bg-card text-foreground border border-border/40 shadow-lg">
         {label}
       </TooltipContent>
     </Tooltip>

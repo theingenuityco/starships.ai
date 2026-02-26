@@ -63,6 +63,7 @@ const UpdateConnectorTemplateSchema = z
     description: TemplateTextSchema.max(120).optional(),
     isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
+    demoVideoUrl: z.string().trim().max(2048).url().optional(),
     category: z.string().trim().min(1).max(100).optional(),
     baseUrl: z.string().trim().min(1).max(2048).optional(),
     auth: AuthObjectSchema.optional(),
@@ -76,6 +77,7 @@ const UpdateConnectorTemplateSchema = z
       body.description !== undefined ||
       body.isEnabled !== undefined ||
       body.version !== undefined ||
+      body.demoVideoUrl !== undefined ||
       body.category !== undefined ||
       body.baseUrl !== undefined ||
       body.auth !== undefined ||
@@ -94,6 +96,7 @@ const CreateConnectorTemplateSchema = z.object({
   isEnabled: z.boolean().optional(),
   version: z.string().trim().min(1).max(20).optional(),
   category: z.string().trim().min(1).max(100).optional(),
+  demoVideoUrl: z.string().trim().max(2048).url().optional(),
   baseUrl: z.string().trim().min(1).max(2048),
   auth: AuthObjectSchema,
   variables: z.array(z.record(z.string(), z.unknown())).optional(),
@@ -108,6 +111,7 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
     provider: entity.provider,
     name: entity.name,
     description: entity.description,
+    demoVideoUrl: entity.demoVideoUrl ?? undefined,
     auth: { type: ((entity.authJson as unknown as { type?: string })?.type || 'none') as z.infer<typeof AuthTypeSchema> },
     isEnabled: Boolean(entity.isEnabled),
     version: entity.version,
@@ -121,6 +125,7 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
 function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminModel {
   return {
     ...toTemplateSummary(entity),
+    demoVideoUrl: entity.demoVideoUrl ?? undefined,
     baseUrl: entity.baseUrl,
     auth: entity.authJson as unknown as ConnectorAuthV2,
     variables: entity.variablesJson as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
@@ -212,6 +217,7 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
         variables: safeVariables,
         rateLimit: safeRateLimit,
         metadataSchema: safeMetadataSchema,
+        demoVideoUrl: template.demoVideoUrl ?? undefined,
       },
       actions,
     };
@@ -270,6 +276,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
           rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
           metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
+          demoVideoUrl: z.string().trim().max(2048).url().nullable().optional(),
         }),
         actions: z.array(z.record(z.string(), z.unknown())).optional(),
       }),
@@ -286,6 +293,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
       variables?: unknown;
       rateLimit?: unknown;
       metadataSchema?: unknown;
+      demoVideoUrl?: unknown;
     };
     // Normalize nulls (common when JSONB columns are null) into undefined for optional fields.
     const ct: CreateConnectorTemplateRequest = {
@@ -293,6 +301,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
       variables: ctRawNullable.variables === null ? undefined : ctRaw.variables,
       rateLimit: ctRawNullable.rateLimit === null ? undefined : ctRaw.rateLimit,
       metadataSchema: ctRawNullable.metadataSchema === null ? undefined : ctRaw.metadataSchema,
+      demoVideoUrl: typeof ctRawNullable.demoVideoUrl === 'string' ? ctRawNullable.demoVideoUrl.trim() || undefined : undefined,
     };
 
     const repo = new ConnectorTemplateRepository();
@@ -320,6 +329,7 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           isEnabled: ct.isEnabled,
           version: ct.version,
           category: ct.category,
+          demoVideoUrl: ct.demoVideoUrl,
           baseUrl: ct.baseUrl,
           authJson: ct.auth as unknown as ConnectorAuthV2,
           variablesJson: ct.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
@@ -395,6 +405,7 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
+      demoVideoUrl: body.demoVideoUrl,
       baseUrl: body.baseUrl,
       auth: body.auth as unknown as ConnectorAuthV2,
       variables: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
@@ -458,6 +469,7 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
+      demoVideoUrl: body.demoVideoUrl,
       baseUrl: body.baseUrl,
       authJson: body.auth as unknown as ConnectorAuthV2,
       variablesJson: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],

@@ -55,6 +55,12 @@ export class ConnectorTemplateEntity {
   description!: string;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 2048)
+  demoVideoUrl?: string;
+
+  @Expose()
   @IsString()
   @IsIn(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none'])
   authType!: ConnectorAuthTypeV2;
@@ -143,6 +149,7 @@ export class ConnectorTemplateEntity {
       provider: (dataRecord.provider as string) || '',
       name: dataRecord.name || '',
       description: dataRecord.description || '',
+      demoVideoUrl: (dataRecord.demoVideoUrl as string | undefined) ?? undefined,
       authType:
         (dataRecord.authType as ConnectorAuthTypeV2) ||
         (((dataRecord.authJson as { type?: string } | undefined)?.type as ConnectorAuthTypeV2 | undefined) ?? 'oauth2'),

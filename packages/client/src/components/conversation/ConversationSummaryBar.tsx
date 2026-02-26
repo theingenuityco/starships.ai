@@ -764,8 +764,8 @@ export function ConversationSummaryBar({
 
                     {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
                   </div>
-                </div>
                   {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+                </div>
               </div>
 
               {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}

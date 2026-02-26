@@ -35,7 +35,8 @@
     },
     "@starships/autopilot#build": {
       "inputs": ["$TURBO_DEFAULT$", "scripts/**", ".env", ".env.local"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "@starships/protocol#build": {
       "dependsOn": ["@starships/autopilot#build"],
@@ -48,7 +49,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/models#build": {
-      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
@@ -82,6 +83,11 @@
     },
     "@starships/autopilot#dev": {
       "dependsOn": ["@starships/autopilot#build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@starships/models#dev": {
+      "dependsOn": ["@starships/autopilot#build", "^build"],
       "cache": false,
       "persistent": true
     },
@@ -134,7 +140,7 @@
       "outputs": []
     },
     "@starships/models#lint": {
-      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -156,11 +162,12 @@
       "outputs": []
     },
     "@starships/models#type-check": {
-      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "tsconfig.json",
         "../../packages/env/dist/**",
+        "../../packages/autopilot/dist/**",
         "../../packages/errors/dist/**",
         "../../packages/protocol/dist/**"
       ],

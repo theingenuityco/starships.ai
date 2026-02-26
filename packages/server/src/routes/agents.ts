@@ -8,6 +8,7 @@ import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentModel } from '@starships/protocol';
 import type { AuthUser } from '@starships/protocol';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '@starships/protocol';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
@@ -17,6 +18,7 @@ import { AttachmentService } from '@/services/AttachmentService';
 import { ImportExportService } from '@/services/ImportExportService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
+import { generatePresignedUploadUrl } from '@/utils/s3-helper';
 
 const router: Router = Router();
 
@@ -510,13 +512,20 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
            * full_chain: regenerate avatarPrompt by asking the agent ("mirror"), save it,
            * then generate a new avatar using that regenerated prompt.
            */
-          mode: z.enum(['avatar_only', 'full_chain']).optional(),
+          mode: z.enum(['avatar_only', 'full_chain', 'migrate_2d_to_3d']).optional(),
+          /**
+           * Optional style switch for avatar generation.
+           * - '3d': current pipeline (default)
+           * - '2d': legacy pipeline
+           */
+          avatarMode: z.enum(['2d', '3d']).optional(),
         }),
         (req.body ?? {}) as unknown,
         res,
         'avatar generation options'
       ) ?? {};
     const mode = bodyValidation.mode ?? 'avatar_only';
+    const avatarMode = bodyValidation.avatarMode;
 
     const agentService = new AgentService();
     const agent = await agentService.getAgent(agentId);
@@ -536,8 +545,56 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       runtimeEnv: { STARSHIP_ID: agent.starshipId },
     });
 
-    // Ensure we have an agent-authored "mirror" description saved for this agent.
+    // Avatar generator
     const generator = new AvatarGenerationService();
+
+    // Special mode: migrate legacy 2D avatar to 3D using the existing avatar image as reference.
+    if (mode === 'migrate_2d_to_3d') {
+      if (!agent.avatarAttachmentId) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent has no existing avatar to migrate', 400);
+        return;
+      }
+
+      // Resolve a presigned inline URL for the current avatar so the image model can fetch it.
+      const attachmentService = new AttachmentService();
+      const refs = await attachmentService.getAttachmentsBatch([agent.avatarAttachmentId], agent.starshipId);
+      const refUrl = refs?.[0]?.previewUrl;
+      if (!refUrl) {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to resolve reference avatar URL', 500);
+        return;
+      }
+
+      const gen = await generator.generateAvatar3DFromReference({
+        subjectName: agent.name,
+        subjectDescription: agent.description,
+        starshipId: agent.starshipId,
+        referenceImageUrl: refUrl,
+        engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
+      });
+
+      // Store as attachment (auth-scoped)
+      const filename = `agent-${agent.slug || agent.id}-avatar.${
+        gen.mimeType.includes('webp') ? 'webp' : gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'
+      }`;
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-avatar-${agent.id}`,
+        filename,
+        mimeType: gen.mimeType,
+        buffer: gen.buffer,
+      });
+
+      // Persist link on agent
+      const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id });
+
+      sendSuccess(res, {
+        agent: updated,
+        attachment,
+      });
+      return;
+    }
+
+    // Ensure we have an agent-authored "mirror" description saved for this agent.
     let avatarPrompt = agent.avatarPrompt;
     if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
       if (!agent.blueprint) {
@@ -550,7 +607,8 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       }
       const mirrorResult = await generator.generateMirrorDescription({
         agentName: agent.name,
-        agentDescription: agent.description,
+        agentRole: agent.role,
+        agentSystemPrompt: agent.systemPrompt,
         agentModel: agent.model,
         agentBlueprint: agent.blueprint,
         agentTools:
@@ -571,6 +629,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       subjectDescription: agent.description,
       subjectAvatarPrompt: avatarPrompt,
       starshipId: agent.starshipId,
+      ...(avatarMode ? { avatarMode } : {}),
       engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
     });
 
@@ -596,6 +655,151 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     });
   } catch (error) {
     handleError(error, res, 'generating agent avatar');
+  }
+});
+
+/**
+ * POST /agents/:id/avatar/upload/init
+ * Initiate an avatar upload by returning a presigned PUT URL.
+ */
+router.post(
+  '/agents/:id/avatar/upload/init',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+      if (!paramValidation) return;
+      const { id: agentId } = paramValidation;
+
+      const bodyValidation = validateData(
+        z.object({
+          filename: z.string().min(1).max(255),
+          mimeType: z.string().min(1).max(200),
+          sizeBytes: z.number().int().min(1).max(MAX_FILE_SIZE),
+        }),
+        req.body,
+        res,
+        'avatar upload init body'
+      );
+      if (!bodyValidation) return;
+      const { filename, mimeType, sizeBytes } = bodyValidation;
+
+      if (!String(mimeType).startsWith('image/')) {
+        sendError(res, 'VALIDATION_ERROR', 'Only image uploads are supported for avatars', 400);
+        return;
+      }
+
+      if (!ALLOWED_MIME_TYPES.includes(mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
+        sendError(res, 'VALIDATION_ERROR', `File type '${mimeType}' not allowed`, 400);
+        return;
+      }
+
+      if (sizeBytes > MAX_FILE_SIZE) {
+        sendError(res, 'VALIDATION_ERROR', `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`, 400);
+        return;
+      }
+
+      const agentService = new AgentService();
+      const agent = await agentService.getAgent(agentId);
+      if (!agent) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+        return;
+      }
+
+      const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+      if (!hasAccess) return;
+
+      sendSuccess(res, {
+        upload: await generatePresignedUploadUrl({
+          starshipId: agent.starshipId,
+          conversationId: `agent-avatar-${agent.id}`,
+          filename,
+          mimeType,
+          expiresIn: 60,
+        }),
+      });
+    } catch (error) {
+      handleError(error, res, 'initiating agent avatar upload');
+    }
+  }
+);
+
+/**
+ * POST /agents/:id/avatar/upload/complete
+ * Finalize an avatar upload by creating an attachment record referencing the uploaded S3 object
+ * and setting avatarAttachmentId on the agent.
+ */
+router.post('/agents/:id/avatar/upload/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+    const { id: agentId } = paramValidation;
+
+    const bodyValidation = validateData(
+      z.object({
+        s3Key: z.string().min(1).max(2048),
+        filename: z.string().min(1).max(255),
+        mimeType: z.string().min(1).max(200),
+        sizeBytes: z.number().int().min(1).max(MAX_FILE_SIZE),
+      }),
+      req.body,
+      res,
+      'avatar upload complete body'
+    );
+    if (!bodyValidation) return;
+
+    const { s3Key, filename, mimeType, sizeBytes } = bodyValidation;
+
+    if (!String(mimeType).startsWith('image/')) {
+      sendError(res, 'VALIDATION_ERROR', 'Only image uploads are supported for avatars', 400);
+      return;
+    }
+    if (!ALLOWED_MIME_TYPES.includes(mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
+      sendError(res, 'VALIDATION_ERROR', `File type '${mimeType}' not allowed`, 400);
+      return;
+    }
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const expectedPrefix = `starship-${agent.starshipId}/conv-agent-avatar-${agent.id}/`;
+    if (!String(s3Key).startsWith(expectedPrefix)) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid upload key', 400);
+      return;
+    }
+
+    // Best-effort delete old avatar attachment to avoid orphaned files
+    if (agent.avatarAttachmentId) {
+      const attachmentService = new AttachmentService();
+      try {
+        await attachmentService.deleteAttachment(agent.avatarAttachmentId, agent.starshipId);
+      } catch (e) {
+        console.warn('[AGENT-AVATAR] Failed to delete previous avatar attachment:', e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    const attachmentService = new AttachmentService();
+    const safeFilename = String(filename || 'avatar').replace(/[^\w.-]+/g, '_');
+    const attachment = await attachmentService.createAttachmentReference({
+      starshipId: agent.starshipId,
+      filename: safeFilename.length > 0 ? safeFilename : `agent-${agent.slug || agent.id}-avatar`,
+      mimeType,
+      s3Key,
+      sizeBytes,
+    });
+
+    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id });
+
+    sendSuccess(res, { agent: updated, attachment });
+  } catch (error) {
+    handleError(error, res, 'completing agent avatar upload');
   }
 });
 

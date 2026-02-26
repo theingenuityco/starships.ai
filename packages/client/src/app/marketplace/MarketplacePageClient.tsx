@@ -24,8 +24,10 @@ import ExploreCTA from '@/app/components/ExploreCTA'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipsForDeploySelection } from '@/hooks/useStarships'
 
-const MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
-type MarketplaceTab = (typeof MARKETPLACE_TABS)[number]
+const ALL_MARKETPLACE_TABS = ['all', 'agents', 'tools', 'connectors'] as const
+type MarketplaceTab = (typeof ALL_MARKETPLACE_TABS)[number]
+// Tabs shown in the hero navigation (we no longer surface "All" or "Automations" there).
+const MARKETPLACE_TABS: MarketplaceTab[] = ['agents', 'connectors']
 
 const MAX_LISTING_RESULTS = 9
 
@@ -39,7 +41,7 @@ function excludeInternalStarshipsConnectorFromTotal(total: number): number {
 }
 
 function isMarketplaceTab(value: string): value is MarketplaceTab {
-  return (MARKETPLACE_TABS as readonly string[]).includes(value)
+  return (ALL_MARKETPLACE_TABS as readonly string[]).includes(value)
 }
 
 const TAB_TO_ROUTE: Record<MarketplaceTab, string> = {
@@ -60,12 +62,15 @@ export default function MarketplacePageClient(props: {
   initialToolTemplates?: ToolTemplateModel[]
   initialConnectorCatalog?: ConnectorCatalogItem[]
   activeTab?: MarketplaceTab
+  showConnectors?: boolean
   initialTotals?: { agents: number; tools: number; connectors: number }
   pagination?: { page: number; limit: number; total: number; has_next: boolean; has_prev: boolean }
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  const showConnectors = props.showConnectors ?? true
 
   // Authenticated users: show connector connection state on listing cards.
   const { userId, isAuthenticated } = useAuth()
@@ -92,6 +97,10 @@ export default function MarketplacePageClient(props: {
     ? (String(props.activeTab).trim().toLowerCase() as MarketplaceTab)
     : 'all'
 
+  // `/explore` uses tab="all" but we sometimes want it to behave like "agents only"
+  // (no connectors/tools, no tab strip, full agent pagination).
+  const agentsOnlyLanding = tab === 'all' && !showConnectors
+
   const [searchText, setSearchText] = useState<string>('')
   const [debouncedSearch, setDebouncedSearch] = useState<string>('')
 
@@ -109,11 +118,11 @@ export default function MarketplacePageClient(props: {
 
   const useServerInitialAgents = initialAgentTemplates.length > 0
   const useServerInitialTools = initialToolTemplates.length > 0
-  const useServerInitialConnectors = initialConnectorCatalog.length > 0
+  const useServerInitialConnectors = showConnectors && initialConnectorCatalog.length > 0
 
   const shouldNeedAgents = tab === 'all' || tab === 'agents'
-  const shouldNeedTools = tab === 'all' || tab === 'tools'
-  const shouldNeedConnectors = tab === 'all' || tab === 'connectors'
+  const shouldNeedTools = !agentsOnlyLanding && (tab === 'all' || tab === 'tools')
+  const shouldNeedConnectors = showConnectors && (tab === 'all' || tab === 'connectors')
 
   const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents && shouldNeedAgents)
   const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools && shouldNeedTools)
@@ -123,17 +132,20 @@ export default function MarketplacePageClient(props: {
   // If the page shipped server-provided initial templates/catalog, keep using them on hydration.
   const agentTemplates = (useServerInitialAgents ? initialAgentTemplates : (agentData ?? [])) as AgentTemplateModel[]
   const toolTemplates = (useServerInitialTools ? initialToolTemplates : (toolData ?? [])) as ToolTemplateModel[]
-  const connectorCatalog = (useServerInitialConnectors ? initialConnectorCatalog : (connectorData ?? [])) as ConnectorCatalogItem[]
+  const connectorCatalog = (showConnectors
+    ? (useServerInitialConnectors ? initialConnectorCatalog : (connectorData ?? []))
+    : []) as ConnectorCatalogItem[]
 
   const agentTemplatesLoading = agentLoadingRaw && !useServerInitialAgents
   const toolTemplatesLoading = toolLoadingRaw && !useServerInitialTools
-  const connectorsLoading = connectorLoadingRaw && !useServerInitialConnectors
+  const connectorsLoading = showConnectors && connectorLoadingRaw && !useServerInitialConnectors
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 
   const q = debouncedSearch.trim()
   const shouldUseServerSearch = q.length > 0
-  const serverSearch = useExploreSearch({ q: debouncedSearch, type: tab, limit: 18, enabled: shouldUseServerSearch })
+  const serverSearchType = agentsOnlyLanding ? 'agents' : tab
+  const serverSearch = useExploreSearch({ q: debouncedSearch, type: serverSearchType, limit: 18, enabled: shouldUseServerSearch })
   const isSearching = shouldUseServerSearch && (serverSearch.isFetching || serverSearch.isLoading)
 
   const agentsMatchingSearch = useMemo(() => {
@@ -154,8 +166,8 @@ export default function MarketplacePageClient(props: {
   const agentsVisible = useMemo(() => {
     if (shouldUseServerSearch) return agentsMatchingSearch
     // Only cap results on the "All" tab sections.
-    return tab === 'all' ? agentsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : agentsMatchingSearch
-  }, [agentsMatchingSearch, shouldUseServerSearch, tab])
+    return tab === 'all' && !agentsOnlyLanding ? agentsMatchingSearch.slice(0, MAX_LISTING_RESULTS) : agentsMatchingSearch
+  }, [agentsMatchingSearch, agentsOnlyLanding, shouldUseServerSearch, tab])
 
   const toolsVisible = useMemo(() => {
     if (shouldUseServerSearch) return toolsMatchingSearch
@@ -196,14 +208,16 @@ export default function MarketplacePageClient(props: {
         ? (initialTotals?.tools ?? toolsMatchingSearch.length)
         : toolsMatchingSearch.length
 
-    const connectorsRaw = shouldUseServerSearch
-      ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
-      : shouldTrustInitialTotals
-        ? (initialTotals?.connectors ?? connectorsMatchingSearch.length)
-        : connectorsMatchingSearch.length
-    const connectors = excludeInternalStarshipsConnectorFromTotal(connectorsRaw)
+    const connectorsRaw = !showConnectors
+      ? 0
+      : shouldUseServerSearch
+        ? (serverSearch.data?.totals?.connectors ?? connectorsMatchingSearch.length)
+        : shouldTrustInitialTotals
+          ? (initialTotals?.connectors ?? connectorsMatchingSearch.length)
+          : connectorsMatchingSearch.length
+    const connectors = showConnectors ? excludeInternalStarshipsConnectorFromTotal(connectorsRaw) : 0
     return {
-      all: agents + tools + connectors,
+      all: showConnectors ? agents + tools + connectors : agents,
       agents,
       tools,
       connectors,
@@ -218,6 +232,7 @@ export default function MarketplacePageClient(props: {
     serverSearch.data?.totals?.agents,
     serverSearch.data?.totals?.tools,
     serverSearch.data?.totals?.connectors,
+    showConnectors,
     shouldUseServerSearch,
     useServerInitialAgents,
     useServerInitialTools,
@@ -225,10 +240,12 @@ export default function MarketplacePageClient(props: {
   ])
 
   const pagination = props.pagination
-  const hasPagination = !shouldUseServerSearch && tab !== 'all' && !!pagination && (pagination.has_next || pagination.has_prev)
+  const hasPagination =
+    !shouldUseServerSearch && (!!pagination && (pagination.has_next || pagination.has_prev)) && (tab !== 'all' || agentsOnlyLanding)
 
   function routeForPage(t: MarketplaceTab, page: number): string {
-    const base = TAB_TO_ROUTE[t]
+    const routingTab: MarketplaceTab = agentsOnlyLanding ? 'agents' : t
+    const base = TAB_TO_ROUTE[routingTab]
     const p = Math.max(1, Math.floor(page))
     if (p <= 1) return base
     return `${base}/page/${p}`
@@ -363,7 +380,7 @@ export default function MarketplacePageClient(props: {
 
   const activeCount = countsByTab[tab]
   // Initial list loading (no query). Search loading is handled separately (Members-style).
-  const isAllLoading = agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
+  const isAllLoading = agentsOnlyLanding ? agentTemplatesLoading : agentTemplatesLoading || toolTemplatesLoading || connectorsLoading
   const activeLoading = shouldUseServerSearch ? false : tab === 'all' ? isAllLoading : tab === 'agents' ? agentTemplatesLoading : tab === 'tools' ? toolTemplatesLoading : connectorsLoading
 
   const renderCenteredState = (message: string) => {
@@ -406,10 +423,35 @@ export default function MarketplacePageClient(props: {
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
   const hero = useMemo(() => {
-    const t = tab === 'all' ? 'Explore' : tab === 'agents' ? 'Explore agents' : tab === 'tools' ? 'Explore automations' : 'Explore connectors'
-    const subtitle = 'Search and install agents, automations, and connectors.'
-    return { title: t, subtitle }
-  }, [tab])
+    let title: string
+    let subtitle: string
+    let placeholder: string
+
+    if (tab === 'agents') {
+      title = 'Explore agents'
+      subtitle = 'Search and install agents for your business.'
+      placeholder = 'Search agents'
+    } else if (tab === 'tools') {
+      title = 'Explore automations'
+      subtitle = 'Search and install automations for your agents.'
+      placeholder = 'Search automations'
+    } else if (tab === 'connectors') {
+      title = 'Explore connectors'
+      subtitle = 'Search and connect apps and services to your starships.'
+      placeholder = 'Search connectors'
+    } else {
+      // "All" landing page
+      title = agentsOnlyLanding ? 'Explore agents' : 'Explore'
+      subtitle = agentsOnlyLanding
+        ? 'Search and install agents for your business.'
+        : showConnectors
+          ? 'Search and install agents and connectors.'
+          : 'Search and install agents.'
+      placeholder = agentsOnlyLanding ? 'Search agents' : showConnectors ? 'Search agents and connectors' : 'Search agents'
+    }
+
+    return { title, subtitle, placeholder }
+  }, [agentsOnlyLanding, showConnectors, tab])
 
   const renderConnectorCard = useCallback(
     (c: ConnectorCatalogItem, idx: number) => {
@@ -548,12 +590,12 @@ export default function MarketplacePageClient(props: {
           <div className="relative">
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
               {/* Hero (transparent, normal container width) */}
-              <div className="pt-10 sm:pt-12 pb-6">
+              <div className="pt-4 sm:pt-6 pb-3">
                 <div className="flex flex-col items-center text-center">
-                  <h1 className="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">{hero.title}</h1>
-                  <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-2xl">{hero.subtitle}</p>
+                  <h1 className="mt-0 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">{hero.title}</h1>
+                  <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl">{hero.subtitle}</p>
 
-                  <div className="mt-6 max-w-2xl mx-auto w-full">
+                  <div className="mt-4 max-w-2xl mx-auto w-full">
                     <div
                       className={
                         // Match ConversationMessageInput "minimal/compact" composer styling:
@@ -565,7 +607,7 @@ export default function MarketplacePageClient(props: {
                         <span className="flex flex-shrink-0 items-center justify-center p-1.5 rounded-lg text-muted-foreground">
                           <Icon name="search" className="h-5 w-5" />
                         </span>
-                        <Input
+                          <Input
                           value={searchText}
                           onChange={e => setSearchText(e.target.value)}
                           onKeyDown={e => {
@@ -574,7 +616,7 @@ export default function MarketplacePageClient(props: {
                               if (q) track({ type: 'marketplace_search_used', query: q })
                             }
                           }}
-                          placeholder="Search agents, tools, and connectors"
+                          placeholder={hero.placeholder}
                           aria-label="Search Explore"
                           className="h-auto border-0 bg-transparent shadow-none p-0 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
@@ -584,34 +626,40 @@ export default function MarketplacePageClient(props: {
                 </div>
               </div>
 
-              <div className="pb-2">
-                <nav aria-label="Explore categories" className="flex justify-center">
-                  <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
-                    <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
-                      {MARKETPLACE_TABS.map(t => {
-                        const label = t === 'all' ? 'All' : t === 'agents' ? 'Agents' : t === 'tools' ? 'Automations' : 'Connectors'
-                        const isActive = tab === t
-                        const isLoading = t === 'all' ? isAllLoading : t === 'agents' ? agentTemplatesLoading : t === 'tools' ? toolTemplatesLoading : connectorsLoading
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => {
-                              track({ type: 'marketplace_tab_selected', tab: t })
-                              router.push(TAB_TO_ROUTE[t])
-                            }}
-                            className={['inline-flex items-center gap-2 text-sm font-medium transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'].join(' ')}
-                          >
-                            <span className={['inline-flex items-baseline gap-2 pb-1 border-b-2', isActive ? 'border-primary' : 'border-transparent'].join(' ')}>
-                              <span>{label}</span>
-                              {!isLoading ? <span className={['tabular-nums', isActive ? 'text-foreground/80' : 'text-muted-foreground'].join(' ')}>({countsByTab[t]})</span> : null}
-                            </span>
-                          </button>
-                        )
-                      })}
+              <div className="pt-0 pb-2">
+                {tab !== 'all' ? (
+                  <nav aria-label="Explore categories" className="flex justify-center">
+                    <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
+                      <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
+                        {(showConnectors ? MARKETPLACE_TABS : (['agents'] as MarketplaceTab[])).map(t => {
+                          const label = t === 'agents' ? 'Agents' : 'Connectors'
+                          const isActive = tab === t
+                          const isLoading = t === 'agents' ? agentTemplatesLoading : connectorsLoading
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => {
+                                track({ type: 'marketplace_tab_selected', tab: t })
+                                router.push(TAB_TO_ROUTE[t])
+                              }}
+                              className={['inline-flex items-center gap-2 text-sm font-medium transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'].join(' ')}
+                            >
+                              <span className={['inline-flex items-baseline gap-2 pb-1 border-b-2', isActive ? 'border-primary' : 'border-transparent'].join(' ')}>
+                                <span>{label}</span>
+                                {!isLoading ? (
+                                  <span className={['tabular-nums', isActive ? 'text-foreground/80' : 'text-muted-foreground'].join(' ')}>
+                                    ({countsByTab[t]})
+                                  </span>
+                                ) : null}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                </nav>
+                  </nav>
+                ) : null}
               </div>
 
               {/* Results */}
@@ -626,82 +674,66 @@ export default function MarketplacePageClient(props: {
                   </div>
                 ) : activeCount > 0 ? (
                   tab === 'all' ? (
-                    <div className="space-y-10">
-                      {agentsVisible.length > 0 ? (
-                        <section>
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular agents</h2>
-                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
-                                {agentsVisible.length}
-                              </Badge>
+                    agentsOnlyLanding ? (
+                      <section>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                            <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                              <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                            </motion.div>
+                          ))}
+                        </div>
+                        {renderPaginationNav()}
+                      </section>
+                    ) : (
+                      <div className="space-y-10">
+                        {agentsVisible.length > 0 ? (
+                          <section>
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex items-center gap-3">
+                                <h2 className="text-lg font-semibold leading-tight text-foreground">Popular agents</h2>
+                                <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                  {agentsVisible.length}
+                                </Badge>
+                              </div>
+                              <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
+                                <span>Explore all agents</span>
+                                <Icon name="chevron-right" className="h-4 w-4" />
+                              </button>
                             </div>
-                            <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
-                              <span>Explore all agents</span>
-                              <Icon name="chevron-right" className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
-                              <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
-                                <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
-                              </motion.div>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                              {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                                <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                                  <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                                </motion.div>
+                              ))}
+                            </div>
+                          </section>
+                        ) : null}
 
-                      {toolsVisible.length > 0 ? (
-                        <section>
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular automations</h2>
-                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
-                                {toolsVisible.length}
-                              </Badge>
-                            </div>
-                            <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.tools)}>
-                              <span>Explore all automations</span>
-                              <Icon name="chevron-right" className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                            {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
-                              <motion.div
-                                key={template.id || `${idx}`}
-                                initial={{ opacity: 0, y: 14 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.04 }}
+                        {showConnectors && connectorsVisible.length > 0 ? (
+                          <section>
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex items-center gap-3">
+                                <h2 className="text-lg font-semibold leading-tight text-foreground">Popular connectors</h2>
+                                <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                  {connectorsVisibleFiltered.length}
+                                </Badge>
+                              </div>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
+                                onClick={() => router.push(TAB_TO_ROUTE.connectors)}
                               >
-                                <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
-                              </motion.div>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {connectorsVisible.length > 0 ? (
-                        <section>
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex items-center gap-3">
-                              <h2 className="text-lg font-semibold leading-tight text-foreground">Popular connectors</h2>
-                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
-                                {connectorsVisibleFiltered.length}
-                              </Badge>
+                                <span>Explore all connectors</span>
+                                <Icon name="chevron-right" className="h-4 w-4" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
-                              onClick={() => router.push(TAB_TO_ROUTE.connectors)}
-                            >
-                              <span>Explore all connectors</span>
-                              <Icon name="chevron-right" className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
-                        </section>
-                      ) : null}
-                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
+                          </section>
+                        ) : null}
+                      </div>
+                    )
                   ) : tab === 'agents' ? (
                     <section>
                       <div className="mb-4 flex items-center justify-between gap-3">

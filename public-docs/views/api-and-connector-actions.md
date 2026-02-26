@@ -78,7 +78,12 @@ When using `connector_action` with the Starships connector (`connector: "starshi
 - `update-view`
 - `delete-view`
 - `attach-view-to-channel` (attach/detach a view to a channel)
+- `get-view-widgets` (list persisted view widget nodes)
+- `update-view-widget` (upsert/update a single view widget node; props are merged)
+- `patch-view-root` (apply RFC6902 JSON Patch ops to the persisted structure-only root)
 
 Notes:
 - `create-view` / `update-view` use `{ root, runtimeConfig }` (not legacy `layout`).
-- Legacy widget attach/detach actions were removed; edit the view `root` tree instead.
+- For large views, prefer per-node updates:
+  - Use `patch-view-root` to add/move/remove node ids (structure)
+  - Use `update-view-widget` to update a single node’s `type/props/bindings/handlers`

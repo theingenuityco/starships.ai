@@ -52,10 +52,10 @@ export async function up(client: DbClient): Promise<void> {
     };
     const createMapping = {
       body: {
-        starshipId: '{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}',
+        starshipId: '{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? "") }}',
         name: '{{ args.name }}',
         slug: '{{ args.slug }}',
-        description: '{{ args.description ?? \"\" }}',
+        description: '{{ args.description ?? "" }}',
         root: '{{ args.root }}',
         runtimeConfig: '{{ args.runtimeConfig }}',
       },
@@ -75,7 +75,7 @@ export async function up(client: DbClient): Promise<void> {
       additionalProperties: true,
     };
     const updateMapping = {
-      path: { viewId: '{{ String(args.viewId ?? args.id ?? \"\") }}' },
+      path: { viewId: '{{ String(args.viewId ?? args.id ?? "") }}' },
       body: {
         name: '{{ args.name }}',
         description: '{{ args.description }}',

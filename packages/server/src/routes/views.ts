@@ -10,7 +10,8 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ViewStreamBus } from '@/services/ViewStreamBus';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { ExecutionItemUtils, RunnerFactory, type Blueprint, type EngineConfig } from '@starships/autopilot';
-import { ToolRepository } from '@starships/models';
+import { ToolRepository, ViewWidgetRepository } from '@starships/models';
+import { applyPatch } from 'fast-json-patch';
 
 const router: Router = Router();
 
@@ -29,6 +30,36 @@ const WidgetInstanceNodeSchema: z.ZodTypeAny = z.lazy(() =>
 );
 
 const RuntimeConfigSchema = z.record(z.string(), z.unknown()).default({});
+
+const ViewNodeIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .refine((val) => /^[a-z0-9_-]+$/i.test(val), { message: 'Invalid node id' });
+
+const ViewWidgetUpsertSchema = z
+  .object({
+    type: z.string().min(1).max(200).optional(),
+    props: z.record(z.string(), z.unknown()).optional(),
+    bindings: z.record(z.string(), z.unknown()).nullable().optional(),
+    handlers: z.record(z.string(), z.unknown()).nullable().optional(),
+    permissions: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .strict();
+
+const ViewPatchOpSchema = z.object({
+  op: z.enum(['add', 'remove', 'replace', 'move', 'copy', 'test']),
+  path: z.string().min(1),
+  from: z.string().optional(),
+  value: z.unknown().optional(),
+});
+
+const PatchViewRootSchema = z
+  .object({
+    patch: z.array(ViewPatchOpSchema).min(1),
+  })
+  .strict();
 
 const SearchViewsQuerySchema = z.object({
   name: z.preprocess(
@@ -213,6 +244,116 @@ router.get('/views/:id', jwtAuthMiddleware, async (req: Request, res: Response) 
     return sendSuccess(res, view);
   } catch (error) {
     return handleError(error, res, 'fetch view');
+  }
+});
+
+/**
+ * GET /api/v1/views/:id/widgets
+ * List persisted view widget nodes (view_widgets rows)
+ */
+router.get('/views/:id/widgets', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  const idValidated = validateData(IdSchema, req.params.id, res, 'validate view ID');
+  if (!idValidated) return;
+
+  try {
+    const userId = req.user!.id;
+    const viewRepo = new ViewRepository();
+    const view = await viewRepo.findById(idValidated);
+    if (!view) return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
+    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
+
+    const viewWidgetRepo = new ViewWidgetRepository();
+    const widgets = await viewWidgetRepo.listByView(view.id);
+    return sendSuccess(res, widgets);
+  } catch (error) {
+    return handleError(error, res, 'list view widgets');
+  }
+});
+
+/**
+ * PATCH /api/v1/views/:id/widgets/:nodeId
+ * Upsert a single view widget node (merges props on update)
+ */
+router.patch('/views/:id/widgets/:nodeId', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  const viewId = validateData(IdSchema, req.params.id, res, 'validate view ID');
+  if (!viewId) return;
+  const nodeId = validateData(ViewNodeIdSchema, req.params.nodeId, res, 'validate nodeId');
+  if (!nodeId) return;
+
+  const body = validateData(ViewWidgetUpsertSchema, req.body, res, 'validate view widget update body');
+  if (!body) return;
+
+  try {
+    const userId = req.user!.id;
+    const viewRepo = new ViewRepository();
+    const view = await viewRepo.findById(viewId);
+    if (!view) return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
+    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
+
+    const viewWidgetRepo = new ViewWidgetRepository();
+    const updated = await viewWidgetRepo.upsertOne(viewId, nodeId, body);
+
+    // Bump view version (best-effort; not required for correctness today).
+    try {
+      await viewRepo.update(viewId, { version: (view.version || 1) + 1 });
+    } catch {
+      /* ignore */
+    }
+
+    // Live update open view streams by overlaying updated props.
+    try {
+      const bus = ViewStreamBus.getInstance();
+      const at = new Date().toISOString();
+      await bus.publish(viewId, {
+        type: 'state',
+        data: { viewId, at, patch: [{ path: `_props.${nodeId}`, value: updated.props }] },
+      });
+    } catch {
+      /* best-effort */
+    }
+
+    return sendSuccess(res, updated);
+  } catch (error) {
+    return handleError(error, res, 'update view widget');
+  }
+});
+
+/**
+ * PATCH /api/v1/views/:id/root
+ * Apply JSON Patch ops to the persisted structure-only view root.
+ *
+ * Note: this endpoint only mutates structure (node ids + children arrays).
+ * Widget content lives in view_widgets and is edited separately.
+ */
+router.patch('/views/:id/root', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  const viewId = validateData(IdSchema, req.params.id, res, 'validate view ID');
+  if (!viewId) return;
+
+  const body = validateData(PatchViewRootSchema, req.body, res, 'validate view root patch body');
+  if (!body) return;
+
+  try {
+    const userId = req.user!.id;
+    const viewRepo = new ViewRepository();
+    const view = await viewRepo.findById(viewId);
+    if (!view) return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
+    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
+
+    const persistedRoot = await viewRepo.getPersistedRootById(viewId);
+    if (!persistedRoot || typeof persistedRoot !== 'object') {
+      return sendError(res, 'VALIDATION_ERROR', 'Persisted view root is missing', 400);
+    }
+
+    // Apply RFC6902 patch to the persisted root
+    const patched = applyPatch(structuredClone(persistedRoot), body.patch as any, true, false).newDocument;
+
+    const updatedView = await viewRepo.updateStructureRoot(viewId, patched);
+
+    // (Optional) live update open streams by publishing a patch_root event.
+    // For now, we rely on structure changes being reflected on refresh/reconnect.
+    return sendSuccess(res, updatedView);
+  } catch (error) {
+    return handleError(error, res, 'patch view root');
   }
 });
 

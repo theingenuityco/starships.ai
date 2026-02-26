@@ -30,6 +30,12 @@ export { createWidgetToolTemplate } from './create-widget';
 export { updateWidgetToolTemplate } from './update-widget';
 export { searchWidgetsToolTemplate } from './search-widgets';
 export { renderWidgetToolTemplate } from './render-widget';
+export { searchViewsToolTemplate } from './search-views';
+export { getViewToolTemplate } from './get-view';
+export { createViewToolTemplate } from './create-view';
+export { updateViewToolTemplate } from './update-view';
+export { patchViewRootToolTemplate } from './patch-view-root';
+export { updateViewWidgetToolTemplate } from './update-view-widget';
 export { suggestConnectorsToolTemplate } from './suggest-connectors';
 export { suggestAgentsToolTemplate } from './suggest-agents';
 export { renderStarshipDetailsToolTemplate } from './render-starship-details';
@@ -65,6 +71,12 @@ import { createWidgetToolTemplate } from './create-widget';
 import { updateWidgetToolTemplate } from './update-widget';
 import { searchWidgetsToolTemplate } from './search-widgets';
 import { renderWidgetToolTemplate } from './render-widget';
+import { searchViewsToolTemplate } from './search-views';
+import { getViewToolTemplate } from './get-view';
+import { createViewToolTemplate } from './create-view';
+import { updateViewToolTemplate } from './update-view';
+import { patchViewRootToolTemplate } from './patch-view-root';
+import { updateViewWidgetToolTemplate } from './update-view-widget';
 import { suggestConnectorsToolTemplate } from './suggest-connectors';
 import { suggestAgentsToolTemplate } from './suggest-agents';
 import { renderStarshipDetailsToolTemplate } from './render-starship-details';
@@ -100,6 +112,12 @@ export const ALL_TOOL_TEMPLATES = [
   updateWidgetToolTemplate,
   searchWidgetsToolTemplate,
   renderWidgetToolTemplate,
+  searchViewsToolTemplate,
+  getViewToolTemplate,
+  createViewToolTemplate,
+  updateViewToolTemplate,
+  patchViewRootToolTemplate,
+  updateViewWidgetToolTemplate,
   suggestConnectorsToolTemplate,
   suggestAgentsToolTemplate,
   renderStarshipDetailsToolTemplate,

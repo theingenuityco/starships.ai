@@ -52,6 +52,7 @@
       "@tailwindcss/oxide",
       "core-js-pure",
       "cpu-features",
+      "electron",
       "esbuild",
       "protobufjs",
       "sharp",

@@ -1,0 +1,21 @@
+{
+  "name": "@starships/electron-app",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "electron:build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && pnpm run copy:renderer",
+    "copy:renderer": "mkdir -p dist/renderer && cp src/renderer/index.html dist/renderer/index.html",
+    "electron:start": "NODE_OPTIONS=--no-node-snapshot env -u ELECTRON_RUN_AS_NODE electron .",
+    "electron:dev": "pnpm run electron:build && pnpm run electron:start",
+    "type-check": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist && rm -f tsconfig.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "electron": "^37.4.0",
+    "typescript": "^5.8.3"
+  }
+}
+

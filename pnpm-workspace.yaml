@@ -4,6 +4,7 @@ packages:
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - cpu-features
+  - electron
   - esbuild
 
   - protobufjs

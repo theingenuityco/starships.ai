@@ -1,5 +1,24 @@
 'use client'
 
+import React from 'react'
+
+import { StatCard } from './StatCard'
+import { DataTable } from './DataTable'
+import { MetricGrid } from './MetricGrid'
+import { AreaChart, BarChart, DonutChart, LineChart, PieChart, RadarChart, RadialChart } from './charts'
+import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
+import { AgentSuggestionCard } from './AgentSuggestionCard'
+import { StarshipDetails } from './StarshipDetails'
+
+import { Box } from './primitives/Box'
+import { Stack } from './primitives/Stack'
+import { Grid } from './primitives/Grid'
+import { Text } from './primitives/Text'
+import { ButtonWidget } from './primitives/ButtonWidget'
+import { TabsWidget } from './primitives/TabsWidget'
+
+export type WidgetCategory = 'Layout' | 'Content' | 'Data' | 'Charts' | 'Other'
+
 export type WidgetFieldOption = { label: string; value: string }
 
 export type WidgetField =
@@ -36,10 +55,12 @@ export type WidgetField =
       options: WidgetFieldOption[]
     }
 
-export type WidgetDefinition = {
+export type WidgetCatalogEntry = {
   type: string
+  Component: React.ComponentType<any>
+
   label: string
-  category: 'Layout' | 'Content' | 'Data' | 'Charts' | 'Other'
+  category: WidgetCategory
   acceptsChildren: boolean
   defaultProps: Record<string, unknown>
   fields: WidgetField[]
@@ -65,17 +86,18 @@ const JUSTIFY_OPTIONS: WidgetFieldOption[] = [
   { label: 'space-evenly', value: 'space-evenly' },
 ]
 
-export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
-  Box: {
+export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = Object.freeze([
+  // Layout primitives
+  {
     type: 'Box',
     label: 'Box',
     category: 'Layout',
     acceptsChildren: true,
     defaultProps: { className: '' },
     fields: [{ kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' }],
+    Component: Box,
   },
-
-  Stack: {
+  {
     type: 'Stack',
     label: 'Stack',
     category: 'Layout',
@@ -97,9 +119,9 @@ export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
       { kind: 'boolean', path: 'wrap', label: 'Wrap' },
       { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
     ],
+    Component: Stack,
   },
-
-  Grid: {
+  {
     type: 'Grid',
     label: 'Grid',
     category: 'Layout',
@@ -111,9 +133,23 @@ export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
       { kind: 'number', path: 'minColWidthPx', label: 'Min col width (px)', min: 120, max: 1200, step: 1 },
       { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
     ],
+    Component: Grid,
+  },
+  {
+    type: 'Tabs',
+    label: 'Tabs',
+    category: 'Layout',
+    acceptsChildren: true,
+    defaultProps: { defaultIndex: 0, labels: [], className: '' },
+    fields: [
+      { kind: 'number', path: 'defaultIndex', label: 'Default index', min: 0, max: 50, step: 1 },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    Component: TabsWidget,
   },
 
-  Text: {
+  // Content primitives
+  {
     type: 'Text',
     label: 'Text',
     category: 'Content',
@@ -139,9 +175,9 @@ export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
       { kind: 'textarea', path: 'text', label: 'Text', placeholder: 'Text…', rows: 4 },
       { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
     ],
+    Component: Text,
   },
-
-  Button: {
+  {
     type: 'Button',
     label: 'Button',
     category: 'Content',
@@ -178,23 +214,51 @@ export const WIDGET_DEFINITIONS: Record<string, WidgetDefinition> = {
       { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
     ],
     events: ['click'],
+    Component: ButtonWidget,
   },
 
-  Tabs: {
-    type: 'Tabs',
-    label: 'Tabs',
-    category: 'Layout',
-    acceptsChildren: true,
-    defaultProps: { defaultIndex: 0, labels: [], className: '' },
-    fields: [
-      { kind: 'number', path: 'defaultIndex', label: 'Default index', min: 0, max: 50, step: 1 },
-      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
-    ],
-  },
-}
+  // Data / product-ish widgets
+  { type: 'StatCard', label: 'Stat card', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: StatCard },
+  { type: 'DataTable', label: 'Data table', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: DataTable },
+  { type: 'MetricGrid', label: 'Metric grid', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: MetricGrid },
+  { type: 'StarshipDetails', label: 'Starship details', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: StarshipDetails },
 
-export function getWidgetDefinition(type: string | null | undefined): WidgetDefinition | null {
+  // Charts
+  { type: 'BarChart', label: 'Bar chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: BarChart },
+  { type: 'LineChart', label: 'Line chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: LineChart },
+  { type: 'AreaChart', label: 'Area chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: AreaChart },
+  { type: 'PieChart', label: 'Pie chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: PieChart },
+  { type: 'DonutChart', label: 'Donut chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: DonutChart },
+  { type: 'RadarChart', label: 'Radar chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: RadarChart },
+  { type: 'RadialChart', label: 'Radial chart', category: 'Charts', acceptsChildren: false, defaultProps: {}, fields: [], Component: RadialChart },
+
+  // Other
+  {
+    type: 'ConnectorSuggestionCard',
+    label: 'Connector suggestion card',
+    category: 'Other',
+    acceptsChildren: false,
+    defaultProps: {},
+    fields: [],
+    Component: ConnectorSuggestionCard,
+  },
+  {
+    type: 'AgentSuggestionCard',
+    label: 'Agent suggestion card',
+    category: 'Other',
+    acceptsChildren: false,
+    defaultProps: {},
+    fields: [],
+    Component: AgentSuggestionCard,
+  },
+])
+
+export const WIDGET_CATALOG_BY_TYPE: Record<string, WidgetCatalogEntry> = Object.freeze(
+  Object.fromEntries(WIDGET_CATALOG.map(w => [w.type, w])) as Record<string, WidgetCatalogEntry>
+)
+
+export function getWidgetCatalogEntry(type: string | null | undefined): WidgetCatalogEntry | null {
   if (!type) return null
-  return WIDGET_DEFINITIONS[type] ?? null
+  return WIDGET_CATALOG_BY_TYPE[type] ?? null
 }
 

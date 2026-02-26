@@ -19,8 +19,19 @@ import { ImportExportService } from '@/services/ImportExportService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { generatePresignedUploadUrl } from '@/utils/s3-helper';
+import archiver from 'archiver';
 
 const router: Router = Router();
+
+function safeFilenameSegment(input: string): string {
+  const raw = String(input || '').trim();
+  const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
+  return sanitized.length > 0 ? sanitized : 'export';
+}
+
+function isoCompactTimestamp(): string {
+  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+}
 
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
@@ -300,6 +311,220 @@ router.get('/starships/:starshipId/agents/:slug', jwtAuthMiddleware, async (req:
   } catch (error) {
     console.error('[AGENTS] Error getting agent by slug for starship:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
+  }
+});
+
+/**
+ * GET /agents/:id/export-bundle
+ * Export an agent *and its assigned tools* as an npm-installable tarball (instance admin only).
+ *
+ * IMPORTANT: This route must be defined before GET /agents/:slugOrId.
+ */
+router.get('/agents/:id/export-bundle', jwtAuthMiddleware, requireInstanceAdminMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(paramValidation.id);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
+      return;
+    }
+
+    const svc = new ImportExportService();
+    const bundle = await svc.exportAgentsBundle([paramValidation.id]);
+    const agentContainer = bundle.agents[0];
+
+    const fromStarshipSlug = typeof agentContainer?.metadata?.fromStarshipSlug === 'string' ? agentContainer.metadata.fromStarshipSlug : 'starship';
+    const fromAgentSlug = typeof agentContainer?.metadata?.fromSlug === 'string' ? agentContainer.metadata.fromSlug : agent.slug || agent.id;
+
+    const baseName = safeFilenameSegment(`bundle-${fromStarshipSlug}-${fromAgentSlug}-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      throw err;
+    });
+    archive.pipe(res);
+
+    const usedAgentNames = new Set<string>();
+    const agentEntries: Array<{ kind: 'agent'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+    for (let i = 0; i < bundle.agents.length; i += 1) {
+      const a = bundle.agents[i];
+      const slug = typeof a.metadata?.fromSlug === 'string' ? a.metadata.fromSlug : `agent-${i + 1}`;
+      const base = safeFilenameSegment(slug);
+      let outName = base;
+      let n = 2;
+      while (usedAgentNames.has(outName)) {
+        outName = `${base}-${n}`;
+        n += 1;
+      }
+      usedAgentNames.add(outName);
+      const file = `agents/${outName}.json`;
+      agentEntries.push({
+        kind: 'agent',
+        fromSlug: a.metadata?.fromSlug,
+        fromStarshipSlug: a.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(a, null, 2), { name: file });
+    }
+
+    const usedToolNames = new Set<string>();
+    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+    for (let i = 0; i < bundle.tools.length; i += 1) {
+      const t = bundle.tools[i];
+      const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
+      const base = safeFilenameSegment(slug);
+      let outName = base;
+      let n = 2;
+      while (usedToolNames.has(outName)) {
+        outName = `${base}-${n}`;
+        n += 1;
+      }
+      usedToolNames.add(outName);
+      const file = `tools/${outName}.json`;
+      toolEntries.push({
+        kind: 'tool',
+        fromSlug: t.metadata?.fromSlug,
+        fromStarshipSlug: t.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(t, null, 2), { name: file });
+    }
+
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        agents: agentEntries,
+        tools: toolEntries,
+      },
+    };
+
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+
+    await archive.finalize();
+  } catch (error) {
+    if (res.headersSent) {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+      console.error('[AGENTS] Error exporting agent bundle after headers sent:', error);
+      return;
+    }
+    handleError(error, res, 'exporting agent bundle');
+  }
+});
+
+/**
+ * POST /agents/export-bundle
+ * Export multiple agents (and their tools) as a single npm tarball (instance admin only).
+ */
+router.post('/agents/export-bundle', jwtAuthMiddleware, requireInstanceAdminMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const bodyValidation = validateData(
+      z.object({
+        agentIds: z.array(IdSchema).min(1).max(200),
+      }),
+      req.body,
+      res,
+      'bundle export request'
+    );
+    if (!bodyValidation) return;
+
+    const svc = new ImportExportService();
+    const bundle = await svc.exportAgentsBundle(bodyValidation.agentIds);
+
+    const baseName = safeFilenameSegment(`bundle-${bundle.agents.length}-agents-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      throw err;
+    });
+    archive.pipe(res);
+
+    const usedAgentNames = new Set<string>();
+    const agentEntries: Array<{ kind: 'agent'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+    for (let i = 0; i < bundle.agents.length; i += 1) {
+      const a = bundle.agents[i];
+      const slug = typeof a.metadata?.fromSlug === 'string' ? a.metadata.fromSlug : `agent-${i + 1}`;
+      const base = safeFilenameSegment(slug);
+      let outName = base;
+      let n = 2;
+      while (usedAgentNames.has(outName)) {
+        outName = `${base}-${n}`;
+        n += 1;
+      }
+      usedAgentNames.add(outName);
+      const file = `agents/${outName}.json`;
+      agentEntries.push({
+        kind: 'agent',
+        fromSlug: a.metadata?.fromSlug,
+        fromStarshipSlug: a.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(a, null, 2), { name: file });
+    }
+
+    const usedToolNames = new Set<string>();
+    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+    for (let i = 0; i < bundle.tools.length; i += 1) {
+      const t = bundle.tools[i];
+      const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
+      const base = safeFilenameSegment(slug);
+      let outName = base;
+      let n = 2;
+      while (usedToolNames.has(outName)) {
+        outName = `${base}-${n}`;
+        n += 1;
+      }
+      usedToolNames.add(outName);
+      const file = `tools/${outName}.json`;
+      toolEntries.push({
+        kind: 'tool',
+        fromSlug: t.metadata?.fromSlug,
+        fromStarshipSlug: t.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(t, null, 2), { name: file });
+    }
+
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        agents: agentEntries,
+        tools: toolEntries,
+      },
+    };
+
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+
+    await archive.finalize();
+  } catch (error) {
+    if (res.headersSent) {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+      console.error('[AGENTS] Error exporting agents bundle after headers sent:', error);
+      return;
+    }
+    handleError(error, res, 'exporting agents bundle');
   }
 });
 

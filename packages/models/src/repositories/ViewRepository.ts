@@ -1,4 +1,11 @@
-import type { CreateViewRequest, UpdateViewRequest, ViewModel, ViewRuntimeConfig, ViewSearchParams, WidgetInstanceNode } from '@starships/protocol';
+import type {
+  CreateViewRequest,
+  UpdateViewRequest,
+  ViewModel,
+  ViewRuntimeConfig,
+  ViewSearchParams,
+  WidgetInstanceNode,
+} from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { ViewEntity } from '@/entities/ViewEntity';
 import { NotFoundError } from '@starships/errors';
@@ -151,10 +158,10 @@ export class ViewRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const record = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM views WHERE slug = $1 AND starship_id = $2',
-          [slug, starshipId]
-        );
+        const record = await connection.queryOne<Record<string, unknown>>('SELECT * FROM views WHERE slug = $1 AND starship_id = $2', [
+          slug,
+          starshipId,
+        ]);
         if (!record) return null;
         return fromDatabase(ViewEntity, record);
       },
@@ -288,4 +295,3 @@ export class ViewRepository extends BaseRepository {
     );
   }
 }
-

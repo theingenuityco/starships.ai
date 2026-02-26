@@ -31,10 +31,10 @@ export async function up(client: DbClient): Promise<void> {
     const legacyEndpoints: Endpoint[] = Array.isArray(rows[0].endpoints_json) ? (rows[0].endpoints_json as Endpoint[]) : [];
 
     // Remove legacy widget attachment actions.
-    await client.query(
-      `DELETE FROM connector_template_actions WHERE template_id = $1 AND action_name = ANY($2::text[]);`,
-      [templateId, ['attach-widget-to-view', 'detach-widget-from-view']]
-    );
+    await client.query(`DELETE FROM connector_template_actions WHERE template_id = $1 AND action_name = ANY($2::text[]);`, [
+      templateId,
+      ['attach-widget-to-view', 'detach-widget-from-view'],
+    ]);
 
     // Update create-view / update-view to accept root + runtimeConfig.
     const createParams = {
@@ -144,4 +144,3 @@ export async function down(client: DbClient): Promise<void> {
     throw error;
   }
 }
-

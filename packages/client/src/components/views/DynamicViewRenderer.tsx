@@ -68,8 +68,11 @@ export function DynamicViewRenderer(props: { view: ViewModel }) {
         const spec: ViewQuerySpec | undefined =
           queries && Object.prototype.hasOwnProperty.call(queries, queryId) ? queries[queryId as ViewQueryId] : undefined
         if (!spec) return
-
-        const ctx = { state: ((runtimeSlice?.state ?? {}) as Record<string, unknown>) ?? {} }
+        // IMPORTANT:
+        // Queries must use the latest runtime state from the store, not the render-time snapshot.
+        // This matters for script handlers that do `set_state` then `run_query` in the same tick.
+        const latestState = getStateAtPath(view.id, '')
+        const ctx = { state: (isPlainObject(latestState) ? latestState : {}) as Record<string, unknown> }
 
         // v1: http queries execute client-side (same-origin only)
         if (spec.kind === 'http') {

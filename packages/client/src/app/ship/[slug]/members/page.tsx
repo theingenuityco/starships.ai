@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HoverProfilePopover } from '@/components/conversation/HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from '@/components/conversation/ProfileHoverCardContent'
+import { WizardStepper } from '@/components/marketplace/WizardStepper'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAndInvitesPage } from '@/hooks/useStarshipMembers'
 import { STARSHIP_MEMBERS_QUERY_KEYS, useInfiniteStarshipMembers, useRemoveStarshipMember, useRevokeStarshipInvite } from '@/hooks/useStarshipMembers'
@@ -41,6 +42,13 @@ type Filter = 'all' | 'humans' | 'agents'
 type AgentWithAvatar = AgentModel & { avatarAttachmentId?: string | null }
 
 const SKELETON_CARD_COUNT = 2
+type ImportWizardStep = 1 | 2 | 3
+type ImportWizardStepMeta = { id: ImportWizardStep; label: string; subtitle: string }
+const IMPORT_WIZARD_STEPS: ImportWizardStepMeta[] = [
+  { id: 1, label: 'Choose file', subtitle: 'Select a bundle (.zip)' },
+  { id: 2, label: 'Analyze', subtitle: 'Review changes & resolve conflicts' },
+  { id: 3, label: 'Upload', subtitle: 'Confirm & upload' },
+]
 
 function safeFilenameSegment(input: string): string {
   const raw = String(input || '').trim()
@@ -128,6 +136,7 @@ export default function MembersPage() {
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
   const [exportingAgentId, setExportingAgentId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [importStep, setImportStep] = useState<ImportWizardStep>(1)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importAnalysis, setImportAnalysis] = useState<{
     tools: Array<{
@@ -167,6 +176,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     if (!importOpen) return
+    setImportStep(1)
     setImportFile(null)
     setImportAnalysis(null)
     setImportDecisions({ tools: {}, agents: {} })
@@ -177,6 +187,145 @@ export default function MembersPage() {
   const importHasExistingTools = Boolean(importAnalysis?.tools.some(t => t.status !== 'new'))
   const importHasExistingAgents = Boolean(importAnalysis?.agents.some(a => a.status !== 'new'))
   const importHasExisting = importHasExistingTools || importHasExistingAgents
+
+  const importToolDecisionCounts = useMemo(() => {
+    const counts = { skip: 0, copy: 0, overwrite: 0 }
+    const tools = importAnalysis?.tools ?? []
+    for (const t of tools) {
+      const key = String((t as any)?.bundleHash ?? '')
+      const chosen = importDecisions.tools[key]?.action
+      const fallback: 'skip' | 'copy' | 'overwrite' = t.status === 'same' ? 'skip' : 'copy'
+      const action = (chosen ?? fallback) as 'skip' | 'copy' | 'overwrite'
+      counts[action]++
+    }
+    return counts
+  }, [importAnalysis, importDecisions.tools])
+
+  const importAgentDecisionCounts = useMemo(() => {
+    const counts = { skip: 0, copy: 0, overwrite: 0 }
+    const agents = importAnalysis?.agents ?? []
+    for (const a of agents) {
+      const key = String((a as any)?.bundleHash ?? '')
+      const chosen = importDecisions.agents[key]?.action
+      const fallback: 'skip' | 'copy' | 'overwrite' = a.status === 'same' ? 'skip' : 'copy'
+      const action = (chosen ?? fallback) as 'skip' | 'copy' | 'overwrite'
+      counts[action]++
+    }
+    return counts
+  }, [importAnalysis, importDecisions.agents])
+
+  const canGoNextImport = useMemo(() => {
+    if (importStep === 1) return !!importFile && !!starshipIdStr
+    if (importStep === 2) return !!importAnalysis && !isAnalyzingImport
+    return false
+  }, [importStep, importFile, starshipIdStr, importAnalysis, isAnalyzingImport])
+
+  const handleImportBack = () => {
+    if (isAnalyzingImport || isApplyingImport) return
+    if (importStep === 1) {
+      setImportOpen(false)
+      return
+    }
+    if (importStep === 2) {
+      setImportStep(1)
+      setImportAnalysis(null)
+      setImportDecisions({ tools: {}, agents: {} })
+      return
+    }
+    setImportStep(2)
+  }
+
+  const handleImportNext = async () => {
+    if (isAnalyzingImport || isApplyingImport) return
+    if (importStep === 1) {
+      if (!importFile || !starshipIdStr) return
+      setImportStep(2)
+      const ok = await analyzeImportBundle()
+      if (!ok) setImportStep(1)
+      return
+    }
+    if (importStep === 2) {
+      if (!importAnalysis) return
+      setImportStep(3)
+      return
+    }
+    await applyImportBundle()
+  }
+
+  const analyzeImportBundle = async (): Promise<boolean> => {
+    if (!importFile || !starshipIdStr) return false
+    setIsAnalyzingImport(true)
+    try {
+      const token = await getCurrentToken()
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipIdStr)}/import-bundle/analyze`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`Analyze failed (${res.status})`)
+      const json = await res.json()
+      const data = json?.data ?? json
+      setImportAnalysis(data)
+
+      const nextDecisions = {
+        tools: {} as Record<string, { action: 'skip' | 'copy' | 'overwrite'; targetId?: string }>,
+        agents: {} as Record<string, { action: 'skip' | 'copy' | 'overwrite'; targetId?: string }>,
+      }
+      for (const t of (data?.tools ?? []) as any[]) {
+        const status = t?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.tools[String(t.bundleHash)] = { action, targetId: t?.existing?.id }
+      }
+      for (const a of (data?.agents ?? []) as any[]) {
+        const status = a?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.agents[String(a.bundleHash)] = { action, targetId: a?.existing?.id }
+      }
+      setImportDecisions(nextDecisions)
+      return true
+    } catch (error) {
+      toast.error('Analyze failed', { description: getSafeErrorMessage(error) })
+      return false
+    } finally {
+      setIsAnalyzingImport(false)
+    }
+  }
+
+  const applyImportBundle = async (): Promise<boolean> => {
+    if (!importFile || !starshipIdStr || !importAnalysis) return false
+    setIsApplyingImport(true)
+    try {
+      const token = await getCurrentToken()
+      const fd = new FormData()
+      fd.append('file', importFile)
+      fd.append('decisions', JSON.stringify(importDecisions))
+      const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipIdStr)}/import-bundle/apply`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`Import failed (${res.status})`)
+      const json = await res.json()
+      const data = json?.data ?? json
+      const importedTools = Number(data?.imported?.tools ?? 0)
+      const importedAgents = Number(data?.imported?.agents ?? 0)
+      const warnings = Array.isArray(data?.warnings) ? (data.warnings as unknown[]).length : 0
+
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      toast.success('Import complete', {
+        description: `${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
+      })
+      setImportOpen(false)
+      return true
+    } catch (error) {
+      toast.error('Import failed', { description: getSafeErrorMessage(error) })
+      return false
+    } finally {
+      setIsApplyingImport(false)
+    }
+  }
 
   const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50, search: debouncedSearch })
   const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC', search: debouncedSearch })
@@ -1139,246 +1288,268 @@ export default function MembersPage() {
       </Dialog>
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className={cn('sm:max-w-[720px]', importHasExisting ? 'max-h-[85vh] overflow-y-auto' : null)}>
-          <DialogHeader>
-            <DialogTitle>Import bundle</DialogTitle>
-            <DialogDescription>Upload a bundle exported from Members → Agents → Export bundle.</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl h-[80vh] overflow-hidden p-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
+              <DialogTitle>Import bundle</DialogTitle>
+              <DialogDescription>Upload a bundle exported from Members → Agents → Export bundle.</DialogDescription>
+              <div>
+                <WizardStepper currentStep={importStep} steps={IMPORT_WIZARD_STEPS} />
+              </div>
+            </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="bundle-file">Bundle (.zip)</Label>
-              <Input
-                id="bundle-file"
-                type="file"
-                accept=".zip,application/zip"
-                disabled={isAnalyzingImport || isApplyingImport}
-                onChange={e => {
-                  const f = e.target.files?.[0] ?? null
-                  setImportFile(f)
-                  setImportAnalysis(null)
-                  setImportDecisions({ tools: {}, agents: {} })
-                }}
-              />
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              {importStep === 1 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Choose a bundle to import</div>
+                  <div className="space-y-2 max-w-xl">
+                    <Label htmlFor="bundle-file">Bundle (.zip)</Label>
+                    <Input
+                      id="bundle-file"
+                      type="file"
+                      accept=".zip,application/zip"
+                      disabled={isAnalyzingImport || isApplyingImport}
+                      onChange={e => {
+                        const f = e.target.files?.[0] ?? null
+                        setImportFile(f)
+                        setImportAnalysis(null)
+                        setImportDecisions({ tools: {}, agents: {} })
+                      }}
+                    />
+                  </div>
+                  {!importFile ? <div className="text-xs text-muted-foreground max-w-xl">Select a .zip file to continue.</div> : null}
+                </div>
+              ) : null}
+
+              {importStep === 2 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Choose how to resolve these conflicts</div>
+
+                  {isAnalyzingImport ? (
+                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <div className="text-sm font-semibold leading-tight">Analyzing…</div>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">This usually takes a few seconds.</div>
+                    </div>
+                  ) : null}
+
+                  {importAnalysis ? (
+                    <div className="space-y-4">
+                      <div className="space-y-6">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-foreground">Tools</div>
+                            <div className="text-xs text-muted-foreground">{importAnalysis.tools.length} in bundle</div>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {importAnalysis.tools.map(t => {
+                              const decision = importDecisions.tools[t.bundleHash] ?? {
+                                action: t.status === 'same' ? ('skip' as const) : ('copy' as const),
+                                targetId: t.existing?.id,
+                              }
+                              const badge =
+                                t.status === 'same'
+                                  ? { label: 'Same', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }
+                                  : t.status === 'conflict'
+                                    ? { label: 'Conflict', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' }
+                                    : { label: 'New', className: 'bg-muted text-muted-foreground' }
+                              return (
+                                <div key={t.bundleHash} className="rounded-lg border border-border/60 bg-card px-3 py-2 flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', badge.className)}>{badge.label}</span>
+                                      <span className="text-sm font-medium text-foreground truncate">{t.name}</span>
+                                    </div>
+                                    {t.existing ? (
+                                      <div className="mt-1 text-xs text-muted-foreground truncate">
+                                        Existing: {t.existing.name} ({t.existing.slug})
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  <select
+                                    className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
+                                    disabled={isApplyingImport}
+                                    value={decision.action}
+                                    onChange={e => {
+                                      const action = e.target.value as 'skip' | 'copy' | 'overwrite'
+                                      setImportDecisions(prev => ({
+                                        ...prev,
+                                        tools: {
+                                          ...prev.tools,
+                                          [t.bundleHash]: { action, targetId: t.existing?.id },
+                                        },
+                                      }))
+                                    }}
+                                  >
+                                    <option value="skip">Skip</option>
+                                    <option value="copy">Import copy</option>
+                                    <option value="overwrite" disabled={!t.existing}>
+                                      Overwrite existing
+                                    </option>
+                                  </select>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-foreground">Agents</div>
+                            <div className="text-xs text-muted-foreground">{importAnalysis.agents.length} in bundle</div>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {importAnalysis.agents.map(a => {
+                              const decision = importDecisions.agents[a.bundleHash] ?? {
+                                action: a.status === 'same' ? ('skip' as const) : ('copy' as const),
+                                targetId: a.existing?.id,
+                              }
+                              const badge =
+                                a.status === 'same'
+                                  ? { label: 'Same', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }
+                                  : a.status === 'conflict'
+                                    ? { label: 'Conflict', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' }
+                                    : { label: 'New', className: 'bg-muted text-muted-foreground' }
+                              return (
+                                <div key={a.bundleHash} className="rounded-lg border border-border/60 bg-card px-3 py-2 flex items-center justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', badge.className)}>{badge.label}</span>
+                                      <span className="text-sm font-medium text-foreground truncate">{a.name}</span>
+                                    </div>
+                                    {a.existing ? (
+                                      <div className="mt-1 text-xs text-muted-foreground truncate">
+                                        Existing: {a.existing.name} ({a.existing.slug})
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                  <select
+                                    className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
+                                    disabled={isApplyingImport}
+                                    value={decision.action}
+                                    onChange={e => {
+                                      const action = e.target.value as 'skip' | 'copy' | 'overwrite'
+                                      setImportDecisions(prev => ({
+                                        ...prev,
+                                        agents: {
+                                          ...prev.agents,
+                                          [a.bundleHash]: { action, targetId: a.existing?.id },
+                                        },
+                                      }))
+                                    }}
+                                  >
+                                    <option value="skip">Skip</option>
+                                    <option value="copy">Import copy</option>
+                                    <option value="overwrite" disabled={!a.existing}>
+                                      Overwrite existing
+                                    </option>
+                                  </select>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border/60 bg-card/10 p-4">
+                      <div className="text-sm font-semibold text-foreground">No analysis yet</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Press Next to analyze this bundle.</div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {importStep === 3 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Review</div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+                          <Icon name="wrench" className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tools</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground tabular-nums">{importToolDecisionCounts.skip}</span> skipped
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium text-foreground tabular-nums">{importToolDecisionCounts.copy}</span> copied
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium text-foreground tabular-nums">{importToolDecisionCounts.overwrite}</span> upserted
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/50">
+                          <Icon name="bot" className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Agents</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground tabular-nums">{importAgentDecisionCounts.skip}</span> skipped
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium text-foreground tabular-nums">{importAgentDecisionCounts.copy}</span> copied
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="font-medium text-foreground tabular-nums">{importAgentDecisionCounts.overwrite}</span> upserted
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                    <div className="text-sm font-semibold text-foreground">Ready to upload</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Press Upload to import using the decisions you selected.</div>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
-            {importAnalysis ? (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border/60 bg-card px-3 py-3">
-                  <div className="text-sm font-medium text-foreground">Conflicts</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Choose what to do for each item that already exists.</div>
-                </div>
-
-                <div
-                  className={cn(
-                    'space-y-3',
-                    importHasExisting ? 'max-h-[45vh] sm:max-h-[55vh] overflow-y-auto overscroll-contain pr-2' : null,
-                  )}
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-foreground">Tools</div>
-                      <div className="text-xs text-muted-foreground">{importAnalysis.tools.length} in bundle</div>
-                    </div>
-                    <div
-                      className={cn(
-                        'mt-2 space-y-2',
-                        importHasExistingTools ? 'max-h-[28vh] sm:max-h-[32vh] overflow-y-auto overscroll-contain pr-2' : null,
-                      )}
-                    >
-                      {importAnalysis.tools.map(t => {
-                        const decision = importDecisions.tools[t.bundleHash] ?? {
-                          action: t.status === 'same' ? ('skip' as const) : ('copy' as const),
-                          targetId: t.existing?.id,
-                        }
-                        const badge =
-                          t.status === 'same' ? { label: 'Same', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' } : t.status === 'conflict' ? { label: 'Conflict', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' } : { label: 'New', className: 'bg-muted text-muted-foreground' }
-                        return (
-                          <div key={t.bundleHash} className="rounded-lg border border-border/60 bg-card px-3 py-2 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', badge.className)}>{badge.label}</span>
-                                <span className="text-sm font-medium text-foreground truncate">{t.name}</span>
-                              </div>
-                              {t.existing ? (
-                                <div className="mt-1 text-xs text-muted-foreground truncate">
-                                  Existing: {t.existing.name} ({t.existing.slug})
-                                </div>
-                              ) : null}
-                            </div>
-                            <select
-                              className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
-                              disabled={isApplyingImport}
-                              value={decision.action}
-                              onChange={e => {
-                                const action = e.target.value as 'skip' | 'copy' | 'overwrite'
-                                setImportDecisions(prev => ({
-                                  ...prev,
-                                  tools: {
-                                    ...prev.tools,
-                                    [t.bundleHash]: { action, targetId: t.existing?.id },
-                                  },
-                                }))
-                              }}
-                            >
-                              <option value="skip">Skip</option>
-                              <option value="copy">Import copy</option>
-                              <option value="overwrite" disabled={!t.existing}>
-                                Overwrite existing
-                              </option>
-                            </select>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-foreground">Agents</div>
-                      <div className="text-xs text-muted-foreground">{importAnalysis.agents.length} in bundle</div>
-                    </div>
-                    <div
-                      className={cn(
-                        'mt-2 space-y-2',
-                        importHasExistingAgents ? 'max-h-[28vh] sm:max-h-[32vh] overflow-y-auto overscroll-contain pr-2' : null,
-                      )}
-                    >
-                      {importAnalysis.agents.map(a => {
-                        const decision = importDecisions.agents[a.bundleHash] ?? {
-                          action: a.status === 'same' ? ('skip' as const) : ('copy' as const),
-                          targetId: a.existing?.id,
-                        }
-                        const badge =
-                          a.status === 'same' ? { label: 'Same', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' } : a.status === 'conflict' ? { label: 'Conflict', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' } : { label: 'New', className: 'bg-muted text-muted-foreground' }
-                        return (
-                          <div key={a.bundleHash} className="rounded-lg border border-border/60 bg-card px-3 py-2 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', badge.className)}>{badge.label}</span>
-                                <span className="text-sm font-medium text-foreground truncate">{a.name}</span>
-                              </div>
-                              {a.existing ? (
-                                <div className="mt-1 text-xs text-muted-foreground truncate">
-                                  Existing: {a.existing.name} ({a.existing.slug})
-                                </div>
-                              ) : null}
-                            </div>
-                            <select
-                              className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
-                              disabled={isApplyingImport}
-                              value={decision.action}
-                              onChange={e => {
-                                const action = e.target.value as 'skip' | 'copy' | 'overwrite'
-                                setImportDecisions(prev => ({
-                                  ...prev,
-                                  agents: {
-                                    ...prev.agents,
-                                    [a.bundleHash]: { action, targetId: a.existing?.id },
-                                  },
-                                }))
-                              }}
-                            >
-                              <option value="skip">Skip</option>
-                              <option value="copy">Import copy</option>
-                              <option value="overwrite" disabled={!a.existing}>
-                                Overwrite existing
-                              </option>
-                            </select>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
+            <DialogFooter className="shrink-0 px-6 py-4 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
+              <div>
+                <Button type="button" variant="ghost" onClick={() => setImportOpen(false)} disabled={isAnalyzingImport || isApplyingImport}>
+                  Cancel
+                </Button>
               </div>
-            ) : null}
+
+              <div className="flex items-center gap-2">
+                {importStep > 1 ? (
+                  <Button type="button" variant="ghost" onClick={handleImportBack} disabled={isAnalyzingImport || isApplyingImport}>
+                    <Icon name="caret-left" className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                ) : null}
+
+                {importStep < 3 ? (
+                  <Button type="button" variant="primaryOutline" onClick={handleImportNext} disabled={isAnalyzingImport || isApplyingImport || !canGoNextImport} className="min-w-[120px]">
+                    Next
+                    <Icon name="caret-right" className="h-4 w-4 ml-1" />
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={handleImportNext} disabled={isAnalyzingImport || isApplyingImport || !importFile || !starshipIdStr || !importAnalysis} className="min-w-[140px]">
+                    {isApplyingImport ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                        Uploading…
+                      </>
+                    ) : (
+                      <>
+                        Upload
+                        <Icon name="upload" className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </DialogFooter>
           </div>
-
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button type="button" variant="ghost" disabled={isAnalyzingImport || isApplyingImport} onClick={() => setImportOpen(false)}>
-              Close
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={!importFile || !starshipIdStr || isAnalyzingImport || isApplyingImport}
-              onClick={async () => {
-                if (!importFile || !starshipIdStr) return
-                setIsAnalyzingImport(true)
-                try {
-                  const token = await getCurrentToken()
-                  const fd = new FormData()
-                  fd.append('file', importFile)
-                  const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipIdStr)}/import-bundle/analyze`, {
-                    method: 'POST',
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                    body: fd,
-                  })
-                  if (!res.ok) throw new Error(`Analyze failed (${res.status})`)
-                  const json = await res.json()
-                  const data = json?.data ?? json
-                  setImportAnalysis(data)
-
-                  const nextDecisions = { tools: {} as Record<string, { action: 'skip' | 'copy' | 'overwrite'; targetId?: string }>, agents: {} as Record<string, { action: 'skip' | 'copy' | 'overwrite'; targetId?: string }> }
-                  for (const t of (data?.tools ?? []) as any[]) {
-                    const status = t?.status
-                    const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
-                    nextDecisions.tools[String(t.bundleHash)] = { action, targetId: t?.existing?.id }
-                  }
-                  for (const a of (data?.agents ?? []) as any[]) {
-                    const status = a?.status
-                    const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
-                    nextDecisions.agents[String(a.bundleHash)] = { action, targetId: a?.existing?.id }
-                  }
-                  setImportDecisions(nextDecisions)
-                } catch (error) {
-                  toast.error('Analyze failed', { description: getSafeErrorMessage(error) })
-                } finally {
-                  setIsAnalyzingImport(false)
-                }
-              }}
-            >
-              {isAnalyzingImport ? 'Analyzing…' : 'Analyze'}
-            </Button>
-            <Button
-              type="button"
-              disabled={!importFile || !starshipIdStr || !importAnalysis || isAnalyzingImport || isApplyingImport}
-              onClick={async () => {
-                if (!importFile || !starshipIdStr || !importAnalysis) return
-                setIsApplyingImport(true)
-                try {
-                  const token = await getCurrentToken()
-                  const fd = new FormData()
-                  fd.append('file', importFile)
-                  fd.append('decisions', JSON.stringify(importDecisions))
-                  const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipIdStr)}/import-bundle/apply`, {
-                    method: 'POST',
-                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-                    body: fd,
-                  })
-                  if (!res.ok) throw new Error(`Import failed (${res.status})`)
-                  const json = await res.json()
-                  const data = json?.data ?? json
-                  const importedTools = Number(data?.imported?.tools ?? 0)
-                  const importedAgents = Number(data?.imported?.agents ?? 0)
-                  const warnings = Array.isArray(data?.warnings) ? (data.warnings as unknown[]).length : 0
-
-                  queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
-                  toast.success('Import complete', {
-                    description: `${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
-                  })
-                  setImportOpen(false)
-                } catch (error) {
-                  toast.error('Import failed', { description: getSafeErrorMessage(error) })
-                } finally {
-                  setIsApplyingImport(false)
-                }
-              }}
-            >
-              {isApplyingImport ? 'Importing…' : 'Import'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

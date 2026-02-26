@@ -42,6 +42,7 @@ The widget key is the `WIDGET_CATALOG` entry `type` (client).
 
 - Layout (`./layout/`)
   - `Box` → `layout/box.md`
+  - `If` → `layout/if.md`
   - `Stack` → `layout/stack.md`
   - `Grid` → `layout/grid.md`
   - `Tabs` → `layout/tabs.md`

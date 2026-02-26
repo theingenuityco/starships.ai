@@ -107,6 +107,9 @@ function buildSandboxSrcDoc(): string {
               runWorkflow: function (workflowSlug, args) {
                 ops.push({ type: 'run_workflow', workflowSlug: String(workflowSlug || ''), args: (args && typeof args === 'object') ? args : undefined });
               },
+              runQuery: function (queryId) {
+                ops.push({ type: 'run_query', queryId: String(queryId || '') });
+              },
               patchProps: function (instanceId, patch) {
                 ops.push({ type: 'patch_props', instanceId: String(instanceId || ''), patch: (patch && typeof patch === 'object') ? patch : {} });
               },

@@ -25,6 +25,7 @@ export interface DataTableProps {
   pageSize?: number
   striped?: boolean
   className?: string
+  onRowClick?: (payload: { row: Record<string, DataCellValue>; rowIndex: number }) => void
 }
 
 export function DataTable({
@@ -35,6 +36,7 @@ export function DataTable({
   pageSize = 10,
   striped = true,
   className,
+  onRowClick,
 }: DataTableProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -56,6 +58,7 @@ export function DataTable({
   }
 
   const canExport = columns.length > 0 && data.length > 0
+  const rowClickable = typeof onRowClick === 'function'
 
   return (
     <div className={cn('w-full max-w-none', className)}>
@@ -111,7 +114,17 @@ export function DataTable({
                         'border-b last:border-0',
                         striped && tableRowIndex % 2 === 0 && 'bg-muted/20',
                         'transition-colors hover:bg-muted/30',
+                        rowClickable && 'cursor-pointer',
                       )}
+                      onClick={
+                        rowClickable
+                          ? () =>
+                              onRowClick({
+                                row,
+                                rowIndex: pageSize === 0 ? tableRowIndex : pageStart + tableRowIndex,
+                              })
+                          : undefined
+                      }
                     >
                       {columns.map(column => (
                         <td

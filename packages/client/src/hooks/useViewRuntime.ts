@@ -5,10 +5,6 @@ import type { ViewModel } from '@starships/protocol'
 import api from '@/lib/api'
 import { useViewRuntimeStore } from '@/store/view-runtime-store'
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return Boolean(v) && typeof v === 'object' && !Array.isArray(v)
-}
-
 export function useViewRuntime(view: ViewModel | undefined) {
   const viewId = view?.id ? String(view.id) : ''
   const initView = useViewRuntimeStore(s => s.initView)
@@ -18,29 +14,34 @@ export function useViewRuntime(view: ViewModel | undefined) {
   // Ensure slice exists
   useEffect(() => {
     if (!viewId) return
-    initView(viewId, { state: {}, queries: {} })
-  }, [viewId, initView])
+    initView(viewId, { root: view?.root ?? null, state: {}, queries: {} })
+  }, [viewId, view?.root, initView])
 
   // v1 query runner (best-effort): executes http + same-origin api routes.
   useEffect(() => {
-    if (!viewId || !view?.runtimeConfig || !isRecord(view.runtimeConfig) || !isRecord((view.runtimeConfig as any).queries)) return
-    const queries = (view.runtimeConfig as any).queries as Record<string, unknown>
+    if (!viewId) return
+    const queries = view?.runtimeConfig?.queries
+    if (!queries) return
     let cancelled = false
 
     async function runOne(queryId: string, specUnknown: unknown) {
-      if (!queryId || !isRecord(specUnknown)) return
-      const kind = typeof specUnknown.kind === 'string' ? specUnknown.kind : ''
-      if (kind !== 'http') return
-      const url = typeof specUnknown.url === 'string' ? specUnknown.url : ''
-      const method = typeof specUnknown.method === 'string' ? String(specUnknown.method).toUpperCase() : 'GET'
+      if (!queryId || !specUnknown || typeof specUnknown !== 'object' || Array.isArray(specUnknown)) return
+      const spec = specUnknown as { kind?: unknown; url?: unknown; method?: unknown; bodyTemplate?: unknown }
+      if (spec.kind !== 'http') return
+      const url = typeof spec.url === 'string' ? spec.url : ''
+      const method = spec.method === 'POST' ? 'POST' : 'GET'
       if (!url || !url.startsWith('/')) return
 
       setQueryState(viewId, queryId, { status: 'loading', error: undefined })
       try {
-        const resp = method === 'POST' ? await api.post(url, specUnknown.bodyTemplate ?? {}) : await api.get(url)
-        const data = (resp as any)?.data?.data ?? (resp as any)?.data ?? resp
+        const resp = method === 'POST' ? await api.post(url, spec.bodyTemplate ?? {}) : await api.get(url)
+        const data = (resp as { data?: unknown } | null)?.data
+        const unwrapped =
+          data && typeof data === 'object' && !Array.isArray(data) && 'data' in (data as Record<string, unknown>)
+            ? (data as Record<string, unknown>).data
+            : data ?? resp
         if (cancelled) return
-        setQueryState(viewId, queryId, { status: 'success', data })
+        setQueryState(viewId, queryId, { status: 'success', data: unwrapped })
       } catch (e) {
         if (cancelled) return
         setQueryState(viewId, queryId, { status: 'error', error: e instanceof Error ? e.message : String(e) })

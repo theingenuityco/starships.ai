@@ -76,6 +76,11 @@ export function WidgetTreeRenderer({ node, className, runtime, onEvent }: Widget
       ;(props as any).onChange = (payload: unknown) => onEvent(String(node.id), 'change', payload)
     }
 
+    // v1.1 event wiring: DataTable -> row_click.
+    if (node.type === 'DataTable' && typeof (props as any).onRowClick !== 'function' && handlersRec?.row_click && typeof onEvent === 'function') {
+      ;(props as any).onRowClick = (payload: unknown) => onEvent(String(node.id), 'row_click', payload)
+    }
+
     const renderedChildren = children.length
       ? children.map(child => <WidgetTreeRenderer key={child.id} node={child} runtime={runtime} onEvent={onEvent} />)
       : undefined

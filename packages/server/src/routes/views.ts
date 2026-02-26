@@ -9,9 +9,11 @@ import { sendError, sendSuccess, handleError } from '../utils/responseHelpers';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ViewStreamBus } from '@/services/ViewStreamBus';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
+import type { ConnectorActionParams, EndParams, Node, StartParams } from '@starships/autopilot';
 import { ExecutionItemUtils, RunnerFactory, type Blueprint, type EngineConfig } from '@starships/autopilot';
 import { ToolRepository, ViewWidgetRepository } from '@starships/models';
 import { applyPatch } from 'fast-json-patch';
+import type { ViewPatchOp, ViewRuntimeConfig } from '@starships/protocol';
 
 const router: Router = Router();
 
@@ -143,6 +145,50 @@ const ViewRuntimeActionRequestSchema = z.discriminatedUnion('type', [
     patch: z.array(z.record(z.string(), z.unknown())),
   }),
 ]);
+
+const RunViewQueryBodySchema = z
+  .object({
+    state: z.record(z.string(), z.unknown()).optional(),
+  })
+  .default({});
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
+
+const TEMPLATE_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
+function getAtPath(obj: Record<string, unknown>, path: string): unknown {
+  if (!path) return obj;
+  const parts = String(path).split('.').filter(Boolean);
+  let cur: any = obj;
+  for (const p of parts) {
+    if (cur == null) return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+function templateString(input: string, state: Record<string, unknown>): string {
+  if (!input || typeof input !== 'string') return '';
+  if (!input.includes('{{')) return input;
+  return input.replace(TEMPLATE_RE, (_m, token) => {
+    const t = String(token || '').trim();
+    if (!t) return '';
+    const path = t.startsWith('state.') ? t.slice('state.'.length) : t === 'state' ? '' : t;
+    const v = path ? getAtPath(state ?? {}, path) : state;
+    return v === null || v === undefined ? '' : String(v);
+  });
+}
+function templateDeep(input: unknown, state: Record<string, unknown>): unknown {
+  if (input === null || input === undefined) return input;
+  if (typeof input === 'string') return templateString(input, state);
+  if (Array.isArray(input)) return input.map((v) => templateDeep(v, state));
+  if (typeof input === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) out[k] = templateDeep(v, state);
+    return out;
+  }
+  return input;
+}
 
 async function executeToolBlueprint(args: {
   blueprint: Blueprint;
@@ -345,7 +391,7 @@ router.patch('/views/:id/root', jwtAuthMiddleware, async (req: Request, res: Res
     }
 
     // Apply RFC6902 patch to the persisted root
-    const patched = applyPatch(structuredClone(persistedRoot), body.patch as any, true, false).newDocument;
+    const patched = applyPatch(structuredClone(persistedRoot), body.patch as unknown as ViewPatchOp[], true, false).newDocument;
 
     const updatedView = await viewRepo.updateStructureRoot(viewId, patched);
 
@@ -354,6 +400,120 @@ router.patch('/views/:id/root', jwtAuthMiddleware, async (req: Request, res: Res
     return sendSuccess(res, updatedView);
   } catch (error) {
     return handleError(error, res, 'patch view root');
+  }
+});
+
+/**
+ * POST /api/v1/views/:id/queries/:queryId/run
+ * Execute a view query on the server (v1: connector_action only).
+ */
+router.post('/views/:id/queries/:queryId/run', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  const viewId = validateData(IdSchema, req.params.id, res, 'validate view ID');
+  if (!viewId) return;
+  const queryId = validateData(z.string().min(1).max(200), req.params.queryId, res, 'validate queryId');
+  if (!queryId) return;
+  const body = validateData(RunViewQueryBodySchema, req.body, res, 'validate run query body');
+  if (!body) return;
+
+  try {
+    const userId = req.user!.id;
+    const viewRepo = new ViewRepository();
+    const view = await viewRepo.findById(viewId);
+    if (!view) return sendError(res, 'RESOURCE_NOT_FOUND', 'View not found', 404);
+    if (!(await verifyStarshipAccess(view.starshipId, userId, res))) return;
+
+    const rcUnknown = isRecord(view) ? (view as Record<string, unknown>).runtimeConfig : undefined;
+    const rc: ViewRuntimeConfig | null = isRecord(rcUnknown) ? (rcUnknown as unknown as ViewRuntimeConfig) : null;
+    const queriesUnknown = rc && isRecord(rc.queries) ? (rc.queries as unknown as Record<string, unknown>) : {};
+    const specUnknown = queriesUnknown[queryId];
+    if (!isRecord(specUnknown)) return sendError(res, 'RESOURCE_NOT_FOUND', 'Query not found', 404, { queryId });
+    const kind = typeof specUnknown.kind === 'string' ? specUnknown.kind : '';
+    if (kind !== 'connector_action') {
+      return sendError(res, 'VALIDATION_ERROR', 'Only connector_action queries are server-executable', 400, { kind });
+    }
+
+    // View-level permission enforcement: optional connector allowlist.
+    const allowedConnectors =
+      rc && rc.permissions && Array.isArray((rc.permissions as { connectors?: unknown }).connectors)
+        ? ((rc.permissions as { connectors: unknown[] }).connectors.map(String) as string[])
+        : null;
+
+    const connector = typeof specUnknown.connector === 'string' ? specUnknown.connector.trim() : '';
+    const action = typeof specUnknown.action === 'string' ? specUnknown.action.trim() : '';
+    if (!connector || !action) {
+      return sendError(res, 'VALIDATION_ERROR', 'connector and action are required for connector_action queries', 400);
+    }
+    if (allowedConnectors && allowedConnectors.length > 0 && !allowedConnectors.includes(connector)) {
+      return sendError(res, 'ACCESS_DENIED', 'Connector not permitted for this view', 403, { connector });
+    }
+
+    // Connector actions require the remote runner in this server configuration.
+    // (ChildProcessRunner would require a parent HostRuntime.connectorAction implementation.)
+    if (!process.env.RUNNER_URL) {
+      return sendError(
+        res,
+        'VALIDATION_ERROR',
+        'RUNNER_URL is required to execute connector_action view queries (configure remote runner)',
+        400
+      );
+    }
+
+    const state = isRecord(body.state) ? (body.state as Record<string, unknown>) : {};
+    const argsTemplate = isRecord(specUnknown.argsTemplate) ? (specUnknown.argsTemplate as Record<string, unknown>) : {};
+    const args = (templateDeep(argsTemplate, state) as Record<string, unknown>) ?? {};
+
+    const runtimeEnv: Record<string, unknown> = {
+      STARSHIP_ID: view.starshipId,
+      VIEW_ID: viewId,
+    };
+    const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: view.starshipId, authUserId: userId, runtimeEnv });
+
+    const nodes: Node[] = [
+      {
+        ref: 'start',
+        type: 'start',
+        name: 'Start',
+        description: 'Start',
+        parameters: {} satisfies StartParams,
+      },
+      {
+        ref: 'q',
+        type: 'connector_action',
+        name: 'Query',
+        description: 'Execute connector action query',
+        parameters: { connector, action, args, failOnNon2xx: false } satisfies ConnectorActionParams,
+      },
+      {
+        ref: 'end',
+        type: 'end',
+        name: 'End',
+        description: 'End',
+        parameters: { output: "{{ lastOutputOf('q') }}" } satisfies EndParams,
+      },
+    ];
+
+    const blueprint: Blueprint = {
+      nodes,
+      edges: [
+        { ref: 'e1', from: 'start', to: 'q' },
+        { ref: 'e2', from: 'q', to: 'end' },
+      ],
+      metadata: {},
+    };
+
+    const execution = ExecutionItemUtils.createExecution();
+    const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
+
+    const items = await runner.run(blueprint, execution, {
+      failOnNodeError: true,
+      ...(engineConfig as unknown as EngineConfig),
+    });
+
+    const result = ExecutionItemUtils.unwrapSingle(items);
+    const data = isRecord(result) && 'result' in result ? (result as { result: unknown }).result : result;
+    return sendSuccess(res, data);
+  } catch (error) {
+    return handleError(error, res, 'run view query');
   }
 });
 

@@ -2,6 +2,8 @@
 
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { applyPatch, type Operation } from 'fast-json-patch'
+import type { ViewPatchOp, WidgetInstanceNode } from '@starships/protocol'
 import { getAtPath, setAtPath } from '@/lib/objectPath'
 
 export type ViewQueryState = {
@@ -12,6 +14,7 @@ export type ViewQueryState = {
 }
 
 export type ViewRuntimeSlice = {
+  root: WidgetInstanceNode | null
   state: Record<string, unknown>
   queries: Record<string, ViewQueryState>
 }
@@ -20,6 +23,8 @@ export type ViewRuntimeStoreState = {
   views: Record<string, ViewRuntimeSlice>
   initView: (viewId: string, initial?: Partial<ViewRuntimeSlice>) => void
   clearView: (viewId: string) => void
+  replaceRoot: (viewId: string, nextRoot: WidgetInstanceNode | null) => void
+  applyRootPatch: (viewId: string, patch: ViewPatchOp[]) => void
   replaceState: (viewId: string, nextState: Record<string, unknown>) => void
 
   getStateAtPath: (viewId: string, path: string) => unknown
@@ -42,6 +47,7 @@ export const useViewRuntimeStore = create<ViewRuntimeStoreState>()(
               views: {
                 ...s.views,
                 [viewId]: {
+                  root: initial?.root ?? null,
                   state: initial?.state ?? {},
                   queries: initial?.queries ?? {},
                 },
@@ -66,11 +72,45 @@ export const useViewRuntimeStore = create<ViewRuntimeStoreState>()(
         )
       },
 
+      replaceRoot: (viewId: string, nextRoot: WidgetInstanceNode | null) => {
+        if (!viewId) return
+        set(
+          s => {
+            const cur = s.views[viewId] ?? { root: null, state: {}, queries: {} }
+            return { views: { ...s.views, [viewId]: { ...cur, root: nextRoot ?? null } } }
+          },
+          false,
+          'viewRuntime/replaceRoot'
+        )
+      },
+
+      applyRootPatch: (viewId: string, patch: ViewPatchOp[]) => {
+        if (!viewId) return
+        if (!Array.isArray(patch) || patch.length === 0) return
+        set(
+          s => {
+            const cur = s.views[viewId] ?? { root: null, state: {}, queries: {} }
+            if (!cur.root) return s
+            try {
+              const base: WidgetInstanceNode =
+                typeof structuredClone === 'function' ? structuredClone(cur.root) : (JSON.parse(JSON.stringify(cur.root)) as WidgetInstanceNode)
+              const ops: Operation[] = patch
+              const res = applyPatch<WidgetInstanceNode>(base, ops, /*validate*/ true, /*mutateDocument*/ true)
+              return { views: { ...s.views, [viewId]: { ...cur, root: res.newDocument } } }
+            } catch {
+              return s
+            }
+          },
+          false,
+          'viewRuntime/applyRootPatch'
+        )
+      },
+
       replaceState: (viewId: string, nextState: Record<string, unknown>) => {
         if (!viewId) return
         set(
           s => {
-            const cur = s.views[viewId] ?? { state: {}, queries: {} }
+            const cur = s.views[viewId] ?? { root: null, state: {}, queries: {} }
             return { views: { ...s.views, [viewId]: { ...cur, state: nextState ?? {} } } }
           },
           false,
@@ -88,7 +128,7 @@ export const useViewRuntimeStore = create<ViewRuntimeStoreState>()(
         if (!viewId) return
         set(
           s => {
-            const cur = s.views[viewId] ?? { state: {}, queries: {} }
+            const cur = s.views[viewId] ?? { root: null, state: {}, queries: {} }
             const nextState = setAtPath(cur.state, path, value)
             return {
               views: {
@@ -106,7 +146,7 @@ export const useViewRuntimeStore = create<ViewRuntimeStoreState>()(
         if (!viewId || !queryId) return
         set(
           s => {
-            const cur = s.views[viewId] ?? { state: {}, queries: {} }
+            const cur = s.views[viewId] ?? { root: null, state: {}, queries: {} }
             const prevQ = cur.queries[queryId] ?? { status: 'idle' as const }
             return {
               views: {

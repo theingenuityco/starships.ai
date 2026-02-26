@@ -1,10 +1,15 @@
 ---
 title: Radar Chart Widget
-slug: widgets/charts/radar
+slug: widgets/charts/radar-chart
 category: widgets
 ---
 
 # Radar Chart Widget
+
+## Where it can be used
+
+- Inline (conversations): Yes
+- Views (widget tree): Yes
 
 Radar (spider) charts compare multiple metrics across the same axes. This widget composes shadcn/ui’s chart primitives (`ChartContainer`, `ChartTooltipContent`, `ChartLegendContent`) so color variables, accessibility, and responsive behavior match the official documentation (see Context7 `/websites/ui_shadcn`, topic `charts`).
 
@@ -67,6 +72,22 @@ Radar (spider) charts compare multiple metrics across the same axes. This widget
       { "skill": "UX", "alice": 90, "bob": 50 },
       { "skill": "Data", "alice": 40, "bob": 75 }
     ],
+    "maxValue": 100
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "RadarChart",
+  "props": {
+    "title": "Team Skill Radar",
+    "indexKey": "skill",
+    "series": [{ "dataKey": "alice", "label": "Alice", "color": "#3b82f6" }],
+    "data": [{ "skill": "Frontend", "alice": 80 }],
     "maxValue": 100
   }
 }

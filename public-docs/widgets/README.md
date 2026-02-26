@@ -65,20 +65,20 @@ See `../views/README.md` for the Views runtime model (bindings, scripts, actions
 
 ## Supported widget types (current UI)
 
-- Layout & primitives:
-  - `Box` → `box.md`
-  - `Stack` → `stack.md`
-  - `Grid` → `grid.md`
-  - `Tabs` → `tabs.md`
-  - `Text` → `text.md`
-  - `Button` → `button.md`
-- `StatCard` → `stat-card.md`
-- `MetricGrid` → `metric-grid.md`
-- `DataTable` → `data-table.md`
-- `ConnectorSuggestionCard` → `connector-suggestion-card.md`
-- `AgentSuggestionCard` → `agent-suggestion-card.md`
-- `StarshipDetails` → `starship-details.md`
-- Charts:
+The widget key is the `WIDGET_REGISTRY` key (client).
+
+- Layout (`./layout/`)
+  - `Box` → `layout/box.md`
+  - `Stack` → `layout/stack.md`
+  - `Grid` → `layout/grid.md`
+  - `Tabs` → `layout/tabs.md`
+- Primitives (`./primitives/`)
+  - `Text` → `primitives/text.md`
+  - `Button` → `primitives/button.md`
+- Data (`./data/`)
+  - `DataTable` → `data/data-table.md`
+  - `MetricGrid` → `data/metric-grid.md`
+- Charts (`./charts/`)
   - `BarChart` → `charts/bar-chart.md`
   - `LineChart` → `charts/line-chart.md`
   - `AreaChart` → `charts/area-chart.md`
@@ -86,6 +86,17 @@ See `../views/README.md` for the Views runtime model (bindings, scripts, actions
   - `DonutChart` → `charts/donut-chart.md`
   - `RadarChart` → `charts/radar-chart.md`
   - `RadialChart` → `charts/radial-chart.md`
+- Cards (`./cards/`)
+  - `StatCard` → `cards/stat-card.md`
+- Product (`./product/`)
+  - `StarshipDetails` → `product/starship-details.md`
+  - `AgentSuggestionCard` → `product/agent-suggestion-card.md`
+  - `ConnectorSuggestionCard` → `product/connector-suggestion-card.md`
+
+## Authoring
+
+- Widget doc template: `./_template.md`
+- Conventions: `./CONVENTIONS.md`
 
 ## Links
 

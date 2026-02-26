@@ -24,7 +24,17 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import type { ConnectorAuthTypeV2, ConnectorAuthV2, ConnectorEndpointV2, HttpMethod, RequestStyle } from '@starships/protocol'
+import type {
+  ConnectorAuthTypeV2,
+  ConnectorAuthV2,
+  ConnectorEndpointV2,
+  ConnectorHttpEndpointV2,
+  ConnectorSqlEndpointV2,
+  ConnectorTemplateRuntimeFieldsV2,
+  HttpMethod,
+  RequestStyle,
+  SecretRef,
+} from '@starships/protocol'
 
 function formatJson(value: unknown): string {
   if (value === undefined) return ''
@@ -44,6 +54,50 @@ function parseOptionalJson(value: string): unknown | undefined {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
+}
+
+function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
+  return (endpoint as { kind?: unknown }).kind === 'sql'
+}
+
+type HttpActionDraft = Partial<Omit<ConnectorHttpEndpointV2, 'kind'>> & { kind: 'http' }
+type SqlActionDraft = Partial<Omit<ConnectorSqlEndpointV2, 'kind'>> & { kind: 'sql' }
+type ActionDraft = HttpActionDraft | SqlActionDraft
+
+function isSqlDraft(draft: ActionDraft | null): draft is SqlActionDraft {
+  return draft?.kind === 'sql'
+}
+
+function isSecretRef(v: unknown): v is SecretRef {
+  if (!isRecord(v)) return false
+  return (v.type === 'platform_secret' || v.type === 'connector_secret') && typeof v.key === 'string' && v.key.trim().length > 0
+}
+
+function getSecretRefKey(obj: Record<string, unknown> | null, key: string): string {
+  if (!obj) return ''
+  const ref = obj[key]
+  return isSecretRef(ref) ? ref.key : ''
+}
+
+function getString(obj: Record<string, unknown> | null, key: string): string {
+  if (!obj) return ''
+  const v = obj[key]
+  return typeof v === 'string' ? v : ''
+}
+
+function getStringArray(obj: Record<string, unknown> | null, key: string): string[] {
+  if (!obj) return []
+  const v = obj[key]
+  if (!Array.isArray(v)) return []
+  return v.map(x => String(x))
+}
+
+function getInjectionHeaderName(obj: Record<string, unknown> | null, fallback: string = 'Authorization'): string {
+  if (!obj) return fallback
+  const inj = obj['injection']
+  if (!isRecord(inj)) return fallback
+  const hn = inj['headerName']
+  return typeof hn === 'string' && hn.trim().length > 0 ? hn.trim() : fallback
 }
 
 function defaultAuthForType(authType: ConnectorAuthTypeV2): ConnectorAuthV2 {
@@ -108,7 +162,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   const [actionsLimit, setActionsLimit] = useState<number>(50)
   const [actionsOffset, setActionsOffset] = useState<number>(0)
   const [selectedActionName, setSelectedActionName] = useState<string | null>(null)
-  const [actionDraft, setActionDraft] = useState<Partial<ConnectorEndpointV2> | null>(null)
+  const [actionDraft, setActionDraft] = useState<ActionDraft | null>(null)
   const [actionParametersText, setActionParametersText] = useState('')
   const [actionMappingText, setActionMappingText] = useState('')
   const [actionResponseText, setActionResponseText] = useState('')
@@ -162,7 +216,26 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   useEffect(() => {
     if (!selectedAction) return
+    if (isSqlEndpoint(selectedAction)) {
+      setActionDraft({
+        kind: 'sql',
+        name: selectedAction.name,
+        description: selectedAction.description,
+        timeoutMs: selectedAction.timeoutMs,
+        driver: selectedAction.driver || 'postgres',
+        sql: selectedAction.sql || '',
+        mode: selectedAction.mode,
+        rowLimit: selectedAction.rowLimit,
+        readOnly: selectedAction.readOnly,
+      })
+      setActionParametersText(formatJson(selectedAction.parameters))
+      setActionMappingText('')
+      setActionResponseText(formatJson(selectedAction.response))
+      return
+    }
+
     setActionDraft({
+      kind: 'http',
       name: selectedAction.name,
       method: selectedAction.method,
       path: selectedAction.path,
@@ -180,9 +253,15 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
   const authTypeBadge = (authType || 'none') as string
   const hasActions = Boolean(actionsResp?.actions?.length)
+  const actionDraftKind = useMemo(() => (actionDraft?.kind === 'sql' ? 'sql' : 'http'), [actionDraft])
 
   const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']
   const REQUEST_STYLES: RequestStyle[] = ['auto', 'query', 'json', 'form', 'multipart']
+  const SQL_DRIVERS = ['postgres'] as const
+  const SQL_MODES = ['query', 'execute'] as const
+
+  const httpDraft = useMemo(() => (actionDraft && !isSqlDraft(actionDraft) ? actionDraft : null), [actionDraft])
+  const sqlDraft = useMemo(() => (actionDraft && isSqlDraft(actionDraft) ? actionDraft : null), [actionDraft])
 
   // Reset pagination when filters/page size change.
   useEffect(() => {
@@ -279,10 +358,10 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                   onClick={async () => {
                     if (!id) return
                     try {
-                      const auth = parseOptionalJson(authText) as any
-                      const variables = parseOptionalJson(variablesText) as any
-                      const rateLimit = parseOptionalJson(rateLimitText) as any
-                      const metadataSchema = parseOptionalJson(metadataSchemaText) as any
+                      const auth = parseOptionalJson(authText)
+                      const variables = parseOptionalJson(variablesText)
+                      const rateLimit = parseOptionalJson(rateLimitText)
+                      const metadataSchema = parseOptionalJson(metadataSchemaText)
 
                       if (auth !== undefined && (auth === null || typeof auth !== 'object' || Array.isArray(auth))) {
                         toast.error('auth must be a JSON object')
@@ -311,14 +390,18 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                           category,
                           demoVideoUrl: demoVideoUrl.trim() || undefined,
                           baseUrl,
-                          auth: auth === undefined ? undefined : (auth as any),
-                          variables: variables === undefined ? undefined : (variables as any),
-                          rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
-                          metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
+                          auth: auth === undefined ? undefined : (auth as unknown as ConnectorAuthV2),
+                          variables: variables === undefined ? undefined : (variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables']),
+                          rateLimit: rateLimit === undefined ? undefined : (rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit']),
+                          metadataSchema:
+                            metadataSchema === undefined
+                              ? undefined
+                              : (metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema']),
                         },
                       })
-                    } catch (e: any) {
-                      toast.error('Invalid JSON', { description: e?.message || 'Please fix JSON fields.' })
+                    } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : 'Please fix JSON fields.'
+                      toast.error('Invalid JSON', { description: msg })
                     }
                   }}
                   disabled={updateMutation.isPending || isLoading}
@@ -336,7 +419,11 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                 </div>
               )}
 
-              {isError && !isLoading && <div className="flex items-center justify-center py-12 text-muted-foreground">{(error as any)?.message || 'Failed to load connector template.'}</div>}
+              {isError && !isLoading && (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  {(error instanceof Error ? error.message : '') || 'Failed to load connector template.'}
+                </div>
+              )}
 
               {!isLoading && !isError && connector && (
                 <div className="grid gap-6">
@@ -476,7 +563,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2 md:col-span-2">
                           <label className="text-sm font-medium">Scopes</label>
                           <Input
-                            value={Array.isArray(parsedAuth?.scopes) ? (parsedAuth?.scopes as any[]).join(', ') : ''}
+                            value={getStringArray(parsedAuth, 'scopes').join(', ')}
                             onChange={e =>
                               updateAuth(a => {
                                 const raw = e.target.value
@@ -493,7 +580,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Client ID secret key</label>
                           <Input
-                            value={String((parsedAuth?.clientIdRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'clientIdRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.clientIdRef = { type: 'platform_secret', key: e.target.value }
@@ -505,7 +592,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Client secret key</label>
                           <Input
-                            value={String((parsedAuth?.clientSecretRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'clientSecretRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.clientSecretRef = { type: 'platform_secret', key: e.target.value }
@@ -517,7 +604,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Access token secret key</label>
                           <Input
-                            value={String((parsedAuth?.accessTokenRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'accessTokenRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.accessTokenRef = { type: 'connector_secret', key: e.target.value }
@@ -529,7 +616,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Injection header name</label>
                           <Input
-                            value={String((parsedAuth?.injection as any)?.headerName ?? 'Authorization')}
+                            value={getInjectionHeaderName(parsedAuth, 'Authorization')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.injection = { ...(isRecord(a.injection) ? a.injection : {}), style: 'header', headerName: e.target.value }
@@ -546,7 +633,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">API key secret key</label>
                           <Input
-                            value={String((parsedAuth?.apiKeyRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'apiKeyRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.apiKeyRef = { type: 'connector_secret', key: e.target.value }
@@ -558,7 +645,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Injection header name</label>
                           <Input
-                            value={String((parsedAuth?.injection as any)?.headerName ?? 'Authorization')}
+                            value={getInjectionHeaderName(parsedAuth, 'Authorization')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.injection = { ...(isRecord(a.injection) ? a.injection : {}), style: 'header', headerName: e.target.value }
@@ -575,7 +662,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Username/API key secret key</label>
                           <Input
-                            value={String((parsedAuth?.usernameRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'usernameRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 a.usernameRef = { type: 'connector_secret', key: e.target.value }
@@ -587,12 +674,12 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Password secret key (optional)</label>
                           <Input
-                            value={String((parsedAuth?.passwordRef as any)?.key ?? '')}
+                            value={getSecretRefKey(parsedAuth, 'passwordRef')}
                             onChange={e =>
                               updateAuth(a => {
                                 const key = e.target.value.trim()
                                 if (!key) {
-                                  delete (a as any).passwordRef
+                                  delete (a as Record<string, unknown>)['passwordRef']
                                 } else {
                                   a.passwordRef = { type: 'connector_secret', key }
                                 }
@@ -645,10 +732,13 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                             }
                             if (!confirm('Migrate LEGACY_endpoints into actions? This will REPLACE all existing actions.')) return
                             try {
-                              await bulkReplaceMutation.mutateAsync({ id, payload: { actions: legacy as any } })
-                              toast.success('Migrated legacy endpoints → actions', { description: `${legacy.length} actions` })
-                            } catch (e: any) {
-                              toast.error('Migration failed', { description: e?.message || 'Please try again.' })
+                              const actions: ConnectorEndpointV2[] = legacy
+                                .filter(isRecord)
+                                .filter(e => typeof e.name === 'string' && typeof e.method === 'string' && typeof e.path === 'string') as unknown as ConnectorEndpointV2[]
+                              await bulkReplaceMutation.mutateAsync({ id, payload: { actions } })
+                              toast.success('Migrated legacy endpoints → actions', { description: `${actions.length} actions` })
+                            } catch (e: unknown) {
+                              toast.error('Migration failed', { description: e instanceof Error ? e.message : 'Please try again.' })
                             }
                           }}
                           disabled={bulkReplaceMutation.isPending || !(legacyEndpoints?.length ?? 0)}
@@ -766,77 +856,265 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                   <Input value={selectedActionName} readOnly className="font-mono h-9 text-sm" />
                                 </div>
                                 <div className="space-y-2">
-                                  <label className="text-xs font-medium text-muted-foreground">HTTP method</label>
+                                  <label className="text-xs font-medium text-muted-foreground">Kind</label>
                                   <Select
-                                    value={String(actionDraft?.method ?? '')}
+                                    value={actionDraftKind}
                                     onValueChange={v =>
-                                      setActionDraft(prev => ({
-                                        ...(prev ?? {}),
-                                        method: v as HttpMethod,
-                                      }))
+                                      setActionDraft(prev => {
+                                        const name = prev?.name
+                                        const description = prev?.description
+                                        const timeoutMs = prev?.timeoutMs
+
+                                        if (v === 'sql') {
+                                          const prevSql = isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'sql',
+                                            ...(name ? { name } : {}),
+                                            ...(description ? { description } : {}),
+                                            ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                                            driver: prevSql?.driver || 'postgres',
+                                            sql: prevSql?.sql || '',
+                                            mode: prevSql?.mode || 'query',
+                                            readOnly: prevSql?.readOnly ?? true,
+                                          }
+                                        }
+
+                                        const prevHttp = prev && !isSqlDraft(prev) ? prev : null
+                                        return {
+                                          kind: 'http',
+                                          ...(name ? { name } : {}),
+                                          ...(description ? { description } : {}),
+                                          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                                          method: prevHttp?.method || 'GET',
+                                          path: prevHttp?.path || '',
+                                          baseUrlOverride: prevHttp?.baseUrlOverride,
+                                          requestStyle: prevHttp?.requestStyle,
+                                        }
+                                      })
                                     }
                                   >
                                     <SelectTrigger className="h-9 text-sm">
-                                      <SelectValue placeholder="Select method" />
+                                      <SelectValue placeholder="Select kind" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {HTTP_METHODS.map(m => (
-                                        <SelectItem key={m} value={m}>
-                                          <span className="font-mono">{m}</span>
-                                        </SelectItem>
-                                      ))}
+                                      <SelectItem value="http">
+                                        <span className="font-mono">http</span>
+                                      </SelectItem>
+                                      <SelectItem value="sql">
+                                        <span className="font-mono">sql</span>
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
-                                  <label className="text-xs font-medium text-muted-foreground">Path</label>
-                                  <Input
-                                    value={String(actionDraft?.path ?? '')}
-                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), path: e.target.value }))}
-                                    placeholder="/v1/items/{id}"
-                                    spellCheck={false}
-                                    className="font-mono h-9 text-sm"
-                                  />
-                                </div>
+
+                                {actionDraftKind === 'http' ? (
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">HTTP method</label>
+                                    <Select
+                                      value={String(httpDraft?.method ?? '')}
+                                      onValueChange={v =>
+                                        setActionDraft(prev => {
+                                          const p = prev && !isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'http',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            method: v as HttpMethod,
+                                            path: p?.path ?? '',
+                                            description: p?.description,
+                                            baseUrlOverride: p?.baseUrlOverride,
+                                            requestStyle: p?.requestStyle,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="Select method" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {HTTP_METHODS.map(m => (
+                                          <SelectItem key={m} value={m}>
+                                            <span className="font-mono">{m}</span>
+                                          </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">SQL driver</label>
+                                    <Select
+                                      value={sqlDraft?.driver ?? 'postgres'}
+                                      onValueChange={v =>
+                                        setActionDraft(prev => {
+                                          const p = prev && isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'sql',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            driver: v,
+                                            sql: p?.sql ?? '',
+                                            description: p?.description,
+                                            mode: p?.mode ?? 'query',
+                                            rowLimit: p?.rowLimit,
+                                            readOnly: p?.readOnly ?? true,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="Select driver" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {SQL_DRIVERS.map(d => (
+                                          <SelectItem key={d} value={d}>
+                                            <span className="font-mono">{d}</span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                {actionDraftKind === 'http' ? (
+                                  <div className="space-y-2 md:col-span-2">
+                                    <label className="text-xs font-medium text-muted-foreground">Path</label>
+                                    <Input
+                                      value={String(httpDraft?.path ?? '')}
+                                      onChange={e =>
+                                        setActionDraft(prev => {
+                                          const p = prev && !isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'http',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            method: p?.method ?? 'GET',
+                                            path: e.target.value,
+                                            description: p?.description,
+                                            baseUrlOverride: p?.baseUrlOverride,
+                                            requestStyle: p?.requestStyle,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                      placeholder="/v1/items/{id}"
+                                      spellCheck={false}
+                                      className="font-mono h-9 text-sm"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 md:col-span-2">
+                                    <label className="text-xs font-medium text-muted-foreground">SQL</label>
+                                    <Textarea
+                                      value={String(sqlDraft?.sql ?? '')}
+                                      onChange={e =>
+                                        setActionDraft(prev => {
+                                          const p = prev && isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'sql',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            driver: p?.driver ?? 'postgres',
+                                            sql: e.target.value,
+                                            description: p?.description,
+                                            mode: p?.mode ?? 'query',
+                                            rowLimit: p?.rowLimit,
+                                            readOnly: p?.readOnly ?? true,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                      className="min-h-[120px] font-mono text-xs"
+                                      spellCheck={false}
+                                      placeholder="SELECT 1 as ok"
+                                    />
+                                  </div>
+                                )}
                                 <div className="space-y-2 md:col-span-2">
                                   <label className="text-xs font-medium text-muted-foreground">Description</label>
                                   <Textarea
                                     value={String(actionDraft?.description ?? '')}
-                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), description: e.target.value }))}
+                                    onChange={e => setActionDraft(prev => (prev ? { ...prev, description: e.target.value } : prev))}
                                     className="min-h-[72px] text-sm"
                                   />
                                 </div>
-                                <div className="space-y-2">
-                                  <label className="text-xs font-medium text-muted-foreground">Request style</label>
-                                  <Select
-                                    value={String(actionDraft?.requestStyle ?? '')}
-                                    onValueChange={v =>
-                                      setActionDraft(prev => ({
-                                        ...(prev ?? {}),
-                                        requestStyle: v as RequestStyle,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="h-9 text-sm">
-                                      <SelectValue placeholder="(optional)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {REQUEST_STYLES.map(s => (
-                                        <SelectItem key={s} value={s}>
-                                          <span className="font-mono">{s}</span>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+
+                                {actionDraftKind === 'http' ? (
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">Request style</label>
+                                    <Select
+                                      value={String(httpDraft?.requestStyle ?? '')}
+                                      onValueChange={v =>
+                                        setActionDraft(prev => {
+                                          const p = prev && !isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'http',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            method: p?.method ?? 'GET',
+                                            path: p?.path ?? '',
+                                            description: p?.description,
+                                            baseUrlOverride: p?.baseUrlOverride,
+                                            requestStyle: v as RequestStyle,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="(optional)" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {REQUEST_STYLES.map(s => (
+                                          <SelectItem key={s} value={s}>
+                                            <span className="font-mono">{s}</span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <label className="text-xs font-medium text-muted-foreground">Mode</label>
+                                    <Select
+                                      value={String(sqlDraft?.mode ?? 'query')}
+                                      onValueChange={v =>
+                                        setActionDraft(prev => {
+                                          const p = prev && isSqlDraft(prev) ? prev : null
+                                          const nextMode: 'query' | 'execute' = v === 'execute' ? 'execute' : 'query'
+                                          return {
+                                            kind: 'sql',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            driver: p?.driver ?? 'postgres',
+                                            sql: p?.sql ?? '',
+                                            description: p?.description,
+                                            mode: nextMode,
+                                            rowLimit: p?.rowLimit,
+                                            readOnly: p?.readOnly ?? true,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <SelectTrigger className="h-9 text-sm">
+                                        <SelectValue placeholder="query" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {SQL_MODES.map(m => (
+                                          <SelectItem key={m} value={m}>
+                                            <span className="font-mono">{m}</span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
                                 <div className="space-y-2">
                                   <label className="text-xs font-medium text-muted-foreground">Timeout (ms)</label>
                                   <Input
                                     value={actionDraft?.timeoutMs === undefined ? '' : String(actionDraft.timeoutMs)}
                                     onChange={e =>
                                       setActionDraft(prev => {
+                                        if (!prev) return prev
                                         const raw = e.target.value.trim()
-                                        return { ...(prev ?? {}), timeoutMs: raw ? Number(raw) : undefined }
+                                        return { ...prev, timeoutMs: raw ? Number(raw) : undefined }
                                       })
                                     }
                                     placeholder="e.g. 5000"
@@ -844,16 +1122,59 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                     className="h-9 text-sm"
                                   />
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
-                                  <label className="text-xs font-medium text-muted-foreground">Base URL override</label>
-                                  <Input
-                                    value={String(actionDraft?.baseUrlOverride ?? '')}
-                                    onChange={e => setActionDraft(prev => ({ ...(prev ?? {}), baseUrlOverride: e.target.value }))}
-                                    placeholder="(optional) https://api.example.com"
-                                    spellCheck={false}
-                                    className="font-mono h-9 text-sm"
-                                  />
-                                </div>
+
+                                {actionDraftKind === 'http' ? (
+                                  <div className="space-y-2 md:col-span-2">
+                                    <label className="text-xs font-medium text-muted-foreground">Base URL override</label>
+                                    <Input
+                                      value={String(httpDraft?.baseUrlOverride ?? '')}
+                                      onChange={e =>
+                                        setActionDraft(prev => {
+                                          const p = prev && !isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'http',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            method: p?.method ?? 'GET',
+                                            path: p?.path ?? '',
+                                            description: p?.description,
+                                            baseUrlOverride: e.target.value,
+                                            requestStyle: p?.requestStyle,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                      placeholder="(optional) https://api.example.com"
+                                      spellCheck={false}
+                                      className="font-mono h-9 text-sm"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 md:col-span-2 flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-medium text-muted-foreground">Read-only</div>
+                                      <div className="text-[11px] text-muted-foreground">Block non-read queries unless disabled.</div>
+                                    </div>
+                                    <Switch
+                                      checked={sqlDraft?.readOnly ?? true}
+                                      onCheckedChange={checked =>
+                                        setActionDraft(prev => {
+                                          const p = prev && isSqlDraft(prev) ? prev : null
+                                          return {
+                                            kind: 'sql',
+                                            name: selectedActionName ?? p?.name ?? '',
+                                            driver: p?.driver ?? 'postgres',
+                                            sql: p?.sql ?? '',
+                                            description: p?.description,
+                                            mode: p?.mode ?? 'query',
+                                            rowLimit: p?.rowLimit,
+                                            readOnly: checked,
+                                            timeoutMs: p?.timeoutMs,
+                                          }
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                )}
                               </div>
 
                               <div className="pt-2 border-t border-border/60 space-y-3">
@@ -877,6 +1198,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                       className="min-h-[120px] font-mono text-xs"
                                       spellCheck={false}
                                       placeholder='e.g. { "query": { "q": "{{ String(args.q) }}" } }'
+                                      disabled={actionDraftKind === 'sql'}
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -918,35 +1240,77 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                             onClick={async () => {
                               if (!id || !selectedActionName) return
                               try {
-                                const method = String(actionDraft?.method ?? '')
-                                  .trim()
-                                  .toUpperCase()
-                                const path = String(actionDraft?.path ?? '').trim()
-                                if (!method) {
-                                  toast.error('method is required')
-                                  return
-                                }
-                                if (!path) {
-                                  toast.error('path is required')
-                                  return
-                                }
-
                                 const timeoutMs =
                                   actionDraft?.timeoutMs === undefined || actionDraft.timeoutMs === null || Number.isNaN(Number(actionDraft.timeoutMs))
                                     ? undefined
                                     : Math.max(0, Math.floor(Number(actionDraft.timeoutMs)))
 
-                                const endpoint: ConnectorEndpointV2 = {
-                                  name: selectedActionName,
-                                  method: method as HttpMethod,
-                                  path,
-                                  ...(String(actionDraft?.description ?? '').trim() ? { description: String(actionDraft?.description ?? '').trim() } : {}),
-                                  ...(String(actionDraft?.baseUrlOverride ?? '').trim() ? { baseUrlOverride: String(actionDraft?.baseUrlOverride ?? '').trim() } : {}),
-                                  ...(actionDraft?.requestStyle ? { requestStyle: actionDraft.requestStyle } : {}),
-                                  ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-                                  ...(parseOptionalJsonObject('parameters', actionParametersText) ? { parameters: parseOptionalJsonObject('parameters', actionParametersText) as any } : {}),
-                                  ...(parseOptionalJsonObject('mapping', actionMappingText) ? { mapping: parseOptionalJsonObject('mapping', actionMappingText) as any } : {}),
-                                  ...(parseOptionalJsonObject('response', actionResponseText) ? { response: parseOptionalJsonObject('response', actionResponseText) as any } : {}),
+                                const parameters = parseOptionalJsonObject('parameters', actionParametersText)
+                                const mapping = parseOptionalJsonObject('mapping', actionMappingText)
+                                const response = parseOptionalJsonObject('response', actionResponseText)
+
+                                let endpoint: ConnectorEndpointV2
+                                if (actionDraftKind === 'sql') {
+                                  if (!sqlDraft) {
+                                    toast.error('SQL draft is missing')
+                                    return
+                                  }
+                                  const driver = String(sqlDraft.driver ?? 'postgres').trim()
+                                  const sql = String(sqlDraft.sql ?? '').trim()
+                                  if (!driver) {
+                                    toast.error('driver is required')
+                                    return
+                                  }
+                                  if (!sql) {
+                                    toast.error('sql is required')
+                                    return
+                                  }
+
+                                  const e: ConnectorSqlEndpointV2 = {
+                                    kind: 'sql',
+                                    name: selectedActionName,
+                                    driver,
+                                    sql,
+                                    ...(String(sqlDraft.description ?? '').trim() ? { description: String(sqlDraft.description ?? '').trim() } : {}),
+                                    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                                    ...(sqlDraft.mode ? { mode: sqlDraft.mode } : {}),
+                                    ...(typeof sqlDraft.rowLimit === 'number' ? { rowLimit: Math.floor(sqlDraft.rowLimit) } : {}),
+                                    ...(typeof sqlDraft.readOnly === 'boolean' ? { readOnly: sqlDraft.readOnly } : {}),
+                                    ...(parameters ? { parameters: parameters as unknown as ConnectorSqlEndpointV2['parameters'] } : {}),
+                                    ...(response ? { response: response as unknown as ConnectorSqlEndpointV2['response'] } : {}),
+                                  }
+                                  endpoint = e
+                                } else {
+                                  if (!httpDraft) {
+                                    toast.error('HTTP draft is missing')
+                                    return
+                                  }
+                                  const methodRaw = String(httpDraft.method ?? '')
+                                    .trim()
+                                    .toUpperCase()
+                                  const path = String(httpDraft.path ?? '').trim()
+                                  if (!methodRaw) {
+                                    toast.error('method is required')
+                                    return
+                                  }
+                                  if (!path) {
+                                    toast.error('path is required')
+                                    return
+                                  }
+
+                                  const e: ConnectorHttpEndpointV2 = {
+                                    name: selectedActionName,
+                                    method: methodRaw as HttpMethod,
+                                    path,
+                                    ...(String(httpDraft.description ?? '').trim() ? { description: String(httpDraft.description ?? '').trim() } : {}),
+                                    ...(String(httpDraft.baseUrlOverride ?? '').trim() ? { baseUrlOverride: String(httpDraft.baseUrlOverride ?? '').trim() } : {}),
+                                    ...(httpDraft.requestStyle ? { requestStyle: httpDraft.requestStyle } : {}),
+                                    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                                    ...(parameters ? { parameters: parameters as unknown as ConnectorHttpEndpointV2['parameters'] } : {}),
+                                    ...(mapping ? { mapping: mapping as unknown as ConnectorHttpEndpointV2['mapping'] } : {}),
+                                    ...(response ? { response: response as unknown as ConnectorHttpEndpointV2['response'] } : {}),
+                                  }
+                                  endpoint = e
                                 }
 
                                 await upsertActionMutation.mutateAsync({
@@ -954,8 +1318,8 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                                   actionName: selectedActionName,
                                   payload: { action: endpoint },
                                 })
-                              } catch (e: any) {
-                                toast.error('Failed to save action', { description: e?.message || 'Please verify fields.' })
+                              } catch (e: unknown) {
+                                toast.error('Failed to save action', { description: e instanceof Error ? e.message : 'Please verify fields.' })
                               }
                             }}
                             disabled={!selectedActionName || upsertActionMutation.isPending}

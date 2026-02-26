@@ -91,9 +91,6 @@ export class ConnectorActionSessionService {
     if (!host || !database) return null;
 
     const ssl = this.coerceBool(md.ssl ?? md.pgSsl ?? md.postgresSsl);
-    const sslRejectUnauthorized = this.coerceBool(
-      md.sslRejectUnauthorized ?? md.pgSslRejectUnauthorized ?? md.postgresSslRejectUnauthorized
-    );
 
     return {
       driver: 'postgres',
@@ -103,7 +100,6 @@ export class ConnectorActionSessionService {
       user: args.user,
       ...(args.password ? { password: args.password } : {}),
       ...(ssl !== undefined ? { ssl } : {}),
-      ...(sslRejectUnauthorized !== undefined ? { sslRejectUnauthorized } : {}),
     };
   }
 

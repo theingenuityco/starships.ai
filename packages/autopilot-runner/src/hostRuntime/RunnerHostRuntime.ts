@@ -17,8 +17,9 @@ import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
 import { invokeAzureAiFoundry } from './azure-ai-foundry';
 import { Pool } from 'pg';
-import type { FieldDef } from 'pg';
+import type { FieldDef, PoolClient } from 'pg';
 import { lookup } from 'node:dns/promises';
+import { Socket } from 'node:net';
 import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
 
 function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
@@ -135,6 +136,40 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
 
+  const tcpProbe = async (
+    host: string,
+    port: number,
+    timeoutMs: number = 1500
+  ): Promise<{ outcome: 'connected' | 'timeout' | 'error'; elapsedMs: number; error: string | null }> => {
+    const startedAt = Date.now();
+    const socket = new Socket();
+    let finished = false;
+
+    return await new Promise((resolve) => {
+      const finish = (outcome: 'connected' | 'timeout' | 'error', err?: unknown) => {
+      if (finished) return;
+      finished = true;
+      try {
+        socket.destroy();
+      } catch {
+        // ignore
+      }
+      const payload = {
+        outcome,
+        elapsedMs: Date.now() - startedAt,
+        error: err instanceof Error ? err.message : err ? String(err) : null,
+      };
+      resolve(payload);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish('connected'));
+    socket.once('timeout', () => finish('timeout'));
+    socket.once('error', (e) => finish('error', e));
+    socket.connect({ host, port });
+    });
+  };
+
   // Best-effort DB pool cache (per-process).
   const pgPools = new Map<string, Pool>();
   const getPgPool = (db: ConnectorDbSessionV2): Pool => {
@@ -146,7 +181,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       user: db.user,
       password: db.password ?? '',
       ssl: Boolean(db.ssl),
-      sslRejectUnauthorized: db.sslRejectUnauthorized === undefined ? undefined : Boolean(db.sslRejectUnauthorized),
     });
     const existing = pgPools.get(key);
     if (existing) return existing;
@@ -154,7 +188,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     const ssl =
       db.ssl === true
         ? {
-            rejectUnauthorized: db.sslRejectUnauthorized !== false,
+            rejectUnauthorized: true,
           }
         : db.ssl === false
           ? false
@@ -197,7 +231,14 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
     // Best-effort DNS resolution to catch private endpoints behind hostnames.
     try {
+      const dnsStartedAt = Date.now();
       const records = await lookup(h, { all: true });
+      const dnsElapsedMs = Date.now() - dnsStartedAt;
+      const privateAddrs = records.filter((r) => isPrivateIp(r.address)).map((r) => r.address);
+      const resolved = records.slice(0, 3).map((r) => ({ address: r.address, family: r.family ?? null }));
+      void dnsElapsedMs;
+      void resolved;
+      void privateAddrs;
       for (const r of records) {
         if (isPrivateIp(r.address) && !allowPrivate) {
           throw new Error('DB host resolves to a private network and is blocked by policy');
@@ -583,6 +624,31 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const paramsRaw = argsRec.params;
       const params: unknown[] = paramsRaw === undefined ? [] : Array.isArray(paramsRaw) ? paramsRaw : (() => { throw new Error('args.params must be an array when provided'); })();
 
+      const hostLower = String(db.host).toLowerCase();
+      const isSupabaseHost = hostLower.endsWith('.supabase.co');
+      const isDefaultPgPort = Number(db.port) === 5432;
+
+      // Fast preflight: if we can't open a TCP connection, the query will never succeed.
+      const preflightMain = await tcpProbe(db.host, db.port, 1500);
+      const preflightPooler = isSupabaseHost && isDefaultPgPort ? await tcpProbe(db.host, 6543, 1500) : null;
+
+      if (preflightMain.outcome !== 'connected' && (preflightPooler?.outcome ?? 'timeout') !== 'connected') {
+        let resolvedIp: string | null = null;
+        try {
+          const r = await lookup(String(db.host), { family: 4 });
+          resolvedIp = r?.address ?? null;
+        } catch {
+          // ignore
+        }
+        const extra =
+          isSupabaseHost && isDefaultPgPort
+            ? ' For Supabase, also verify your project Network Restrictions / IP allowlist and consider using the pooler port (6543) if required.'
+            : '';
+        throw new Error(
+          `Cannot reach Postgres host "${db.host}" on port ${db.port} (TCP ${preflightMain.outcome}${resolvedIp ? `; resolved IPv4 ${resolvedIp}` : ''}). This looks like a network/firewall/egress restriction: the runner must be able to open outbound TCP to your database port.${extra}`
+        );
+      }
+
       const pool = getPgPool(db);
 
       // Ensure timeouts are bounded and safe.
@@ -595,8 +661,32 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
       const safeUrl = `sql:postgres://${encodeURIComponent(db.host)}:${encodeURIComponent(String(db.port))}/${encodeURIComponent(db.database)}`;
 
-      const client = await pool.connect();
+      const connectStartedAt = Date.now();
+      let client: PoolClient;
       try {
+        client = await pool.connect();
+      } catch (err) {
+        const code = (err as { code?: unknown } | null)?.code;
+        if (
+          code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+          code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+          code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+        ) {
+          throw new Error(
+            [
+              `Postgres SSL verification failed while connecting to "${db.host}:${db.port}" (${String(code)}).`,
+              `This usually means the server (or a network proxy) presented a certificate chain that isn't trusted by the runner.`,
+              `Fix options:`,
+              `- Ensure your DB endpoint presents a publicly trusted TLS certificate chain (no MITM/proxy inserting a self-signed cert).`,
+              `- If you're using a pooler/proxy, ensure it is configured with a trusted certificate chain.`,
+            ].join(' ')
+          );
+        }
+        throw err;
+      }
+      try {
+        void connectStartedAt;
+
         // Apply statement timeout for this session.
         // Note: statement_timeout is per-connection; we reset defensively for every call.
         await client.query(`SET statement_timeout = ${effectiveTimeoutMs}`);

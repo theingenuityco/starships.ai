@@ -85,7 +85,6 @@ export { TopupRepository } from './repositories/TopupRepository';
 export { LedgerRepository } from './repositories/LedgerRepository';
 export { PromoRedemptionRepository } from './repositories/PromoRedemptionRepository';
 export { WidgetRepository } from './repositories/WidgetRepository';
-export { ConversationWidgetRepository } from './repositories/ConversationWidgetRepository';
 export { ViewRepository } from './repositories/ViewRepository';
 export { ViewWidgetRepository } from './repositories/ViewWidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';

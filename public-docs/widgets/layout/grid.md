@@ -12,24 +12,9 @@ A responsive layout widget for arranging children in a grid. Control the number 
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Grid",
-  "props": {
-    "cols": 3,
-    "gap": 16,
-    "minColWidthPx": 280,
-    "className": "w-full"
-  }
-}
-```
 
 ### Views node (widget tree)
 

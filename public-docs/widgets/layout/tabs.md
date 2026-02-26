@@ -12,23 +12,9 @@ A layout widget that renders a tabbed interface. `Tabs` accepts children; the wi
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Tabs",
-  "props": {
-    "defaultIndex": 0,
-    "labels": ["Overview", "Details"],
-    "className": "w-full"
-  }
-}
-```
 
 ### Views node (widget tree)
 

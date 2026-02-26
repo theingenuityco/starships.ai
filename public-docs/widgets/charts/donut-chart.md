@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 A hollow pie chart that highlights composition and key totals. Uses shadcn/ui’s `ChartContainer`, `ChartTooltipContent`, and `ChartLegendContent` primitives (Context7 `/websites/ui_shadcn`, topic `charts`) for consistent theming and accessibility.
@@ -45,7 +44,8 @@ Donut segments reuse the same `PieSegment` structure as the Pie widget:
 
 ```json
 {
-  "widgetType": "DonutChart",
+  "id": "chart",
+  "type": "DonutChart",
   "props": {
     "title": "Budget Allocation",
     "description": "FY25 draft",

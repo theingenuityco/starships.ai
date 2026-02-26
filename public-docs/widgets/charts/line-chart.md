@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 Time-series visualization with smooth curves, optional dots, and shadcn/ui tooltips. By reusing `ChartContainer`, `ChartTooltipContent`, and `ChartLegendContent` (Context7 `/websites/ui_shadcn`, topic `charts`), the widget inherits official accessibility and theming guidance.
@@ -55,7 +54,8 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
 
 ```json
 {
-  "widgetType": "LineChart",
+  "id": "chart",
+  "type": "LineChart",
   "props": {
     "title": "Daily Active Users",
     "description": "UTC rolling 7-day average",

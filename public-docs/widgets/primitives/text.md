@@ -12,23 +12,9 @@ A simple text widget. Choose the HTML tag via `as`, set content via `text`, and 
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Text",
-  "props": {
-    "as": "h2",
-    "text": "Quarterly Summary",
-    "className": "text-xl font-semibold"
-  }
-}
-```
 
 ### Views node (widget tree)
 

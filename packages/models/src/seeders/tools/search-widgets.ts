@@ -6,7 +6,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * Query saved widgets for the current starship.
  *
  * IMPORTANT: This tool does NOT emit UI actions and should NOT be used to render widgets.
- * Use `render-widget` to render a widget in the conversation UI.
+ * Render widgets via Views (persist a view root and use the Views runtime).
  */
 export const searchWidgetsTool: ToolParams = {
   name: 'Search Widgets',

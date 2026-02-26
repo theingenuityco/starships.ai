@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 Stacked or single-series area charts that emphasize magnitude over time. Built per the [`AreaChart` guidance from shadcn/ui](https://ui.shadcn.com/docs/components/chart), so it automatically wires `ChartConfig` colors, tooltips, and legends outlined in Context7.
@@ -55,7 +54,8 @@ Stacked or single-series area charts that emphasize magnitude over time. Built p
 
 ```json
 {
-  "widgetType": "AreaChart",
+  "id": "chart",
+  "type": "AreaChart",
   "props": {
     "title": "Traffic Mix",
     "description": "7 day moving average",

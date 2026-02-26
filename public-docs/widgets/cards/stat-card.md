@@ -12,27 +12,9 @@ A card widget that displays multiple statistics with labels, values, and optiona
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "StatCard",
-  "props": {
-    "title": "System Health",
-    "description": "Last 24 hours",
-    "stats": [
-      { "label": "Active Users", "value": 842, "variant": "success" },
-      { "label": "Pending Actions", "value": 23, "variant": "warning" },
-      { "label": "System Errors", "value": 3, "variant": "error" }
-    ]
-  }
-}
-```
 
 ### Views node (widget tree)
 
@@ -62,7 +44,8 @@ A card widget that displays multiple statistics with labels, values, and optiona
 
 ```json
 {
-  "widgetType": "StatCard",
+  "id": "kpis-icons",
+  "type": "StatCard",
   "props": {
     "title": "Revenue Metrics",
     "description": "Last 30 days",

@@ -8,20 +8,20 @@ category: widgets
 
 ## Overview
 
-Renders an inline form in chat that lets a user view/update their starship (name, description, website URL).
+Renders a form that lets a user view/update their starship (name, description, website URL).
 
 ## Where it can be used
 
-- Inline (conversations): Yes
-- Views (widget tree): No
+- Views (widget tree): Yes
 
 ## Payload shapes
 
-### Inline widget (conversations)
+### Views node (widget tree)
 
 ```json
 {
-  "widgetType": "StarshipDetails",
+  "id": "starship-details",
+  "type": "StarshipDetails",
   "props": {
     "starshipId": "starship_123"
   }

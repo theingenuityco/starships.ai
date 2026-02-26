@@ -17,6 +17,5 @@ export { UsageRepository } from './UsageRepository';
 export { UserRepository } from './UserRepository';
 export { WidgetRepository } from './WidgetRepository';
 export { LlmModelRepository } from './LlmModelRepository';
-export { ConversationWidgetRepository } from './ConversationWidgetRepository';
 export { AutopilotAwaitRepository } from './AutopilotAwaitRepository';
 export { AutopilotAwaitFiringRepository } from './AutopilotAwaitFiringRepository';

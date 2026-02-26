@@ -28,7 +28,6 @@ export function DesignWidgetTreeRenderer(props: {
 }) {
   const { node, selectedId, hoveredId, onHover, onSelect } = props
   const Component = WIDGET_REGISTRY[node.type]
-  if (!Component) return <UnknownWidgetType type={node.type} />
 
   const children = Array.isArray(node.children) ? node.children : []
   const acceptsChildren = getWidgetDefinition(node.type)?.acceptsChildren ?? children.length > 0
@@ -132,7 +131,16 @@ export function DesignWidgetTreeRenderer(props: {
 
       {/* Inner padding keeps the outline away from widget edges */}
       <div className="p-1">
-        <Component {...(safeProps as any)}>{renderedChildren}</Component>
+        {Component ? (
+          <Component {...(safeProps as any)}>{renderedChildren}</Component>
+        ) : (
+          <div className="space-y-2">
+            <UnknownWidgetType type={node.type} />
+            {renderedChildren ? (
+              <div className="rounded-md border border-border/60 bg-muted/10 p-2">{renderedChildren}</div>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   )

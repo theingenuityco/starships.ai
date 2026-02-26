@@ -21,10 +21,11 @@ import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 import type { AgentParamsWithoutMetadata } from '@starships/protocol';
 import { computeAgentContentHash } from '@/utils/contentHash';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class AgentRepository extends BaseRepository {
-  constructor() {
-    super('AgentRepository');
+  constructor(connection?: PostgresConnection) {
+    super('AgentRepository', connection);
   }
 
   /**

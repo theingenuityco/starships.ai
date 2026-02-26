@@ -16,17 +16,20 @@ function PaletteItem(props: { def: WidgetDefinition }) {
     data: { kind: 'new', widgetType: def.type },
   })
 
-  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
+  // NOTE: We intentionally do not apply the draggable transform styles here.
+  // When dragging, translating the original list item can make the ScrollArea think
+  // its contents are wider, which introduces an unwanted horizontal scroll.
+  // The editor already renders a DragOverlay for "new" drags.
+  void transform
 
   return (
     <button
       ref={setNodeRef}
       type="button"
       className={cn(
-        'w-full text-left rounded-md border border-border/60 bg-card px-3 py-2 text-sm hover:bg-muted/40 transition-colors',
+        'w-full max-w-full min-w-0 overflow-hidden text-left rounded-md border border-border/60 bg-card px-3 py-2 text-sm hover:bg-muted/40 transition-colors',
         isDragging ? 'opacity-60' : null
       )}
-      style={style}
       {...listeners}
       {...attributes}
     >

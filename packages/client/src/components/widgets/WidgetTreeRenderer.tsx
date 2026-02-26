@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { BindingSpec, WidgetInstanceNode } from '@starships/protocol'
-import { WIDGET_REGISTRY } from './widgetRegistry'
+import { WIDGET_CATALOG_BY_TYPE } from './widgetCatalog'
 import { getAtPath, setAtPath } from '@/lib/objectPath'
 
 export type WidgetTreeRendererProps = {
@@ -19,7 +19,7 @@ function UnknownWidgetType(props: { type: string }) {
   return (
     <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950/20">
       <p className="text-sm text-red-600 dark:text-red-400">Unknown widget type: {props.type}</p>
-      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_REGISTRY).join(', ')}</p>
+      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_CATALOG_BY_TYPE).join(', ')}</p>
     </div>
   )
 }
@@ -38,7 +38,7 @@ function WidgetRenderError(props: { error: unknown; node: WidgetInstanceNode }) 
 }
 
 export function WidgetTreeRenderer({ node, className, runtime, onEvent }: WidgetTreeRendererProps): React.JSX.Element {
-  const Component = WIDGET_REGISTRY[node.type]
+  const Component = WIDGET_CATALOG_BY_TYPE[node.type]?.Component
   const children = Array.isArray(node.children) ? node.children : []
 
   if (!Component) return <UnknownWidgetType type={node.type} />

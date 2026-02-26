@@ -5,7 +5,7 @@ import { devtools } from 'zustand/middleware'
 import type { BindingSpec, HandlerSpec, ViewModel, ViewRuntimeActionRequest, ViewRuntimeConfig, ViewScript, WidgetInstanceNode } from '@starships/protocol'
 import { setAtPath } from '@/lib/objectPath'
 import { getChildIndex, getParentId, insertChild, moveNode, removeNode, reorderChild, updateNode } from '../treeOps'
-import { getWidgetDefinition } from '@/components/widgets/widgetDefinitions'
+import { getWidgetCatalogEntry } from '@/components/widgets/widgetCatalog'
 
 export type ViewEditorMode = 'design' | 'preview'
 
@@ -346,8 +346,8 @@ export const useViewEditorStore = create<ViewEditorState>()(
         const parentId = String(s0.selectedId)
         const parent = findNodeFast(s0.draftRoot, parentId)
         if (!parent) return
-        const def = getWidgetDefinition(parent.type)
-        if (def && !def.acceptsChildren) return
+        const meta = getWidgetCatalogEntry(parent.type)
+        if (meta && !meta.acceptsChildren) return
         const existingCount = Array.isArray(parent?.children) ? parent!.children!.length : 0
         const nextRoot = insertChild(s0.draftRoot, parentId, existingCount, child)
         if (nextRoot === s0.draftRoot) return
@@ -371,8 +371,8 @@ export const useViewEditorStore = create<ViewEditorState>()(
         if (!p) return
         const parent = findNodeFast(s0.draftRoot, p)
         if (!parent) return
-        const def = getWidgetDefinition(parent.type)
-        if (def && !def.acceptsChildren) return
+        const meta = getWidgetCatalogEntry(parent.type)
+        if (meta && !meta.acceptsChildren) return
         const len = Array.isArray(parent?.children) ? parent!.children!.length : 0
         const i = typeof index === 'number' ? index : len
         const nextRoot = insertChild(s0.draftRoot, p, i, child)
@@ -401,8 +401,8 @@ export const useViewEditorStore = create<ViewEditorState>()(
 
         const parent = findNodeFast(s0.draftRoot, parentId)
         if (!parent) return
-        const def = getWidgetDefinition(parent.type)
-        if (def && !def.acceptsChildren) return
+        const meta = getWidgetCatalogEntry(parent.type)
+        if (meta && !meta.acceptsChildren) return
 
         const nextRoot = moveNode(s0.draftRoot, id, parentId, toIndex)
         if (nextRoot === s0.draftRoot) return

@@ -174,6 +174,10 @@ export default function MembersPage() {
     setIsApplyingImport(false)
   }, [importOpen])
 
+  const importHasExistingTools = Boolean(importAnalysis?.tools.some(t => t.status !== 'new'))
+  const importHasExistingAgents = Boolean(importAnalysis?.agents.some(a => a.status !== 'new'))
+  const importHasExisting = importHasExistingTools || importHasExistingAgents
+
   const humansQuery = useInfiniteStarshipMembers(String(starshipId || ''), Boolean(starshipId), { limit: 50, search: debouncedSearch })
   const agentsQuery = useInfiniteStarshipAgents(String(starshipId || ''), Boolean(starshipId), { limit: 50, order: 'ASC', search: debouncedSearch })
 
@@ -1135,7 +1139,7 @@ export default function MembersPage() {
       </Dialog>
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="sm:max-w-[720px]">
+        <DialogContent className={cn('sm:max-w-[720px]', importHasExisting ? 'max-h-[85vh] overflow-y-auto' : null)}>
           <DialogHeader>
             <DialogTitle>Import bundle</DialogTitle>
             <DialogDescription>Upload a bundle exported from Members → Agents → Export bundle.</DialogDescription>
@@ -1165,13 +1169,23 @@ export default function MembersPage() {
                   <div className="mt-1 text-xs text-muted-foreground">Choose what to do for each item that already exists.</div>
                 </div>
 
-                <div className="space-y-3">
+                <div
+                  className={cn(
+                    'space-y-3',
+                    importHasExisting ? 'max-h-[45vh] sm:max-h-[55vh] overflow-y-auto overscroll-contain pr-2' : null,
+                  )}
+                >
                   <div>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-semibold text-foreground">Tools</div>
                       <div className="text-xs text-muted-foreground">{importAnalysis.tools.length} in bundle</div>
                     </div>
-                    <div className="mt-2 space-y-2">
+                    <div
+                      className={cn(
+                        'mt-2 space-y-2',
+                        importHasExistingTools ? 'max-h-[28vh] sm:max-h-[32vh] overflow-y-auto overscroll-contain pr-2' : null,
+                      )}
+                    >
                       {importAnalysis.tools.map(t => {
                         const decision = importDecisions.tools[t.bundleHash] ?? {
                           action: t.status === 'same' ? ('skip' as const) : ('copy' as const),
@@ -1224,7 +1238,12 @@ export default function MembersPage() {
                       <div className="text-sm font-semibold text-foreground">Agents</div>
                       <div className="text-xs text-muted-foreground">{importAnalysis.agents.length} in bundle</div>
                     </div>
-                    <div className="mt-2 space-y-2">
+                    <div
+                      className={cn(
+                        'mt-2 space-y-2',
+                        importHasExistingAgents ? 'max-h-[28vh] sm:max-h-[32vh] overflow-y-auto overscroll-contain pr-2' : null,
+                      )}
+                    >
                       {importAnalysis.agents.map(a => {
                         const decision = importDecisions.agents[a.bundleHash] ?? {
                           action: a.status === 'same' ? ('skip' as const) : ('copy' as const),

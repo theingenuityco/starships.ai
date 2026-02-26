@@ -15,6 +15,7 @@ import { compareVersions, isValidVersion } from '@/utils/version';
 import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnectorProviders';
 import { ToolTemplateRepository } from './ToolTemplateRepository';
 import { generateSlug } from '@/helpers/slugUtils';
+import { computeToolContentHash } from '@/utils/contentHash';
 
 export class ToolRepository extends BaseRepository {
   constructor() {
@@ -76,6 +77,17 @@ export class ToolRepository extends BaseRepository {
           configuration: undefined,
           isEnabled: rest.isEnabled ?? true,
           status: rest.status || 'active',
+          contentHash: computeToolContentHash({
+            name: rest.name,
+            description: rest.description,
+            parameters: rest.parameters,
+            blueprint: rest.blueprint,
+            transforms: rest.transforms,
+            mutations: rest.mutations,
+            condition: rest.condition,
+            isEnabled: rest.isEnabled ?? true,
+            status: rest.status || 'active',
+          }),
 
           // Relationship field
           starshipId: starshipId,
@@ -431,6 +443,17 @@ export class ToolRepository extends BaseRepository {
           configuration: data.configuration,
           isEnabled: data.isEnabled ?? true,
           status: data.status || 'active',
+          contentHash: computeToolContentHash({
+            name: data.name,
+            description: data.description,
+            parameters: data.parameters,
+            blueprint: data.blueprint,
+            transforms: data.transforms,
+            mutations: data.mutations,
+            condition: data.condition,
+            isEnabled: data.isEnabled ?? true,
+            status: data.status || 'active',
+          }),
 
           // Relationship field
           starshipId: starshipId,
@@ -489,6 +512,20 @@ export class ToolRepository extends BaseRepository {
         await ToolEntity.validate(updateProps, 'update');
 
         // Convert entity updates to database format
+        const mergedForHash = {
+          name: updates.name !== undefined ? updates.name : existing.name,
+          description: updates.description !== undefined ? updates.description : existing.description,
+          parameters: updates.parameters !== undefined ? updates.parameters : existing.parameters,
+          blueprint: updates.blueprint !== undefined ? updates.blueprint : existing.blueprint,
+          transforms: updates.transforms !== undefined ? updates.transforms : existing.transforms,
+          mutations: updates.mutations !== undefined ? updates.mutations : existing.mutations,
+          condition: updates.condition !== undefined ? updates.condition : existing.condition,
+          isEnabled: updates.isEnabled !== undefined ? updates.isEnabled : existing.isEnabled,
+          status: updates.status !== undefined ? updates.status : existing.status,
+        };
+        const updatePropsWithHash: Partial<ToolModel> & { contentHash?: string } = updateProps;
+        updatePropsWithHash.contentHash = computeToolContentHash(mergedForHash);
+
         const updateData = toDatabase(toEntityInstance(ToolEntity, updateProps));
 
         // Filter out protected fields (id, createdAt)

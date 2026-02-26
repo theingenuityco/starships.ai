@@ -19,7 +19,7 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
 import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
-import { getConnection } from '@starships/models';
+import { AgentRepository, ToolRepository, computeAgentContentHash, computeToolContentHash, getConnection } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
@@ -1154,6 +1154,596 @@ router.post(
       );
     } catch (error) {
       handleError(error, res, 'importing bundle into starship');
+    }
+  }
+);
+
+/**
+ * POST /starships/:id/import-bundle/analyze
+ * Analyze a zipped agent bundle and return conflicts vs the destination starship.
+ *
+ * Instance-admin only.
+ */
+router.post(
+  '/starships/:id/import-bundle/analyze',
+  jwtAuthMiddleware,
+  requireInstanceAdminMiddleware,
+  bundleUpload.single('file'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
+
+      if (!req.file?.buffer) {
+        sendError(res, 'VALIDATION_ERROR', 'No bundle file provided', 400);
+        return;
+      }
+
+      let zip: AdmZip;
+      try {
+        zip = new AdmZip(req.file.buffer);
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Invalid zip bundle', 400);
+        return;
+      }
+
+      const manifestEntry = zip.getEntry('manifest.json');
+      if (!manifestEntry) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle is missing manifest.json', 400);
+        return;
+      }
+
+      let manifestRaw: unknown;
+      try {
+        manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json is not valid JSON', 400);
+        return;
+      }
+
+      const ManifestSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.literal('bundle'),
+        exportedAt: z.string().min(1),
+        entities: z.object({
+          agents: z.array(z.object({ kind: z.literal('agent'), file: z.string().min(1) })).default([]),
+          tools: z.array(z.object({ kind: z.literal('tool'), file: z.string().min(1) })).default([]),
+        }),
+      });
+
+      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      if (!manifestParsed.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, { issues: manifestParsed.error.issues });
+        return;
+      }
+
+      const ContainerSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.enum(['agent', 'tool']),
+        exportedAt: z.string().min(1),
+        metadata: z
+          .object({
+            fromSlug: z.string().optional(),
+            fromStarshipSlug: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+        source: z
+          .object({
+            app: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+        payload: z.unknown(),
+      });
+
+      const starshipId = paramValidation.id;
+      const toolRepo = new ToolRepository();
+      const agentRepo = new AgentRepository();
+
+      const existingTools = await toolRepo.findByStarship(starshipId);
+      const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
+      const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
+      for (const t of existingTools) {
+        const nameKey = String(t.name || '').trim().toLowerCase();
+        if (nameKey) existingToolsByName.set(nameKey, t);
+        const hash = (t as any).contentHash;
+        if (typeof hash === 'string' && hash.length === 64) existingToolsByHash.set(hash, t);
+      }
+
+      const existingAgents = await agentRepo.findByStarship(starshipId);
+      const assignedToolRows = await agentRepo.getAssignedToolSlugsForAgents(existingAgents.map((a) => a.id));
+      const assignedToolSlugsByAgentId = new Map<string, string[]>();
+      for (const row of assignedToolRows) {
+        const list = assignedToolSlugsByAgentId.get(row.agentId) ?? [];
+        list.push(row.toolSlug);
+        assignedToolSlugsByAgentId.set(row.agentId, list);
+      }
+
+      const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
+      const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
+      for (const a of existingAgents) {
+        const nameKey = String(a.name || '').trim().toLowerCase();
+        if (nameKey) existingAgentsByName.set(nameKey, a);
+        const hash = (a as any).contentHash;
+        if (typeof hash === 'string' && hash.length === 64) existingAgentsByHash.set(hash, a);
+        // Lazy backfill for older rows: compute if missing.
+        if (!(typeof hash === 'string' && hash.length === 64)) {
+          const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
+          const computed = computeAgentContentHash({
+            name: a.name,
+            role: a.role,
+            description: a.description,
+            model: a.model,
+            temperature: a.temperature,
+            maxTokens: a.maxTokens,
+            timeout: a.timeout,
+            reasoning: (a as any).reasoning,
+            systemPrompt: a.systemPrompt,
+            state: a.state,
+            blueprint: a.blueprint,
+            category: a.category,
+            previewPrompts: a.previewPrompts,
+            assignedToolSlugs: slugs,
+          });
+          existingAgentsByHash.set(computed, a);
+        }
+      }
+
+      const toolsAnalysis: Array<{
+        kind: 'tool';
+        file: string;
+        name: string;
+        bundleHash: string;
+        status: 'new' | 'same' | 'conflict';
+        existing?: { id: string; name: string; slug: string; contentHash?: string };
+      }> = [];
+
+      for (const t of manifestParsed.data.entities.tools) {
+        const entry = zip.getEntry(t.file);
+        if (!entry) continue;
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          continue;
+        }
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'tool') continue;
+
+        const payload: any = containerParsed.data.payload as any;
+        const toolPayload = payload?.tool ?? {};
+        const bundleHash = computeToolContentHash({
+          name: toolPayload?.name,
+          description: toolPayload?.description,
+          parameters: toolPayload?.parameters,
+          blueprint: toolPayload?.blueprint,
+          transforms: toolPayload?.transforms,
+          mutations: toolPayload?.mutations,
+          condition: toolPayload?.condition,
+          isEnabled: toolPayload?.isEnabled,
+          status: toolPayload?.status,
+        });
+        const name = String(toolPayload?.name || '').trim();
+        const existingByHash = existingToolsByHash.get(bundleHash);
+        const existingByName = name ? existingToolsByName.get(name.toLowerCase()) : undefined;
+
+        const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
+        const existing = existingByHash ?? existingByName;
+        toolsAnalysis.push({
+          kind: 'tool',
+          file: t.file,
+          name: name || '(unnamed tool)',
+          bundleHash,
+          status,
+          existing: existing
+            ? {
+                id: existing.id,
+                name: existing.name,
+                slug: existing.slug,
+                contentHash: (existing as any).contentHash,
+              }
+            : undefined,
+        });
+      }
+
+      const agentsAnalysis: Array<{
+        kind: 'agent';
+        file: string;
+        name: string;
+        bundleHash: string;
+        status: 'new' | 'same' | 'conflict';
+        existing?: { id: string; name: string; slug: string; contentHash?: string };
+      }> = [];
+
+      for (const a of manifestParsed.data.entities.agents) {
+        const entry = zip.getEntry(a.file);
+        if (!entry) continue;
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          continue;
+        }
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'agent') continue;
+
+        const payload: any = containerParsed.data.payload as any;
+        const agentPayload = payload?.agent ?? {};
+        const assignedToolSlugs = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+        const bundleHash = computeAgentContentHash({
+          name: agentPayload?.name,
+          role: agentPayload?.role,
+          description: agentPayload?.description,
+          model: agentPayload?.model,
+          temperature: agentPayload?.temperature,
+          maxTokens: agentPayload?.maxTokens,
+          timeout: agentPayload?.timeout,
+          reasoning: agentPayload?.reasoning,
+          systemPrompt: agentPayload?.systemPrompt,
+          state: agentPayload?.state,
+          blueprint: agentPayload?.blueprint,
+          category: agentPayload?.category,
+          previewPrompts: agentPayload?.previewPrompts,
+          assignedToolSlugs,
+        });
+
+        const name = String(agentPayload?.name || '').trim();
+        const existingByHash = existingAgentsByHash.get(bundleHash);
+        const existingByName = name ? existingAgentsByName.get(name.toLowerCase()) : undefined;
+        const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
+        const existing = existingByHash ?? existingByName;
+        agentsAnalysis.push({
+          kind: 'agent',
+          file: a.file,
+          name: name || '(unnamed agent)',
+          bundleHash,
+          status,
+          existing: existing
+            ? {
+                id: existing.id,
+                name: existing.name,
+                slug: existing.slug,
+                contentHash: (existing as any).contentHash,
+              }
+            : undefined,
+        });
+      }
+
+      sendSuccess(res, { tools: toolsAnalysis, agents: agentsAnalysis });
+    } catch (error) {
+      handleError(error, res, 'analyzing bundle import conflicts');
+    }
+  }
+);
+
+/**
+ * POST /starships/:id/import-bundle/apply
+ * Apply a zipped agent bundle import using user-selected conflict strategies.
+ *
+ * Form-data:
+ * - file: zip bundle
+ * - decisions: JSON string
+ *
+ * Instance-admin only.
+ */
+router.post(
+  '/starships/:id/import-bundle/apply',
+  jwtAuthMiddleware,
+  requireInstanceAdminMiddleware,
+  bundleUpload.single('file'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
+
+      const decisionsRaw = (req.body as any)?.decisions;
+      if (typeof decisionsRaw !== 'string' || decisionsRaw.trim().length === 0) {
+        sendError(res, 'VALIDATION_ERROR', 'Missing decisions', 400);
+        return;
+      }
+
+      let decisionsJson: unknown;
+      try {
+        decisionsJson = JSON.parse(decisionsRaw);
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Decisions must be valid JSON', 400);
+        return;
+      }
+
+      const DecisionSchema = z.object({
+        action: z.enum(['skip', 'copy', 'overwrite']),
+        targetId: z.string().optional(),
+      });
+      const DecisionsSchema = z.object({
+        tools: z.record(z.string().min(1), DecisionSchema).default({}),
+        agents: z.record(z.string().min(1), DecisionSchema).default({}),
+      });
+      const decisionsParsed = DecisionsSchema.safeParse(decisionsJson);
+      if (!decisionsParsed.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Decisions have an unexpected shape', 400, { issues: decisionsParsed.error.issues });
+        return;
+      }
+
+      if (!req.file?.buffer) {
+        sendError(res, 'VALIDATION_ERROR', 'No bundle file provided', 400);
+        return;
+      }
+
+      let zip: AdmZip;
+      try {
+        zip = new AdmZip(req.file.buffer);
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Invalid zip bundle', 400);
+        return;
+      }
+
+      const manifestEntry = zip.getEntry('manifest.json');
+      if (!manifestEntry) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle is missing manifest.json', 400);
+        return;
+      }
+
+      let manifestRaw: unknown;
+      try {
+        manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json is not valid JSON', 400);
+        return;
+      }
+
+      const ManifestSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.literal('bundle'),
+        exportedAt: z.string().min(1),
+        entities: z.object({
+          agents: z.array(z.object({ kind: z.literal('agent'), file: z.string().min(1) })).default([]),
+          tools: z.array(z.object({ kind: z.literal('tool'), file: z.string().min(1) })).default([]),
+        }),
+      });
+
+      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      if (!manifestParsed.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, { issues: manifestParsed.error.issues });
+        return;
+      }
+
+      const ContainerSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.enum(['agent', 'tool']),
+        exportedAt: z.string().min(1),
+        metadata: z
+          .object({
+            fromSlug: z.string().optional(),
+            fromStarshipSlug: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+        source: z
+          .object({
+            app: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+        payload: z.unknown(),
+      });
+
+      const starshipId = paramValidation.id;
+      const toolRepo = new ToolRepository();
+      const agentRepo = new AgentRepository();
+      const agentService = new AgentService();
+      const svc = new ImportExportService();
+
+      const warnings: string[] = [];
+      const importedTools: unknown[] = [];
+      const importedAgents: unknown[] = [];
+      const toolSlugMap = new Map<string, string>();
+
+      // Tools first
+      for (const t of manifestParsed.data.entities.tools) {
+        const entry = zip.getEntry(t.file);
+        if (!entry) {
+          warnings.push(`Bundle is missing tool file: ${t.file}`);
+          continue;
+        }
+
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          warnings.push(`Tool file is not valid JSON: ${t.file}`);
+          continue;
+        }
+
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
+          warnings.push(`Tool file is not a valid tool container: ${t.file}`);
+          continue;
+        }
+
+        const payload: any = containerParsed.data.payload as any;
+        const toolPayload = payload?.tool ?? {};
+        const fromSlug = containerParsed.data.metadata?.fromSlug;
+        const bundleHash = computeToolContentHash({
+          name: toolPayload?.name,
+          description: toolPayload?.description,
+          parameters: toolPayload?.parameters,
+          blueprint: toolPayload?.blueprint,
+          transforms: toolPayload?.transforms,
+          mutations: toolPayload?.mutations,
+          condition: toolPayload?.condition,
+          isEnabled: toolPayload?.isEnabled,
+          status: toolPayload?.status,
+        });
+
+        const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
+        const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
+
+        const existingTools = await toolRepo.findByStarship(starshipId);
+        const existingByHash = existingTools.find((x) => (x as any).contentHash === bundleHash);
+        const existingByName = toolNameKey ? existingTools.find((x) => String(x.name || '').trim().toLowerCase() === toolNameKey) : undefined;
+        const target = existingByHash ?? existingByName ?? null;
+
+        if (decision.action === 'skip') {
+          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && target?.slug) {
+            toolSlugMap.set(fromSlug, target.slug);
+          }
+          continue;
+        }
+
+        if (decision.action === 'overwrite') {
+          const targetId = decision.targetId || target?.id;
+          if (!targetId) {
+            warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
+            continue;
+          }
+          const updated = await toolRepo.update(targetId, {
+            name: toolPayload?.name,
+            description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
+            parameters: toolPayload?.parameters,
+            blueprint: toolPayload?.blueprint,
+            transforms: toolPayload?.transforms,
+            mutations: toolPayload?.mutations,
+            condition: toolPayload?.condition,
+            isEnabled: toolPayload?.isEnabled,
+            status: toolPayload?.status,
+          } as any);
+          if (updated) {
+            importedTools.push(updated);
+            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) toolSlugMap.set(fromSlug, updated.slug);
+          }
+          continue;
+        }
+
+        // copy (default)
+        const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
+        if (result?.warnings?.length) warnings.push(...result.warnings);
+        if (result?.kind === 'tool' && (result as any).tool) {
+          importedTools.push((result as any).tool);
+          const createdSlug = (result as any).tool?.slug;
+          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+            toolSlugMap.set(fromSlug, createdSlug);
+          }
+        }
+      }
+
+      // Agents
+      for (const a of manifestParsed.data.entities.agents) {
+        const entry = zip.getEntry(a.file);
+        if (!entry) {
+          warnings.push(`Bundle is missing agent file: ${a.file}`);
+          continue;
+        }
+
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          warnings.push(`Agent file is not valid JSON: ${a.file}`);
+          continue;
+        }
+
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
+          warnings.push(`Agent file is not a valid agent container: ${a.file}`);
+          continue;
+        }
+
+        const payload: any = containerParsed.data.payload as any;
+        const agentPayload = payload?.agent ?? {};
+        const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+        const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
+        const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
+
+        const bundleHash = computeAgentContentHash({
+          name: agentPayload?.name,
+          role: agentPayload?.role,
+          description: agentPayload?.description,
+          model: agentPayload?.model,
+          temperature: agentPayload?.temperature,
+          maxTokens: agentPayload?.maxTokens,
+          timeout: agentPayload?.timeout,
+          reasoning: agentPayload?.reasoning,
+          systemPrompt: agentPayload?.systemPrompt,
+          state: agentPayload?.state,
+          blueprint: agentPayload?.blueprint,
+          category: agentPayload?.category,
+          previewPrompts: agentPayload?.previewPrompts,
+          assignedToolSlugs: assignedToolSlugs,
+        });
+
+        const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
+        const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
+
+        const existingAgents = await agentRepo.findByStarship(starshipId);
+        const existingByHash = existingAgents.find((x) => (x as any).contentHash === bundleHash);
+        const existingByName = agentNameKey ? existingAgents.find((x) => String(x.name || '').trim().toLowerCase() === agentNameKey) : undefined;
+        const target = existingByHash ?? existingByName ?? null;
+
+        if (decision.action === 'skip') {
+          continue;
+        }
+
+        if (decision.action === 'overwrite') {
+          const targetId = decision.targetId || target?.id;
+          if (!targetId) {
+            warnings.push(`No overwrite target found for agent: ${String(agentPayload?.name || a.file)}`);
+            continue;
+          }
+
+          const updated = await agentService.updateAgent(targetId, {
+            name: agentPayload?.name,
+            role: agentPayload?.role,
+            description: agentPayload?.description,
+            model: agentPayload?.model,
+            temperature: agentPayload?.temperature,
+            maxTokens: agentPayload?.maxTokens,
+            timeout: agentPayload?.timeout,
+            reasoning: agentPayload?.reasoning,
+            systemPrompt: agentPayload?.systemPrompt,
+            state: agentPayload?.state,
+            blueprint: agentPayload?.blueprint,
+            category: agentPayload?.category,
+            previewPrompts: agentPayload?.previewPrompts,
+          } as any);
+          if (updated) {
+            try {
+              await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
+            } catch (err) {
+              warnings.push(`Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`);
+            }
+            importedAgents.push(updated);
+          }
+          continue;
+        }
+
+        // copy (default)
+        const rewrittenContainer: ImportExportContainerV1 = {
+          ...(containerParsed.data as any),
+          payload: {
+            ...(payload || {}),
+            assignedToolSlugs: rewrittenToolSlugs,
+          },
+        };
+        const result = await svc.importToStarship(starshipId, rewrittenContainer);
+        if (result?.warnings?.length) warnings.push(...result.warnings);
+        if (result?.kind === 'agent' && (result as any).agent) {
+          importedAgents.push((result as any).agent);
+        }
+      }
+
+      sendSuccess(
+        res,
+        {
+          imported: { tools: importedTools.length, agents: importedAgents.length },
+          tools: importedTools.length ? importedTools : undefined,
+          agents: importedAgents.length ? importedAgents : undefined,
+          warnings: warnings.length ? warnings : undefined,
+        },
+        201
+      );
+    } catch (error) {
+      handleError(error, res, 'applying bundle import');
     }
   }
 );

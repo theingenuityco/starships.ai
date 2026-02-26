@@ -75,8 +75,10 @@ export function WidgetTreeRenderer({ node, className, runtime, onEvent }: Widget
       : undefined
 
     // NOTE: Children are passed as React children. Container widgets should render them.
+    const propsClassName = typeof (props as any).className === 'string' ? String((props as any).className) : ''
+    const mergedClassName = [propsClassName, className].filter(Boolean).join(' ') || undefined
     return (
-      <Component {...(props as any)} className={className}>
+      <Component {...(props as any)} className={mergedClassName}>
         {renderedChildren}
       </Component>
     )

@@ -1,4 +1,10 @@
-## StarshipDetails
+---
+title: StarshipDetails Widget
+slug: widgets/starship-details
+category: widgets
+---
+
+# StarshipDetails Widget
 
 Renders a small **inline form** in chat that lets a user view/update their starship:
 

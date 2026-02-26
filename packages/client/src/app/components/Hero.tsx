@@ -1,193 +1,82 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { track } from '@/lib/analytics'
-import { useAuth } from '@/hooks/useAuth'
-import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
-import { useRouter } from 'next/navigation'
-import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { useCallback, useEffect, useState } from 'react'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
+import { HeroCtaButton } from '@/app/components/HeroCtaButton'
 import type { AgentTemplateModel } from '@starships/protocol'
-
-type LandingPreset = {
-  id: string
-  label: string
-  prompt: string
-}
-
-const HERO_AGENT_PRESETS: Record<string, LandingPreset[]> = {
-  aria: [
-    {
-      id: 'aria_leads',
-      label: 'Build lead lists',
-      prompt: 'Find finance decision makers at Series A SaaS startups and summarize 20 high-fit prospects.',
-    },
-    {
-      id: 'aria_outreach',
-      label: 'Personalize outreach',
-      prompt: 'Draft 5 highly personalized outreach emails for my top prospects, focusing on their recent fundraise.',
-    },
-    {
-      id: 'aria_research',
-      label: 'Deep account research',
-      prompt: 'Research this target account in depth and give me a one-page brief with risks, opportunities, and key stakeholders.',
-    },
-  ],
-  kepler: [
-    {
-      id: 'kepler_dashboard',
-      label: 'Build a dashboard',
-      prompt: 'Design a metrics dashboard for weekly revenue, new signups, and active users with the right chart widgets.',
-    },
-    {
-      id: 'kepler_view',
-      label: 'Create a view',
-      prompt: 'Create a view that shows my top 20 opportunities by stage, owner, and next action.',
-    },
-    {
-      id: 'kepler_iterate',
-      label: 'Refine an existing view',
-      prompt: 'Take this existing revenue view and improve the layout and labels so it is easier to read in exec meetings.',
-    },
-  ],
-  default: [
-    {
-      id: 'generic_brainstorm',
-      label: 'Brainstorm ideas',
-      prompt: 'Brainstorm 10 concrete ways this agent could help my team this week, then pick the best one and outline the steps.',
-    },
-    {
-      id: 'generic_workflow',
-      label: 'Design a workflow',
-      prompt: 'Design a detailed workflow this agent can run end-to-end to automate one repetitive task for my team.',
-    },
-    {
-      id: 'generic_first_task',
-      label: 'Start with one task',
-      prompt: 'Suggest one high-value, low-risk task this agent should run first and describe exactly what it will do.',
-    },
-  ],
-}
-
-function normalizeAgentKey(template?: AgentTemplateModel | null): string {
-  if (!template) return 'default'
-  const slug = String((template as any)?.slug ?? '')
-    .trim()
-    .toLowerCase()
-  if (slug) return slug
-  const name = String(template.name ?? '')
-    .trim()
-    .toLowerCase()
-  if (name) return name
-  return 'default'
-}
-
-function getPresetsForAgent(template?: AgentTemplateModel | null): LandingPreset[] {
-  const key = normalizeAgentKey(template)
-  return HERO_AGENT_PRESETS[key] ?? HERO_AGENT_PRESETS.default ?? []
-}
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
-  const router = useRouter()
-  const { isAuthenticated, user, isLoading: authLoading, getToken } = useAuth()
-  const { getSelectedStarshipId } = useSelectedStarship()
-  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
-  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
-  const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
-  const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
-  const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
-  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // IMPORTANT: Do NOT read localStorage/token during render.
-  // This component is server-rendered, and reading client-only state during render causes hydration mismatches.
-  const [hasClientAuthToken, setHasClientAuthToken] = useState(false)
-  const hasAuthToken = hasClientAuthToken
 
   // Landing hero input + agent selection state
   const [selectedAgentTemplate, setSelectedAgentTemplate] = useState<AgentTemplateModel | null>(null)
   const [heroInputValue, setHeroInputValue] = useState('')
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
-
-  // If the user has a token, but auth/starships are still resolving, do NOT let the CTA
-  // behave like a logged-out CTA (push /login). This is the flicker we saw in logs.
-  const shouldBlockCtaWhileResolving = hasAuthToken && (authLoading || starshipsLoading)
-
+  const [mounted, setMounted] = useState(false)
   useEffect(() => {
-    let has = false
-    try {
-      has = !!getToken()
-    } catch {
-      has = false
-    }
-    setHasClientAuthToken(has)
-  }, [getToken])
-
-  useEffect(() => {
-    return () => {
-      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current)
-    }
+    setMounted(true)
   }, [])
 
-  const runPendingPrimaryAction = useCallback(() => {
-    const fn = pendingPrimaryActionRef.current
-    if (!fn) return
-    pendingPrimaryActionRef.current = null
-    if (fallbackTimeoutRef.current) {
-      clearTimeout(fallbackTimeoutRef.current)
-      fallbackTimeoutRef.current = null
-    }
-    fn()
-  }, [])
-
-  const handleHeroAgentSelection = useCallback((template: AgentTemplateModel) => {
-    setSelectedAgentTemplate(previous => {
-      if (!previous || previous.id !== template.id) {
-        // Behavior B: when switching agents, clear any existing text/preset.
-        setHeroInputValue('')
-        setSelectedPresetId(null)
-      }
+  const handleAgentSelection = useCallback((template: AgentTemplateModel) => {
+    setSelectedAgentTemplate(prev => {
+      if (prev?.id === template.id) return prev
+      setHeroInputValue('')
       return template
     })
   }, [])
 
-  const navigatePrimary = useCallback(() => {
-    if (isAuthenticated && primaryStarship?.slug) {
-      router.push(`/ship/${primaryStarship.slug}`)
-      return
-    }
-    router.push('/login')
-  }, [isAuthenticated, primaryStarship?.slug, router])
-
-  const handlePrimaryClick = useCallback(() => {
-    if (isPrimaryAnimating) return
-
-    if (shouldBlockCtaWhileResolving) {
-      return
-    }
-
-    track({ type: 'hero_cta_clicked' })
-
-    setIsPrimaryAnimating(true)
-    pendingPrimaryActionRef.current = () => {
-      navigatePrimary()
-      setIsPrimaryAnimating(false)
-    }
-
-    // Kick off the logo entry animation, then navigate once it completes.
-    setHeroLogoTrigger(v => v + 1)
-
-    // Fallback: if the animation completion callback doesn't fire (e.g. reduced motion),
-    // proceed after a short delay.
-    fallbackTimeoutRef.current = setTimeout(() => {
-      runPendingPrimaryAction()
-    }, 1100)
-  }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
-
-  const heroPresets = getPresetsForAgent(selectedAgentTemplate)
   const selectedAgentName = String(selectedAgentTemplate?.name || '').trim() || 'this agent'
+  const [typewriterText, setTypewriterText] = useState<string>('')
+
+  // Typewriter placeholder that cycles through per-agent prompts when the input is empty.
+  useEffect(() => {
+    const prompts =
+      (selectedAgentTemplate?.previewPrompts && selectedAgentTemplate.previewPrompts.length > 0
+        ? selectedAgentTemplate.previewPrompts
+        : null) ??
+      [
+        selectedAgentTemplate
+          ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
+          : 'Describe what you want an agent to research, plan, or execute…',
+      ]
+
+    let cancelled = false
+    let promptIndex = 0
+    let charIndex = 0
+    let timeout: ReturnType<typeof setTimeout> | null = null
+
+    const tick = () => {
+      if (cancelled) return
+      const current = prompts[promptIndex] ?? ''
+      if (!current) {
+        setTypewriterText('')
+        return
+      }
+      charIndex += 1
+      setTypewriterText(current.slice(0, charIndex))
+
+      if (charIndex < current.length) {
+        timeout = setTimeout(tick, 35)
+      } else {
+        timeout = setTimeout(() => {
+          if (cancelled) return
+          charIndex = 0
+          promptIndex = (promptIndex + 1) % prompts.length
+          setTypewriterText('')
+          timeout = setTimeout(tick, 350)
+        }, 1200)
+      }
+    }
+
+    // Start animation fresh for the newly selected agent.
+    setTypewriterText('')
+    timeout = setTimeout(tick, 250)
+
+    return () => {
+      cancelled = true
+      if (timeout) clearTimeout(timeout)
+    }
+  }, [selectedAgentTemplate, selectedAgentName])
 
   return (
     <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
@@ -215,87 +104,36 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             Chat with your team, delegate work to agents, and ship faster across your tools.
           </p>
           <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
-            <div className="w-full max-w-3xl mx-auto flex flex-col gap-3 items-stretch text-left">
+            <div className="w-full max-w-3xl mx-auto flex flex-col gap-4 items-stretch text-left">
               <div className="relative">
                 <Textarea
                   value={heroInputValue}
-                  onChange={event => {
-                    setHeroInputValue(event.target.value)
-                    setSelectedPresetId(null)
-                  }}
-                  placeholder={
-                    selectedAgentTemplate
-                      ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
-                      : 'Describe what you want an agent to research, plan, or execute…'
-                  }
+                  onChange={event => setHeroInputValue(event.target.value)}
                   rows={3}
-                  className="min-h-[112px] rounded-3xl bg-background/80 pl-5 pr-16 pt-4 pb-5 text-sm sm:text-base shadow-[0_20px_60px_rgba(15,23,42,0.45)] border-border/60 resize-none"
+                  placeholder=""
+                  className="min-h-[112px] rounded-3xl bg-background/80 pl-5 pr-16 pt-4 pb-5 text-sm sm:text-base shadow-[0_20px_60px_rgba(15,23,42,0.45)] border-border/60 resize-none placeholder-transparent"
                 />
+                {heroInputValue === '' && (
+                  <div className="pointer-events-none absolute inset-x-5 top-4 text-sm sm:text-base text-muted-foreground/80 select-none">
+                    {typewriterText || (selectedAgentTemplate ? `Describe what you want ${selectedAgentName} to research, plan, or execute…` : 'Describe what you want an agent to research, plan, or execute…')}
+                  </div>
+                )}
                 <button
                   type="button"
-                  className="absolute right-4 bottom-3 h-12 w-12 sm:h-[3.25rem] sm:w-[3.25rem] rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="absolute right-4 bottom-4 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   aria-label="Submit"
                 >
                   <span className="text-lg">↑</span>
                 </button>
               </div>
-              {heroPresets.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {heroPresets.map(preset => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setHeroInputValue(preset.prompt)
-                        setSelectedPresetId(preset.id)
-                      }}
-                      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs sm:text-sm transition-colors ${
-                        selectedPresetId === preset.id
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background/60 text-muted-foreground hover:bg-background border-border/70'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
-            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} autoPlay={false} onSelectionChange={handleHeroAgentSelection} />
-            <Button
-              size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
-              onClick={handlePrimaryClick}
-              disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
-              aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
-            >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
-                <StarshipsLogo
-                  width={48}
-                  height={48}
-                  className="text-primary-foreground"
-                  gradientId="hero-starships-logo-gradient"
-                  idleLoop={false}
-                  activeStroke="currentColor"
-                  triggerAnimation={heroLogoTrigger}
-                  onEntryAnimationComplete={runPendingPrimaryAction}
-                />
-              </span>
-              {shouldBlockCtaWhileResolving ? (
-                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
-                  <span>Loading your starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
-                </span>
-              ) : isAuthenticated ? (
-                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
-                  <span>Enter my starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
-                </span>
-              ) : (
-                'Get started for free'
-              )}
-            </Button>
+            <HeroMarketplaceCarousel
+              initialAgentTemplates={initialAgentTemplates}
+              autoPlay={false}
+              onSelectionChange={handleAgentSelection}
+            />
+            {mounted ? <HeroCtaButton /> : <div className="h-14 w-64 max-w-[22rem] animate-pulse rounded-full bg-muted" />}
           </div>
         </div>
       </div>

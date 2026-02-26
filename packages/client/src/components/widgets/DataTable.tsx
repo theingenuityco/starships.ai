@@ -18,8 +18,8 @@ export interface DataColumn {
 }
 
 export interface DataTableProps {
-  columns: DataColumn[]
-  data: Array<Record<string, DataCellValue>>
+  columns?: DataColumn[]
+  data?: Array<Record<string, DataCellValue>>
   title?: string
   description?: string
   pageSize?: number
@@ -40,14 +40,19 @@ export function DataTable({
 }: DataTableProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1)
 
-  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(data.length / pageSize))
-  const pageStart = pageSize === 0 ? 0 : (currentPage - 1) * pageSize
-  const pageEnd = pageSize === 0 ? data.length : pageStart + pageSize
-  const visibleRows = data.slice(pageStart, pageEnd)
+  const safeColumns: DataColumn[] = Array.isArray(columns) ? columns : []
+  const safeData: Array<Record<string, DataCellValue>> = Array.isArray(data) ? data : []
+
+  const safePageSize = Number.isFinite(pageSize) ? Math.max(0, Math.floor(pageSize)) : 10
+  const totalPages = safePageSize === 0 ? 1 : Math.max(1, Math.ceil(safeData.length / safePageSize))
+  const safeCurrentPage = Math.min(totalPages, Math.max(1, currentPage))
+  const pageStart = safePageSize === 0 ? 0 : (safeCurrentPage - 1) * safePageSize
+  const pageEnd = safePageSize === 0 ? safeData.length : pageStart + safePageSize
+  const visibleRows = safeData.slice(pageStart, pageEnd)
 
   const handleExportCsv = () => {
     try {
-      const table = adaptDataTable(columns, data)
+      const table = adaptDataTable(safeColumns, safeData)
       const baseName = sanitizeFilename(title || 'data-table')
       const filename = `${baseName}-${Date.now()}.csv`
       downloadTableAsCsv(table, filename)
@@ -57,7 +62,7 @@ export function DataTable({
     }
   }
 
-  const canExport = columns.length > 0 && data.length > 0
+  const canExport = safeColumns.length > 0 && safeData.length > 0
   const rowClickable = typeof onRowClick === 'function'
 
   return (
@@ -89,7 +94,7 @@ export function DataTable({
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
-                  {columns.map(column => (
+                  {safeColumns.map(column => (
                     <th key={column.key} className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">
                       {column.label}
                     </th>
@@ -100,7 +105,7 @@ export function DataTable({
                 {visibleRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={columns.length}
+                      colSpan={Math.max(1, safeColumns.length)}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
                       No data available
@@ -109,7 +114,7 @@ export function DataTable({
                 ) : (
                   visibleRows.map((row, tableRowIndex) => (
                     <tr
-                      key={`${tableRowIndex}-${row[columns[0]?.key ?? 'row'] ?? tableRowIndex}`}
+                      key={`${tableRowIndex}-${row[safeColumns[0]?.key ?? 'row'] ?? tableRowIndex}`}
                       className={cn(
                         'border-b last:border-0',
                         striped && tableRowIndex % 2 === 0 && 'bg-muted/20',
@@ -121,12 +126,12 @@ export function DataTable({
                           ? () =>
                               onRowClick({
                                 row,
-                                rowIndex: pageSize === 0 ? tableRowIndex : pageStart + tableRowIndex,
+                                rowIndex: safePageSize === 0 ? tableRowIndex : pageStart + tableRowIndex,
                               })
                           : undefined
                       }
                     >
-                      {columns.map(column => (
+                      {safeColumns.map(column => (
                         <td
                           key={`${tableRowIndex}-${column.key}`}
                           className="px-4 py-3 text-sm text-left whitespace-normal break-words"
@@ -141,24 +146,24 @@ export function DataTable({
             </table>
           </div>
 
-          {pageSize > 0 && totalPages > 1 && (
+          {safePageSize > 0 && totalPages > 1 && (
             <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={currentPage === 1}
+                disabled={safeCurrentPage === 1}
               >
                 <Icon name="chevron-left" className="h-4 w-4" />
               </Button>
               <span>
-                Page {currentPage} of {totalPages}
+                Page {safeCurrentPage} of {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                disabled={currentPage === totalPages}
+                disabled={safeCurrentPage === totalPages}
               >
                 <Icon name="chevron-right" className="h-4 w-4" />
               </Button>

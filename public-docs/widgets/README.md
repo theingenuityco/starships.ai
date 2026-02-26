@@ -34,6 +34,8 @@ Minimal example root:
 
 See `../views/README.md` for the Views runtime model (bindings, scripts, actions, streaming).
 
+If you are authoring interactive widgets (bindings/handlers), start with `../views/runtime.md`.
+
 ## Supported widget types (current UI)
 
 The widget key is the `WIDGET_CATALOG` entry `type` (client).
@@ -43,6 +45,12 @@ The widget key is the `WIDGET_CATALOG` entry `type` (client).
   - `Stack` → `layout/stack.md`
   - `Grid` → `layout/grid.md`
   - `Tabs` → `layout/tabs.md`
+- Form (`./form/`)
+  - `Input` → `form/input.md`
+  - `Textarea` → `form/textarea.md`
+  - `Select` → `form/select.md`
+  - `Checkbox` → `form/checkbox.md`
+  - `Switch` → `form/switch.md`
 - Primitives (`./primitives/`)
   - `Text` → `primitives/text.md`
   - `Button` → `primitives/button.md`
@@ -72,7 +80,7 @@ These conventions apply to `public-docs/widgets/**`.
 
 - **Widget key**: use the `WIDGET_CATALOG` `type` (e.g. `Button`, `Tabs`, `LineChart`).
 - **File name**: kebab-case (e.g. `line-chart.md`).
-- **Directory**: group by function (layout, primitives, data, charts, cards, product).
+- **Directory**: group by function (layout, form, primitives, data, charts, cards, product).
 
 ### Terminology
 

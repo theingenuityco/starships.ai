@@ -16,8 +16,13 @@ import { Grid } from './primitives/Grid'
 import { Text } from './primitives/Text'
 import { ButtonWidget } from './primitives/ButtonWidget'
 import { TabsWidget } from './primitives/TabsWidget'
+import { InputWidget } from './primitives/InputWidget'
+import { TextareaWidget } from './primitives/TextareaWidget'
+import { SelectWidget } from './primitives/SelectWidget'
+import { CheckboxWidget } from './primitives/CheckboxWidget'
+import { SwitchWidget } from './primitives/SwitchWidget'
 
-export type WidgetCategory = 'Layout' | 'Content' | 'Data' | 'Charts' | 'Other'
+export type WidgetCategory = 'Layout' | 'Content' | 'Form' | 'Data' | 'Charts' | 'Other'
 
 export type WidgetFieldOption = { label: string; value: string }
 
@@ -215,6 +220,118 @@ export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = Object.freeze([
     ],
     events: ['click'],
     Component: ButtonWidget,
+  },
+
+  // Form controls
+  {
+    type: 'Input',
+    label: 'Input',
+    category: 'Form',
+    acceptsChildren: false,
+    defaultProps: { label: 'Label', placeholder: 'Type…', value: '', type: 'text', disabled: false, className: '' },
+    fields: [
+      { kind: 'string', path: 'label', label: 'Label', placeholder: 'Label' },
+      { kind: 'string', path: 'placeholder', label: 'Placeholder', placeholder: 'Type…' },
+      { kind: 'string', path: 'value', label: 'Value', placeholder: '' },
+      {
+        kind: 'select',
+        path: 'type',
+        label: 'Type',
+        options: [
+          { label: 'text', value: 'text' },
+          { label: 'email', value: 'email' },
+          { label: 'password', value: 'password' },
+          { label: 'number', value: 'number' },
+          { label: 'search', value: 'search' },
+          { label: 'url', value: 'url' },
+          { label: 'tel', value: 'tel' },
+        ],
+      },
+      { kind: 'boolean', path: 'disabled', label: 'Disabled' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    events: ['change'],
+    Component: InputWidget,
+  },
+  {
+    type: 'Textarea',
+    label: 'Textarea',
+    category: 'Form',
+    acceptsChildren: false,
+    defaultProps: { label: 'Label', placeholder: 'Write…', value: '', rows: 4, disabled: false, className: '' },
+    fields: [
+      { kind: 'string', path: 'label', label: 'Label', placeholder: 'Label' },
+      { kind: 'string', path: 'placeholder', label: 'Placeholder', placeholder: 'Write…' },
+      { kind: 'textarea', path: 'value', label: 'Value', placeholder: '', rows: 4 },
+      { kind: 'number', path: 'rows', label: 'Rows', min: 1, max: 24, step: 1 },
+      { kind: 'boolean', path: 'disabled', label: 'Disabled' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    events: ['change'],
+    Component: TextareaWidget,
+  },
+  {
+    type: 'Select',
+    label: 'Select',
+    category: 'Form',
+    acceptsChildren: false,
+    defaultProps: {
+      label: 'Label',
+      placeholder: 'Select…',
+      value: 'a',
+      optionsText: 'a: Option A\nb: Option B',
+      disabled: false,
+      className: '',
+    },
+    fields: [
+      { kind: 'string', path: 'label', label: 'Label', placeholder: 'Label' },
+      { kind: 'string', path: 'placeholder', label: 'Placeholder', placeholder: 'Select…' },
+      { kind: 'string', path: 'value', label: 'Value', placeholder: 'a' },
+      { kind: 'textarea', path: 'optionsText', label: 'Options (value: label per line)', placeholder: 'a: Option A\nb: Option B', rows: 5 },
+      { kind: 'boolean', path: 'disabled', label: 'Disabled' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    events: ['change'],
+    Component: SelectWidget,
+  },
+  {
+    type: 'Checkbox',
+    label: 'Checkbox',
+    category: 'Form',
+    acceptsChildren: false,
+    defaultProps: { label: 'Checkbox', checked: false, disabled: false, className: '' },
+    fields: [
+      { kind: 'string', path: 'label', label: 'Label', placeholder: 'Checkbox' },
+      { kind: 'boolean', path: 'checked', label: 'Checked' },
+      { kind: 'boolean', path: 'disabled', label: 'Disabled' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    events: ['change'],
+    Component: CheckboxWidget,
+  },
+  {
+    type: 'Switch',
+    label: 'Switch',
+    category: 'Form',
+    acceptsChildren: false,
+    defaultProps: { label: 'Switch', checked: false, size: 'default', disabled: false, className: '' },
+    fields: [
+      { kind: 'string', path: 'label', label: 'Label', placeholder: 'Switch' },
+      { kind: 'boolean', path: 'checked', label: 'Checked' },
+      {
+        kind: 'select',
+        path: 'size',
+        label: 'Size',
+        options: [
+          { label: 'default', value: 'default' },
+          { label: 'sm', value: 'sm' },
+        ],
+      },
+      { kind: 'boolean', path: 'disabled', label: 'Disabled' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    events: ['change'],
+    Component: SwitchWidget,
   },
 
   // Data / product-ish widgets

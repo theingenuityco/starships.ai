@@ -70,6 +70,12 @@ export function WidgetTreeRenderer({ node, className, runtime, onEvent }: Widget
       ;(props as any).onClick = () => onEvent(String(node.id), 'click')
     }
 
+    // v1 event wiring: basic form controls -> change.
+    const supportsChange = node.type === 'Input' || node.type === 'Textarea' || node.type === 'Select' || node.type === 'Checkbox' || node.type === 'Switch'
+    if (supportsChange && typeof (props as any).onChange !== 'function' && handlersRec?.change && typeof onEvent === 'function') {
+      ;(props as any).onChange = (payload: unknown) => onEvent(String(node.id), 'change', payload)
+    }
+
     const renderedChildren = children.length
       ? children.map(child => <WidgetTreeRenderer key={child.id} node={child} runtime={runtime} onEvent={onEvent} />)
       : undefined

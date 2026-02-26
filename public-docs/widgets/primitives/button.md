@@ -45,9 +45,12 @@ An interactive button widget. In Views, `Button` supports a `click` event handle
 ## Events / handlers (optional)
 
 - Views: `handlers.click` is supported on `Button` nodes.
+  - The runtime only wires the `click` event if `handlers.click` exists on the node.
+  - `click` payload: `undefined`
 
 ## Related
 
 - `../README.md`
 - Primitives: `./text.md`
+- Views runtime: `../../views/runtime.md`
 

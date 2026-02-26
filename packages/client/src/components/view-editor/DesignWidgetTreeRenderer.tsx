@@ -95,7 +95,7 @@ export function DesignWidgetTreeRenderer(props: {
       style={style}
       onMouseEnter={() => onHover(String(node.id))}
       onMouseLeave={() => onHover(null)}
-      onClickCapture={(e) => {
+      onPointerDownCapture={(e) => {
         e.preventDefault()
         e.stopPropagation()
         onSelect(String(node.id))
@@ -108,7 +108,7 @@ export function DesignWidgetTreeRenderer(props: {
         ref={sortable.setActivatorNodeRef}
         type="button"
         className="absolute top-1 right-1 z-10 rounded border border-border/60 bg-card/90 p-1 text-muted-foreground hover:text-foreground"
-        onClickCapture={(e) => {
+        onPointerDownCapture={(e) => {
           e.preventDefault()
           e.stopPropagation()
         }}

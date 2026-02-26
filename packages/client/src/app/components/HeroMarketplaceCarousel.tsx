@@ -15,24 +15,21 @@ function normalize(s: unknown) {
     .toLowerCase()
 }
 
-type HeroMarketplaceCarouselProps = {
-  initialAgentTemplates?: AgentTemplateModel[]
-  /** When false, carousel does not auto-advance (used on landing hero). Default true. */
+export type HeroMarketplaceCarouselViewProps = {
+  agentTemplates: AgentTemplateModel[]
+  agentTemplatesLoading?: boolean
   autoPlay?: boolean
-  /** Called when the centered slide changes; pass the template for that slide so the hero can tie prompt/presets to the active agent. */
   onSelectionChange?: (template: AgentTemplateModel) => void
 }
 
-export default function HeroMarketplaceCarousel({ initialAgentTemplates = [], autoPlay = true, onSelectionChange }: HeroMarketplaceCarouselProps) {
+/** Presentational carousel: no React Query. Use when you have server-provided templates (SSR-safe). */
+export function HeroMarketplaceCarouselView({
+  agentTemplates,
+  agentTemplatesLoading = false,
+  autoPlay = true,
+  onSelectionChange,
+}: HeroMarketplaceCarouselViewProps) {
   const router = useRouter()
-  const useServerInitial = initialAgentTemplates.length > 0
-  const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
-  // IMPORTANT (hydration stability):
-  // When we render with server-provided `initialAgentTemplates`, do not let any pre-existing
-  // client-side React Query cache override them. Otherwise, on hydration we can "swap" to a
-  // stale/incomplete cached list (e.g. missing `avatarUrl`) and images appear to disappear.
-  const agentTemplates = (useServerInitial ? initialAgentTemplates : (data ?? [])) as AgentTemplateModel[]
-  const agentTemplatesLoading = isLoading && !useServerInitial
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
@@ -209,5 +206,28 @@ export default function HeroMarketplaceCarousel({ initialAgentTemplates = [], au
         <CarouselNext className="hidden md:inline-flex" />
       </Carousel>
     </div>
+  )
+}
+
+type HeroMarketplaceCarouselProps = {
+  initialAgentTemplates?: AgentTemplateModel[]
+  autoPlay?: boolean
+  onSelectionChange?: (template: AgentTemplateModel) => void
+}
+
+/** Fetches templates via React Query. Only use on the client (e.g. after mount); for SSR use HeroMarketplaceCarouselView with server data. */
+export default function HeroMarketplaceCarousel({ initialAgentTemplates = [], autoPlay = true, onSelectionChange }: HeroMarketplaceCarouselProps) {
+  const useServerInitial = initialAgentTemplates.length > 0
+  const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
+  const agentTemplates = (useServerInitial ? initialAgentTemplates : (data ?? [])) as AgentTemplateModel[]
+  const agentTemplatesLoading = isLoading && !useServerInitial
+
+  return (
+    <HeroMarketplaceCarouselView
+      agentTemplates={agentTemplates}
+      agentTemplatesLoading={agentTemplatesLoading}
+      autoPlay={autoPlay}
+      onSelectionChange={onSelectionChange}
+    />
   )
 }

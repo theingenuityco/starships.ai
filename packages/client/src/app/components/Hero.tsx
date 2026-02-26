@@ -1,12 +1,14 @@
 'use client'
 
 import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCallback, useEffect, useState } from 'react'
+import { HeroMarketplaceCarouselView } from '@/app/components/HeroMarketplaceCarousel'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 import { HeroCtaButton } from '@/app/components/HeroCtaButton'
+import type { AgentTemplateModel } from '@starships/protocol'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import type { AgentTemplateModel } from '@starships/protocol'
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
@@ -56,19 +58,19 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             Chat with your team, delegate work to agents, and ship faster across your tools.
           </p>
           <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
-            <div className="w-full max-w-3xl mx-auto flex flex-col gap-2 items-stretch text-left">
-              {/* Single input box: arrow button inside with padding from edges (match reference) */}
-              <div className="relative h-[200px] rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)]">
+            <div className="w-full max-w-2xl mx-auto flex flex-col gap-2 items-stretch text-left">
+              {/* Input + submit button with comfortable padding so button isn’t stuck to edges */}
+              <div className="flex items-end gap-3 rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)] min-h-[160px] pl-2 pr-4 pt-2 pb-2">
                 <Textarea
                   value={heroInputValue}
                   onChange={event => setHeroInputValue(event.target.value)}
-                  rows={4}
+                  rows={3}
                   placeholder={defaultPlaceholder}
-                  className="h-full min-h-0 w-full rounded-xl border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-5 pr-14 pt-5 pb-14 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
+                  className="flex-1 min-h-[140px] w-full rounded-lg border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-2 pt-2 pr-3 pb-2 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
                 />
                 <button
                   type="button"
-                  className="absolute right-2 bottom-2 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex-shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
                   aria-label="Submit"
                 >
                   <span className="text-lg leading-none">↑</span>
@@ -102,7 +104,22 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               </div>
             </div>
 
-            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} autoPlay={false} onSelectionChange={handleAgentSelection} />
+            {/* SSR-safe: use View with server data so we never call useAgentTemplates on the server */}
+            {initialAgentTemplates.length > 0 ? (
+              <HeroMarketplaceCarouselView
+                agentTemplates={initialAgentTemplates}
+                autoPlay={false}
+                onSelectionChange={handleAgentSelection}
+              />
+            ) : mounted ? (
+              <HeroMarketplaceCarousel autoPlay={false} onSelectionChange={handleAgentSelection} />
+            ) : (
+              <div className="w-full max-w-2xl mx-auto flex justify-center gap-2" aria-hidden>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Skeleton key={i} className="h-[180px] w-[136px] rounded-2xl shrink-0" />
+                ))}
+              </div>
+            )}
             {mounted ? <HeroCtaButton /> : <div className="h-14 w-64 max-w-[22rem] animate-pulse rounded-full bg-muted" />}
           </div>
         </div>

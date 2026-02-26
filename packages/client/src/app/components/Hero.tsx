@@ -4,6 +4,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCallback, useEffect, useState } from 'react'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 import { HeroCtaButton } from '@/app/components/HeroCtaButton'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Button } from '@/components/ui/button'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
@@ -26,66 +28,18 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [])
 
   const selectedAgentName = String(selectedAgentTemplate?.name || '').trim() || 'this agent'
-  const [typewriterText, setTypewriterText] = useState<string>('')
-
-  // Typewriter placeholder that cycles through per-agent prompts when the input is empty.
-  useEffect(() => {
-    const prompts =
-      (selectedAgentTemplate?.previewPrompts && selectedAgentTemplate.previewPrompts.length > 0
-        ? selectedAgentTemplate.previewPrompts
-        : null) ??
-      [
-        selectedAgentTemplate
-          ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
-          : 'Describe what you want an agent to research, plan, or execute…',
-      ]
-
-    let cancelled = false
-    let promptIndex = 0
-    let charIndex = 0
-    let timeout: ReturnType<typeof setTimeout> | null = null
-
-    const tick = () => {
-      if (cancelled) return
-      const current = prompts[promptIndex] ?? ''
-      if (!current) {
-        setTypewriterText('')
-        return
-      }
-      charIndex += 1
-      setTypewriterText(current.slice(0, charIndex))
-
-      if (charIndex < current.length) {
-        timeout = setTimeout(tick, 35)
-      } else {
-        timeout = setTimeout(() => {
-          if (cancelled) return
-          charIndex = 0
-          promptIndex = (promptIndex + 1) % prompts.length
-          setTypewriterText('')
-          timeout = setTimeout(tick, 350)
-        }, 1200)
-      }
-    }
-
-    // Start animation fresh for the newly selected agent.
-    setTypewriterText('')
-    timeout = setTimeout(tick, 250)
-
-    return () => {
-      cancelled = true
-      if (timeout) clearTimeout(timeout)
-    }
-  }, [selectedAgentTemplate, selectedAgentName])
+  const defaultPlaceholder = selectedAgentTemplate
+    ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
+    : 'Describe what you want an agent to research, plan, or execute…'
+  const examplePrompts = (selectedAgentTemplate?.previewPrompts ?? []).filter(Boolean)
+  const [tryPromptsOpen, setTryPromptsOpen] = useState(false)
 
   return (
-    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
+    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-16 sm:py-20">
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div className="w-full min-w-0">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
-            Team chat,
-            <br className="hidden md:block" />
-            powered by{' '}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[42ch] mx-auto break-words text-balance">
+            Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
               <span className="warp-letter">I</span>
@@ -104,27 +58,55 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             Chat with your team, delegate work to agents, and ship faster across your tools.
           </p>
           <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
-            <div className="w-full max-w-3xl mx-auto flex flex-col gap-4 items-stretch text-left">
-              <div className="relative">
+            <div className="w-full max-w-3xl mx-auto flex flex-col gap-2 items-stretch text-left">
+              {/* Single input box: arrow button inside with padding from edges (match reference) */}
+              <div className="relative min-h-[148px] rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)]">
                 <Textarea
                   value={heroInputValue}
                   onChange={event => setHeroInputValue(event.target.value)}
                   rows={3}
-                  placeholder=""
-                  className="min-h-[112px] rounded-3xl bg-background/80 pl-5 pr-16 pt-4 pb-5 text-sm sm:text-base shadow-[0_20px_60px_rgba(15,23,42,0.45)] border-border/60 resize-none placeholder-transparent"
+                  placeholder={defaultPlaceholder}
+                  className="min-h-[148px] w-full rounded-xl border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-5 pr-14 pt-5 pb-4 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
                 />
-                {heroInputValue === '' && (
-                  <div className="pointer-events-none absolute inset-x-5 top-4 text-sm sm:text-base text-muted-foreground/80 select-none">
-                    {typewriterText || (selectedAgentTemplate ? `Describe what you want ${selectedAgentName} to research, plan, or execute…` : 'Describe what you want an agent to research, plan, or execute…')}
-                  </div>
-                )}
                 <button
                   type="button"
-                  className="absolute right-4 bottom-4 h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   aria-label="Submit"
                 >
-                  <span className="text-lg">↑</span>
+                  <span className="text-lg leading-none">↑</span>
                 </button>
+              </div>
+              <div className="flex items-center justify-between gap-2 px-1">
+                <Popover open={tryPromptsOpen} onOpenChange={setTryPromptsOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                      disabled={examplePrompts.length === 0}
+                    >
+                      Try these prompts
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[min(calc(100vw-2rem),28rem)] p-2" align="start">
+                    <div className="flex flex-col gap-1 max-h-[240px] overflow-y-auto">
+                      {examplePrompts.map((prompt, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="text-left text-sm px-3 py-2 rounded-md hover:bg-muted line-clamp-2"
+                          onClick={() => {
+                            setHeroInputValue(prompt)
+                            setTryPromptsOpen(false)
+                          }}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

@@ -1,10 +1,27 @@
-import type { CreateViewRequest, UpdateViewRequest, ViewModel, ViewSearchParams, ViewLayout } from '@starships/protocol';
+import type {
+  CreateViewRequest,
+  UpdateViewRequest,
+  ViewModel,
+  ViewRuntimeConfig,
+  ViewSearchParams,
+  WidgetInstanceNode,
+} from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { ViewEntity } from '@/entities/ViewEntity';
 import { NotFoundError } from '@starships/errors';
 import { nanoid } from 'nanoid';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import { ViewWidgetRepository } from './ViewWidgetRepository';
+import {
+  collectStructureNodeIds,
+  dehydrateViewRoot,
+  hydrateViewRoot,
+  isFullWidgetNode,
+  isStructureNode,
+  type ViewWidgetRow,
+} from '@/utils/viewRootWidgets';
+import type { PoolClient } from 'pg';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -18,46 +35,109 @@ function toFiniteInt(value: unknown, fallback: number): number {
   return Math.floor(n);
 }
 
-function normalizeLayout(input: unknown): ViewLayout {
-  if (!isRecord(input)) return { cols: 3, items: [] };
-  const cols = Math.max(1, toFiniteInt(input.cols, 3));
-  const itemsRaw = input.items;
-  const items = Array.isArray(itemsRaw) ? itemsRaw : [];
-  // Ensure each item has an id (nanoid) for stable client rendering.
-  const normalizedItems = items
-    .map((item) => {
-      if (!isRecord(item)) return null;
-      const idRaw = item.id;
-      const widgetIdRaw = item.widgetId;
-      const id = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : nanoid();
-      const widgetId = typeof widgetIdRaw === 'string' ? widgetIdRaw : '';
-      const col = Math.max(0, toFiniteInt(item.col, 0));
-      const row = Math.max(0, toFiniteInt(item.row, 0));
+function normalizeRuntimeConfig(input: unknown): ViewRuntimeConfig {
+  if (!isRecord(input)) return {};
+  return input as unknown as ViewRuntimeConfig;
+}
 
-      const colSpanVal = item.colSpan;
-      const rowSpanVal = item.rowSpan;
-      const colSpan = colSpanVal == null ? undefined : Math.max(1, toFiniteInt(colSpanVal, 1));
-      const rowSpan = rowSpanVal == null ? undefined : Math.max(1, toFiniteInt(rowSpanVal, 1));
+function normalizeRoot(input: unknown, opts?: { maxDepth?: number; maxNodes?: number }): WidgetInstanceNode {
+  const maxDepth = typeof opts?.maxDepth === 'number' && opts.maxDepth > 0 ? Math.floor(opts.maxDepth) : 32;
+  const maxNodes = typeof opts?.maxNodes === 'number' && opts.maxNodes > 0 ? Math.floor(opts.maxNodes) : 2_000;
 
-      return {
-        id,
-        widgetId,
-        col,
-        row,
-        ...(colSpan !== undefined ? { colSpan } : null),
-        ...(rowSpan !== undefined ? { rowSpan } : null),
-      };
-    })
-    .filter((it): it is ViewLayout['items'][number] => Boolean(it))
-    // Keep only items with a plausible widgetId; deeper validation happens at API boundary.
-    .filter((it) => typeof it.widgetId === 'string' && it.widgetId.trim().length > 0);
+  let seen = 0;
 
-  return { cols, items: normalizedItems };
+  function norm(node: unknown, depth: number): WidgetInstanceNode {
+    if (depth > maxDepth) {
+      return { id: nanoid(), type: 'Box', props: { error: 'max_depth_exceeded' }, children: [] };
+    }
+    if (seen++ > maxNodes) {
+      return { id: nanoid(), type: 'Box', props: { error: 'max_nodes_exceeded' }, children: [] };
+    }
+    const rec = isRecord(node) ? node : {};
+    const idRaw = rec.id;
+    const typeRaw = rec.type;
+    const propsRaw = rec.props;
+    const childrenRaw = rec.children;
+
+    const id = typeof idRaw === 'string' && idRaw.trim() ? idRaw.trim() : nanoid();
+    const type = typeof typeRaw === 'string' && typeRaw.trim() ? typeRaw.trim() : 'Box';
+    const props = isRecord(propsRaw) ? propsRaw : {};
+    const children = Array.isArray(childrenRaw) ? childrenRaw.map((c) => norm(c, depth + 1)) : undefined;
+
+    const out: WidgetInstanceNode = {
+      id,
+      type,
+      props,
+      ...(children ? { children } : null),
+    };
+
+    if (isRecord(rec.bindings)) (out as unknown as { bindings: Record<string, unknown> }).bindings = rec.bindings;
+    if (isRecord(rec.handlers)) (out as unknown as { handlers: Record<string, unknown> }).handlers = rec.handlers;
+    if (isRecord(rec.permissions)) (out as unknown as { permissions: Record<string, unknown> }).permissions = rec.permissions;
+
+    return out;
+  }
+
+  return norm(input, 0);
 }
 
 export class ViewRepository extends BaseRepository {
   constructor() {
     super('ViewRepository');
+  }
+
+  /**
+   * Returns the persisted `views.root` value as stored in the database (structure-only after migration 132).
+   * This does not hydrate from view_widgets.
+   */
+  async getPersistedRootById(id: string): Promise<unknown | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const record = await connection.queryOne<{ root: unknown }>('SELECT root FROM views WHERE id = $1', [id]);
+        return record ? record.root : null;
+      },
+      'getPersistedRootById',
+      'View',
+      id
+    );
+  }
+
+  /**
+   * Persist a structure-only root (id + children) and clean up view_widgets that are no longer referenced.
+   * Returns a hydrated ViewModel (full WidgetInstanceNode root).
+   */
+  async updateStructureRoot(id: string, structureRoot: unknown): Promise<ViewModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!isStructureNode(structureRoot)) {
+          throw new Error('structureRoot must be { id, children? }');
+        }
+        const keepIds = collectStructureNodeIds(structureRoot);
+        const connection = this.getConnection();
+        const viewWidgetRepo = new ViewWidgetRepository();
+
+        await connection.transaction(async (client: PoolClient) => {
+          const res = await client.query(
+            `UPDATE views
+                SET root = $1::jsonb,
+                    version = version + 1,
+                    updated_at = NOW()
+              WHERE id = $2`,
+            [JSON.stringify(structureRoot), id]
+          );
+          if ((res.rowCount ?? 0) === 0) throw new NotFoundError('View', id);
+          await viewWidgetRepo.deleteNotIn(id, keepIds, client);
+        });
+
+        const view = await this.findById(id);
+        if (!view) throw new NotFoundError('View', id);
+        return view;
+      },
+      'updateStructureRoot',
+      'View',
+      id
+    );
   }
 
   async create(data: CreateViewRequest): Promise<ViewModel> {
@@ -74,14 +154,18 @@ export class ViewRepository extends BaseRepository {
               { fallbackBase: 'view', maxLength: 100 }
             );
 
-        const layout = normalizeLayout(data.layout);
+        const root = normalizeRoot(data.root ?? { id: 'root', type: 'Box', props: {}, children: [] });
+        const runtimeConfig = normalizeRuntimeConfig(data.runtimeConfig);
+        const version = 1;
 
         const viewData: ViewModel = {
           id,
           name: data.name,
           slug,
           description: data.description,
-          layout,
+          root,
+          runtimeConfig,
+          version,
           starshipId: data.starshipId,
           createdAt: now,
           updatedAt: now,
@@ -92,26 +176,35 @@ export class ViewRepository extends BaseRepository {
         const viewEntity = toEntityInstance(ViewEntity, viewData as unknown as Record<string, unknown>);
         const databaseFormat = toDatabase(viewEntity);
 
-        const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>(
-          `INSERT INTO views (
-            id, name, slug, description, layout,
-            starship_id, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING *`,
-          [
-            databaseFormat.id,
-            databaseFormat.name,
-            databaseFormat.slug,
-            databaseFormat.description,
-            JSON.stringify(databaseFormat.layout),
-            databaseFormat.starship_id,
-            databaseFormat.created_at,
-            databaseFormat.updated_at,
-          ]
-        );
+        const { structureRoot, widgets } = dehydrateViewRoot(root);
 
-        return fromDatabase(ViewEntity, result[0]);
+        const connection = this.getConnection();
+        const viewWidgetRepo = new ViewWidgetRepository();
+
+        await connection.transaction(async (client: PoolClient) => {
+          await client.query(
+            `INSERT INTO views (
+              id, name, slug, description, root, runtime_config, version,
+              starship_id, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10)`,
+            [
+              databaseFormat.id,
+              databaseFormat.name,
+              databaseFormat.slug,
+              databaseFormat.description,
+              JSON.stringify(structureRoot),
+              JSON.stringify(databaseFormat.runtime_config),
+              databaseFormat.version,
+              databaseFormat.starship_id,
+              databaseFormat.created_at,
+              databaseFormat.updated_at,
+            ]
+          );
+          await viewWidgetRepo.upsertMany(id, widgets, client);
+        });
+
+        // Return the full view shape the client expects (hydrated root).
+        return viewData;
       },
       'create',
       'View'
@@ -124,7 +217,33 @@ export class ViewRepository extends BaseRepository {
         const connection = this.getConnection();
         const record = await connection.queryOne<Record<string, unknown>>('SELECT * FROM views WHERE id = $1', [id]);
         if (!record) return null;
-        return fromDatabase(ViewEntity, record);
+        const view = fromDatabase(ViewEntity, record);
+        const rootAny: unknown = (view as unknown as { root: unknown }).root;
+        if (isFullWidgetNode(rootAny)) return view;
+        if (!isStructureNode(rootAny)) return view;
+
+        try {
+          const viewWidgetRepo = new ViewWidgetRepository();
+          const widgets = await viewWidgetRepo.listByView(view.id);
+          const map = new Map<string, ViewWidgetRow>();
+          for (const w of widgets) {
+            map.set(w.nodeId, {
+              nodeId: w.nodeId,
+              type: w.type,
+              props: w.props || {},
+              ...(w.bindings ? { bindings: w.bindings } : null),
+              ...(w.handlers ? { handlers: w.handlers } : null),
+              ...(w.permissions ? { permissions: w.permissions } : null),
+            });
+          }
+          (view as unknown as { root: unknown }).root = hydrateViewRoot(rootAny, map);
+        } catch (e: unknown) {
+          // If the view_widgets table doesn't exist yet, keep existing root as-is.
+          const code = (e as { code?: string } | null | undefined)?.code;
+          if (code !== '42P01') throw e;
+        }
+
+        return view;
       },
       'findById',
       'View',
@@ -136,12 +255,37 @@ export class ViewRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const record = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM views WHERE slug = $1 AND starship_id = $2',
-          [slug, starshipId]
-        );
+        const record = await connection.queryOne<Record<string, unknown>>('SELECT * FROM views WHERE slug = $1 AND starship_id = $2', [
+          slug,
+          starshipId,
+        ]);
         if (!record) return null;
-        return fromDatabase(ViewEntity, record);
+        const view = fromDatabase(ViewEntity, record);
+        const rootAny: unknown = (view as unknown as { root: unknown }).root;
+        if (isFullWidgetNode(rootAny)) return view;
+        if (!isStructureNode(rootAny)) return view;
+
+        try {
+          const viewWidgetRepo = new ViewWidgetRepository();
+          const widgets = await viewWidgetRepo.listByView(view.id);
+          const map = new Map<string, ViewWidgetRow>();
+          for (const w of widgets) {
+            map.set(w.nodeId, {
+              nodeId: w.nodeId,
+              type: w.type,
+              props: w.props || {},
+              ...(w.bindings ? { bindings: w.bindings } : null),
+              ...(w.handlers ? { handlers: w.handlers } : null),
+              ...(w.permissions ? { permissions: w.permissions } : null),
+            });
+          }
+          (view as unknown as { root: unknown }).root = hydrateViewRoot(rootAny, map);
+        } catch (e: unknown) {
+          const code = (e as { code?: string } | null | undefined)?.code;
+          if (code !== '42P01') throw e;
+        }
+
+        return view;
       },
       'findBySlug',
       'View',
@@ -189,7 +333,45 @@ export class ViewRepository extends BaseRepository {
           values
         );
 
-        return fromDatabaseArray(ViewEntity, records);
+        const views = fromDatabaseArray(ViewEntity, records);
+        const needsHydration = views.filter((v) => {
+          const r: unknown = (v as unknown as { root: unknown }).root;
+          return isStructureNode(r) && !isFullWidgetNode(r);
+        });
+        if (needsHydration.length === 0) return views;
+
+        try {
+          const viewWidgetRepo = new ViewWidgetRepository();
+          const viewIds = needsHydration.map((v) => v.id);
+          const widgets = await viewWidgetRepo.listByViews(viewIds);
+          const byViewId = new Map<string, ViewWidgetRow[]>();
+          for (const w of widgets) {
+            const arr = byViewId.get(w.viewId) ?? [];
+            arr.push({
+              nodeId: w.nodeId,
+              type: w.type,
+              props: w.props || {},
+              ...(w.bindings ? { bindings: w.bindings } : null),
+              ...(w.handlers ? { handlers: w.handlers } : null),
+              ...(w.permissions ? { permissions: w.permissions } : null),
+            });
+            byViewId.set(w.viewId, arr);
+          }
+
+          for (const v of needsHydration) {
+            const rootAny: unknown = (v as unknown as { root: unknown }).root;
+            if (!isStructureNode(rootAny)) continue;
+            const rows = byViewId.get(v.id) ?? [];
+            const map = new Map<string, ViewWidgetRow>();
+            for (const r of rows) map.set(r.nodeId, r);
+            (v as unknown as { root: unknown }).root = hydrateViewRoot(rootAny, map);
+          }
+        } catch (e: unknown) {
+          const code = (e as { code?: string } | null | undefined)?.code;
+          if (code !== '42P01') throw e;
+        }
+
+        return views;
       },
       'search',
       'View'
@@ -204,12 +386,16 @@ export class ViewRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const updatedAt = new Date().toISOString();
-        const layout = data.layout !== undefined ? normalizeLayout(data.layout) : undefined;
+        const root = data.root !== undefined ? normalizeRoot(data.root) : undefined;
+        const runtimeConfig = data.runtimeConfig !== undefined ? normalizeRuntimeConfig(data.runtimeConfig) : undefined;
+        const version = data.version !== undefined ? Math.max(1, toFiniteInt(data.version, 1)) : undefined;
 
         const updatedData: Partial<ViewModel> = {
           ...(data.name !== undefined ? { name: data.name } : null),
           ...(data.description !== undefined ? { description: data.description } : null),
-          ...(layout !== undefined ? { layout } : null),
+          ...(root !== undefined ? { root } : null),
+          ...(runtimeConfig !== undefined ? { runtimeConfig } : null),
+          ...(version !== undefined ? { version } : null),
           updatedAt,
         };
 
@@ -227,9 +413,20 @@ export class ViewRepository extends BaseRepository {
           updates.push(`description = $${paramIndex++}`);
           values.push(data.description);
         }
-        if (layout !== undefined) {
-          updates.push(`layout = $${paramIndex++}`);
-          values.push(JSON.stringify(layout));
+        let dehydrate: { structureRoot: unknown; widgets: ViewWidgetRow[]; keepIds: string[] } | null = null;
+        if (root !== undefined) {
+          const d = dehydrateViewRoot(root);
+          dehydrate = { structureRoot: d.structureRoot, widgets: d.widgets, keepIds: collectStructureNodeIds(d.structureRoot) };
+          updates.push(`root = $${paramIndex++}`);
+          values.push(JSON.stringify(d.structureRoot));
+        }
+        if (runtimeConfig !== undefined) {
+          updates.push(`runtime_config = $${paramIndex++}`);
+          values.push(JSON.stringify(runtimeConfig));
+        }
+        if (version !== undefined) {
+          updates.push(`version = $${paramIndex++}`);
+          values.push(version);
         }
 
         updates.push(`updated_at = $${paramIndex++}`);
@@ -237,12 +434,26 @@ export class ViewRepository extends BaseRepository {
         values.push(id);
 
         const connection = this.getConnection();
-        const record = await connection.queryOne<Record<string, unknown>>(
-          `UPDATE views SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-          values
-        );
-        if (!record) throw new NotFoundError('View', id);
-        return fromDatabase(ViewEntity, record);
+        const viewWidgetRepo = new ViewWidgetRepository();
+
+        const updatedView = await connection.transaction(async (client: PoolClient) => {
+          const res = await client.query(`UPDATE views SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`, values);
+          const record = res.rows?.[0] as Record<string, unknown> | undefined;
+          if (!record) throw new NotFoundError('View', id);
+
+          if (dehydrate) {
+            await viewWidgetRepo.upsertMany(id, dehydrate.widgets, client);
+            await viewWidgetRepo.deleteNotIn(id, dehydrate.keepIds, client);
+          }
+
+          return fromDatabase(ViewEntity, record);
+        });
+
+        // Ensure callers always see the hydrated root.
+        if (root !== undefined) {
+          (updatedView as unknown as { root: unknown }).root = root;
+        }
+        return updatedView;
       },
       'update',
       'View',
@@ -261,4 +472,3 @@ export class ViewRepository extends BaseRepository {
     );
   }
 }
-

@@ -1,10 +1,14 @@
 ---
 title: Bar Chart Widget
-slug: widgets/charts/bar
+slug: widgets/charts/bar-chart
 category: widgets
 ---
 
 # Bar Chart Widget
+
+## Where it can be used
+
+- Views (widget tree): Yes
 
 A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It reuses `ChartContainer`, tooltip, and legend implementations from the official docs (Context7 `/websites/ui_shadcn`, topic `charts`), meaning theme colors (`var(--chart-*)`), keyboard navigation, and responsive sizing all match the recommended approach.
 
@@ -50,7 +54,8 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
 
 ```json
 {
-  "widgetType": "BarChart",
+  "id": "chart",
+  "type": "BarChart",
   "props": {
     "title": "Sessions by Device",
     "description": "Last 6 months",
@@ -69,6 +74,21 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
     ],
     "height": 280,
     "stacked": false
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "BarChart",
+  "props": {
+    "title": "Sessions by Device",
+    "indexKey": "month",
+    "series": [{ "dataKey": "desktop", "label": "Desktop", "color": "#3b82f6" }],
+    "data": [{ "month": "Jan", "desktop": 186 }]
   }
 }
 ```

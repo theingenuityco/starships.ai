@@ -10,7 +10,20 @@ import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
 import { AgentSuggestionCard } from './AgentSuggestionCard'
 import { StarshipDetails } from './StarshipDetails'
 
+import { Box } from './primitives/Box'
+import { Stack } from './primitives/Stack'
+import { Grid } from './primitives/Grid'
+import { Text } from './primitives/Text'
+import { ButtonWidget } from './primitives/ButtonWidget'
+import { TabsWidget } from './primitives/TabsWidget'
+
 export const WIDGET_REGISTRY: Record<string, React.ComponentType<any>> = {
+  Box,
+  Stack,
+  Grid,
+  Tabs: TabsWidget,
+  Text,
+  Button: ButtonWidget,
   StatCard,
   DataTable,
   MetricGrid,

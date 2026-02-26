@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
@@ -52,21 +52,12 @@ function sanitizeIdPart(input: string): string {
   return input.replace(/[^a-zA-Z0-9_-]/g, '_')
 }
 
-export default function AgentAvatar({
-  seed,
-  imageUrl,
-  size = 40,
-  className,
-  emphasis = false,
-  animation = 'none',
-  rounded = false,
-  instanceId = null,
-  fill = false,
-  clip = false,
-}: AgentAvatarProps) {
+export default function AgentAvatar({ seed, imageUrl, size = 40, className, emphasis = false, animation = 'none', rounded = false, instanceId = null, fill = false, clip = false }: AgentAvatarProps) {
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
-  const showInitialsFallback = !hasImage && hasSeed
+  const [imageError, setImageError] = useState(false)
+  const useImage = hasImage && !imageError
+  const showInitialsFallback = !useImage && hasSeed
 
   const initials = useMemo(() => {
     if (!hasSeed) return ''
@@ -114,16 +105,14 @@ export default function AgentAvatar({
   }
 
   return (
-    <div
-      className={cn(className, animation !== 'none' && 'animate-pulse')}
-      style={outerStyle}
-    >
-      {hasImage ? (
+    <div className={cn(className, animation !== 'none' && 'animate-pulse')} style={outerStyle}>
+      {useImage ? (
         <img
           src={imageUrl as string}
           alt=""
           width={size}
           height={size}
+          onError={() => setImageError(true)}
           style={{
             width: fill ? '100%' : size,
             height: fill ? '100%' : size,
@@ -134,10 +123,7 @@ export default function AgentAvatar({
         />
       ) : showInitialsFallback ? (
         <div
-          className={cn(
-            'flex items-center justify-center font-semibold select-none',
-            emphasis ? 'text-foreground' : 'text-white/90'
-          )}
+          className={cn('flex items-center justify-center font-semibold select-none', emphasis ? 'text-foreground' : 'text-white/90')}
           style={{
             width: fill ? '100%' : size,
             height: fill ? '100%' : size,
@@ -149,14 +135,7 @@ export default function AgentAvatar({
         >
           {generated ? (
             <>
-              <svg
-                viewBox="0 0 100 100"
-                width="100%"
-                height="100%"
-                preserveAspectRatio="xMidYMid slice"
-                style={{ position: 'absolute', inset: 0 }}
-                aria-hidden="true"
-              >
+              <svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0 }} aria-hidden="true">
                 <defs>
                   <linearGradient id={`${svgIdBase}-g`} x1="0" y1="0" x2="1" y2="1">
                     <stop offset="0" stopColor={generated.c1} />

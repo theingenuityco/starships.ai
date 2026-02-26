@@ -28,9 +28,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [])
 
   const selectedAgentName = String(selectedAgentTemplate?.name || '').trim() || 'this agent'
-  const defaultPlaceholder = selectedAgentTemplate
-    ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
-    : 'Describe what you want an agent to research, plan, or execute…'
+  const defaultPlaceholder = selectedAgentTemplate ? `Describe what you want ${selectedAgentName} to research, plan, or execute…` : 'Describe what you want an agent to research, plan, or execute…'
   const examplePrompts = (selectedAgentTemplate?.previewPrompts ?? []).filter(Boolean)
   const [tryPromptsOpen, setTryPromptsOpen] = useState(false)
 
@@ -38,7 +36,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-16 sm:py-20">
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div className="w-full min-w-0">
-          <h1 className="text-[38px] sm:text-[46px] font-bold tracking-tight leading-tight mb-4 w-full max-w-[48ch] mx-auto break-words text-balance">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[48ch] mx-auto break-words text-balance">
             Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
@@ -60,17 +58,17 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
             <div className="w-full max-w-3xl mx-auto flex flex-col gap-2 items-stretch text-left">
               {/* Single input box: arrow button inside with padding from edges (match reference) */}
-              <div className="relative min-h-[148px] rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)]">
+              <div className="relative h-[200px] rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)]">
                 <Textarea
                   value={heroInputValue}
                   onChange={event => setHeroInputValue(event.target.value)}
-                  rows={3}
+                  rows={4}
                   placeholder={defaultPlaceholder}
-                  className="min-h-[148px] w-full rounded-xl border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-5 pr-14 pt-5 pb-4 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
+                  className="h-full min-h-0 w-full rounded-xl border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-5 pr-14 pt-5 pb-14 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
                 />
                 <button
                   type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="absolute right-2 bottom-2 h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   aria-label="Submit"
                 >
                   <span className="text-lg leading-none">↑</span>
@@ -79,13 +77,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               <div className="flex items-center justify-between gap-2 px-1">
                 <Popover open={tryPromptsOpen} onOpenChange={setTryPromptsOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
-                      disabled={examplePrompts.length === 0}
-                    >
+                    <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" disabled={examplePrompts.length === 0}>
                       Try these prompts
                     </Button>
                   </PopoverTrigger>
@@ -110,11 +102,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               </div>
             </div>
 
-            <HeroMarketplaceCarousel
-              initialAgentTemplates={initialAgentTemplates}
-              autoPlay={false}
-              onSelectionChange={handleAgentSelection}
-            />
+            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} autoPlay={false} onSelectionChange={handleAgentSelection} />
             {mounted ? <HeroCtaButton /> : <div className="h-14 w-64 max-w-[22rem] animate-pulse rounded-full bg-muted" />}
           </div>
         </div>
@@ -148,11 +136,9 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           --warp-delay: 0ms;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) var(--warp-delay) both,
-            /* Keep these independent of per-letter entry delay */
-            gradient-shift 8s ease-in-out 1.2s infinite,
+            /* Keep these independent of per-letter entry delay */ gradient-shift 8s ease-in-out 1.2s infinite,
             warp-blur 3.6s ease-in-out 1.3s infinite,
-            /* Continuous subtle warping after entry finishes */
-            warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
+            /* Continuous subtle warping after entry finishes */ warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
           will-change: transform, opacity, filter, background-position;
           background: linear-gradient(120deg, rgba(168, 85, 247, 0.95) 0%, rgba(139, 92, 246, 0.9) 35%, rgba(124, 58, 237, 0.9) 70%, rgba(168, 85, 247, 0.95) 100%);
           background-size: 250% 250%;

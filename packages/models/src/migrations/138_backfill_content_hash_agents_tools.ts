@@ -1,5 +1,5 @@
 import type { Client } from 'pg';
-import { computeAgentContentHash, computeToolContentHash } from '@/utils/contentHash';
+import { computeAgentContentHash, computeToolContentHash, sha256Hex } from '@/utils/contentHash';
 
 const BATCH_SIZE = 500;
 
@@ -64,19 +64,29 @@ export async function up(client: Client): Promise<void> {
       if (tools.length === 0) break;
 
       for (const t of tools) {
-        const hash = computeToolContentHash({
-          name: t.name,
-          description: t.description,
-          parameters: t.parameters,
-          blueprint: t.blueprint,
-          transforms: t.transforms,
-          mutations: t.mutations,
-          condition: t.condition,
-          isEnabled: t.is_enabled,
-          status: t.status,
-        });
+        try {
+          const hash = computeToolContentHash({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+            blueprint: t.blueprint,
+            transforms: t.transforms,
+            mutations: t.mutations,
+            condition: t.condition,
+            isEnabled: t.is_enabled,
+            status: t.status,
+          });
 
-        await client.query('UPDATE tools SET content_hash = $2, updated_at = NOW() WHERE id = $1', [t.id, hash]);
+          await client.query('UPDATE tools SET content_hash = $2, updated_at = NOW() WHERE id = $1', [t.id, hash]);
+        } catch (err) {
+          // Prevent infinite loops: mark problematic rows with a deterministic sentinel hash.
+          const sentinel = sha256Hex(`error:tools:${t.id}`);
+          try {
+            await client.query('UPDATE tools SET content_hash = $2, updated_at = NOW() WHERE id = $1', [t.id, sentinel]);
+          } catch {
+            throw err;
+          }
+        }
       }
     }
 
@@ -166,25 +176,35 @@ export async function up(client: Client): Promise<void> {
       }
 
       for (const a of agents) {
-        const assignedToolSlugs = assignedByAgentId.get(a.id) ?? [];
-        const hash = computeAgentContentHash({
-          name: a.name,
-          role: a.role,
-          description: a.description,
-          model: a.model,
-          temperature: a.temperature,
-          maxTokens: a.max_tokens,
-          timeout: a.timeout,
-          reasoning: a.reasoning,
-          systemPrompt: a.system_prompt,
-          state: a.state,
-          blueprint: a.blueprint,
-          category: a.category,
-          previewPrompts: a.preview_prompts,
-          assignedToolSlugs,
-        });
+        try {
+          const assignedToolSlugs = assignedByAgentId.get(a.id) ?? [];
+          const hash = computeAgentContentHash({
+            name: a.name,
+            role: a.role,
+            description: a.description,
+            model: a.model,
+            temperature: a.temperature,
+            maxTokens: a.max_tokens,
+            timeout: a.timeout,
+            reasoning: a.reasoning,
+            systemPrompt: a.system_prompt,
+            state: a.state,
+            blueprint: a.blueprint,
+            category: a.category,
+            previewPrompts: a.preview_prompts,
+            assignedToolSlugs,
+          });
 
-        await client.query('UPDATE agents SET content_hash = $2, updated_at = NOW() WHERE id = $1', [a.id, hash]);
+          await client.query('UPDATE agents SET content_hash = $2, updated_at = NOW() WHERE id = $1', [a.id, hash]);
+        } catch (err) {
+          // Prevent infinite loops: mark problematic rows with a deterministic sentinel hash.
+          const sentinel = sha256Hex(`error:agents:${a.id}`);
+          try {
+            await client.query('UPDATE agents SET content_hash = $2, updated_at = NOW() WHERE id = $1', [a.id, sentinel]);
+          } catch {
+            throw err;
+          }
+        }
       }
     }
 

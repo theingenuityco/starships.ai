@@ -5,10 +5,11 @@ import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel } from '@starships/protocol';
 import { StarshipModel } from '@starships/protocol';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class StarshipRepository extends BaseRepository {
-  constructor() {
-    super('StarshipRepository');
+  constructor(connection?: PostgresConnection) {
+    super('StarshipRepository', connection);
   }
 
   async findAll(): Promise<StarshipModel[]> {

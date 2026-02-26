@@ -16,10 +16,11 @@ import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnec
 import { ToolTemplateRepository } from './ToolTemplateRepository';
 import { generateSlug } from '@/helpers/slugUtils';
 import { computeToolContentHash } from '@/utils/contentHash';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class ToolRepository extends BaseRepository {
-  constructor() {
-    super('ToolRepository');
+  constructor(connection?: PostgresConnection) {
+    super('ToolRepository', connection);
   }
 
   private async toolSlugExistsOnStarship(starshipId: string, slug: string, excludeId?: string): Promise<boolean> {

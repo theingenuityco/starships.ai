@@ -10,7 +10,7 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
 import { verifyResourceAccess, verifyStarshipAccess } from '@/middleware/verify-starship-access';
-import type { StarshipModel } from '@starships/protocol';
+import type { StarshipModel, UpdateAgentRequest, UpdateToolRequest } from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
@@ -19,7 +19,7 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
 import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
-import { AgentRepository, ToolRepository, computeAgentContentHash, computeToolContentHash, getConnection } from '@starships/models';
+import { AgentRepository, PostgresConnection, ToolRepository, computeAgentContentHash, computeToolContentHash, getConnection } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
@@ -47,11 +47,143 @@ const openRouterClient =
       })
     : null;
 
+const ImportExportContainerSchemaV1 = z.object({
+  schemaVersion: z.literal('1'),
+  kind: z.enum(['agent', 'tool']),
+  exportedAt: z.string().min(1),
+  metadata: z
+    .object({
+      fromSlug: z.string().optional(),
+      fromStarshipSlug: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
+  source: z
+    .object({
+      app: z.string().optional(),
+      version: z.string().optional(),
+    })
+    .optional(),
+  payload: z.unknown(),
+});
+
+const ImportBundleManifestSchemaV1 = z.object({
+  schemaVersion: z.literal('1'),
+  kind: z.literal('bundle'),
+  exportedAt: z.string().min(1),
+  entities: z.object({
+    agents: z
+      .array(
+        z.object({
+          kind: z.literal('agent'),
+          file: z.string().min(1),
+          fromSlug: z.unknown().optional(),
+          fromStarshipSlug: z.unknown().optional(),
+        })
+      )
+      .default([]),
+    tools: z
+      .array(
+        z.object({
+          kind: z.literal('tool'),
+          file: z.string().min(1),
+          fromSlug: z.unknown().optional(),
+          fromStarshipSlug: z.unknown().optional(),
+        })
+      )
+      .default([]),
+  }),
+});
+
+const BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|tools)\/[\w.-]+\.json$/;
+function isAllowedBundlePath(file: unknown): file is string {
+  return typeof file === 'string' && BUNDLE_ENTRY_PATH_ALLOWLIST.test(file);
+}
+function assertBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportBundleManifestSchemaV1>): void {
+  for (const t of manifest.entities.tools) {
+    if (!isAllowedBundlePath(t.file) || !t.file.startsWith('tools/')) {
+      throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
+    }
+  }
+  for (const a of manifest.entities.agents) {
+    if (!isAllowedBundlePath(a.file) || !a.file.startsWith('agents/')) {
+      throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
+    }
+  }
+}
+
+function makeTransactionConnection(client: {
+  query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>;
+}): PostgresConnection {
+  const txConn = {
+    // Pool lifecycle is handled by the outer connection; no-op here.
+    async connect() {},
+    async disconnect() {},
+    getPool() {
+      throw new Error('Pool not available on transaction-scoped connection');
+    },
+    async query<T = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T[]> {
+      const res = await client.query(text, params);
+      return res.rows as T[];
+    },
+    async queryOne<T = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T | null> {
+      const res = await client.query(text, params);
+      return (res.rows?.[0] ?? null) as T | null;
+    },
+    async queryCount(text: string, params: unknown[] = []): Promise<number> {
+      const row = await txConn.queryOne<{ count: string }>(text, params);
+      return row ? parseInt(row.count, 10) : 0;
+    },
+    async queryWithResult(text: string, params: unknown[] = []): Promise<{ rows: unknown[]; rowCount: number }> {
+      const res = await client.query(text, params);
+      return { rows: res.rows, rowCount: res.rowCount ?? 0 };
+    },
+    async transaction() {
+      throw new Error('Nested transactions are not supported here');
+    },
+    async batchQuery<T = Record<string, unknown>>(queries: Array<{ text: string; params?: unknown[] }>): Promise<T[][]> {
+      const results: T[][] = [];
+      for (const q of queries) {
+        const res = await client.query(q.text, q.params || []);
+        results.push(res.rows as T[]);
+      }
+      return results;
+    },
+    async getClient(): Promise<unknown> {
+      return client;
+    },
+    async healthCheck(): Promise<boolean> {
+      try {
+        await client.query('SELECT 1');
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async getInfo() {
+      throw new Error('Not available on transaction-scoped connection');
+    },
+    async initializeSchema() {},
+  };
+
+  return txConn as unknown as PostgresConnection;
+}
+
 function extractTextFromHtml(html: string): string {
   // Very lightweight extraction to avoid extra deps.
   const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
   const withoutTags = withoutScripts.replace(/<[^>]+>/g, ' ');
   return withoutTags.replace(/\s+/g, ' ').trim();
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function readContentHash(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length === 64 ? value : undefined;
 }
 
 function requireAuthUser(req: Request, res: Response): AuthUser | null {
@@ -927,28 +1059,7 @@ router.post(
       const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
       if (!paramValidation) return;
 
-      // Basic container validation (deep validation is handled in service-level create calls)
-      const ContainerSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.enum(['agent', 'tool']),
-        exportedAt: z.string().min(1),
-        metadata: z
-          .object({
-            fromSlug: z.string().optional(),
-            fromStarshipSlug: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-        source: z
-          .object({
-            app: z.string().optional(),
-            version: z.string().optional(),
-          })
-          .optional(),
-        payload: z.unknown(),
-      });
-
-      const bodyValidation = validateData(ContainerSchema, req.body, res, 'import container');
+      const bodyValidation = validateData(ImportExportContainerSchemaV1, req.body, res, 'import container');
       if (!bodyValidation) return;
 
       const svc = new ImportExportService();
@@ -1003,35 +1114,7 @@ router.post(
         return;
       }
 
-      const ManifestSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.literal('bundle'),
-        exportedAt: z.string().min(1),
-        entities: z.object({
-          agents: z
-            .array(
-              z.object({
-                kind: z.literal('agent'),
-                file: z.string().min(1),
-                fromSlug: z.unknown().optional(),
-                fromStarshipSlug: z.unknown().optional(),
-              })
-            )
-            .default([]),
-          tools: z
-            .array(
-              z.object({
-                kind: z.literal('tool'),
-                file: z.string().min(1),
-                fromSlug: z.unknown().optional(),
-                fromStarshipSlug: z.unknown().optional(),
-              })
-            )
-            .default([]),
-        }),
-      });
-
-      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      const manifestParsed = ImportBundleManifestSchemaV1.safeParse(manifestRaw);
       if (!manifestParsed.success) {
         sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, {
           issues: manifestParsed.error.issues,
@@ -1039,119 +1122,112 @@ router.post(
         return;
       }
 
-      const ContainerSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.enum(['agent', 'tool']),
-        exportedAt: z.string().min(1),
-        metadata: z
-          .object({
-            fromSlug: z.string().optional(),
-            fromStarshipSlug: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-        source: z
-          .object({
-            app: z.string().optional(),
-            version: z.string().optional(),
-          })
-          .optional(),
-        payload: z.unknown(),
-      });
+      try {
+        assertBundleManifestPathsOrThrow(manifestParsed.data);
+      } catch (err) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest contains invalid file paths', 400, {
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
 
-      const warnings: string[] = [];
-      const importedTools: unknown[] = [];
-      const importedAgents: unknown[] = [];
-      const toolSlugMap = new Map<string, string>();
-
-      const svc = new ImportExportService();
       const starshipId = paramValidation.id;
+      const conn = getConnection();
 
-      // Import tools first so agent tool assignment can be remapped.
-      for (const t of manifestParsed.data.entities.tools) {
-        const entry = zip.getEntry(t.file);
-        if (!entry) {
-          warnings.push(`Bundle is missing tool file: ${t.file}`);
-          continue;
-        }
+      const importResult = await conn.transaction(async (client) => {
+        const txConn = makeTransactionConnection(client);
+        const svc = new ImportExportService(txConn);
 
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          warnings.push(`Tool file is not valid JSON: ${t.file}`);
-          continue;
-        }
+        const warnings: string[] = [];
+        const importedTools: unknown[] = [];
+        const importedAgents: unknown[] = [];
+        const toolSlugMap = new Map<string, string>();
 
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-          warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-          continue;
-        }
+        // Import tools first so agent tool assignment can be remapped.
+        for (const t of manifestParsed.data.entities.tools) {
+          const entry = zip.getEntry(t.file);
+          if (!entry) {
+            warnings.push(`Bundle is missing tool file: ${t.file}`);
+            continue;
+          }
 
-        const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-        if (result?.warnings?.length) warnings.push(...result.warnings);
-        if (result?.kind === 'tool' && (result as any).tool) {
-          importedTools.push((result as any).tool);
-          const fromSlug = containerParsed.data.metadata?.fromSlug;
-          const createdSlug = (result as any).tool?.slug;
-          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
-            toolSlugMap.set(fromSlug, createdSlug);
+          let containerRaw: unknown;
+          try {
+            containerRaw = JSON.parse(entry.getData().toString('utf8'));
+          } catch {
+            warnings.push(`Tool file is not valid JSON: ${t.file}`);
+            continue;
+          }
+
+          const containerParsed = ImportExportContainerSchemaV1.safeParse(containerRaw);
+          if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
+            warnings.push(`Tool file is not a valid tool container: ${t.file}`);
+            continue;
+          }
+
+          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
+          if (result?.warnings?.length) warnings.push(...result.warnings);
+          if (result?.kind === 'tool' && result.tool) {
+            importedTools.push(result.tool);
+            const fromSlug = containerParsed.data.metadata?.fromSlug;
+            const createdSlug = result.tool?.slug;
+            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+              toolSlugMap.set(fromSlug, createdSlug);
+            }
           }
         }
-      }
 
-      for (const a of manifestParsed.data.entities.agents) {
-        const entry = zip.getEntry(a.file);
-        if (!entry) {
-          warnings.push(`Bundle is missing agent file: ${a.file}`);
-          continue;
+        for (const a of manifestParsed.data.entities.agents) {
+          const entry = zip.getEntry(a.file);
+          if (!entry) {
+            warnings.push(`Bundle is missing agent file: ${a.file}`);
+            continue;
+          }
+
+          let containerRaw: unknown;
+          try {
+            containerRaw = JSON.parse(entry.getData().toString('utf8'));
+          } catch {
+            warnings.push(`Agent file is not valid JSON: ${a.file}`);
+            continue;
+          }
+
+          const containerParsed = ImportExportContainerSchemaV1.safeParse(containerRaw);
+          if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
+            warnings.push(`Agent file is not a valid agent container: ${a.file}`);
+            continue;
+          }
+
+          const payload = containerParsed.data.payload as unknown as { assignedToolSlugs?: unknown };
+          const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+          const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
+          const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
+
+          const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
+          const rewrittenContainer: ImportExportContainerV1 = {
+            ...(containerParsed.data as unknown as ImportExportContainerV1),
+            payload: {
+              ...basePayloadObj,
+              assignedToolSlugs: rewrittenToolSlugs,
+            } as unknown as ImportExportContainerV1['payload'],
+          };
+
+          const result = await svc.importToStarship(starshipId, rewrittenContainer);
+          if (result?.warnings?.length) warnings.push(...result.warnings);
+          if (result?.kind === 'agent' && result.agent) {
+            importedAgents.push(result.agent);
+          }
         }
 
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          warnings.push(`Agent file is not valid JSON: ${a.file}`);
-          continue;
-        }
-
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
-          warnings.push(`Agent file is not a valid agent container: ${a.file}`);
-          continue;
-        }
-
-        const payload: any = containerParsed.data.payload as any;
-        const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-        const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-        const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
-
-        const rewrittenContainer: ImportExportContainerV1 = {
-          ...(containerParsed.data as any),
-          payload: {
-            ...(payload || {}),
-            assignedToolSlugs: rewrittenToolSlugs,
-          },
-        };
-
-        const result = await svc.importToStarship(starshipId, rewrittenContainer);
-        if (result?.warnings?.length) warnings.push(...result.warnings);
-        if (result?.kind === 'agent' && (result as any).agent) {
-          importedAgents.push((result as any).agent);
-        }
-      }
-
-      sendSuccess(
-        res,
-        {
+        return {
           imported: { tools: importedTools.length, agents: importedAgents.length },
           tools: importedTools.length ? importedTools : undefined,
           agents: importedAgents.length ? importedAgents : undefined,
           warnings: warnings.length ? warnings : undefined,
-        },
-        201
-      );
+        };
+      });
+
+      sendSuccess(res, importResult, 201);
     } catch (error) {
       handleError(error, res, 'importing bundle into starship');
     }
@@ -1201,41 +1277,21 @@ router.post(
         return;
       }
 
-      const ManifestSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.literal('bundle'),
-        exportedAt: z.string().min(1),
-        entities: z.object({
-          agents: z.array(z.object({ kind: z.literal('agent'), file: z.string().min(1) })).default([]),
-          tools: z.array(z.object({ kind: z.literal('tool'), file: z.string().min(1) })).default([]),
-        }),
-      });
-
-      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      const manifestParsed = ImportBundleManifestSchemaV1.safeParse(manifestRaw);
       if (!manifestParsed.success) {
         sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, { issues: manifestParsed.error.issues });
         return;
       }
+      try {
+        assertBundleManifestPathsOrThrow(manifestParsed.data);
+      } catch (err) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest contains invalid file paths', 400, {
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
 
-      const ContainerSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.enum(['agent', 'tool']),
-        exportedAt: z.string().min(1),
-        metadata: z
-          .object({
-            fromSlug: z.string().optional(),
-            fromStarshipSlug: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-        source: z
-          .object({
-            app: z.string().optional(),
-            version: z.string().optional(),
-          })
-          .optional(),
-        payload: z.unknown(),
-      });
+      const ContainerSchema = ImportExportContainerSchemaV1;
 
       const starshipId = paramValidation.id;
       const toolRepo = new ToolRepository();
@@ -1247,8 +1303,8 @@ router.post(
       for (const t of existingTools) {
         const nameKey = String(t.name || '').trim().toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
-        const hash = (t as any).contentHash;
-        if (typeof hash === 'string' && hash.length === 64) existingToolsByHash.set(hash, t);
+        const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+        if (hash) existingToolsByHash.set(hash, t);
       }
 
       const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -1265,10 +1321,10 @@ router.post(
       for (const a of existingAgents) {
         const nameKey = String(a.name || '').trim().toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
-        const hash = (a as any).contentHash;
-        if (typeof hash === 'string' && hash.length === 64) existingAgentsByHash.set(hash, a);
+        const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
+        if (hash) existingAgentsByHash.set(hash, a);
         // Lazy backfill for older rows: compute if missing.
-        if (!(typeof hash === 'string' && hash.length === 64)) {
+        if (!hash) {
           const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
           const computed = computeAgentContentHash({
             name: a.name,
@@ -1278,7 +1334,7 @@ router.post(
             temperature: a.temperature,
             maxTokens: a.maxTokens,
             timeout: a.timeout,
-            reasoning: (a as any).reasoning,
+            reasoning: (a as unknown as { reasoning?: unknown }).reasoning,
             systemPrompt: a.systemPrompt,
             state: a.state,
             blueprint: a.blueprint,
@@ -1311,7 +1367,7 @@ router.post(
         const containerParsed = ContainerSchema.safeParse(containerRaw);
         if (!containerParsed.success || containerParsed.data.kind !== 'tool') continue;
 
-        const payload: any = containerParsed.data.payload as any;
+        const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
         const toolPayload = payload?.tool ?? {};
         const bundleHash = computeToolContentHash({
           name: toolPayload?.name,
@@ -1341,7 +1397,7 @@ router.post(
                 id: existing.id,
                 name: existing.name,
                 slug: existing.slug,
-                contentHash: (existing as any).contentHash,
+                contentHash: readContentHash((existing as unknown as { contentHash?: unknown }).contentHash),
               }
             : undefined,
         });
@@ -1368,7 +1424,7 @@ router.post(
         const containerParsed = ContainerSchema.safeParse(containerRaw);
         if (!containerParsed.success || containerParsed.data.kind !== 'agent') continue;
 
-        const payload: any = containerParsed.data.payload as any;
+        const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
         const agentPayload = payload?.agent ?? {};
         const assignedToolSlugs = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
         const bundleHash = computeAgentContentHash({
@@ -1404,7 +1460,7 @@ router.post(
                 id: existing.id,
                 name: existing.name,
                 slug: existing.slug,
-                contentHash: (existing as any).contentHash,
+                contentHash: readContentHash((existing as unknown as { contentHash?: unknown }).contentHash),
               }
             : undefined,
         });
@@ -1492,114 +1548,77 @@ router.post(
         return;
       }
 
-      const ManifestSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.literal('bundle'),
-        exportedAt: z.string().min(1),
-        entities: z.object({
-          agents: z.array(z.object({ kind: z.literal('agent'), file: z.string().min(1) })).default([]),
-          tools: z.array(z.object({ kind: z.literal('tool'), file: z.string().min(1) })).default([]),
-        }),
-      });
-
-      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      const manifestParsed = ImportBundleManifestSchemaV1.safeParse(manifestRaw);
       if (!manifestParsed.success) {
         sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, { issues: manifestParsed.error.issues });
         return;
       }
+      try {
+        assertBundleManifestPathsOrThrow(manifestParsed.data);
+      } catch (err) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest contains invalid file paths', 400, {
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
 
-      const ContainerSchema = z.object({
-        schemaVersion: z.literal('1'),
-        kind: z.enum(['agent', 'tool']),
-        exportedAt: z.string().min(1),
-        metadata: z
-          .object({
-            fromSlug: z.string().optional(),
-            fromStarshipSlug: z.string().optional(),
-          })
-          .passthrough()
-          .optional(),
-        source: z
-          .object({
-            app: z.string().optional(),
-            version: z.string().optional(),
-          })
-          .optional(),
-        payload: z.unknown(),
-      });
+      const ContainerSchema = ImportExportContainerSchemaV1;
 
       const starshipId = paramValidation.id;
-      const toolRepo = new ToolRepository();
-      const agentRepo = new AgentRepository();
-      const agentService = new AgentService();
-      const svc = new ImportExportService();
+      const conn = getConnection();
 
-      const warnings: string[] = [];
-      const importedTools: unknown[] = [];
-      const importedAgents: unknown[] = [];
-      const toolSlugMap = new Map<string, string>();
+      const applyResult = await conn.transaction(async (client) => {
+        const txConn = makeTransactionConnection(client);
+        const toolRepo = new ToolRepository(txConn);
+        const agentRepo = new AgentRepository(txConn);
+        const agentService = new AgentService(txConn);
+        const svc = new ImportExportService(txConn);
 
-      // Tools first
-      for (const t of manifestParsed.data.entities.tools) {
-        const entry = zip.getEntry(t.file);
-        if (!entry) {
-          warnings.push(`Bundle is missing tool file: ${t.file}`);
-          continue;
-        }
+        const warnings: string[] = [];
+        const importedTools: unknown[] = [];
+        const importedAgents: unknown[] = [];
+        const toolSlugMap = new Map<string, string>();
 
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          warnings.push(`Tool file is not valid JSON: ${t.file}`);
-          continue;
-        }
-
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-          warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-          continue;
-        }
-
-        const payload: any = containerParsed.data.payload as any;
-        const toolPayload = payload?.tool ?? {};
-        const fromSlug = containerParsed.data.metadata?.fromSlug;
-        const bundleHash = computeToolContentHash({
-          name: toolPayload?.name,
-          description: toolPayload?.description,
-          parameters: toolPayload?.parameters,
-          blueprint: toolPayload?.blueprint,
-          transforms: toolPayload?.transforms,
-          mutations: toolPayload?.mutations,
-          condition: toolPayload?.condition,
-          isEnabled: toolPayload?.isEnabled,
-          status: toolPayload?.status,
-        });
-
-        const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-        const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
-
+        // Snapshot + index existing tools once (update maps as we create/overwrite).
         const existingTools = await toolRepo.findByStarship(starshipId);
-        const existingByHash = existingTools.find((x) => (x as any).contentHash === bundleHash);
-        const existingByName = toolNameKey ? existingTools.find((x) => String(x.name || '').trim().toLowerCase() === toolNameKey) : undefined;
-        const target = existingByHash ?? existingByName ?? null;
+        const toolsByHash = new Map<string, (typeof existingTools)[number]>();
+        const toolsByName = new Map<string, (typeof existingTools)[number]>();
+        const indexTool = (t: (typeof existingTools)[number]) => {
+          const nameKey = String(t.name || '').trim().toLowerCase();
+          if (nameKey) toolsByName.set(nameKey, t);
+        const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+        if (hash) toolsByHash.set(hash, t);
+        };
+        for (const t of existingTools) indexTool(t);
 
-        if (decision.action === 'skip') {
-          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && target?.slug) {
-            toolSlugMap.set(fromSlug, target.slug);
-          }
-          continue;
-        }
-
-        if (decision.action === 'overwrite') {
-          const targetId = decision.targetId || target?.id;
-          if (!targetId) {
-            warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
+        // Tools first
+        for (const t of manifestParsed.data.entities.tools) {
+          const entry = zip.getEntry(t.file);
+          if (!entry) {
+            warnings.push(`Bundle is missing tool file: ${t.file}`);
             continue;
           }
-          const updated = await toolRepo.update(targetId, {
+
+          let containerRaw: unknown;
+          try {
+            containerRaw = JSON.parse(entry.getData().toString('utf8'));
+          } catch {
+            warnings.push(`Tool file is not valid JSON: ${t.file}`);
+            continue;
+          }
+
+          const containerParsed = ContainerSchema.safeParse(containerRaw);
+          if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
+            warnings.push(`Tool file is not a valid tool container: ${t.file}`);
+            continue;
+          }
+
+          const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
+          const toolPayload = payload?.tool ?? {};
+          const fromSlug = containerParsed.data.metadata?.fromSlug;
+          const bundleHash = computeToolContentHash({
             name: toolPayload?.name,
-            description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
+            description: toolPayload?.description,
             parameters: toolPayload?.parameters,
             blueprint: toolPayload?.blueprint,
             transforms: toolPayload?.transforms,
@@ -1607,91 +1626,106 @@ router.post(
             condition: toolPayload?.condition,
             isEnabled: toolPayload?.isEnabled,
             status: toolPayload?.status,
-          } as any);
-          if (updated) {
-            importedTools.push(updated);
-            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) toolSlugMap.set(fromSlug, updated.slug);
-          }
-          continue;
-        }
+          });
 
-        // copy (default)
-        const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-        if (result?.warnings?.length) warnings.push(...result.warnings);
-        if (result?.kind === 'tool' && (result as any).tool) {
-          importedTools.push((result as any).tool);
-          const createdSlug = (result as any).tool?.slug;
-          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
-            toolSlugMap.set(fromSlug, createdSlug);
-          }
-        }
-      }
+          const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
+          const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
 
-      // Agents
-      for (const a of manifestParsed.data.entities.agents) {
-        const entry = zip.getEntry(a.file);
-        if (!entry) {
-          warnings.push(`Bundle is missing agent file: ${a.file}`);
-          continue;
-        }
+          const existingByHash = toolsByHash.get(bundleHash);
+          const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
+          const target = existingByHash ?? existingByName ?? null;
 
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          warnings.push(`Agent file is not valid JSON: ${a.file}`);
-          continue;
-        }
-
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
-          warnings.push(`Agent file is not a valid agent container: ${a.file}`);
-          continue;
-        }
-
-        const payload: any = containerParsed.data.payload as any;
-        const agentPayload = payload?.agent ?? {};
-        const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-        const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-        const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
-
-        const bundleHash = computeAgentContentHash({
-          name: agentPayload?.name,
-          role: agentPayload?.role,
-          description: agentPayload?.description,
-          model: agentPayload?.model,
-          temperature: agentPayload?.temperature,
-          maxTokens: agentPayload?.maxTokens,
-          timeout: agentPayload?.timeout,
-          reasoning: agentPayload?.reasoning,
-          systemPrompt: agentPayload?.systemPrompt,
-          state: agentPayload?.state,
-          blueprint: agentPayload?.blueprint,
-          category: agentPayload?.category,
-          previewPrompts: agentPayload?.previewPrompts,
-          assignedToolSlugs: assignedToolSlugs,
-        });
-
-        const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
-        const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
-
-        const existingAgents = await agentRepo.findByStarship(starshipId);
-        const existingByHash = existingAgents.find((x) => (x as any).contentHash === bundleHash);
-        const existingByName = agentNameKey ? existingAgents.find((x) => String(x.name || '').trim().toLowerCase() === agentNameKey) : undefined;
-        const target = existingByHash ?? existingByName ?? null;
-
-        if (decision.action === 'skip') {
-          continue;
-        }
-
-        if (decision.action === 'overwrite') {
-          const targetId = decision.targetId || target?.id;
-          if (!targetId) {
-            warnings.push(`No overwrite target found for agent: ${String(agentPayload?.name || a.file)}`);
+          if (decision.action === 'skip') {
+            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && target?.slug) {
+              toolSlugMap.set(fromSlug, target.slug);
+            }
             continue;
           }
 
-          const updated = await agentService.updateAgent(targetId, {
+          if (decision.action === 'overwrite') {
+            const targetId = decision.targetId || target?.id;
+            if (!targetId) {
+              warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
+              continue;
+            }
+            const updateReq: UpdateToolRequest = {
+              name: typeof toolPayload?.name === 'string' ? toolPayload.name : undefined,
+              description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
+              parameters: toolPayload?.parameters as UpdateToolRequest['parameters'],
+              blueprint: toolPayload?.blueprint as UpdateToolRequest['blueprint'],
+              transforms: toolPayload?.transforms as UpdateToolRequest['transforms'],
+              mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
+              condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
+              isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
+              status:
+                toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
+            };
+            const updated = await toolRepo.update(targetId, updateReq);
+            if (updated) {
+              importedTools.push(updated);
+              indexTool(updated);
+              if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) toolSlugMap.set(fromSlug, updated.slug);
+            }
+            continue;
+          }
+
+          // copy (default)
+          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
+          if (result?.warnings?.length) warnings.push(...result.warnings);
+          if (result?.kind === 'tool' && result.tool) {
+            importedTools.push(result.tool);
+            indexTool(result.tool);
+            const createdSlug = result.tool?.slug;
+            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+              toolSlugMap.set(fromSlug, createdSlug);
+            }
+          }
+        }
+
+        // Snapshot + index existing agents once (update maps as we create/overwrite).
+        const existingAgents = await agentRepo.findByStarship(starshipId);
+        const agentsByHash = new Map<string, (typeof existingAgents)[number]>();
+        const agentsByName = new Map<string, (typeof existingAgents)[number]>();
+        const indexAgent = (a: (typeof existingAgents)[number]) => {
+          const nameKey = String(a.name || '').trim().toLowerCase();
+          if (nameKey) agentsByName.set(nameKey, a);
+          const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
+          if (hash) agentsByHash.set(hash, a);
+        };
+        for (const a of existingAgents) indexAgent(a);
+
+        // Agents
+        for (const a of manifestParsed.data.entities.agents) {
+          const entry = zip.getEntry(a.file);
+          if (!entry) {
+            warnings.push(`Bundle is missing agent file: ${a.file}`);
+            continue;
+          }
+
+          let containerRaw: unknown;
+          try {
+            containerRaw = JSON.parse(entry.getData().toString('utf8'));
+          } catch {
+            warnings.push(`Agent file is not valid JSON: ${a.file}`);
+            continue;
+          }
+
+          const containerParsed = ContainerSchema.safeParse(containerRaw);
+          if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
+            warnings.push(`Agent file is not a valid agent container: ${a.file}`);
+            continue;
+          }
+
+          const payload = containerParsed.data.payload as unknown as {
+            agent?: Record<string, unknown>;
+            assignedToolSlugs?: unknown;
+          };
+          const agentPayload = payload?.agent ?? {};
+          const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+          const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
+          const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
+
+          const bundleHash = computeAgentContentHash({
             name: agentPayload?.name,
             role: agentPayload?.role,
             description: agentPayload?.description,
@@ -1705,43 +1739,84 @@ router.post(
             blueprint: agentPayload?.blueprint,
             category: agentPayload?.category,
             previewPrompts: agentPayload?.previewPrompts,
-          } as any);
-          if (updated) {
-            try {
-              await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
-            } catch (err) {
-              warnings.push(`Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`);
-            }
-            importedAgents.push(updated);
+            assignedToolSlugs: assignedToolSlugs,
+          });
+
+          const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
+          const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
+
+          const existingByHash = agentsByHash.get(bundleHash);
+          const existingByName = agentNameKey ? agentsByName.get(agentNameKey) : undefined;
+          const target = existingByHash ?? existingByName ?? null;
+
+          if (decision.action === 'skip') {
+            continue;
           }
-          continue;
+
+          if (decision.action === 'overwrite') {
+            const targetId = decision.targetId || target?.id;
+            if (!targetId) {
+              warnings.push(`No overwrite target found for agent: ${String(agentPayload?.name || a.file)}`);
+              continue;
+            }
+
+            const updateReq: UpdateAgentRequest = {
+              name: typeof agentPayload?.name === 'string' ? agentPayload.name : undefined,
+              role: typeof agentPayload?.role === 'string' ? agentPayload.role : undefined,
+              description: typeof agentPayload?.description === 'string' ? agentPayload.description : undefined,
+              model: typeof agentPayload?.model === 'string' ? agentPayload.model : undefined,
+              temperature: typeof agentPayload?.temperature === 'number' ? agentPayload.temperature : undefined,
+              maxTokens: typeof agentPayload?.maxTokens === 'number' ? agentPayload.maxTokens : undefined,
+              timeout: typeof agentPayload?.timeout === 'number' ? agentPayload.timeout : undefined,
+              reasoning: agentPayload?.reasoning as UpdateAgentRequest['reasoning'],
+              systemPrompt: typeof agentPayload?.systemPrompt === 'string' ? agentPayload.systemPrompt : undefined,
+              state: agentPayload?.state as UpdateAgentRequest['state'],
+              blueprint: agentPayload?.blueprint as UpdateAgentRequest['blueprint'],
+              category: typeof agentPayload?.category === 'string' ? (agentPayload.category as any) : undefined,
+              previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as any) : undefined,
+            };
+            const updated = await agentService.updateAgent(targetId, updateReq);
+            if (updated) {
+              try {
+                await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
+              } catch (err) {
+                warnings.push(
+                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+                );
+              }
+              importedAgents.push(updated);
+              indexAgent(updated);
+            }
+            continue;
+          }
+
+          // copy (default)
+          const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
+          const rewrittenContainer = {
+            ...(containerParsed.data as unknown as ImportExportContainerV1),
+            payload: {
+              ...basePayloadObj,
+              assignedToolSlugs: rewrittenToolSlugs,
+            },
+          } as unknown as ImportExportContainerV1;
+
+          const result = await svc.importToStarship(starshipId, rewrittenContainer);
+          if (result?.warnings?.length) warnings.push(...result.warnings);
+          if (result?.kind === 'agent' && result.agent) {
+            importedAgents.push(result.agent);
+            indexAgent(result.agent);
+          }
         }
 
-        // copy (default)
-        const rewrittenContainer: ImportExportContainerV1 = {
-          ...(containerParsed.data as any),
-          payload: {
-            ...(payload || {}),
-            assignedToolSlugs: rewrittenToolSlugs,
-          },
-        };
-        const result = await svc.importToStarship(starshipId, rewrittenContainer);
-        if (result?.warnings?.length) warnings.push(...result.warnings);
-        if (result?.kind === 'agent' && (result as any).agent) {
-          importedAgents.push((result as any).agent);
-        }
-      }
-
-      sendSuccess(
-        res,
-        {
+        return {
           imported: { tools: importedTools.length, agents: importedAgents.length },
           tools: importedTools.length ? importedTools : undefined,
           agents: importedAgents.length ? importedAgents : undefined,
           warnings: warnings.length ? warnings : undefined,
-        },
-        201
-      );
+        };
+      });
+
+      sendSuccess(res, applyResult, 201);
     } catch (error) {
       handleError(error, res, 'applying bundle import');
     }

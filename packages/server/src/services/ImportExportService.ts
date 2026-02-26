@@ -1,6 +1,5 @@
 import { AgentService } from '@/services/AgentService';
-import { StarshipService } from '@/services/StarshipService';
-import { AgentRepository, StarshipRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, PostgresConnection, StarshipRepository, ToolRepository } from '@starships/models';
 import type {
   AgentExportPayloadV1,
   CreateAgentRequest,
@@ -16,14 +15,12 @@ export class ImportExportService {
   private toolRepo: ToolRepository;
   private starshipRepo: StarshipRepository;
   private agentService: AgentService;
-  private starshipService: StarshipService;
 
-  constructor() {
-    this.agentRepo = new AgentRepository();
-    this.toolRepo = new ToolRepository();
-    this.starshipRepo = new StarshipRepository();
-    this.agentService = new AgentService();
-    this.starshipService = new StarshipService();
+  constructor(connection?: PostgresConnection) {
+    this.agentRepo = new AgentRepository(connection);
+    this.toolRepo = new ToolRepository(connection);
+    this.starshipRepo = new StarshipRepository(connection);
+    this.agentService = new AgentService(connection);
   }
 
   /**
@@ -60,21 +57,67 @@ export class ImportExportService {
       return { agents: [], tools: [] };
     }
 
-    const agents = await Promise.all(ids.map((id) => this.exportAgent(id)));
+    // Fetch each agent once (avoid double round-trips for large bundles).
+    const agentModels = await Promise.all(
+      ids.map(async (id) => {
+        const agent = await this.agentRepo.findById(id);
+        if (!agent) throw new Error('Agent not found');
+        return agent;
+      })
+    );
+
+    const starshipById = new Map<string, Awaited<ReturnType<StarshipRepository['findById']>>>();
+    const agents: Array<ImportExportContainerV1<'agent'>> = [];
 
     // Dedup tool exports across all agents by tool id.
     const toolIdSet = new Set<string>();
 
-    for (const id of ids) {
-      const agent = await this.agentRepo.findById(id);
-      if (!agent) {
-        // exportAgent would have thrown; this is defensive.
-        continue;
+    for (const agent of agentModels) {
+      let starship = starshipById.get(agent.starshipId);
+      if (starship === undefined) {
+        starship = await this.starshipRepo.findById(agent.starshipId);
+        starshipById.set(agent.starshipId, starship);
       }
+
       const assignedTools = await this.agentRepo.getAgentTools(agent.id, agent.starshipId);
       for (const t of assignedTools) {
         if (t?.id) toolIdSet.add(String(t.id));
       }
+      const assignedToolSlugs = assignedTools.map((t) => t.slug).filter((s) => typeof s === 'string' && s.trim().length > 0);
+
+      const payload: AgentExportPayloadV1 = {
+        agent: {
+          name: agent.name,
+          role: agent.role || 'Assistant',
+          description: agent.description,
+          model: agent.model,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens,
+          timeout: agent.timeout,
+          reasoning: agent.reasoning,
+          systemPrompt: agent.systemPrompt,
+          state: agent.state,
+          blueprint: agent.blueprint,
+          category: agent.category,
+          previewPrompts: agent.previewPrompts,
+        },
+        assignedToolSlugs,
+      };
+
+      agents.push({
+        schemaVersion: '1',
+        kind: 'agent',
+        exportedAt: new Date().toISOString(),
+        metadata: {
+          fromSlug: agent.slug,
+          fromStarshipSlug: starship?.slug,
+        },
+        source: {
+          app: 'starships.ai',
+          version: process.env.npm_package_version,
+        },
+        payload,
+      });
     }
 
     const toolIds = Array.from(toolIdSet);
@@ -172,7 +215,7 @@ export class ImportExportService {
   }
 
   async importToStarship(starshipId: string, container: ImportExportContainerV1): Promise<StarshipImportResponse> {
-    const starship = await this.starshipService.getStarship(starshipId);
+    const starship = await this.starshipRepo.findById(starshipId);
     if (!starship) {
       throw new Error('Starship not found');
     }

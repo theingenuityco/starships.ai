@@ -26,6 +26,63 @@ export class ImportExportService {
     this.starshipService = new StarshipService();
   }
 
+  /**
+   * Export an agent together with all tools currently assigned to it.
+   *
+   * Notes:
+   * - Tool exports intentionally omit configuration (which may contain secrets).
+   * - The returned objects are the same JSON containers used by the single-resource export endpoints.
+   */
+  async exportAgentBundle(
+    agentId: string
+  ): Promise<{
+    agent: ImportExportContainerV1<'agent'>;
+    tools: Array<ImportExportContainerV1<'tool'>>;
+  }> {
+    const bundle = await this.exportAgentsBundle([agentId]);
+    if (bundle.agents.length !== 1) {
+      throw new Error('Unexpected export result: agent bundle must contain exactly one agent');
+    }
+    return { agent: bundle.agents[0], tools: bundle.tools };
+  }
+
+  /**
+   * Export multiple agents and the union of their assigned tools (deduped).
+   */
+  async exportAgentsBundle(
+    agentIds: string[]
+  ): Promise<{
+    agents: Array<ImportExportContainerV1<'agent'>>;
+    tools: Array<ImportExportContainerV1<'tool'>>;
+  }> {
+    const ids = Array.isArray(agentIds) ? agentIds.map((id) => String(id || '').trim()).filter(Boolean) : [];
+    if (ids.length === 0) {
+      return { agents: [], tools: [] };
+    }
+
+    const agents = await Promise.all(ids.map((id) => this.exportAgent(id)));
+
+    // Dedup tool exports across all agents by tool id.
+    const toolIdSet = new Set<string>();
+
+    for (const id of ids) {
+      const agent = await this.agentRepo.findById(id);
+      if (!agent) {
+        // exportAgent would have thrown; this is defensive.
+        continue;
+      }
+      const assignedTools = await this.agentRepo.getAgentTools(agent.id, agent.starshipId);
+      for (const t of assignedTools) {
+        if (t?.id) toolIdSet.add(String(t.id));
+      }
+    }
+
+    const toolIds = Array.from(toolIdSet);
+    const tools = await Promise.all(toolIds.map((tid) => this.exportTool(tid)));
+
+    return { agents, tools };
+  }
+
   async exportAgent(agentId: string): Promise<ImportExportContainerV1<'agent'>> {
     const agent = await this.agentRepo.findById(agentId);
     if (!agent) {

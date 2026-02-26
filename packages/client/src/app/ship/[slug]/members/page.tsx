@@ -32,12 +32,21 @@ import { useParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
+import { toast } from 'sonner'
+import { getSafeErrorMessage } from '@/lib/error-utils'
+import { getCurrentToken } from '@/lib/api'
 
 type Filter = 'all' | 'humans' | 'agents'
 
 type AgentWithAvatar = AgentModel & { avatarAttachmentId?: string | null }
 
 const SKELETON_CARD_COUNT = 2
+
+function safeFilenameSegment(input: string): string {
+  const raw = String(input || '').trim()
+  const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '')
+  return sanitized.length > 0 ? sanitized : 'export'
+}
 
 function initialsFromName(name?: string | null): string {
   if (!name || typeof name !== 'string') return 'U'
@@ -117,6 +126,7 @@ export default function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
+  const [exportingAgentId, setExportingAgentId] = useState<string | null>(null)
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedSearch(searchText.trim()), SEARCH_DEBOUNCE_MS)
@@ -399,6 +409,8 @@ export default function MembersPage() {
     const canKickAgent = Boolean(fromMarketplace && a.id)
     const canUnpublish = Boolean(!fromMarketplace && isPublished && a.id)
     const canDelete = Boolean(!fromMarketplace && !isPublished && a.id)
+    const canExportBundle = Boolean(isInstanceAdmin === true && a.id)
+    const isExporting = Boolean(exportingAgentId && a.id && exportingAgentId === a.id)
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label.primary}>
@@ -459,6 +471,52 @@ export default function MembersPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
+              {canExportBundle ? (
+                <DropdownMenuItem
+                  disabled={isExporting}
+                  onClick={async () => {
+                    if (!a.id) return
+                    setExportingAgentId(a.id)
+                    try {
+                      const token = await getCurrentToken()
+                      const res = await fetch(`/api/v1/agents/${encodeURIComponent(a.id)}/export-bundle`, {
+                        method: 'GET',
+                        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                      })
+
+                      if (!res.ok) {
+                        throw new Error(`Export failed (${res.status})`)
+                      }
+
+                      const blob = await res.blob()
+                      const contentDisposition = res.headers.get('content-disposition') || ''
+                      const filenameMatch = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(contentDisposition)
+                      const fallbackName = `${safeFilenameSegment(`starships-agent-${agentSlug || a.id}`)}.tgz`
+                      const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : fallbackName
+
+                      const url = window.URL.createObjectURL(blob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = filename
+                      document.body.appendChild(link)
+                      link.click()
+                      link.remove()
+                      window.setTimeout(() => window.URL.revokeObjectURL(url), 1500)
+
+                      toast.success('Export ready', { description: `Downloaded ${filename}` })
+                    } catch (error) {
+                      toast.error('Export failed', { description: getSafeErrorMessage(error) })
+                    } finally {
+                      setExportingAgentId(prev => (prev === a.id ? null : prev))
+                    }
+                  }}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Icon name="download" className="h-4 w-4" />
+                  {isExporting ? 'Exporting…' : 'Export npm package'}
+                </DropdownMenuItem>
+              ) : null}
+
               {canKickAgent ? (
                 <DropdownMenuItem
                   onClick={() => setConfirmAction({ kind: 'kickAgent', agentId: a.id, label: label.primary })}

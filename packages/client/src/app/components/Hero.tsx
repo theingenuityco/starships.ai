@@ -38,7 +38,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-16 sm:py-20">
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div className="w-full min-w-0">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[42ch] mx-auto break-words text-balance">
+          <h1 className="text-[38px] sm:text-[46px] font-bold tracking-tight leading-tight mb-4 w-full max-w-[48ch] mx-auto break-words text-balance">
             Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>

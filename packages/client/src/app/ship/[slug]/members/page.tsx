@@ -491,7 +491,7 @@ export default function MembersPage() {
                       const blob = await res.blob()
                       const contentDisposition = res.headers.get('content-disposition') || ''
                       const filenameMatch = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(contentDisposition)
-                      const fallbackName = `${safeFilenameSegment(`starships-agent-${agentSlug || a.id}`)}.tgz`
+                      const fallbackName = `${safeFilenameSegment(`bundle-${agentSlug || a.id}`)}.zip`
                       const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : fallbackName
 
                       const url = window.URL.createObjectURL(blob)
@@ -513,7 +513,7 @@ export default function MembersPage() {
                   className="flex items-center gap-2 cursor-pointer"
                 >
                   <Icon name="download" className="h-4 w-4" />
-                  {isExporting ? 'Exporting…' : 'Export npm package'}
+                  {isExporting ? 'Exporting…' : 'Export bundle'}
                 </DropdownMenuItem>
               ) : null}
 

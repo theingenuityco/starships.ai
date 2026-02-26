@@ -29,30 +29,8 @@ function safeFilenameSegment(input: string): string {
   return sanitized.length > 0 ? sanitized : 'export';
 }
 
-function toNpmName(input: string): string {
-  // npm package name rules are more strict; keep it simple and safe.
-  // https://docs.npmjs.com/cli/v10/configuring-npm/package-json#name
-  const raw = String(input || '').trim().toLowerCase();
-  const cleaned = raw
-    .replace(/[^a-z0-9._-]+/g, '-') // replace invalid chars with hyphen
-    .replace(/-+/g, '-') // collapse
-    .replace(/^[._-]+/, '') // avoid leading dot/underscore/hyphen
-    .replace(/[._-]+$/, ''); // avoid trailing punctuation
-  const out = cleaned.slice(0, 214);
-  return out.length > 0 ? out : 'starships-agent-export';
-}
-
-function toSemverOrFallback(input: unknown, fallback: string): string {
-  const v = typeof input === 'string' ? input.trim() : '';
-  // Minimal semver check: 1.2.3, optionally with -pre or +build
-  if (/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(v)) return v;
-  return fallback;
-}
-
-function semverBundleVersion(): string {
-  // Example: 0.0.0-bundle.20260226T154422Z
-  const iso = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
-  return `0.0.0-bundle.${iso}`;
+function isoCompactTimestamp(): string {
+  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 }
 
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -361,73 +339,20 @@ router.get('/agents/:id/export-bundle', jwtAuthMiddleware, requireInstanceAdminM
     const fromStarshipSlug = typeof agentContainer?.metadata?.fromStarshipSlug === 'string' ? agentContainer.metadata.fromStarshipSlug : 'starship';
     const fromAgentSlug = typeof agentContainer?.metadata?.fromSlug === 'string' ? agentContainer.metadata.fromSlug : agent.slug || agent.id;
 
-    const pkgName = toNpmName(`starships-bundle-${fromStarshipSlug}-${fromAgentSlug}`);
-    const pkgVersion = toSemverOrFallback(agent.version, semverBundleVersion());
-    const baseName = safeFilenameSegment(`${pkgName}-${pkgVersion}`);
-    const filename = `${baseName}.tgz`;
+    const baseName = safeFilenameSegment(`bundle-${fromStarshipSlug}-${fromAgentSlug}-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
 
-    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    // NPM package tarballs are gzipped tars where all paths are prefixed with "package/".
-    const archive = archiver('tar', { gzip: true, gzipOptions: { level: 9 } });
+    const archive = archiver('zip', { zlib: { level: 9 } });
     archive.on('error', (err) => {
       throw err;
     });
     archive.pipe(res);
 
-    const manifest = {
-      schemaVersion: '1',
-      kind: 'bundle',
-      exportedAt: new Date().toISOString(),
-      entities: {
-        agents: bundle.agents.map((a) => ({
-          kind: 'agent',
-          fromSlug: a.metadata?.fromSlug,
-          fromStarshipSlug: a.metadata?.fromStarshipSlug,
-          file: `agents/${safeFilenameSegment(a.metadata?.fromSlug || 'agent')}.json`,
-        })),
-        tools: bundle.tools.map((t) => ({
-          kind: 'tool',
-          fromSlug: t.metadata?.fromSlug,
-          fromStarshipSlug: t.metadata?.fromStarshipSlug,
-          file: `tools/${safeFilenameSegment(t.metadata?.fromSlug || 'tool')}.json`,
-        })),
-      },
-    };
-
-    const pkgJson = {
-      name: pkgName,
-      version: pkgVersion,
-      private: true,
-      description: `Starships bundle export`,
-      main: 'index.js',
-      type: 'commonjs',
-      files: ['bundle/**', 'index.js', 'README.md'],
-      keywords: ['starships', 'agent', 'export'],
-    };
-
-    const readme = `# ${pkgName}
-
-This package was exported from **starships.ai**.
-
-## Contents
-- \`bundle/agents/*.json\`
-- \`bundle/tools/*.json\`
-- \`bundle/manifest.json\`
-
-## Usage
-\`\`\`js
-const bundle = require('${pkgName}')
-console.log(bundle.manifest)
-\`\`\`
-
-## Importing
-Use your starships import pipeline with the included containers.
-`;
-
     const usedAgentNames = new Set<string>();
-    const agentFileBasenames: string[] = [];
+    const agentEntries: Array<{ kind: 'agent'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
     for (let i = 0; i < bundle.agents.length; i += 1) {
       const a = bundle.agents[i];
       const slug = typeof a.metadata?.fromSlug === 'string' ? a.metadata.fromSlug : `agent-${i + 1}`;
@@ -439,12 +364,18 @@ Use your starships import pipeline with the included containers.
         n += 1;
       }
       usedAgentNames.add(outName);
-      agentFileBasenames.push(outName);
-      archive.append(JSON.stringify(a, null, 2), { name: `package/bundle/agents/${outName}.json` });
+      const file = `agents/${outName}.json`;
+      agentEntries.push({
+        kind: 'agent',
+        fromSlug: a.metadata?.fromSlug,
+        fromStarshipSlug: a.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(a, null, 2), { name: file });
     }
 
     const usedToolNames = new Set<string>();
-    const toolFileBasenames: string[] = [];
+    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
     for (let i = 0; i < bundle.tools.length; i += 1) {
       const t = bundle.tools[i];
       const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
@@ -456,31 +387,27 @@ Use your starships import pipeline with the included containers.
         n += 1;
       }
       usedToolNames.add(outName);
-      toolFileBasenames.push(outName);
-      archive.append(JSON.stringify(t, null, 2), { name: `package/bundle/tools/${outName}.json` });
+      const file = `tools/${outName}.json`;
+      toolEntries.push({
+        kind: 'tool',
+        fromSlug: t.metadata?.fromSlug,
+        fromStarshipSlug: t.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(t, null, 2), { name: file });
     }
 
-    const indexJs = `/* eslint-disable */
-// Auto-generated export package from starships.ai
-const manifest = require('./bundle/manifest.json')
-const agents = [
-${agentFileBasenames.map((b) => `  require('./bundle/agents/${b}.json')`).join(',\n')}
-]
-const tools = [
-${toolFileBasenames.map((b) => `  require('./bundle/tools/${b}.json')`).join(',\n')}
-]
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        agents: agentEntries,
+        tools: toolEntries,
+      },
+    };
 
-module.exports = {
-  manifest,
-  agents,
-  tools,
-}
-`;
-
-    archive.append(JSON.stringify(pkgJson, null, 2), { name: 'package/package.json' });
-    archive.append(readme, { name: 'package/README.md' });
-    archive.append(indexJs, { name: 'package/index.js' });
-    archive.append(JSON.stringify(manifest, null, 2), { name: 'package/bundle/manifest.json' });
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
 
     await archive.finalize();
   } catch (error) {
@@ -516,62 +443,20 @@ router.post('/agents/export-bundle', jwtAuthMiddleware, requireInstanceAdminMidd
     const svc = new ImportExportService();
     const bundle = await svc.exportAgentsBundle(bodyValidation.agentIds);
 
-    // Package naming: when exporting multiple agents we avoid pretending this is a semantic release.
-    const pkgName = toNpmName(`starships-bundle-${bundle.agents.length}-agents`);
-    const pkgVersion = semverBundleVersion();
-    const baseName = safeFilenameSegment(`${pkgName}-${pkgVersion}`);
-    const filename = `${baseName}.tgz`;
+    const baseName = safeFilenameSegment(`bundle-${bundle.agents.length}-agents-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
 
-    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-    const archive = archiver('tar', { gzip: true, gzipOptions: { level: 9 } });
+    const archive = archiver('zip', { zlib: { level: 9 } });
     archive.on('error', (err) => {
       throw err;
     });
     archive.pipe(res);
 
-    const manifest = {
-      schemaVersion: '1',
-      kind: 'bundle',
-      exportedAt: new Date().toISOString(),
-      entities: {
-        agents: bundle.agents.map((a) => ({
-          kind: 'agent',
-          fromSlug: a.metadata?.fromSlug,
-          fromStarshipSlug: a.metadata?.fromStarshipSlug,
-        })),
-        tools: bundle.tools.map((t) => ({
-          kind: 'tool',
-          fromSlug: t.metadata?.fromSlug,
-          fromStarshipSlug: t.metadata?.fromStarshipSlug,
-        })),
-      },
-    };
-
-    const pkgJson = {
-      name: pkgName,
-      version: pkgVersion,
-      private: true,
-      description: `Starships bundle export`,
-      main: 'index.js',
-      type: 'commonjs',
-      files: ['bundle/**', 'index.js', 'README.md'],
-      keywords: ['starships', 'bundle', 'export'],
-    };
-
-    const readme = `# ${pkgName}
-
-This package was exported from **starships.ai**.
-
-## Contents
-- \`bundle/agents/*.json\`
-- \`bundle/tools/*.json\`
-- \`bundle/manifest.json\`
-`;
-
     const usedAgentNames = new Set<string>();
-    const agentFileBasenames: string[] = [];
+    const agentEntries: Array<{ kind: 'agent'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
     for (let i = 0; i < bundle.agents.length; i += 1) {
       const a = bundle.agents[i];
       const slug = typeof a.metadata?.fromSlug === 'string' ? a.metadata.fromSlug : `agent-${i + 1}`;
@@ -583,12 +468,18 @@ This package was exported from **starships.ai**.
         n += 1;
       }
       usedAgentNames.add(outName);
-      agentFileBasenames.push(outName);
-      archive.append(JSON.stringify(a, null, 2), { name: `package/bundle/agents/${outName}.json` });
+      const file = `agents/${outName}.json`;
+      agentEntries.push({
+        kind: 'agent',
+        fromSlug: a.metadata?.fromSlug,
+        fromStarshipSlug: a.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(a, null, 2), { name: file });
     }
 
     const usedToolNames = new Set<string>();
-    const toolFileBasenames: string[] = [];
+    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
     for (let i = 0; i < bundle.tools.length; i += 1) {
       const t = bundle.tools[i];
       const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
@@ -600,26 +491,27 @@ This package was exported from **starships.ai**.
         n += 1;
       }
       usedToolNames.add(outName);
-      toolFileBasenames.push(outName);
-      archive.append(JSON.stringify(t, null, 2), { name: `package/bundle/tools/${outName}.json` });
+      const file = `tools/${outName}.json`;
+      toolEntries.push({
+        kind: 'tool',
+        fromSlug: t.metadata?.fromSlug,
+        fromStarshipSlug: t.metadata?.fromStarshipSlug,
+        file,
+      });
+      archive.append(JSON.stringify(t, null, 2), { name: file });
     }
 
-    const indexJs = `/* eslint-disable */
-const manifest = require('./bundle/manifest.json')
-const agents = [
-${agentFileBasenames.map((b) => `  require('./bundle/agents/${b}.json')`).join(',\n')}
-]
-const tools = [
-${toolFileBasenames.map((b) => `  require('./bundle/tools/${b}.json')`).join(',\n')}
-]
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        agents: agentEntries,
+        tools: toolEntries,
+      },
+    };
 
-module.exports = { manifest, agents, tools }
-`;
-
-    archive.append(JSON.stringify(pkgJson, null, 2), { name: 'package/package.json' });
-    archive.append(readme, { name: 'package/README.md' });
-    archive.append(indexJs, { name: 'package/index.js' });
-    archive.append(JSON.stringify(manifest, null, 2), { name: 'package/bundle/manifest.json' });
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
 
     await archive.finalize();
   } catch (error) {

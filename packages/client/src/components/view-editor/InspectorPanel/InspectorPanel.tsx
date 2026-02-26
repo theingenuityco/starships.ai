@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getAtPath } from '@/lib/objectPath'
-import { getWidgetDefinition, type WidgetField } from '@/components/widgets/widgetDefinitions'
+import { getWidgetCatalogEntry, type WidgetField } from '@/components/widgets/widgetCatalog'
 import type { BindingSpec, HandlerSpec, ViewRuntimeActionRequest, ViewRuntimeConfig, WidgetInstanceNode } from '@starships/protocol'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(m => m.default), {
@@ -49,9 +49,9 @@ export function InspectorPanel(props: {
     onOpenView,
   } = props
 
-  const def = React.useMemo(() => getWidgetDefinition(selectedNode?.type), [selectedNode?.type])
-  const fields = def?.fields ?? []
-  const events = def?.events ?? []
+  const widget = React.useMemo(() => getWidgetCatalogEntry(selectedNode?.type), [selectedNode?.type])
+  const fields = widget?.fields ?? []
+  const events = widget?.events ?? []
 
   const [newBindingPropPath, setNewBindingPropPath] = React.useState('')
   const [newBindingKind, setNewBindingKind] = React.useState<'state' | 'query'>('state')
@@ -197,10 +197,10 @@ export function InspectorPanel(props: {
               </TabsList>
 
               <TabsContent value="props">
-                {def ? (
+                {widget ? (
                   <div className="flex flex-col gap-3">
                     <div className="text-[11px] text-muted-foreground">
-                      {def.label} • <span className="font-mono">{def.type}</span>
+                      {widget.label} • <span className="font-mono">{widget.type}</span>
                     </div>
                     {fields.length ? fields.map(renderField) : <div className="text-sm text-muted-foreground">No editable fields defined yet.</div>}
                   </div>
@@ -457,7 +457,7 @@ export function InspectorPanel(props: {
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-medium">Props (JSON)</label>
                   <Textarea value={propsJson} onChange={e => onChangeSelectedPropsJson(e.target.value)} className="font-mono text-xs min-h-[280px]" />
-                  <div className="text-[11px] text-muted-foreground">Tip: primitives available: Box, Stack, Grid, Text, Button, Tabs.</div>
+                  <div className="text-[11px] text-muted-foreground">Tip: widget type is the node’s `type` string from the catalog.</div>
                 </div>
               </TabsContent>
             </Tabs>

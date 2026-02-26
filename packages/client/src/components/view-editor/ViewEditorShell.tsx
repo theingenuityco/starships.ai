@@ -11,8 +11,7 @@ import { Button } from '@/components/ui/button'
 import type { ViewModel, WidgetInstanceNode } from '@starships/protocol'
 import { useUpdateView } from '@/hooks/useViews'
 import { generateId } from '@/lib/utils'
-import { getWidgetDefinition } from '@/components/widgets/widgetDefinitions'
-import { WIDGET_REGISTRY } from '@/components/widgets/widgetRegistry'
+import { WIDGET_CATALOG_BY_TYPE, getWidgetCatalogEntry } from '@/components/widgets/widgetCatalog'
 import { toast } from 'sonner'
 
 import { DesignCanvas } from './DesignCanvas'
@@ -145,12 +144,12 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
     try {
       if (data?.kind === 'new' && typeof data.widgetType === 'string' && draftRoot) {
         const widgetType = String(data.widgetType)
-        const def = getWidgetDefinition(widgetType)
+        const meta = getWidgetCatalogEntry(widgetType)
         const child: WidgetInstanceNode = {
           id: makeId(),
           type: widgetType,
-          props: cloneDefaults(def?.defaultProps ?? {}),
-          ...(def?.acceptsChildren ? { children: [] } : null),
+          props: cloneDefaults(meta?.defaultProps ?? {}),
+          ...(meta?.acceptsChildren ? { children: [] } : null),
         }
 
         // Preferred: drop directly onto a container droppable.
@@ -167,10 +166,10 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
           if (!overNodeId) return
 
           const overNode = findNode(draftRoot, overNodeId)
-          const overDef = getWidgetDefinition(overNode?.type)
+          const overMeta = getWidgetCatalogEntry(overNode?.type)
 
           // If the node under cursor is a container, append into it.
-          if (overNode && (overDef?.acceptsChildren ?? Array.isArray(overNode.children))) {
+          if (overNode && (overMeta?.acceptsChildren ?? Array.isArray(overNode.children))) {
             insertChild(overNodeId, child)
             return
           }
@@ -244,10 +243,10 @@ export function ViewEditorShell(props: { slug: string; viewId: string; view: Vie
       const stack: WidgetInstanceNode[] = [draftRoot]
       while (stack.length) {
         const cur = stack.pop()!
-        if (!WIDGET_REGISTRY[cur.type]) errors.push(`Unknown widget type: ${cur.type}`)
+        if (!WIDGET_CATALOG_BY_TYPE[cur.type]) errors.push(`Unknown widget type: ${cur.type}`)
         const children = Array.isArray(cur.children) ? cur.children : []
-        const def = getWidgetDefinition(cur.type)
-        if (children.length && def && !def.acceptsChildren) {
+        const meta = getWidgetCatalogEntry(cur.type)
+        if (children.length && meta && !meta.acceptsChildren) {
           errors.push(`Widget type ${cur.type} cannot have children (node ${String(cur.id).slice(0, 10)}).`)
         }
         for (const c of children) stack.push(c)

@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { WIDGET_REGISTRY } from './widgetRegistry'
+import { WIDGET_CATALOG_BY_TYPE } from './widgetCatalog'
 
 export interface WidgetConfig {
   id: string
@@ -15,13 +15,13 @@ export interface WidgetRendererProps {
 }
 
 export function WidgetRenderer({ widget, className }: WidgetRendererProps): React.JSX.Element {
-  const Component = WIDGET_REGISTRY[widget.widgetType]
+  const Component = WIDGET_CATALOG_BY_TYPE[widget.widgetType]?.Component
 
   if (!Component) {
     return (
       <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950/20">
         <p className="text-sm text-red-600 dark:text-red-400">Unknown widget type: {widget.widgetType}</p>
-        <p className="text-xs text-muted-foreground mt-1">Available components: {Object.keys(WIDGET_REGISTRY).join(', ')}</p>
+        <p className="text-xs text-muted-foreground mt-1">Available components: {Object.keys(WIDGET_CATALOG_BY_TYPE).join(', ')}</p>
       </div>
     )
   }

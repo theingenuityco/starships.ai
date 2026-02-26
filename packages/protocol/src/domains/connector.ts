@@ -224,10 +224,6 @@ export interface ConnectorDbSessionV2 {
    * SSL/TLS controls. Runtimes may override for safety.
    */
   ssl?: boolean;
-  /**
-   * Optional: rejectUnauthorized override. Runtimes may override for safety.
-   */
-  sslRejectUnauthorized?: boolean;
 }
 
 export interface ConnectorSessionV2 {

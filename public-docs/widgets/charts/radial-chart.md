@@ -1,10 +1,15 @@
 ---
 title: Radial Bar Chart Widget
-slug: widgets/charts/radial
+slug: widgets/charts/radial-chart
 category: widgets
 ---
 
 # Radial Bar Chart Widget
+
+## Where it can be used
+
+- Inline (conversations): Yes
+- Views (widget tree): Yes
 
 A radial (semi-donut) bar chart for ranking categories while keeping focus on absolute values instead of proportions. It leverages shadcn/ui’s `ChartContainer`, tooltip, and CSS-variable theming, ensuring consistency with other chart widgets (see Context7 `/websites/ui_shadcn`, topic `charts`).
 
@@ -55,6 +60,22 @@ If `color` is omitted, the widget uses built-in fallback colors.
     ],
     "innerRadius": "55%",
     "outerRadius": "95%",
+    "startAngle": 180,
+    "endAngle": 540
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "RadialChart",
+  "props": {
+    "title": "Top Support Queues",
+    "data": [{ "label": "Billing", "value": 142, "color": "#3b82f6" }],
+    "innerRadius": "55%",
     "startAngle": 180,
     "endAngle": 540
   }

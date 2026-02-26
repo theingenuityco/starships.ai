@@ -1,10 +1,15 @@
 ---
 title: Pie Chart Widget
-slug: widgets/charts/pie
+slug: widgets/charts/pie-chart
 category: widgets
 ---
 
 # Pie Chart Widget
+
+## Where it can be used
+
+- Inline (conversations): Yes
+- Views (widget tree): Yes
 
 Single-ring composition chart for parts-of-a-whole storytelling. Built atop shadcn/ui’s chart primitives (`ChartContainer`, `ChartTooltipContent`, `ChartLegendContent`) so colors, theming, and accessibility follow the official documentation (Context7 `/websites/ui_shadcn`, topic `charts`).
 
@@ -56,6 +61,19 @@ Single-ring composition chart for parts-of-a-whole storytelling. Built atop shad
       { "label": "Firefox", "value": 65, "color": "#06b6d4" },
       { "label": "Other", "value": 48, "color": "#f59e0b" }
     ]
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "PieChart",
+  "props": {
+    "title": "Browser Share",
+    "data": [{ "label": "Chrome", "value": 187, "color": "#3b82f6" }]
   }
 }
 ```

@@ -1,10 +1,15 @@
 ---
 title: Area Chart Widget
-slug: widgets/charts/area
+slug: widgets/charts/area-chart
 category: widgets
 ---
 
 # Area Chart Widget
+
+## Where it can be used
+
+- Inline (conversations): Yes
+- Views (widget tree): Yes
 
 Stacked or single-series area charts that emphasize magnitude over time. Built per the [`AreaChart` guidance from shadcn/ui](https://ui.shadcn.com/docs/components/chart), so it automatically wires `ChartConfig` colors, tooltips, and legends outlined in Context7.
 
@@ -66,6 +71,21 @@ Stacked or single-series area charts that emphasize magnitude over time. Built p
       { "date": "2024-06-12", "organic": 2800, "paid": 1400 },
       { "date": "2024-06-13", "organic": 3000, "paid": 1500 }
     ]
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "AreaChart",
+  "props": {
+    "title": "Traffic Mix",
+    "indexKey": "date",
+    "series": [{ "dataKey": "organic", "label": "Organic", "color": "#3b82f6" }],
+    "data": [{ "date": "2024-06-10", "organic": 2400 }]
   }
 }
 ```

@@ -12,24 +12,9 @@ A flexbox-based layout widget for arranging children in a row or column with con
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Stack",
-  "props": {
-    "direction": "row",
-    "gap": 12,
-    "align": "center",
-    "className": "p-4 border rounded-lg"
-  }
-}
-```
 
 ### Views node (widget tree)
 

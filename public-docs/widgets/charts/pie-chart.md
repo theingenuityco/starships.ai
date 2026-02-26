@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 Single-ring composition chart for parts-of-a-whole storytelling. Built atop shadcn/ui’s chart primitives (`ChartContainer`, `ChartTooltipContent`, `ChartLegendContent`) so colors, theming, and accessibility follow the official documentation (Context7 `/websites/ui_shadcn`, topic `charts`).
@@ -50,7 +49,8 @@ Single-ring composition chart for parts-of-a-whole storytelling. Built atop shad
 
 ```json
 {
-  "widgetType": "PieChart",
+  "id": "chart",
+  "type": "PieChart",
   "props": {
     "title": "Browser Share",
     "description": "Week ending Jun 15",

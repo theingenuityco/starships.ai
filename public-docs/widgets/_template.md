@@ -10,19 +10,9 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes/No
 - Views (widget tree): Yes/No
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "<WidgetName>",
-  "props": {}
-}
-```
 
 ### Views node (widget tree)
 
@@ -48,7 +38,8 @@ category: widgets
 
 ```json
 {
-  "widgetType": "<WidgetName>",
+  "id": "example",
+  "type": "<WidgetName>",
   "props": {}
 }
 ```
@@ -57,7 +48,8 @@ category: widgets
 
 ```json
 {
-  "widgetType": "<WidgetName>",
+  "id": "example",
+  "type": "<WidgetName>",
   "props": {}
 }
 ```

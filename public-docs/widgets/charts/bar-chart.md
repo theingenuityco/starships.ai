@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It reuses `ChartContainer`, tooltip, and legend implementations from the official docs (Context7 `/websites/ui_shadcn`, topic `charts`), meaning theme colors (`var(--chart-*)`), keyboard navigation, and responsive sizing all match the recommended approach.
@@ -55,7 +54,8 @@ A multi-series column chart powered by Recharts and shadcn/ui chart patterns. It
 
 ```json
 {
-  "widgetType": "BarChart",
+  "id": "chart",
+  "type": "BarChart",
   "props": {
     "title": "Sessions by Device",
     "description": "Last 6 months",

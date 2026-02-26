@@ -8,7 +8,6 @@ category: widgets
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 A radial (semi-donut) bar chart for ranking categories while keeping focus on absolute values instead of proportions. It leverages shadcn/ui’s `ChartContainer`, tooltip, and CSS-variable theming, ensuring consistency with other chart widgets (see Context7 `/websites/ui_shadcn`, topic `charts`).
@@ -48,7 +47,8 @@ If `color` is omitted, the widget uses built-in fallback colors.
 
 ```json
 {
-  "widgetType": "RadialChart",
+  "id": "chart",
+  "type": "RadialChart",
   "props": {
     "title": "Top Support Queues",
     "description": "Tickets resolved last week",

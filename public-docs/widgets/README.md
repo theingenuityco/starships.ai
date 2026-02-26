@@ -2,41 +2,12 @@
 
 Widgets are **structured UI components** that starships.ai can render inside the product.
 
-They show up in two main places:
-
-- **Conversations (inline widgets)**: emitted by a workflow/tool as a `ui_action` with `action: "render_widget"`.
-- **Views (dynamic pages)**: persisted as a widget tree (`ViewModel.root`) and rendered by the Views runtime.
+Widgets are rendered in **Views (dynamic pages)**: persisted as a widget tree (`ViewModel.root`) and rendered by the Views runtime.
 
 ## Where widgets show up
 
 - **API**: widgets are managed via `@starships/server` routes (for example `GET /api/v1/starships/:starshipId/widgets`, `POST /api/v1/widgets`).
-- **Client**: the chat UI renders widgets from conversation stream `ui_action` events (specifically `action: "render_widget"`) using a known widget type + props.
 - **Views**: the view renderer (`DynamicViewRenderer` → `WidgetTreeRenderer`) renders a persisted widget tree (`ViewModel.root`) and supports bindings/handlers at runtime.
-
-## Inline widget payload shape (conversations)
-
-When a tool wants the UI to render a widget, emit a `ui_action` with a payload containing:
-
-- `widgetType`: the widget component name (see supported types below)
-- `props`: the widget props object (must be JSON)
-- Optional metadata: `id`, `name`, `description`
-
-Example:
-
-```json
-{
-  "widgetType": "BarChart",
-  "props": {
-    "title": "Revenue by month",
-    "data": [
-      { "name": "Jan", "value": 120 },
-      { "name": "Feb", "value": 180 }
-    ]
-  },
-  "name": "Revenue chart",
-  "description": "Monthly revenue in USD"
-}
-```
 
 ## Widget trees (Views)
 
@@ -105,13 +76,11 @@ These conventions apply to `public-docs/widgets/**`.
 
 ### Terminology
 
-- **Inline widget**: emitted via `ui_action` with `action: "render_widget"` and a payload containing `{ widgetType, props }`.
 - **Views node**: a node in `ViewModel.root` with `{ id, type, props, children?, handlers? }`.
 
 ### Examples
 
 - Prefer JSON examples (agents can copy/paste).
-- Include both payload shapes when the widget can be used in both contexts.
 - Keep examples minimal and realistic; avoid huge data blocks unless required.
 
 ### Props section

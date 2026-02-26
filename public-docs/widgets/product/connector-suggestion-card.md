@@ -8,28 +8,26 @@ category: widgets
 
 ## Overview
 
-Renders one or more connector cards (the same UI used on the Connectors page) inline in chat.
+Renders one or more connector cards (the same UI used on the Connectors page).
 
 ## Where it can be used
 
-- Inline (conversations): Yes
-- Views (widget tree): No
+- Views (widget tree): Yes
 
 ## Payload shapes
 
-### Inline widget (conversations)
+### Views node (widget tree)
 
 ```json
 {
-  "widgetType": "ConnectorSuggestionCard",
+  "id": "connector-suggestions",
+  "type": "ConnectorSuggestionCard",
   "props": {
     "starshipId": "starship_123",
     "providers": ["slack", "notion"],
     "hideSearch": true,
     "hideDisconnect": false
-  },
-  "name": "Connectors: slack, notion",
-  "description": "Suggested connectors: slack, notion"
+  }
 }
 ```
 

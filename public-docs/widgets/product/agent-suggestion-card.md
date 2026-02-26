@@ -8,20 +8,20 @@ category: widgets
 
 ## Overview
 
-Renders 2–3 marketplace agent cards inline in chat, each with a deploy CTA.
+Renders 2–3 marketplace agent cards, each with a deploy CTA.
 
 ## Where it can be used
 
-- Inline (conversations): Yes
-- Views (widget tree): No
+- Views (widget tree): Yes
 
 ## Payload shapes
 
-### Inline widget (conversations)
+### Views node (widget tree)
 
 ```json
 {
-  "widgetType": "AgentSuggestionCard",
+  "id": "agent-suggestions",
+  "type": "AgentSuggestionCard",
   "props": {
     "starshipId": "starship_123",
     "templateSlugs": ["data-analyst", "support-triage", "github-pr-summarizer"],

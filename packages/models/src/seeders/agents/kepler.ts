@@ -31,19 +31,18 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
 
 - Widget lifecycle (required ordering):
   1) Reuse if possible:
-     - Search Widgets (search-widgets) to find an existing widget (get its slug)
-     - Render Widget (render-widget) by slug
+     - Search Views (search-views) / Get View (get-view) to find an existing View
+     - Search Widgets (search-widgets) to find an existing saved widget (get its id/slug)
   2) Otherwise build new:
      - Choose widgetType based on the user’s goal
      - Create Widget (create-widget) with widgetType + props to persist it
-     - Render Widget (render-widget) using the created widget’s slug
-  3) Iterate:
-     - Update Widget (update-widget) to adjust a saved widget
-     - Render Widget (render-widget) again by slug
-
-- Rendering rule (non-negotiable):
-  - Render Widget only renders an EXISTING saved widget by slug.
-  - Never pass widgetType/props into render-widget.
+  3) Place widgets into Views:
+     - Create View (create-view) or Update View (update-view) as needed
+     - Patch View Root (patch-view-root) to add/move/remove structure nodes
+     - Update View Widget (update-view-widget) to set per-node widget details/props
+  4) Iterate:
+     - Update Widget (update-widget) to adjust saved widget props
+     - Update View / View Widgets to refine layout and bindings
 </instructions>
 
 <constraints>
@@ -57,7 +56,6 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
   - Search Docs (search-docs), Get Doc (get-doc)
   - Search Widgets (search-widgets)
   - Create Widget (create-widget), Update Widget (update-widget)
-  - Render Widget (render-widget) — takes only { slug }
 - Views:
   - Search Views (search-views), Get View (get-view)
   - Create View (create-view), Update View (update-view)
@@ -67,19 +65,12 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
 </context>
 
 <examples>
-- Reuse an existing widget:
-  1) search-widgets for name/slug/widgetType
-  2) pick the best match
-  3) render-widget with its slug
-
-- Create and render a new widget:
+- Build a view with a widget:
   1) search-docs + get-doc for the chosen widgetType
   2) create-widget with name/description/widgetType/props
-  3) render-widget with the returned slug
-
-- Update then re-render:
-  1) update-widget to change props
-  2) render-widget with the widget’s slug
+  3) create-view (or get-view + update-view) for the page
+  4) patch-view-root to place a node id in the structure
+  5) update-view-widget to attach the saved widget to that node
 </examples>
 
 <behavior>
@@ -118,7 +109,6 @@ export const keplerTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'upda
     'create-widget', // Persist widgets
     'update-widget', // Update persisted widgets
     'search-widgets', // Search persisted widgets
-    'render-widget', // Render widgets in the conversation UI (ui_action driven)
     // Views (persisted widget trees)
     'search-views',
     'get-view',
@@ -131,11 +121,11 @@ export const keplerTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'upda
 
   icon: '🧩',
   previewPrompts: [
-    'Render a bar chart widget from this dataset',
+    'Build a view with a bar chart widget from this dataset',
     'Make me a KPI stat card widget for this metric',
     'Turn this CSV into a sortable data table widget',
-    'Find an existing saved widget for revenue and render it',
-    'Update this saved widget to change the title and colors',
+    'Find an existing saved widget for revenue and add it to a view',
+    'Update this saved widget to change the title and colors, then update the view',
   ],
   blueprint: createKeplerDefaultBlueprint(),
   ...createKeplerConfig(),

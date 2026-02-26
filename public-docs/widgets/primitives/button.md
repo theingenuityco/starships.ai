@@ -12,22 +12,9 @@ An interactive button widget. In Views, `Button` supports a `click` event handle
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Button",
-  "props": {
-    "label": "Continue",
-    "variant": "default"
-  }
-}
-```
 
 ### Views node (widget tree)
 

@@ -12,21 +12,9 @@ A simple container widget. Commonly used as the root of Views because it compose
 
 ## Where it can be used
 
-- Inline (conversations): Yes
 - Views (widget tree): Yes
 
 ## Payload shapes
-
-### Inline widget (conversations)
-
-```json
-{
-  "widgetType": "Box",
-  "props": {
-    "className": "p-6 border rounded-lg bg-background"
-  }
-}
-```
 
 ### Views node (widget tree)
 

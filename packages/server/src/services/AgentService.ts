@@ -23,6 +23,7 @@ import {
   MIN_AGENT_MAX_TOKENS,
   MIN_AGENT_TIMEOUT_MS,
   getConnection,
+  PostgresConnection,
 } from '@starships/models';
 import type {
   PendingAgentSummary,
@@ -68,9 +69,9 @@ export class AgentService {
 
   private connectorSecretService: ConnectorSecretService;
 
-  constructor() {
-    this.agentRepository = new AgentRepository();
-    this.starshipRepository = new StarshipRepository();
+  constructor(connection?: PostgresConnection) {
+    this.agentRepository = new AgentRepository(connection);
+    this.starshipRepository = new StarshipRepository(connection);
     this.messageService = new MessageService();
     this.connectorSecretService = new ConnectorSecretService();
   }

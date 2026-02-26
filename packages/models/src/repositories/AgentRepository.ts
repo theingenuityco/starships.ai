@@ -20,6 +20,7 @@ import {
 import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 import type { AgentParamsWithoutMetadata } from '@starships/protocol';
+import { computeAgentContentHash } from '@/utils/contentHash';
 
 export class AgentRepository extends BaseRepository {
   constructor() {
@@ -338,6 +339,22 @@ export class AgentRepository extends BaseRepository {
           state: normalizedData.state,
           blueprint: normalizedData.blueprint,
           previewPrompts: normalizedData.previewPrompts,
+          contentHash: computeAgentContentHash({
+            name: normalizedData.name,
+            role: normalizedData.role || 'Assistant',
+            description: normalizedData.description,
+            model: normalizedData.model,
+            temperature: normalizedData.temperature,
+            maxTokens: normalizedData.maxTokens,
+            timeout: normalizedData.timeout,
+            reasoning: (normalizedData as unknown as { reasoning?: unknown }).reasoning,
+            systemPrompt: normalizedData.systemPrompt,
+            state: normalizedData.state,
+            blueprint: normalizedData.blueprint,
+            category: normalizedData.category || 'general',
+            previewPrompts: normalizedData.previewPrompts,
+            assignedToolSlugs: toolSlugsForRelationships,
+          }),
 
           // Versioning fields
           version: data.version || '1.0.0',
@@ -414,6 +431,34 @@ export class AgentRepository extends BaseRepository {
         }
 
         // Convert entity updates to database format
+        // Keep contentHash in sync for import/export conflict detection.
+        // Since tool assignments live in a junction table, we include the current assigned tool slugs.
+        let assignedToolSlugs: string[] = [];
+        try {
+          const rows = await this.getAssignedToolSlugsForAgents([id]);
+          assignedToolSlugs = rows.filter((r) => r.agentId === id).map((r) => r.toolSlug);
+        } catch {
+          assignedToolSlugs = [];
+        }
+
+        const updatePropsWithHash: Partial<AgentModel> & { contentHash?: string } = updateProps;
+        updatePropsWithHash.contentHash = computeAgentContentHash({
+          name: updates.name !== undefined ? updates.name : existing.name,
+          role: updates.role !== undefined ? updates.role : existing.role,
+          description: updates.description !== undefined ? updates.description : existing.description,
+          model: updates.model !== undefined ? updates.model : existing.model,
+          temperature: updates.temperature !== undefined ? updates.temperature : existing.temperature,
+          maxTokens: updates.maxTokens !== undefined ? updates.maxTokens : existing.maxTokens,
+          timeout: updates.timeout !== undefined ? updates.timeout : existing.timeout,
+          reasoning: updates.reasoning !== undefined ? updates.reasoning : existing.reasoning,
+          systemPrompt: updates.systemPrompt !== undefined ? updates.systemPrompt : existing.systemPrompt,
+          state: updates.state !== undefined ? updates.state : existing.state,
+          blueprint: updates.blueprint !== undefined ? updates.blueprint : existing.blueprint,
+          category: updates.category !== undefined ? updates.category : existing.category,
+          previewPrompts: updates.previewPrompts !== undefined ? updates.previewPrompts : existing.previewPrompts,
+          assignedToolSlugs,
+        });
+
         const updateData = toDatabase(toEntityInstance(AgentEntity, updateProps));
 
         // Filter out protected fields (id, createdAt)
@@ -1186,6 +1231,32 @@ export class AgentRepository extends BaseRepository {
             // Create relationship via junction table
             await this.addToolRelationship(agentId, toolResult.id);
           }
+        }
+
+        // Update agent contentHash to reflect assigned tools.
+        try {
+          const agent = await this.findById(agentId);
+          if (agent) {
+            const nextHash = computeAgentContentHash({
+              name: agent.name,
+              role: agent.role,
+              description: agent.description,
+              model: agent.model,
+              temperature: agent.temperature,
+              maxTokens: agent.maxTokens,
+              timeout: agent.timeout,
+              reasoning: agent.reasoning,
+              systemPrompt: agent.systemPrompt,
+              state: agent.state,
+              blueprint: agent.blueprint,
+              category: agent.category,
+              previewPrompts: agent.previewPrompts,
+              assignedToolSlugs: toolSlugs,
+            });
+            await connection.query('UPDATE agents SET content_hash = $2, updated_at = NOW() WHERE id = $1', [agentId, nextHash]);
+          }
+        } catch {
+          // Best-effort: don't fail assignments due to hash update.
         }
       },
       'assignToolsToAgent',

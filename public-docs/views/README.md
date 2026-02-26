@@ -4,7 +4,7 @@ A **View** is a persisted, starship-scoped UI page defined as a **widget tree** 
 
 Views are rendered in the product via:
 
-- `DynamicViewRenderer` (client) → renders `view.root` using `WidgetTreeRenderer`
+- `DynamicViewRenderer` (client) → renders the view root (initial snapshot, then streamed patches) using `WidgetTreeRenderer`
 - `GET /api/v1/views/:id/stream` (server) → streams runtime events over SSE (snapshot + patches/toasts/errors)
 
 ## Data model (conceptual)

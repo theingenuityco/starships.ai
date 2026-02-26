@@ -3,8 +3,7 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import type { WidgetInstanceNode } from '@starships/protocol'
-import { WIDGET_REGISTRY } from '@/components/widgets/widgetRegistry'
-import { getWidgetDefinition } from '@/components/widgets/widgetDefinitions'
+import { WIDGET_CATALOG_BY_TYPE, getWidgetCatalogEntry } from '@/components/widgets/widgetCatalog'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -14,7 +13,7 @@ function UnknownWidgetType(props: { type: string }) {
   return (
     <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950/20">
       <p className="text-sm text-red-600 dark:text-red-400">Unknown widget type: {props.type}</p>
-      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_REGISTRY).join(', ')}</p>
+      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_CATALOG_BY_TYPE).join(', ')}</p>
     </div>
   )
 }
@@ -27,10 +26,10 @@ export function DesignWidgetTreeRenderer(props: {
   onSelect: (id: string) => void
 }) {
   const { node, selectedId, hoveredId, onHover, onSelect } = props
-  const Component = WIDGET_REGISTRY[node.type]
+  const Component = WIDGET_CATALOG_BY_TYPE[node.type]?.Component
 
   const children = Array.isArray(node.children) ? node.children : []
-  const acceptsChildren = getWidgetDefinition(node.type)?.acceptsChildren ?? children.length > 0
+  const acceptsChildren = getWidgetCatalogEntry(node.type)?.acceptsChildren ?? children.length > 0
 
   const isSelected = String(node.id) === String(selectedId)
   const isHovered = String(node.id) === String(hoveredId)
@@ -96,7 +95,7 @@ export function DesignWidgetTreeRenderer(props: {
       style={style}
       onMouseEnter={() => onHover(String(node.id))}
       onMouseLeave={() => onHover(null)}
-      onClickCapture={(e) => {
+      onPointerDownCapture={(e) => {
         e.preventDefault()
         e.stopPropagation()
         onSelect(String(node.id))
@@ -109,7 +108,7 @@ export function DesignWidgetTreeRenderer(props: {
         ref={sortable.setActivatorNodeRef}
         type="button"
         className="absolute top-1 right-1 z-10 rounded border border-border/60 bg-card/90 p-1 text-muted-foreground hover:text-foreground"
-        onClickCapture={(e) => {
+        onPointerDownCapture={(e) => {
           e.preventDefault()
           e.stopPropagation()
         }}

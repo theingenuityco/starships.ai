@@ -2,7 +2,7 @@
 
 import React from 'react'
 import type { BindingSpec, WidgetInstanceNode } from '@starships/protocol'
-import { WIDGET_REGISTRY } from './widgetRegistry'
+import { WIDGET_CATALOG_BY_TYPE } from './widgetCatalog'
 import { getAtPath, setAtPath } from '@/lib/objectPath'
 
 export type WidgetTreeRendererProps = {
@@ -19,7 +19,7 @@ function UnknownWidgetType(props: { type: string }) {
   return (
     <div className="p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950/20">
       <p className="text-sm text-red-600 dark:text-red-400">Unknown widget type: {props.type}</p>
-      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_REGISTRY).join(', ')}</p>
+      <p className="text-xs text-muted-foreground mt-1">Available: {Object.keys(WIDGET_CATALOG_BY_TYPE).join(', ')}</p>
     </div>
   )
 }
@@ -38,7 +38,7 @@ function WidgetRenderError(props: { error: unknown; node: WidgetInstanceNode }) 
 }
 
 export function WidgetTreeRenderer({ node, className, runtime, onEvent }: WidgetTreeRendererProps): React.JSX.Element {
-  const Component = WIDGET_REGISTRY[node.type]
+  const Component = WIDGET_CATALOG_BY_TYPE[node.type]?.Component
   const children = Array.isArray(node.children) ? node.children : []
 
   if (!Component) return <UnknownWidgetType type={node.type} />
@@ -68,6 +68,17 @@ export function WidgetTreeRenderer({ node, className, runtime, onEvent }: Widget
     const handlersRec = node.handlers && typeof node.handlers === 'object' && !Array.isArray(node.handlers) ? (node.handlers as any) : null
     if (node.type === 'Button' && typeof (props as any).onClick !== 'function' && handlersRec?.click && typeof onEvent === 'function') {
       ;(props as any).onClick = () => onEvent(String(node.id), 'click')
+    }
+
+    // v1 event wiring: basic form controls -> change.
+    const supportsChange = node.type === 'Input' || node.type === 'Textarea' || node.type === 'Select' || node.type === 'Checkbox' || node.type === 'Switch'
+    if (supportsChange && typeof (props as any).onChange !== 'function' && handlersRec?.change && typeof onEvent === 'function') {
+      ;(props as any).onChange = (payload: unknown) => onEvent(String(node.id), 'change', payload)
+    }
+
+    // v1.1 event wiring: DataTable -> row_click.
+    if (node.type === 'DataTable' && typeof (props as any).onRowClick !== 'function' && handlersRec?.row_click && typeof onEvent === 'function') {
+      ;(props as any).onRowClick = (payload: unknown) => onEvent(String(node.id), 'row_click', payload)
     }
 
     const renderedChildren = children.length

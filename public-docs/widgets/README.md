@@ -14,7 +14,7 @@ Widgets are rendered in **Views (dynamic pages)**: persisted as a widget tree (`
 Views store widgets as a **tree**. Each node has:
 
 - `id`: stable node id (string)
-- `type`: widget type (must exist in the client widget registry)
+- `type`: widget type (must exist in the client widget catalog)
 - `props`: raw props object
 - Optional: `children[]`, `bindings`, `handlers`, `permissions`
 
@@ -34,15 +34,24 @@ Minimal example root:
 
 See `../views/README.md` for the Views runtime model (bindings, scripts, actions, streaming).
 
+If you are authoring interactive widgets (bindings/handlers), start with `../views/runtime.md`.
+
 ## Supported widget types (current UI)
 
-The widget key is the `WIDGET_REGISTRY` key (client).
+The widget key is the `WIDGET_CATALOG` entry `type` (client).
 
 - Layout (`./layout/`)
   - `Box` → `layout/box.md`
+  - `If` → `layout/if.md`
   - `Stack` → `layout/stack.md`
   - `Grid` → `layout/grid.md`
   - `Tabs` → `layout/tabs.md`
+- Form (`./form/`)
+  - `Input` → `form/input.md`
+  - `Textarea` → `form/textarea.md`
+  - `Select` → `form/select.md`
+  - `Checkbox` → `form/checkbox.md`
+  - `Switch` → `form/switch.md`
 - Primitives (`./primitives/`)
   - `Text` → `primitives/text.md`
   - `Button` → `primitives/button.md`
@@ -70,9 +79,9 @@ These conventions apply to `public-docs/widgets/**`.
 
 ### Naming
 
-- **Widget key**: use the `WIDGET_REGISTRY` key (e.g. `Button`, `Tabs`, `LineChart`).
+- **Widget key**: use the `WIDGET_CATALOG` `type` (e.g. `Button`, `Tabs`, `LineChart`).
 - **File name**: kebab-case (e.g. `line-chart.md`).
-- **Directory**: group by function (layout, primitives, data, charts, cards, product).
+- **Directory**: group by function (layout, form, primitives, data, charts, cards, product).
 
 ### Terminology
 

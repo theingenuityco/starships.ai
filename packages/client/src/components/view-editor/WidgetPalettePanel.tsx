@@ -6,14 +6,14 @@ import { CSS } from '@dnd-kit/utilities'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { WIDGET_DEFINITIONS, type WidgetDefinition } from '@/components/widgets/widgetDefinitions'
+import { WIDGET_CATALOG, type WidgetCatalogEntry } from '@/components/widgets/widgetCatalog'
 
-function PaletteItem(props: { def: WidgetDefinition }) {
-  const { def } = props
-  const id = `palette:${def.type}`
+function PaletteItem(props: { widget: WidgetCatalogEntry }) {
+  const { widget } = props
+  const id = `palette:${widget.type}`
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
-    data: { kind: 'new', widgetType: def.type },
+    data: { kind: 'new', widgetType: widget.type },
   })
 
   // NOTE: We intentionally do not apply the draggable transform styles here.
@@ -35,10 +35,10 @@ function PaletteItem(props: { def: WidgetDefinition }) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium truncate">{def.label}</div>
-          <div className="text-[11px] text-muted-foreground font-mono truncate">{def.type}</div>
+          <div className="font-medium truncate">{widget.label}</div>
+          <div className="text-[11px] text-muted-foreground font-mono truncate">{widget.type}</div>
         </div>
-        <div className="text-[11px] text-muted-foreground">{def.category}</div>
+        <div className="text-[11px] text-muted-foreground">{widget.category}</div>
       </div>
     </button>
   )
@@ -47,21 +47,24 @@ function PaletteItem(props: { def: WidgetDefinition }) {
 export function WidgetPalettePanel() {
   const [q, setQ] = React.useState('')
 
-  const defs = React.useMemo(() => Object.values(WIDGET_DEFINITIONS), [])
-  const filtered = React.useMemo(() => {
+  const widgets = React.useMemo(() => [...WIDGET_CATALOG], [])
+  const filtered = React.useMemo((): WidgetCatalogEntry[] => {
     const query = q.trim().toLowerCase()
-    if (!query) return defs
-    return defs.filter(d => d.type.toLowerCase().includes(query) || d.label.toLowerCase().includes(query) || d.category.toLowerCase().includes(query))
-  }, [defs, q])
+    if (!query) return widgets
+    return widgets.filter(w => w.type.toLowerCase().includes(query) || w.label.toLowerCase().includes(query) || w.category.toLowerCase().includes(query))
+  }, [widgets, q])
 
   const grouped = React.useMemo(() => {
-    const m = new Map<string, WidgetDefinition[]>()
-    for (const d of filtered) {
-      const arr = m.get(d.category) ?? []
-      arr.push(d)
-      m.set(d.category, arr)
+    const m = new Map<string, WidgetCatalogEntry[]>()
+    for (const w of filtered) {
+      const arr = m.get(w.category) ?? []
+      arr.push(w)
+      m.set(w.category, arr)
     }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+    const entries = Array.from(m.entries())
+      .map(([category, items]) => [category, items.slice().sort((a, b) => a.label.localeCompare(b.label))] as const)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+    return entries
   }, [filtered])
 
   return (
@@ -78,12 +81,9 @@ export function WidgetPalettePanel() {
               <div key={category} className="flex flex-col gap-2">
                 <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{category}</div>
                 <div className="flex flex-col gap-2">
-                  {items
-                    .slice()
-                    .sort((a, b) => a.label.localeCompare(b.label))
-                    .map(def => (
-                      <PaletteItem key={def.type} def={def} />
-                    ))}
+                  {items.map(widget => (
+                    <PaletteItem key={widget.type} widget={widget} />
+                  ))}
                 </div>
               </div>
             ))}

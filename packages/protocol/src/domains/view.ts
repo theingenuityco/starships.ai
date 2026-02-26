@@ -147,7 +147,14 @@ export type ViewRuntimeActionRequest =
   | { type: 'run_workflow'; workflowSlug: string; args?: Record<string, unknown> }
   | { type: 'set_state'; path: string; value: unknown; persist?: boolean }
   | { type: 'patch_props'; instanceId: ViewNodeId; patch: Record<string, unknown> }
-  | { type: 'patch_root'; patch: ViewPatchOp[] };
+  | { type: 'patch_root'; patch: ViewPatchOp[] }
+  /**
+   * Request the host (client) to (re)run a view query and store results under runtime.queries[queryId].
+   *
+   * - `http` queries execute on the client (same-origin only).
+   * - `connector_action` queries execute via server endpoint (requires auth + permissions).
+   */
+  | { type: 'run_query'; queryId: ViewQueryId };
 
 export type ViewRuntimeEvent =
   | { type: 'snapshot'; data: { viewId: string; at: string; root: WidgetInstanceNode; state?: Record<string, unknown> } }

@@ -9,6 +9,11 @@ export { Grid, type GridProps } from './primitives/Grid'
 export { Text, type TextProps } from './primitives/Text'
 export { ButtonWidget, type ButtonWidgetProps } from './primitives/ButtonWidget'
 export { TabsWidget, type TabsWidgetProps } from './primitives/TabsWidget'
+export { InputWidget, type InputWidgetProps } from './primitives/InputWidget'
+export { TextareaWidget, type TextareaWidgetProps } from './primitives/TextareaWidget'
+export { SelectWidget, type SelectWidgetProps, type SelectOption } from './primitives/SelectWidget'
+export { CheckboxWidget, type CheckboxWidgetProps } from './primitives/CheckboxWidget'
+export { SwitchWidget, type SwitchWidgetProps } from './primitives/SwitchWidget'
 export {
   BarChart,
   type BarChartProps,

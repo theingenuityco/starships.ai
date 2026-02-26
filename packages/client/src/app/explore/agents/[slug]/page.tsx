@@ -17,8 +17,8 @@ import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import ExploreCTA from '@/app/components/ExploreCTA'
 
-// Public marketing page: cacheable at the edge with ISR.
-export const dynamic = 'force-static'
+// Public marketing page: rendered on-demand (avoid build-time API dependency).
+export const dynamic = 'force-dynamic'
 export const dynamicParams = true
 export const revalidate = 3600 // 1 hour
 

@@ -23,7 +23,6 @@ import {
   ConversationMemberRepository,
   ConversationParticipantRepository,
   ConversationNotificationPrefRepository,
-  ConversationWidgetRepository,
   DirectMessageRepository,
   getConnection,
   MessageRepository,
@@ -820,41 +819,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
-      // Attach persisted widgets directly onto the snapshot messages as uiActions.
-      // This avoids duplication caused by emitting "replay" ui_action events on reconnect.
-      try {
-        const convWidgetRepo = new ConversationWidgetRepository();
-        const widgetRepo = new WidgetRepository();
-        const convWidgets = await convWidgetRepo.listByConversation(conversationId, { limit: 50 });
-        const byAnchor = new Map<string, Array<{ action: string; payload: Record<string, unknown> }>>();
-        for (const cw of convWidgets) {
-          if (!cw.anchorMessageId) continue;
-          const widget = await widgetRepo.findById(cw.widgetId).catch(() => null);
-          if (!widget) continue;
-          const action = 'render_widget';
-          const payload: Record<string, unknown> = {
-            widget,
-            anchorMessageId: cw.anchorMessageId,
-            ...(cw.turnId ? { turnId: cw.turnId } : null),
-            ...(cw.toolCallId ? { toolCallId: cw.toolCallId } : null),
-          };
-          const prev = byAnchor.get(cw.anchorMessageId) ?? [];
-          prev.push({ action, payload });
-          byAnchor.set(cw.anchorMessageId, prev);
-        }
-        if (byAnchor.size > 0 && Array.isArray(snapshotMessages)) {
-          snapshotMessages = snapshotMessages.map((m: MessageModel & { uiActions?: unknown[] }) => {
-            const mid = typeof m?.id === 'string' ? m.id : '';
-            if (!mid) return m;
-            const actions = byAnchor.get(mid);
-            if (!actions || actions.length === 0) return m;
-            const existing = Array.isArray(m.uiActions) ? m.uiActions : [];
-            return { ...m, uiActions: [...existing, ...actions] };
-          });
-        }
-      } catch {
-        // best-effort only
-      }
 
       res.write(
         `data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor, ...(turnUsageByTurnId ? { turnUsageByTurnId } : null) })}\n\n`
@@ -1360,7 +1324,6 @@ router.post(
       const bus = ConversationStreamBus.getInstance();
       const uiActions = new UIActionService(bus);
       const messageRepo = new MessageRepository();
-      const conversationWidgetRepo = new ConversationWidgetRepository();
 
       const result = await executeToolBlueprint({
         blueprint: tool.blueprint,
@@ -1382,45 +1345,6 @@ router.post(
               dataRec.payload && typeof dataRec.payload === 'object' && !Array.isArray(dataRec.payload)
                 ? (dataRec.payload as Record<string, unknown>)
                 : undefined;
-
-            // Persist rendered widgets across reloads by anchoring to an existing message id.
-            // This is best-effort and must not affect tool execution.
-            if (action.trim() === 'render_widget' && payload) {
-              const widgetUnknown = payload.widget;
-              const widgetId =
-                widgetUnknown && typeof widgetUnknown === 'object' ? (widgetUnknown as Record<string, unknown>).id : undefined;
-              const widgetIdStr = typeof widgetId === 'string' ? widgetId : widgetId != null ? String(widgetId) : '';
-
-              if (widgetIdStr) {
-                const assistantMsg = await messageRepo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId).catch(() => null);
-                const toolMsg = assistantMsg
-                  ? null
-                  : await messageRepo.findLatestToolMessageByToolCallId(conversationId, toolCallId).catch(() => null);
-                const anchorMessageId = assistantMsg?.id ?? toolMsg?.id ?? null;
-                const turnId = assistantMsg?.turnId ?? toolMsg?.turnId ?? null;
-
-                if (anchorMessageId) {
-                  // Upstream dedupe: if this widget is already associated to the same anchor message,
-                  // don't re-publish the same render_widget again.
-                  const persisted = await conversationWidgetRepo
-                    .createOrIgnore({
-                      starshipId: conversation.starshipId,
-                      conversationId,
-                      widgetId: widgetIdStr,
-                      turnId,
-                      anchorMessageId,
-                      toolCallId,
-                    })
-                    .catch(() => null);
-                  if (!persisted) return;
-
-                  // Enrich live action for immediate attachment client-side.
-                  payload.anchorMessageId = anchorMessageId;
-                  if (turnId) payload.turnId = turnId;
-                  payload.toolCallId = toolCallId;
-                }
-              }
-            }
 
             await uiActions.publish(conversationId, payload ? { action: action.trim(), payload } : { action: action.trim() });
           } catch {

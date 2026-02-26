@@ -1,10 +1,14 @@
 ---
 title: Line Chart Widget
-slug: widgets/charts/line
+slug: widgets/charts/line-chart
 category: widgets
 ---
 
 # Line Chart Widget
+
+## Where it can be used
+
+- Views (widget tree): Yes
 
 Time-series visualization with smooth curves, optional dots, and shadcn/ui tooltips. By reusing `ChartContainer`, `ChartTooltipContent`, and `ChartLegendContent` (Context7 `/websites/ui_shadcn`, topic `charts`), the widget inherits official accessibility and theming guidance.
 
@@ -50,7 +54,8 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
 
 ```json
 {
-  "widgetType": "LineChart",
+  "id": "chart",
+  "type": "LineChart",
   "props": {
     "title": "Daily Active Users",
     "description": "UTC rolling 7-day average",
@@ -67,6 +72,21 @@ Time-series visualization with smooth curves, optional dots, and shadcn/ui toolt
     ],
     "height": 300,
     "showDots": true
+  }
+}
+```
+
+## Views node example (widget tree)
+
+```json
+{
+  "id": "chart",
+  "type": "LineChart",
+  "props": {
+    "title": "Daily Active Users",
+    "indexKey": "date",
+    "series": [{ "dataKey": "desktop", "label": "Desktop", "color": "#3b82f6" }],
+    "data": [{ "date": "2024-06-01", "desktop": 222 }]
   }
 }
 ```

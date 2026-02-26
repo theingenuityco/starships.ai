@@ -31,7 +31,6 @@ import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
@@ -2161,48 +2160,6 @@ export function ConversationMessageList({
                               ]
                           )}
                         />
-                        {(() => {
-                          const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
-                          if (widgets.length === 0) return null
-                          return (
-                            <div className="flex justify-start">
-                              <div className="flex items-start gap-3 w-full max-w-full -mx-2 px-2">
-                                {/* Spacer to match avatar width */}
-                                <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-                                <div className="flex-1 w-full">
-                                  <div className="space-y-4 mt-3 w-full max-w-none">
-                                    {widgets.map(widget => (
-                                      <div key={widget.id} className="w-full max-w-none mb-4">
-                                        {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
-                                        {widget.widgetType !== 'StarshipDetails' && (
-                                          <div className="text-sm w-full mb-4">
-                                            <div className="flex items-baseline gap-1">
-                                              <span className="font-medium">{widget.name}</span>
-                                            </div>
-                                            {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                                          </div>
-                                        )}
-
-                                        {/* Widget visualization - minimal styling, full width */}
-                                        {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                                        <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                          <InlineWidgetRenderer
-                                            widget={{
-                                              widgetType: widget.widgetType,
-                                              props: widget.props,
-                                            }}
-                                            compactMode={true}
-                                            className="w-full"
-                                          />
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })()}
                       </div>
                     </Fragment>
                   )
@@ -2622,78 +2579,6 @@ function initialsFromName(name?: string | null): string {
     .map(p => p[0]?.toUpperCase())
     .filter(Boolean)
     .join('')
-}
-
-// Known widget types from public-docs (rendered immediately after the message row)
-const KNOWN_WIDGET_TYPES = new Set([
-  'StatCard',
-  'DataTable',
-  'MetricGrid',
-  'BarChart',
-  'LineChart',
-  'AreaChart',
-  'PieChart',
-  'DonutChart',
-  'RadarChart',
-  'RadialChart',
-  'ConnectorSuggestionCard',
-  'AgentSuggestionCard',
-  'StarshipDetails',
-])
-
-type WidgetResult = {
-  id: string
-  widgetType: string
-  props: Record<string, unknown>
-  name: string
-  description: string | undefined
-  index: number
-}
-
-function extractWidgetResults(uiActions: unknown): WidgetResult[] {
-  const actions = Array.isArray(uiActions) ? (uiActions as Array<{ action?: unknown; payload?: unknown }>) : []
-  if (actions.length === 0) return []
-
-  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-
-  const outRaw: Array<WidgetResult | null> = actions.map((ua, index) => {
-    if (!ua || ua.action !== 'render_widget') return null
-    const payload = ua.payload
-    if (!payload || !isRecord(payload)) return null
-    const widget = payload['widget']
-    if (!isRecord(widget)) return null
-
-    const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
-    const props = widget['props']
-    if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
-    if (!props || typeof props !== 'object') return null
-
-    const id =
-      (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
-      (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
-      `ui-widget-${index}`
-
-    return {
-      id,
-      widgetType,
-      props: props as Record<string, unknown>,
-      name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
-      description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
-      index,
-    } satisfies WidgetResult
-  })
-  const out = outRaw.filter((w): w is WidgetResult => w !== null)
-
-  // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
-  const seen = new Set<string>()
-  const deduped: WidgetResult[] = []
-  for (const w of out) {
-    if (seen.has(w.id)) continue
-    seen.add(w.id)
-    deduped.push(w)
-  }
-
-  return deduped
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
@@ -3623,7 +3508,7 @@ const MemoizedMessageBubble = memo(
     const nextToolResults = (nextProps.message as ExtendedMessage).toolResults?.length ?? 0
     if (prevToolResults !== nextToolResults) return false
 
-    // Re-render when uiActions attach later (render_widget and other UI-driven messages)
+    // Re-render when uiActions attach later (UI-driven messages)
     const prevUiActions = (prevProps.message as ExtendedMessage).uiActions?.length ?? 0
     const nextUiActions = (nextProps.message as ExtendedMessage).uiActions?.length ?? 0
     if (prevUiActions !== nextUiActions) return false

@@ -16,13 +16,15 @@ export interface ConnectorSuggestionCardProps {
   /** Disable entrance animations for connector cards (useful in wizard step 3). */
   animateCards?: boolean
   className?: string
+  /** When true, show optional demo videos for connectors that define demoVideoUrl. */
+  showDemoVideos?: boolean
 }
 
 /**
  * ConnectorSuggestionCard
  *
  * Renders one or more connector cards (from the Connectors page UI) inline as a widget.
- * Intended for chat rendering via `render_widget`.
+ * Intended for embedding in Views and product surfaces (e.g. marketplace wizards).
  */
 export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = true, hideDisconnect = false, compactCard = false, connectButtonLabel, animateCards = true, className }: ConnectorSuggestionCardProps): React.JSX.Element {
   const normalized = Array.isArray(providers) ? providers.map(p => String(p ?? '').trim()).filter(Boolean) : []
@@ -49,6 +51,7 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
         density={compactCard ? 'compact' : 'default'}
         animateCards={animateCards}
         connectButtonLabel={connectButtonLabel}
+        showDemoVideos
       />
     </div>
   )

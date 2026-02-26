@@ -93,20 +93,18 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             variant="ghost"
             size="sm"
             aria-label="Open user menu"
-            className="h-9 w-full justify-start gap-2 rounded-lg px-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            className="h-7 w-full justify-start gap-1.5 rounded-lg pl-1.5 pr-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]"
           >
-            <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
+            <UserProfile mode="collapsed" collapsedSize="sm" />
             <span className="min-w-0 flex-1 text-left">
-              <span className="block text-sm font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</span>
-              <span className="flex items-center text-xs leading-tight text-muted-foreground min-w-0">
-                <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
-              </span>
+              <span className="block text-[13px] font-medium leading-[1.05] truncate text-foreground">{userName || userEmail || 'Account'}</span>
+              <span className="mt-[1px] block text-[10.5px] leading-[1.05] truncate text-muted-foreground">{userEmail || userName || 'Account email'}</span>
             </span>
-            <Icon name="chevron-up" className="h-3.5 w-3.5 text-muted-foreground" />
+            <Icon name="chevron-up" className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
           </Button>
         ) : (
-          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-9 w-9`}>
-            <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
+          <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-8 w-8`}>
+            <UserProfile mode="collapsed" centerInContainer collapsedSize="sm" />
           </Button>
         )}
       </DropdownMenuTrigger>
@@ -124,7 +122,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             <div className="min-w-0">
               <div className="text-sm font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</div>
               <div className="flex items-center text-[13px] text-muted-foreground leading-tight min-w-0">
-                <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
+                <span className="truncate">{userEmail || userName || 'Account email'}</span>
               </div>
             </div>
           </div>

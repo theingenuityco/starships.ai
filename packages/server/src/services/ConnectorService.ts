@@ -282,6 +282,7 @@ export class ConnectorService {
           description: tpl.description,
           auth: { type: authType },
           metadataSchema,
+          ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
           ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
             ? (() => {
                 const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };

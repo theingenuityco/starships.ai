@@ -62,6 +62,12 @@ export function getEnvConfig(): EnvironmentConfig {
   // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
   const resolvedEnableEmails = process.env.ENABLE_EMAILS === 'true';
 
+  const resolvedAvatarGenerationMode = (() => {
+    const raw = process.env.AVATAR_GENERATION_MODE;
+    const v = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    return v === '2d' || v === '3d' ? (v as '2d' | '3d') : undefined;
+  })();
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -86,6 +92,7 @@ export function getEnvConfig(): EnvironmentConfig {
 
     // LLM Provider Configuration
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    AVATAR_GENERATION_MODE: resolvedAvatarGenerationMode,
 
     // AWS Bedrock Configuration (optional; used by autopilot execution bundle)
     AWS_BEDROCK_ACCESS_KEY_ID: process.env.AWS_BEDROCK_ACCESS_KEY_ID,

@@ -274,6 +274,13 @@ export interface LlmParams extends BaseParams {
    * Supports template expressions via string (e.g. '{{ state.plugins }}').
    */
   plugins?: Array<{ id: string; max_results?: number }> | string;
+  /**
+   * Optional structured output / response formatting.
+   * Passed through to HostRuntime as `responseFormat` (and typically mapped to `response_format` upstream).
+   *
+   * Supports template expressions via string (e.g. '{{ state.responseFormat }}').
+   */
+  responseFormat?: Record<string, unknown> | string;
 }
 
 /**

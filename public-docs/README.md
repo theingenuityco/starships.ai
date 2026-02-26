@@ -13,6 +13,9 @@ This folder contains documentation for the Starships workflow system, including 
 - **Widgets**
   - [Widgets](./widgets/README.md)
 
+- **Views**
+  - [Views](./views/README.md)
+
 Audience and access modes
 
 These docs are used by two audiences:

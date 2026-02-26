@@ -24,7 +24,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
@@ -121,6 +120,11 @@ interface StarshipConnectorsPanelProps {
    * Useful for wizard/modals where staggered animations feel distracting.
    */
   animateCards?: boolean
+  /**
+   * When true, render optional demo videos for connectors that
+   * provide a demoVideoUrl in the catalog (e.g. YouTube walkthroughs).
+   */
+  showDemoVideos?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -139,6 +143,41 @@ function getConnectorLogoSrc(provider: string): string {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
+}
+
+function getYouTubeEmbedUrl(raw: string | null | undefined): string | null {
+  const url = typeof raw === 'string' ? raw.trim() : ''
+  if (!url) return null
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  const host = parsed.hostname.toLowerCase()
+  let videoId: string | null = null
+
+  if (host.includes('youtu.be')) {
+    videoId = parsed.pathname.replace(/^\/+/, '') || null
+  } else if (host.includes('youtube.com')) {
+    const v = parsed.searchParams.get('v')
+    if (v && v.trim()) {
+      videoId = v.trim()
+    } else if (parsed.pathname.startsWith('/embed/')) {
+      videoId = parsed.pathname.replace('/embed/', '').replace(/^\/+/, '') || null
+    }
+  }
+
+  if (!videoId) return null
+  const safeId = videoId.replace(/[^a-zA-Z0-9_-]/g, '')
+  if (!safeId) return null
+  const base = `https://www.youtube.com/embed/${safeId}`
+  const params = new URLSearchParams({
+    autoplay: '1',
+    mute: '1',
+    rel: '0',
+  })
+  return `${base}?${params.toString()}`
 }
 
 export function StarshipConnectorsPanel({
@@ -164,6 +203,7 @@ export function StarshipConnectorsPanel({
   matchAgentCardStyle = false,
   onStatsChange,
   animateCards = true,
+  showDemoVideos = false,
 }: StarshipConnectorsPanelProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -496,6 +536,8 @@ export function StarshipConnectorsPanel({
   //   setGithubDialogOpen(false)
   // }
 
+  const [activeDemo, setActiveDemo] = useState<{ provider: string; label: string; url: string } | null>(null)
+
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
     const base = (catalogItems || []).filter(item => item.provider !== 'starships')
@@ -608,13 +650,9 @@ export function StarshipConnectorsPanel({
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')}>
           <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+            <div className="mt-0.5 h-10 w-10 flex-shrink-0">
               <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
                 <Skeleton className="h-[22px] w-[22px] rounded-md" />
-              </span>
-              {/* Presence dot placeholder (match `PresenceIndicator` placement + connectors row offsets). */}
-              <span className="absolute bottom-0 right-0 translate-x-[22%] translate-y-[6%] z-50 pointer-events-none">
-                <Skeleton className="h-2 w-2 rounded-full ring-2 ring-background outline outline-1 outline-border" />
               </span>
             </div>
             <div className="min-w-0 flex-1">
@@ -678,11 +716,18 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
+    const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
+
     if (cardVariant === 'explore') {
       const compact = density === 'compact'
+      const handleHowToClick = () => {
+        if (!demoEmbedUrl) return
+        setActiveDemo({ provider, label, url: demoEmbedUrl })
+      }
+
       const exploreConnectButton = (
         <Button
-          variant={isConnected ? 'ghost' : 'ghost'}
+          variant="ghost"
           size="sm"
           disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
           onClick={() => {
@@ -692,7 +737,14 @@ export function StarshipConnectorsPanel({
             if (isApiKeyConnectable) return openApiKeyDialog(provider)
             if (isBasicConnectable) return openBasicDialog(provider)
           }}
-          className={cn('h-7 px-2 shrink-0 text-xs', isConnected ? 'text-emerald-700 dark:text-emerald-300 opacity-100' : 'text-primary hover:text-primary disabled:text-muted-foreground')}
+          className={cn(
+            'group min-w-[110px] justify-center shrink-0 text-xs',
+            isConnected
+              ? 'h-7 px-2 text-emerald-700 dark:text-emerald-300 opacity-100'
+              : isManaged
+                ? 'h-7 px-2 text-muted-foreground'
+                : [CONNECTOR_CTA_BUTTON_CLASS, 'h-7 px-3']
+          )}
         >
           {isConnected ? (
             <>
@@ -719,19 +771,34 @@ export function StarshipConnectorsPanel({
         </Button>
       ) : null
 
+      const exploreHowToButton =
+        demoEmbedUrl != null
+          ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleHowToClick}
+                className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-7 group min-w-[110px] justify-center shrink-0 text-xs')}
+              >
+                <Icon name="play-circle" className={CONNECTOR_CTA_ICON_CLASS} />
+                How to connect
+              </Button>
+            )
+          : null
+
       if (compact) {
         const CardShell = (
           <div className="group relative rounded-lg border border-border/60 bg-card/10 p-3 transition-colors hover:bg-card/15">
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {provider && showLogo ? (
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                      <ConnectorLogo provider={provider} className="h-4 w-4 object-contain" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                      <ConnectorLogo provider={provider} className="h-5 w-5 object-contain" />
                     </div>
                   ) : (
-                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
-                      <Icon name="plug" className="h-3.5 w-3.5" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white border border-border/40 text-muted-foreground" title="Connector">
+                      <Icon name="plug" className="h-4 w-4" />
                     </div>
                   )}
 
@@ -739,12 +806,17 @@ export function StarshipConnectorsPanel({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {exploreHowToButton}
                   {exploreDisconnectButton}
                   {!shouldHideConnectButton ? exploreConnectButton : null}
                 </div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
+
+              {/* Video is shown via a separate modal triggered by "How to connect". */}
             </div>
           </div>
         )
@@ -767,8 +839,8 @@ export function StarshipConnectorsPanel({
             <div className="relative w-20 shrink-0 overflow-hidden bg-transparent">
               <div className="absolute inset-0 flex items-center justify-center">
                 {provider ? (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
-                    <ConnectorLogo provider={provider} className="h-6 w-6 object-contain" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white border border-border/40 overflow-hidden" title={provider || label}>
+                    <ConnectorLogo provider={provider} className="h-7 w-7 object-contain" />
                   </div>
                 ) : (
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-border/40 text-muted-foreground" title="Connector">
@@ -784,9 +856,12 @@ export function StarshipConnectorsPanel({
                 <div className="text-base font-semibold leading-tight truncate">{label}</div>
               </div>
 
-              {!hideCardDescription && catalogItem.description ? <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div> : null}
+              {!hideCardDescription && catalogItem.description ? (
+                <div className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">{catalogItem.description}</div>
+              ) : null}
 
               <div className="mt-auto pt-3 flex items-center justify-end gap-2">
+                {exploreHowToButton}
                 {exploreDisconnectButton}
                 {!shouldHideConnectButton ? exploreConnectButton : null}
               </div>
@@ -861,16 +936,17 @@ export function StarshipConnectorsPanel({
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-3 min-w-0">
                 {showLogo && (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white shadow-sm border',
+                      isConnected ? 'border-emerald-500/80' : 'border-border/40'
+                    )}
+                  >
                     <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                   </div>
                 )}
                 <div className="flex flex-col justify-center min-w-0">
                   <span className="text-lg leading-tight truncate">{label}</span>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
-                    <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
-                  </div>
                 </div>
               </CardTitle>
               {hideCardDescription ? (
@@ -918,6 +994,8 @@ export function StarshipConnectorsPanel({
 
     const shouldHideConnectButton = hideReconnect && isConnected && isOauthConnectable
 
+    const demoEmbedUrl = showDemoVideos ? getYouTubeEmbedUrl((catalogItem as any).demoVideoUrl as string | undefined) : null
+
     const connectButton = (
       <Button
         size="sm"
@@ -950,40 +1028,42 @@ export function StarshipConnectorsPanel({
 
     const cta = isConnected ? (disconnectButton ?? connectButton) : connectButton
 
+    const howToButton =
+      demoEmbedUrl != null
+        ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-8 group min-w-[130px] justify-center shrink-0')}
+            onClick={() => setActiveDemo({ provider, label, url: demoEmbedUrl })}
+          >
+            <Icon name="play-circle" className={CONNECTOR_CTA_ICON_CLASS} />
+            How to connect
+          </Button>
+          )
+        : null
+
     return (
       <div key={provider} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className={cn('min-w-0 flex-1')} aria-label={label}>
           <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-              <span className={cn('flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden')}>
+            <div className="mt-0.5 h-10 w-10 flex-shrink-0">
+              <span
+                className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-full overflow-hidden',
+                  isConnected ? 'ring-2 ring-emerald-500/80 bg-emerald-500/5' : 'ring-1 ring-border/50 bg-muted/10'
+                )}
+              >
                 {showLogo ? (
                   <Image src={logoSrc} alt={`${label} logo`} width={22} height={22} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                 ) : (
                   <Icon name="plug" className="h-4 w-4 text-muted-foreground" />
                 )}
               </span>
-              <PresenceIndicator
-                kind={isConnected ? 'online' : 'offline'}
-                active={true}
-                size="sm"
-                placement="outset"
-                // Match Members page placement for 40px avatar.
-                className="translate-x-[22%] translate-y-[6%]"
-              />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium truncate text-foreground')}>{label}</span>
-                <span
-                  className={cn(
-                    'inline-flex items-center whitespace-nowrap h-4 rounded-md border px-1.5 text-[9px] font-medium leading-none shrink-0',
-                    isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-border/50 bg-muted/20 text-muted-foreground'
-                  )}
-                  aria-label={isConnected ? 'Connected' : 'Not connected'}
-                  title={isConnected ? 'Connected' : 'Not connected'}
-                >
-                  {isConnected ? 'Connected' : 'Not connected'}
-                </span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="truncate">{catalogItem.description}</span>
@@ -992,7 +1072,10 @@ export function StarshipConnectorsPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 self-center">{!shouldHideConnectButton ? cta : null}</div>
+        <div className="flex items-center gap-2 self-center">
+          {howToButton}
+          {!shouldHideConnectButton ? cta : null}
+        </div>
       </div>
     )
   }
@@ -1061,6 +1144,34 @@ export function StarshipConnectorsPanel({
               </Button>
               <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
                 Disconnect
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {showDemoVideos && activeDemo ? (
+        <Dialog open={true} onOpenChange={open => !open && setActiveDemo(null)}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitlePrimitive>{`How to connect ${activeDemo.label}`}</DialogTitlePrimitive>
+              <DialogDescription>Watch this quick video to see how to connect this connector.</DialogDescription>
+            </DialogHeader>
+            <div className="mt-2">
+              <div className="relative w-full overflow-hidden rounded-md bg-black/80 aspect-video">
+                <iframe
+                  src={activeDemo.url}
+                  title={`${activeDemo.label} connection guide`}
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  loading="lazy"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={() => setActiveDemo(null)}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

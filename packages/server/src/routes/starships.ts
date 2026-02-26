@@ -23,10 +23,18 @@ import { getConnection } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
+import multer from 'multer';
+import AdmZip from 'adm-zip';
 
 const router: Router = Router();
 const envConfig = getEnvConfig();
 const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
+const bundleUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
+});
 const openRouterClient =
   envConfig.OPENROUTER_API_KEY && envConfig.OPENROUTER_API_KEY.trim().length > 0
     ? new OpenAI({
@@ -948,6 +956,204 @@ router.post(
       sendSuccess(res, result, 201);
     } catch (error) {
       handleError(error, res, 'importing into starship');
+    }
+  }
+);
+
+/**
+ * POST /starships/:id/import-bundle
+ * Import a zipped agent bundle (manifest.json + agents/*.json + tools/*.json) into the given starship.
+ *
+ * Instance-admin only.
+ */
+router.post(
+  '/starships/:id/import-bundle',
+  jwtAuthMiddleware,
+  requireInstanceAdminMiddleware,
+  bundleUpload.single('file'),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
+
+      if (!req.file?.buffer) {
+        sendError(res, 'VALIDATION_ERROR', 'No bundle file provided', 400);
+        return;
+      }
+
+      let zip: AdmZip;
+      try {
+        zip = new AdmZip(req.file.buffer);
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Invalid zip bundle', 400);
+        return;
+      }
+
+      const manifestEntry = zip.getEntry('manifest.json');
+      if (!manifestEntry) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle is missing manifest.json', 400);
+        return;
+      }
+
+      let manifestRaw: unknown;
+      try {
+        manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json is not valid JSON', 400);
+        return;
+      }
+
+      const ManifestSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.literal('bundle'),
+        exportedAt: z.string().min(1),
+        entities: z.object({
+          agents: z
+            .array(
+              z.object({
+                kind: z.literal('agent'),
+                file: z.string().min(1),
+                fromSlug: z.unknown().optional(),
+                fromStarshipSlug: z.unknown().optional(),
+              })
+            )
+            .default([]),
+          tools: z
+            .array(
+              z.object({
+                kind: z.literal('tool'),
+                file: z.string().min(1),
+                fromSlug: z.unknown().optional(),
+                fromStarshipSlug: z.unknown().optional(),
+              })
+            )
+            .default([]),
+        }),
+      });
+
+      const manifestParsed = ManifestSchema.safeParse(manifestRaw);
+      if (!manifestParsed.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, {
+          issues: manifestParsed.error.issues,
+        });
+        return;
+      }
+
+      const ContainerSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.enum(['agent', 'tool']),
+        exportedAt: z.string().min(1),
+        metadata: z
+          .object({
+            fromSlug: z.string().optional(),
+            fromStarshipSlug: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+        source: z
+          .object({
+            app: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+        payload: z.unknown(),
+      });
+
+      const warnings: string[] = [];
+      const importedTools: unknown[] = [];
+      const importedAgents: unknown[] = [];
+      const toolSlugMap = new Map<string, string>();
+
+      const svc = new ImportExportService();
+      const starshipId = paramValidation.id;
+
+      // Import tools first so agent tool assignment can be remapped.
+      for (const t of manifestParsed.data.entities.tools) {
+        const entry = zip.getEntry(t.file);
+        if (!entry) {
+          warnings.push(`Bundle is missing tool file: ${t.file}`);
+          continue;
+        }
+
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          warnings.push(`Tool file is not valid JSON: ${t.file}`);
+          continue;
+        }
+
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
+          warnings.push(`Tool file is not a valid tool container: ${t.file}`);
+          continue;
+        }
+
+        const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
+        if (result?.warnings?.length) warnings.push(...result.warnings);
+        if (result?.kind === 'tool' && (result as any).tool) {
+          importedTools.push((result as any).tool);
+          const fromSlug = containerParsed.data.metadata?.fromSlug;
+          const createdSlug = (result as any).tool?.slug;
+          if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+            toolSlugMap.set(fromSlug, createdSlug);
+          }
+        }
+      }
+
+      for (const a of manifestParsed.data.entities.agents) {
+        const entry = zip.getEntry(a.file);
+        if (!entry) {
+          warnings.push(`Bundle is missing agent file: ${a.file}`);
+          continue;
+        }
+
+        let containerRaw: unknown;
+        try {
+          containerRaw = JSON.parse(entry.getData().toString('utf8'));
+        } catch {
+          warnings.push(`Agent file is not valid JSON: ${a.file}`);
+          continue;
+        }
+
+        const containerParsed = ContainerSchema.safeParse(containerRaw);
+        if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
+          warnings.push(`Agent file is not a valid agent container: ${a.file}`);
+          continue;
+        }
+
+        const payload: any = containerParsed.data.payload as any;
+        const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+        const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
+        const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
+
+        const rewrittenContainer: ImportExportContainerV1 = {
+          ...(containerParsed.data as any),
+          payload: {
+            ...(payload || {}),
+            assignedToolSlugs: rewrittenToolSlugs,
+          },
+        };
+
+        const result = await svc.importToStarship(starshipId, rewrittenContainer);
+        if (result?.warnings?.length) warnings.push(...result.warnings);
+        if (result?.kind === 'agent' && (result as any).agent) {
+          importedAgents.push((result as any).agent);
+        }
+      }
+
+      sendSuccess(
+        res,
+        {
+          imported: { tools: importedTools.length, agents: importedAgents.length },
+          tools: importedTools.length ? importedTools : undefined,
+          agents: importedAgents.length ? importedAgents : undefined,
+          warnings: warnings.length ? warnings : undefined,
+        },
+        201
+      );
+    } catch (error) {
+      handleError(error, res, 'importing bundle into starship');
     }
   }
 );

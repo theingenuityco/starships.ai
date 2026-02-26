@@ -4,9 +4,9 @@
  * Bridges between database records and domain models with validation and transformation capabilities.
  */
 
-import type { ViewLayout, ViewModel } from '@starships/protocol';
+import type { ViewModel, ViewRuntimeConfig, WidgetInstanceNode } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsISO8601, IsInt, IsObject, IsString, Length, Min, validate, ValidationError } from 'class-validator';
 
 export class ViewEntity implements ViewModel {
   @Expose()
@@ -31,7 +31,16 @@ export class ViewEntity implements ViewModel {
 
   @Expose()
   @IsObject()
-  layout!: ViewLayout;
+  root!: WidgetInstanceNode;
+
+  @Expose()
+  @IsObject()
+  runtimeConfig!: ViewRuntimeConfig;
+
+  @Expose()
+  @IsInt()
+  @Min(1)
+  version!: number;
 
   @Expose()
   @IsString()
@@ -59,7 +68,9 @@ export class ViewEntity implements ViewModel {
         name: dataRecord.name || '',
         slug: dataRecord.slug || '',
         description: dataRecord.description || '',
-        layout: dataRecord.layout || { cols: 3, items: [] },
+        root: dataRecord.root || { id: 'root', type: 'Box', props: {}, children: [] },
+        runtimeConfig: dataRecord.runtimeConfig || {},
+        version: dataRecord.version || 1,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         starshipId: dataRecord.starshipId || '',

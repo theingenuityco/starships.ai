@@ -4556,8 +4556,7 @@ export class ConversationService {
                   console.warn('[STREAM] Failed to publish message.append', e);
                 }
 
-                // NOTE: Widget rendering is now explicit via a dedicated tool (render-widget) that emits
-                // a ui_action directly. We intentionally do NOT infer widget UI actions from tool_result payloads.
+                // NOTE: We intentionally do NOT infer UI actions from tool_result payloads.
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
               }

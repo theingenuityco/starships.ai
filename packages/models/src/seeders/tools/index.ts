@@ -29,10 +29,12 @@ export { modelsListToolTemplate } from './list-models';
 export { createWidgetToolTemplate } from './create-widget';
 export { updateWidgetToolTemplate } from './update-widget';
 export { searchWidgetsToolTemplate } from './search-widgets';
-export { renderWidgetToolTemplate } from './render-widget';
-export { suggestConnectorsToolTemplate } from './suggest-connectors';
-export { suggestAgentsToolTemplate } from './suggest-agents';
-export { renderStarshipDetailsToolTemplate } from './render-starship-details';
+export { searchViewsToolTemplate } from './search-views';
+export { getViewToolTemplate } from './get-view';
+export { createViewToolTemplate } from './create-view';
+export { updateViewToolTemplate } from './update-view';
+export { patchViewRootToolTemplate } from './patch-view-root';
+export { updateViewWidgetToolTemplate } from './update-view-widget';
 export { connectorSearchToolTemplate } from './search-connector';
 export { generateCharacterVariantToolTemplate } from './generate-character-variant';
 export { readConversationMessagesToolTemplate } from './read-conversation-messages';
@@ -64,10 +66,12 @@ import { modelsListToolTemplate } from './list-models';
 import { createWidgetToolTemplate } from './create-widget';
 import { updateWidgetToolTemplate } from './update-widget';
 import { searchWidgetsToolTemplate } from './search-widgets';
-import { renderWidgetToolTemplate } from './render-widget';
-import { suggestConnectorsToolTemplate } from './suggest-connectors';
-import { suggestAgentsToolTemplate } from './suggest-agents';
-import { renderStarshipDetailsToolTemplate } from './render-starship-details';
+import { searchViewsToolTemplate } from './search-views';
+import { getViewToolTemplate } from './get-view';
+import { createViewToolTemplate } from './create-view';
+import { updateViewToolTemplate } from './update-view';
+import { patchViewRootToolTemplate } from './patch-view-root';
+import { updateViewWidgetToolTemplate } from './update-view-widget';
 import { connectorSearchToolTemplate } from './search-connector';
 import { generateCharacterVariantToolTemplate } from './generate-character-variant';
 import { readConversationMessagesToolTemplate } from './read-conversation-messages';
@@ -99,10 +103,12 @@ export const ALL_TOOL_TEMPLATES = [
   createWidgetToolTemplate,
   updateWidgetToolTemplate,
   searchWidgetsToolTemplate,
-  renderWidgetToolTemplate,
-  suggestConnectorsToolTemplate,
-  suggestAgentsToolTemplate,
-  renderStarshipDetailsToolTemplate,
+  searchViewsToolTemplate,
+  getViewToolTemplate,
+  createViewToolTemplate,
+  updateViewToolTemplate,
+  patchViewRootToolTemplate,
+  updateViewWidgetToolTemplate,
   connectorSearchToolTemplate,
   generateCharacterVariantToolTemplate,
   readConversationMessagesToolTemplate,

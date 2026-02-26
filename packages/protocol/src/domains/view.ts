@@ -1,56 +1,99 @@
 /**
  * View Domain Types
  *
- * A "View" is a persisted, starship-scoped grid layout that arranges existing widgets
- * into a fixed-column grid with potentially infinite rows.
+ * A "View" is a persisted, starship-scoped screen/app definition.
+ *
+ * - Layout/composability is provided by the root widget (container widgets with children).
+ * - Interactivity is defined via events + handlers (optionally backed by sandboxed JS).
+ * - Dynamic data comes from bindings/queries defined in the view runtime config.
  */
 
-export interface ViewGridItem {
+export type ViewNodeId = string;
+export type ViewScriptId = string;
+export type ViewQueryId = string;
+
+/**
+ * WidgetInstanceNode
+ *
+ * A node in the view's widget tree. Nodes can be containers (with children) or leaf widgets.
+ */
+export interface WidgetInstanceNode {
+  id: ViewNodeId;
   /**
-   * Stable item id within the view layout (nanoid format recommended).
+   * Registry key / component type to render.
    */
-  id: string;
+  type: string;
   /**
-   * References an existing WidgetModel.id
+   * Raw props for the component. Bindings (if any) can compute/override values at runtime.
    */
-  widgetId: string;
+  props: Record<string, unknown>;
+  children?: WidgetInstanceNode[];
   /**
-   * 0-based grid coordinates.
+   * Optional bindings, keyed by a dot-path into props (e.g. "title", "data.rows").
    */
-  col: number;
-  row: number;
+  bindings?: Record<string, BindingSpec>;
   /**
-   * Optional spans. Defaults are interpreted by the client as 1.
+   * Optional event handlers keyed by event name (e.g. "click", "row_select").
    */
-  colSpan?: number;
-  rowSpan?: number;
+  handlers?: Record<string, HandlerSpec>;
+  /**
+   * Optional per-node permissions (overrides / tightens view-level permissions).
+   */
+  permissions?: PermissionSpec;
 }
 
 /**
- * Input item shape accepted by create/update endpoints.
- * The server/models layer will generate an id when omitted.
+ * Input node shape accepted by create/update endpoints.
+ * The server/models layer may generate missing ids.
  */
-export interface ViewGridItemInput extends Omit<ViewGridItem, 'id'> {
-  id?: string;
-}
-
-export interface ViewLayout {
-  /**
-   * Fixed number of columns for the grid.
-   */
-  cols: number;
-  /**
-   * Placed widget items.
-   */
-  items: ViewGridItem[];
+export interface WidgetInstanceNodeInput extends Omit<WidgetInstanceNode, 'id' | 'children'> {
+  id?: ViewNodeId;
+  children?: WidgetInstanceNodeInput[];
 }
 
 /**
- * Input layout shape accepted by create/update endpoints.
- * Item ids may be omitted and will be generated.
+ * BindingSpec
+ *
+ * Deterministic data binding (separate from sandboxed JS handlers).
  */
-export interface ViewLayoutInput extends Omit<ViewLayout, 'items'> {
-  items: ViewGridItemInput[];
+export type BindingSpec =
+  | { kind: 'state'; path: string }
+  | { kind: 'query'; queryId: ViewQueryId; path?: string }
+  | { kind: 'expr'; expr: string };
+
+/**
+ * HandlerSpec
+ *
+ * Event handler definition. The primary mode is sandboxed JavaScript scripts referenced by id.
+ */
+export type HandlerSpec =
+  | { kind: 'script'; scriptId: ViewScriptId; entrypoint?: string }
+  | { kind: 'actions'; actions: ViewRuntimeActionRequest[] };
+
+export type PermissionSpec = {
+  /**
+   * Allowed workflows (Autopilot tool/workflow slugs) the view/runtime may invoke.
+   */
+  workflows?: string[];
+  /**
+   * Allowed connector ids/providers for query/actions (optional; server enforced).
+   */
+  connectors?: string[];
+};
+
+export type ViewScript = {
+  language: 'javascript';
+  source: string;
+};
+
+export type ViewQuerySpec =
+  | { kind: 'http'; url: string; method?: 'GET' | 'POST'; bodyTemplate?: Record<string, unknown> }
+  | { kind: 'connector_action'; connector: string; action: string; argsTemplate?: Record<string, unknown> };
+
+export interface ViewRuntimeConfig {
+  scripts?: Record<ViewScriptId, ViewScript>;
+  queries?: Record<ViewQueryId, ViewQuerySpec>;
+  permissions?: PermissionSpec;
 }
 
 export interface ViewModel {
@@ -58,7 +101,9 @@ export interface ViewModel {
   name: string;
   slug: string;
   description: string;
-  layout: ViewLayout;
+  root: WidgetInstanceNode;
+  runtimeConfig: ViewRuntimeConfig;
+  version: number;
   starshipId: string;
   createdAt: string;
   updatedAt: string;
@@ -68,14 +113,17 @@ export interface CreateViewRequest {
   name: string;
   slug?: string;
   description: string;
-  layout?: ViewLayoutInput;
+  root?: WidgetInstanceNodeInput;
+  runtimeConfig?: ViewRuntimeConfig;
   starshipId: string;
 }
 
 export interface UpdateViewRequest {
   name?: string;
   description?: string;
-  layout?: ViewLayoutInput;
+  root?: WidgetInstanceNodeInput;
+  runtimeConfig?: ViewRuntimeConfig;
+  version?: number;
 }
 
 export interface ViewSearchParams {
@@ -85,4 +133,26 @@ export interface ViewSearchParams {
   limit?: number;
   offset?: number;
 }
+
+// ----------------------------------------------------------------------------
+// View Runtime Actions/Events (server <-> client coordination)
+// ----------------------------------------------------------------------------
+
+export type ViewPatchOp =
+  | { op: 'add' | 'replace' | 'test'; path: string; value: unknown }
+  | { op: 'remove'; path: string }
+  | { op: 'move' | 'copy'; from: string; path: string };
+
+export type ViewRuntimeActionRequest =
+  | { type: 'run_workflow'; workflowSlug: string; args?: Record<string, unknown> }
+  | { type: 'set_state'; path: string; value: unknown; persist?: boolean }
+  | { type: 'patch_props'; instanceId: ViewNodeId; patch: Record<string, unknown> }
+  | { type: 'patch_root'; patch: ViewPatchOp[] };
+
+export type ViewRuntimeEvent =
+  | { type: 'snapshot'; data: { viewId: string; at: string; root: WidgetInstanceNode; state?: Record<string, unknown> } }
+  | { type: 'patch'; data: { viewId: string; at: string; patch: ViewPatchOp[] } }
+  | { type: 'state'; data: { viewId: string; at: string; patch: Array<{ path: string; value: unknown }> } }
+  | { type: 'toast'; data: { viewId: string; at: string; level?: 'info' | 'success' | 'warning' | 'error'; message: string } }
+  | { type: 'error'; data: { viewId: string; at: string; message: string; code?: string } };
 

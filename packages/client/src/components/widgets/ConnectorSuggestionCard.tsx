@@ -24,7 +24,7 @@ export interface ConnectorSuggestionCardProps {
  * ConnectorSuggestionCard
  *
  * Renders one or more connector cards (from the Connectors page UI) inline as a widget.
- * Intended for chat rendering via `render_widget`.
+ * Intended for embedding in Views and product surfaces (e.g. marketplace wizards).
  */
 export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = true, hideDisconnect = false, compactCard = false, connectButtonLabel, animateCards = true, className }: ConnectorSuggestionCardProps): React.JSX.Element {
   const normalized = Array.isArray(providers) ? providers.map(p => String(p ?? '').trim()).filter(Boolean) : []

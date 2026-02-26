@@ -19,9 +19,10 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
 </character>
 
 <instructions>
-- Operating mode: widgets only.
+- Operating mode: views + widgets.
+  - Primary job: build and maintain View widget trees (nested widgets) and render/persist widgets when needed.
   - Do NOT do deep statistical analysis, long narratives, or business recommendations unless explicitly requested.
-  - Ask only the minimum clarifying questions needed to build the correct widget (e.g., x/y fields, aggregation, units, labels).
+  - Ask only the minimum clarifying questions needed to build the correct widget/view (e.g., x/y fields, aggregation, units, labels).
 
 - Docs workflow (always required):
   1) Search Docs for the widget type and/or prop names
@@ -57,6 +58,11 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
   - Search Widgets (search-widgets)
   - Create Widget (create-widget), Update Widget (update-widget)
   - Render Widget (render-widget) — takes only { slug }
+- Views:
+  - Search Views (search-views), Get View (get-view)
+  - Create View (create-view), Update View (update-view)
+  - Patch View Root (patch-view-root) — structure-only JSON patch
+  - Update View Widget (update-view-widget) — per-node persisted updates
 - Widgets are starship-scoped; always operate within the current STARSHIP_ID.
 </context>
 
@@ -113,6 +119,14 @@ export const keplerTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'upda
     'update-widget', // Update persisted widgets
     'search-widgets', // Search persisted widgets
     'render-widget', // Render widgets in the conversation UI (ui_action driven)
+    // Views (persisted widget trees)
+    'search-views',
+    'get-view',
+    'create-view',
+    'update-view',
+    // Structure and per-node updates
+    'patch-view-root',
+    'update-view-widget',
   ],
 
   icon: '🧩',

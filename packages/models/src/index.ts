@@ -87,6 +87,7 @@ export { PromoRedemptionRepository } from './repositories/PromoRedemptionReposit
 export { WidgetRepository } from './repositories/WidgetRepository';
 export { ConversationWidgetRepository } from './repositories/ConversationWidgetRepository';
 export { ViewRepository } from './repositories/ViewRepository';
+export { ViewWidgetRepository } from './repositories/ViewWidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';
 export { AutopilotAwaitRepository } from './repositories/AutopilotAwaitRepository';
 export { AutopilotAwaitFiringRepository } from './repositories/AutopilotAwaitFiringRepository';

@@ -1,6 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { useAuth } from '@/hooks/useAuth'
@@ -9,6 +10,84 @@ import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 import type { AgentTemplateModel } from '@starships/protocol'
+
+type LandingPreset = {
+  id: string
+  label: string
+  prompt: string
+}
+
+const HERO_AGENT_PRESETS: Record<string, LandingPreset[]> = {
+  aria: [
+    {
+      id: 'aria_leads',
+      label: 'Build lead lists',
+      prompt: 'Find finance decision makers at Series A SaaS startups and summarize 20 high-fit prospects.',
+    },
+    {
+      id: 'aria_outreach',
+      label: 'Personalize outreach',
+      prompt: 'Draft 5 highly personalized outreach emails for my top prospects, focusing on their recent fundraise.',
+    },
+    {
+      id: 'aria_research',
+      label: 'Deep account research',
+      prompt: 'Research this target account in depth and give me a one-page brief with risks, opportunities, and key stakeholders.',
+    },
+  ],
+  kepler: [
+    {
+      id: 'kepler_dashboard',
+      label: 'Build a dashboard',
+      prompt: 'Design a metrics dashboard for weekly revenue, new signups, and active users with the right chart widgets.',
+    },
+    {
+      id: 'kepler_view',
+      label: 'Create a view',
+      prompt: 'Create a view that shows my top 20 opportunities by stage, owner, and next action.',
+    },
+    {
+      id: 'kepler_iterate',
+      label: 'Refine an existing view',
+      prompt: 'Take this existing revenue view and improve the layout and labels so it is easier to read in exec meetings.',
+    },
+  ],
+  default: [
+    {
+      id: 'generic_brainstorm',
+      label: 'Brainstorm ideas',
+      prompt: 'Brainstorm 10 concrete ways this agent could help my team this week, then pick the best one and outline the steps.',
+    },
+    {
+      id: 'generic_workflow',
+      label: 'Design a workflow',
+      prompt: 'Design a detailed workflow this agent can run end-to-end to automate one repetitive task for my team.',
+    },
+    {
+      id: 'generic_first_task',
+      label: 'Start with one task',
+      prompt: 'Suggest one high-value, low-risk task this agent should run first and describe exactly what it will do.',
+    },
+  ],
+}
+
+function normalizeAgentKey(template?: AgentTemplateModel | null): string {
+  if (!template) return 'default'
+  const slug = String((template as any)?.slug ?? '')
+    .trim()
+    .toLowerCase()
+  if (slug) return slug
+  const name = String(template.name ?? '')
+    .trim()
+    .toLowerCase()
+  if (name) return name
+  return 'default'
+}
+
+function getPresetsForAgent(template?: AgentTemplateModel | null): LandingPreset[] {
+  const key = normalizeAgentKey(template)
+  return HERO_AGENT_PRESETS[key] ?? HERO_AGENT_PRESETS.default ?? []
+}
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
@@ -26,6 +105,11 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   // This component is server-rendered, and reading client-only state during render causes hydration mismatches.
   const [hasClientAuthToken, setHasClientAuthToken] = useState(false)
   const hasAuthToken = hasClientAuthToken
+
+  // Landing hero input + agent selection state
+  const [selectedAgentTemplate, setSelectedAgentTemplate] = useState<AgentTemplateModel | null>(null)
+  const [heroInputValue, setHeroInputValue] = useState('')
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null)
 
   // If the user has a token, but auth/starships are still resolving, do NOT let the CTA
   // behave like a logged-out CTA (push /login). This is the flicker we saw in logs.
@@ -56,6 +140,17 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       fallbackTimeoutRef.current = null
     }
     fn()
+  }, [])
+
+  const handleHeroAgentSelection = useCallback((template: AgentTemplateModel) => {
+    setSelectedAgentTemplate(previous => {
+      if (!previous || previous.id !== template.id) {
+        // Behavior B: when switching agents, clear any existing text/preset.
+        setHeroInputValue('')
+        setSelectedPresetId(null)
+      }
+      return template
+    })
   }, [])
 
   const navigatePrimary = useCallback(() => {
@@ -91,6 +186,9 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     }, 1100)
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
+  const heroPresets = getPresetsForAgent(selectedAgentTemplate)
+  const selectedAgentName = String(selectedAgentTemplate?.name || '').trim() || 'this agent'
+
   return (
     <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
@@ -116,8 +214,55 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster across your tools.
           </p>
-          <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
-            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
+          <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
+            <div className="w-full max-w-3xl mx-auto flex flex-col gap-3 items-stretch text-left">
+              <div className="relative">
+                <Textarea
+                  value={heroInputValue}
+                  onChange={event => {
+                    setHeroInputValue(event.target.value)
+                    setSelectedPresetId(null)
+                  }}
+                  placeholder={
+                    selectedAgentTemplate
+                      ? `Describe what you want ${selectedAgentName} to research, plan, or execute…`
+                      : 'Describe what you want an agent to research, plan, or execute…'
+                  }
+                  rows={3}
+                  className="min-h-[112px] rounded-3xl bg-background/80 pl-5 pr-16 pt-4 pb-5 text-sm sm:text-base shadow-[0_20px_60px_rgba(15,23,42,0.45)] border-border/60 resize-none"
+                />
+                <button
+                  type="button"
+                  className="absolute right-4 bottom-3 h-12 w-12 sm:h-[3.25rem] sm:w-[3.25rem] rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/40 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label="Submit"
+                >
+                  <span className="text-lg">↑</span>
+                </button>
+              </div>
+              {heroPresets.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {heroPresets.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setHeroInputValue(preset.prompt)
+                        setSelectedPresetId(preset.id)
+                      }}
+                      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs sm:text-sm transition-colors ${
+                        selectedPresetId === preset.id
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background/60 text-muted-foreground hover:bg-background border-border/70'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} autoPlay={false} onSelectionChange={handleHeroAgentSelection} />
             <Button
               size="lg"
               className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"

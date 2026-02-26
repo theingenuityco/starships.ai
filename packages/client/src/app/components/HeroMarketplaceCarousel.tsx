@@ -15,9 +15,16 @@ function normalize(s: unknown) {
     .toLowerCase()
 }
 
-export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
+type HeroMarketplaceCarouselProps = {
+  initialAgentTemplates?: AgentTemplateModel[]
+  /** When false, carousel does not auto-advance (used on landing hero). Default true. */
+  autoPlay?: boolean
+  /** Called when the centered slide changes; pass the template for that slide so the hero can tie prompt/presets to the active agent. */
+  onSelectionChange?: (template: AgentTemplateModel) => void
+}
+
+export default function HeroMarketplaceCarousel({ initialAgentTemplates = [], autoPlay = true, onSelectionChange }: HeroMarketplaceCarouselProps) {
   const router = useRouter()
-  const initialAgentTemplates = props.initialAgentTemplates ?? []
   const useServerInitial = initialAgentTemplates.length > 0
   const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
   // IMPORTANT (hydration stability):
@@ -29,6 +36,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
+  const [selectedSnapIndex, setSelectedSnapIndex] = useState(0)
 
   // Fixed card widths (avoid percentage-based stretching on small screens)
   const CARD_W = 136
@@ -90,9 +98,31 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
     return { templates, slideCount }
   }, [agentTemplates, cardsPerView])
 
-  // Autoplay the hero carousel slowly (pause on hover).
+  // Sync selected (centered) slide with parent so hero can tie prompt/presets to the active agent.
   useEffect(() => {
-    if (!carouselApi) return
+    if (!carouselApi || featuredAgents.templates.length === 0) return
+
+    const notify = () => {
+      try {
+        const snap = carouselApi.selectedScrollSnap()
+        const n = featuredAgents.templates.length
+        const idx = snap % n
+        setSelectedSnapIndex(snap)
+        const template = featuredAgents.templates[idx]
+        if (template && onSelectionChange) onSelectionChange(template)
+      } catch {
+        /* ignore */
+      }
+    }
+
+    notify()
+    carouselApi.on('select', notify)
+    return () => carouselApi.off('select', notify)
+  }, [carouselApi, featuredAgents.templates, onSelectionChange])
+
+  // Autoplay the hero carousel slowly (pause on hover). Disabled when autoPlay is false (e.g. landing hero).
+  useEffect(() => {
+    if (!carouselApi || !autoPlay) return
 
     const AUTO_PLAY_MS = 6500
     const id = setInterval(() => {
@@ -103,7 +133,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
     }, AUTO_PLAY_MS)
 
     return () => clearInterval(id)
-  }, [carouselApi, isHovering])
+  }, [autoPlay, carouselApi, isHovering])
 
   const handleAgentClick = (template: AgentTemplateModel) => {
     track({
@@ -150,14 +180,16 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                 const role = String(template.role ?? '').trim()
                 const primaryLabel = role || String(template.category ?? '').trim() || String(template.slug ?? '').trim() || name
                 const avatarUrl = template.avatarUrl
+                const isActive = idx === selectedSnapIndex
 
                 return (
                   <CarouselItem key={`${template.id}-${idx}`} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">
                     <button
                       type="button"
                       onClick={() => handleAgentClick(template)}
-                      className="group w-full rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className={`group w-full rounded-2xl border bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isActive ? 'border-primary/70 ring-2 ring-primary/60 shadow-md shadow-primary/20' : 'border-border/50'}`}
                       aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} details`}
+                      aria-current={isActive ? 'true' : undefined}
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">

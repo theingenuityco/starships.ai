@@ -11,6 +11,7 @@ import { AgentSuggestionCard } from './AgentSuggestionCard'
 import { StarshipDetails } from './StarshipDetails'
 
 import { Box } from './primitives/Box'
+import { IfWidget } from './primitives/IfWidget'
 import { Stack } from './primitives/Stack'
 import { Grid } from './primitives/Grid'
 import { Text } from './primitives/Text'
@@ -101,6 +102,18 @@ export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = Object.freeze([
     defaultProps: { className: '' },
     fields: [{ kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' }],
     Component: Box,
+  },
+  {
+    type: 'If',
+    label: 'If',
+    category: 'Layout',
+    acceptsChildren: true,
+    defaultProps: { when: true, className: '' },
+    fields: [
+      { kind: 'boolean', path: 'when', label: 'When' },
+      { kind: 'string', path: 'className', label: 'Class name', placeholder: 'tailwind classes…' },
+    ],
+    Component: IfWidget,
   },
   {
     type: 'Stack',
@@ -336,7 +349,16 @@ export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = Object.freeze([
 
   // Data / product-ish widgets
   { type: 'StatCard', label: 'Stat card', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: StatCard },
-  { type: 'DataTable', label: 'Data table', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: DataTable },
+  {
+    type: 'DataTable',
+    label: 'Data table',
+    category: 'Data',
+    acceptsChildren: false,
+    defaultProps: {},
+    fields: [],
+    events: ['row_click'],
+    Component: DataTable,
+  },
   { type: 'MetricGrid', label: 'Metric grid', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: MetricGrid },
   { type: 'StarshipDetails', label: 'Starship details', category: 'Data', acceptsChildren: false, defaultProps: {}, fields: [], Component: StarshipDetails },
 

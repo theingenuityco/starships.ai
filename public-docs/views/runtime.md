@@ -53,9 +53,28 @@ The current client runtime executes `kind: "http"` queries on mount (best-effort
 
 Results are stored at `runtime.queries[queryId].data` and can be read by query bindings.
 
+#### Parameterizing HTTP queries (v1.1)
+
+HTTP query specs can include simple string templates that read from runtime state:
+
+- `url`: `"/api/v1/things?owner={{state.user.id}}"`
+- `bodyTemplate`: `{ "table": "{{state.selectedTable}}" }`
+
+Templates are applied when a query is executed via the `run_query` runtime action (see below).
+
 ### Connector action queries (not client-executed yet)
 
 The protocol supports `kind: "connector_action"` query specs, but the current client query runner only executes `kind: "http"` queries.
+
+#### Running connector_action queries (v1.1)
+
+The client can execute `connector_action` queries by emitting a `run_query` runtime action. The host will call:
+
+- `POST /api/v1/views/:id/queries/:queryId/run`
+
+and store the result into `runtime.queries[queryId].data`.
+
+Note: connector_action execution requires the server to be configured with a remote runner (`RUNNER_URL`).
 
 ## Handlers (events)
 
@@ -84,6 +103,10 @@ The client runtime currently auto-wires only these events:
   - event: `change`
   - only wired if `node.handlers.change` exists
   - payload: `{ "checked": true }`
+- `DataTable`
+  - event: `row_click`
+  - only wired if `node.handlers.row_click` exists
+  - payload: `{ "row": { ... }, "rowIndex": 0 }`
 
 If a widget type lists events in the widget catalog but the runtime renderer does not wire it, the handler will never fire until wiring is added to the runtime renderer.
 
@@ -116,6 +139,7 @@ At runtime, the sandbox calls:
     - `getState(path)` → reads the current runtime state (dot-path)
     - `setState(path, value, persist?)` → emits a `set_state` action
     - `runWorkflow(workflowSlug, args?)` → emits a `run_workflow` action
+        - `runQuery(queryId)` → emits a `run_query` action (executes HTTP or connector_action queries)
     - `patchProps(instanceId, patch)` → emits a `patch_props` action
     - `patchRoot(patchOps)` → emits a `patch_root` action (RFC6902 JSON Patch ops)
     - `log(...)` → currently a no-op
@@ -137,6 +161,7 @@ Views can dispatch actions locally (state/props) and/or via the server:
 - `patch_props`: merges a patch object into `_props.<instanceId>` (ephemeral per-instance prop overrides)
 - `patch_root`: server-published JSON patch ops applied to the view root tree
 - `run_workflow`: runs an Autopilot workflow/tool and streams `ui_action` side-effects into the view stream
+- `run_query`: executes a query and stores results into `runtime.queries[queryId].data` (host-handled)
 
 ### Local vs server actions (current client behavior)
 
@@ -145,6 +170,9 @@ In the current client runtime:
 - `set_state` is applied locally to the runtime store.
   - Note: the `persist` flag is accepted by the protocol but is not persisted by the current client implementation.
 - `patch_props` is applied locally by merging into `state._props.<instanceId>`.
+- `run_query` is handled by the host:
+  - `http` queries run on the client (same-origin only)
+  - `connector_action` queries run on the server via `POST /api/v1/views/:id/queries/:queryId/run`
 - `run_workflow` and `patch_root` are forwarded to `POST /api/v1/views/:id/actions` (server-handled).
 
 ## Streaming (`GET /api/v1/views/:id/stream`)

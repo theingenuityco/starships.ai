@@ -1,6 +1,16 @@
-## ConnectorSuggestionCard
+---
+title: ConnectorSuggestionCard Widget
+slug: widgets/connector-suggestion-card
+category: widgets
+---
+
+# ConnectorSuggestionCard Widget
 
 ConnectorSuggestionCard renders one or more **connector cards** (the same UI used on the Connectors page) inline in chat.
+
+## Component Name
+
+`ConnectorSuggestionCard`
 
 ### widgetType
 

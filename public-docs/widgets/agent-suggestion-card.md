@@ -1,6 +1,16 @@
-## AgentSuggestionCard
+---
+title: AgentSuggestionCard Widget
+slug: widgets/agent-suggestion-card
+category: widgets
+---
+
+# AgentSuggestionCard Widget
 
 Renders **2–3 marketplace agent cards** inline in chat, each with a deploy CTA.
+
+## Component Name
+
+`AgentSuggestionCard`
 
 ### `widgetType`
 

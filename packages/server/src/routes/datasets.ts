@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { validateData } from '@/utils/validation';
-import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
+import { IdSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
 
@@ -45,13 +45,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 const DatasetColumnSchema: z.ZodType<StarshipDatasetColumn> = z
   .object({
-    key: z
+    name: z
       .string()
       .trim()
       .min(1)
       .max(100)
-      .regex(/^[a-zA-Z0-9_]+$/, 'Column key must be alphanumeric/underscore'),
-    label: z.string().trim().min(1).max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+      .regex(/^[a-zA-Z0-9_]+$/, 'Column name must be alphanumeric/underscore'),
     format: z.enum(['text', 'number', 'currency', 'date', 'percentage']).optional(),
     type: z.enum(['string', 'number', 'boolean', 'date', 'json']).optional(),
   })
@@ -59,7 +58,6 @@ const DatasetColumnSchema: z.ZodType<StarshipDatasetColumn> = z
 
 const CreateDatasetSchema = z.object({
   name: z.string().trim().min(1).max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }),
-  slug: SlugSchema.optional(),
   description: z
     .string()
     .max(2000)
@@ -73,12 +71,11 @@ const CreateDatasetSchema = z.object({
     .max(100)
     .optional()
     .nullable(),
-});
+}).strict();
 
 const UpdateDatasetSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-    slug: SlugSchema.optional(),
     description: z
       .string()
       .max(2000)
@@ -177,7 +174,6 @@ router.post('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Re
     const payload: CreateStarshipDatasetRequest = {
       starshipId: params.starshipId,
       name: body.name,
-      ...(body.slug ? { slug: body.slug } : null),
       ...(body.description ? { description: body.description } : null),
       columns: body.columns ?? [],
       ...(body.primaryKey !== undefined ? { primaryKey: body.primaryKey } : null),
@@ -250,9 +246,9 @@ router.patch('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, as
       const pk = body.primaryKey;
       if (typeof pk === 'string' && pk.trim()) {
         const cols: StarshipDatasetColumn[] = ((body.columns ?? required.dataset.columns) || []) as StarshipDatasetColumn[];
-        const ok = cols.some((c: StarshipDatasetColumn) => String(c?.key || '') === pk);
+        const ok = cols.some((c: StarshipDatasetColumn) => String((c as any)?.name || '') === pk);
         if (!ok) {
-          sendError(res, 'VALIDATION_ERROR', 'primaryKey must match an existing column key', 400, { primaryKey: pk });
+          sendError(res, 'VALIDATION_ERROR', 'primaryKey must match an existing column name', 400, { primaryKey: pk });
           return;
         }
       }

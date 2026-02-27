@@ -13,6 +13,33 @@ export class StarshipDatasetRepository extends BaseRepository {
     super('StarshipDatasetRepository');
   }
 
+  private normalizeColumns(cols: unknown): StarshipDatasetModel['columns'] {
+    const arr = Array.isArray(cols) ? cols : [];
+    const normalized: StarshipDatasetModel['columns'] = [];
+    for (const raw of arr) {
+      if (!raw || typeof raw !== 'object') continue;
+      const r = raw as Record<string, unknown>;
+      const name =
+        typeof r.name === 'string' && r.name.trim()
+          ? r.name.trim()
+          : typeof r.key === 'string' && r.key.trim()
+            ? r.key.trim()
+            : typeof r.label === 'string' && r.label.trim()
+              ? r.label.trim()
+              : '';
+      if (!name) continue;
+      const col: any = { name };
+      if (typeof r.format === 'string') col.format = r.format;
+      if (typeof r.type === 'string') col.type = r.type;
+      normalized.push(col);
+    }
+    return normalized;
+  }
+
+  private normalizeDataset(dataset: StarshipDatasetModel): StarshipDatasetModel {
+    return { ...dataset, columns: this.normalizeColumns((dataset as any).columns) };
+  }
+
   async findById(id: string): Promise<StarshipDatasetModel | null> {
     return this.executeWithErrorHandling(
       async () => {
@@ -35,7 +62,8 @@ export class StarshipDatasetRepository extends BaseRepository {
           `,
           [id]
         );
-        return record ? fromDatabase(StarshipDatasetEntity, record) : null;
+        const dataset = record ? fromDatabase(StarshipDatasetEntity, record) : null;
+        return dataset ? this.normalizeDataset(dataset) : null;
       },
       'findById',
       'StarshipDataset',
@@ -66,7 +94,8 @@ export class StarshipDatasetRepository extends BaseRepository {
           `,
           [starshipId, slug]
         );
-        return record ? fromDatabase(StarshipDatasetEntity, record) : null;
+        const dataset = record ? fromDatabase(StarshipDatasetEntity, record) : null;
+        return dataset ? this.normalizeDataset(dataset) : null;
       },
       'findBySlug',
       'StarshipDataset',
@@ -99,7 +128,8 @@ export class StarshipDatasetRepository extends BaseRepository {
           `,
           [starshipId, includeArchived]
         );
-        return fromDatabaseArray(StarshipDatasetEntity, records);
+        const datasets = fromDatabaseArray(StarshipDatasetEntity, records);
+        return datasets.map((d) => this.normalizeDataset(d));
       },
       'listByStarship',
       'StarshipDataset'
@@ -111,13 +141,11 @@ export class StarshipDatasetRepository extends BaseRepository {
       async () => {
         const id = nanoid();
         const now = new Date().toISOString();
-        const slug = data.slug
-          ? String(data.slug)
-          : await generateUniqueSlugIncremental(
-              String(data.name || 'dataset'),
-              async (candidate: string) => Boolean(await this.findBySlug(candidate, data.starshipId)),
-              { fallbackBase: 'dataset', maxLength: 100 }
-            );
+        const slug = await generateUniqueSlugIncremental(
+          String(data.name || 'dataset'),
+          async (candidate: string) => Boolean(await this.findBySlug(candidate, data.starshipId)),
+          { fallbackBase: 'dataset', maxLength: 100 }
+        );
 
         const datasetData: StarshipDatasetModel = {
           id,
@@ -189,10 +217,6 @@ export class StarshipDatasetRepository extends BaseRepository {
         if (patch.description !== undefined) {
           sets.push(`description = $${i++}`);
           values.push(patch.description);
-        }
-        if (patch.slug !== undefined) {
-          sets.push(`slug = $${i++}`);
-          values.push(patch.slug);
         }
         if (patch.columns !== undefined) {
           sets.push(`columns_json = $${i++}::jsonb`);

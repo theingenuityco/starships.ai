@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { validateData } from '@/utils/validation';
-import { IdSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
+import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
 
@@ -110,20 +110,24 @@ const UpsertRowsSchema = z
   })
   .strict();
 
+const DatasetIdOrSlugSchema = z.union([IdSchema, SlugSchema.max(100)]);
+
 async function requireDatasetInStarship(args: {
-  datasetId: string;
+  datasetIdOrSlug: string;
   starshipId: string;
   datasetRepo: StarshipDatasetRepository;
   res: Response;
 }): Promise<{ dataset: StarshipDatasetModel } | null> {
-  const { datasetId, starshipId, datasetRepo, res } = args;
-  const dataset = await datasetRepo.findById(datasetId);
+  const { datasetIdOrSlug, starshipId, datasetRepo, res } = args;
+  const dataset = IdSchema.safeParse(datasetIdOrSlug).success
+    ? await datasetRepo.findById(datasetIdOrSlug)
+    : await datasetRepo.findBySlug(datasetIdOrSlug, starshipId);
   if (!dataset) {
-    sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetId });
+    sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug });
     return null;
   }
   if (dataset.starshipId !== starshipId) {
-    sendError(res, 'ACCESS_DENIED', 'Dataset does not belong to this starship', 403, { datasetId, starshipId });
+    sendError(res, 'ACCESS_DENIED', 'Dataset does not belong to this starship', 403, { datasetIdOrSlug, starshipId });
     return null;
   }
   return { dataset };
@@ -188,21 +192,26 @@ router.post('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Re
 });
 
 /**
- * GET /api/v1/starships/:starshipId/datasets/:datasetId
+ * GET /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug
  * Get dataset details
  */
-router.get('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
 
-    const params = validateData(z.object({ starshipId: IdSchema, datasetId: IdSchema }), req.params, res, 'dataset params');
+    const params = validateData(
+      z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+      req.params,
+      res,
+      'dataset params'
+    );
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
     const datasetRepo = new StarshipDatasetRepository();
     const required = await requireDatasetInStarship({
-      datasetId: params.datasetId,
+      datasetIdOrSlug: params.datasetIdOrSlug,
       starshipId: params.starshipId,
       datasetRepo,
       res,
@@ -217,14 +226,19 @@ router.get('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, asyn
 });
 
 /**
- * PATCH /api/v1/starships/:starshipId/datasets/:datasetId
+ * PATCH /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug
  * Update dataset
  */
-router.patch('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   const userId = requireAuthUserId(req, res);
   if (!userId) return;
 
-  const params = validateData(z.object({ starshipId: IdSchema, datasetId: IdSchema }), req.params, res, 'dataset params');
+  const params = validateData(
+    z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+    req.params,
+    res,
+    'dataset params'
+  );
   if (!params) return;
   if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
@@ -234,7 +248,7 @@ router.patch('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, as
   try {
     const datasetRepo = new StarshipDatasetRepository();
     const required = await requireDatasetInStarship({
-      datasetId: params.datasetId,
+      datasetIdOrSlug: params.datasetIdOrSlug,
       starshipId: params.starshipId,
       datasetRepo,
       res,
@@ -255,9 +269,9 @@ router.patch('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, as
     }
 
     const updates: UpdateStarshipDatasetRequest = body as unknown as UpdateStarshipDatasetRequest;
-    const updated = await datasetRepo.update(params.datasetId, updates);
+    const updated = await datasetRepo.update(required.dataset.id, updates);
     if (!updated) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetId: params.datasetId });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
       return;
     }
     const resp: StarshipDatasetDetailsResponse = { dataset: updated };
@@ -268,15 +282,20 @@ router.patch('/starships/:starshipId/datasets/:datasetId', jwtAuthMiddleware, as
 });
 
 /**
- * GET /api/v1/starships/:starshipId/datasets/:datasetId/rows?limit&offset
+ * GET /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/rows?limit&offset
  * List dataset rows (paginated)
  */
-router.get('/starships/:starshipId/datasets/:datasetId/rows', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
 
-    const params = validateData(z.object({ starshipId: IdSchema, datasetId: IdSchema }), req.params, res, 'dataset rows params');
+    const params = validateData(
+      z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+      req.params,
+      res,
+      'dataset rows params'
+    );
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
@@ -287,15 +306,16 @@ router.get('/starships/:starshipId/datasets/:datasetId/rows', jwtAuthMiddleware,
     const datasetRepo = new StarshipDatasetRepository();
     const rowRepo = new StarshipDatasetRowRepository();
     const required = await requireDatasetInStarship({
-      datasetId: params.datasetId,
+      datasetIdOrSlug: params.datasetIdOrSlug,
       starshipId: params.starshipId,
       datasetRepo,
       res,
     });
     if (!required) return;
 
-    const total = await rowRepo.countByDataset(params.datasetId);
-    const rows = await rowRepo.listByDataset(params.datasetId, { limit, offset, order: 'desc' });
+    const datasetId = required.dataset.id;
+    const total = await rowRepo.countByDataset(datasetId);
+    const rows = await rowRepo.listByDataset(datasetId, { limit, offset, order: 'desc' });
 
     const resp: StarshipDatasetRowsPageResponse = {
       columns: required.dataset.columns ?? [],
@@ -311,14 +331,22 @@ router.get('/starships/:starshipId/datasets/:datasetId/rows', jwtAuthMiddleware,
 });
 
 /**
- * POST /api/v1/starships/:starshipId/datasets/:datasetId/rows:upsert
+ * POST /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert
  * Append or upsert rows.
  */
-router.post('/starships/:starshipId/datasets/:datasetId/rows:upsert', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post(
+  '/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
   const userId = requireAuthUserId(req, res);
   if (!userId) return;
 
-  const params = validateData(z.object({ starshipId: IdSchema, datasetId: IdSchema }), req.params, res, 'dataset rows params');
+  const params = validateData(
+    z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+    req.params,
+    res,
+    'dataset rows params'
+  );
   if (!params) return;
   if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
@@ -329,7 +357,7 @@ router.post('/starships/:starshipId/datasets/:datasetId/rows:upsert', jwtAuthMid
     const datasetRepo = new StarshipDatasetRepository();
     const rowRepo = new StarshipDatasetRowRepository();
     const required = await requireDatasetInStarship({
-      datasetId: params.datasetId,
+      datasetIdOrSlug: params.datasetIdOrSlug,
       starshipId: params.starshipId,
       datasetRepo,
       res,
@@ -340,6 +368,7 @@ router.post('/starships/:starshipId/datasets/:datasetId/rows:upsert', jwtAuthMid
     const rows = body.rows;
 
     const primaryKey = (required.dataset.primaryKey ?? null) as string | null;
+    const datasetId = required.dataset.id;
 
     if (mode === 'upsert') {
       if (!primaryKey || !primaryKey.trim()) {
@@ -362,7 +391,7 @@ router.post('/starships/:starshipId/datasets/:datasetId/rows:upsert', jwtAuthMid
         toUpsert.push({ rowKey: String(pkVal), data: r });
       }
 
-      const result = await rowRepo.upsertManyByRowKey(params.datasetId, toUpsert);
+      const result = await rowRepo.upsertManyByRowKey(datasetId, toUpsert);
       const resp: UpsertStarshipDatasetRowsResponse = { inserted: result.inserted, updated: result.updated };
       sendSuccess(res, resp, 200);
       return;
@@ -386,13 +415,14 @@ router.post('/starships/:starshipId/datasets/:datasetId/rows:upsert', jwtAuthMid
       toAppend.push({ rowKey, data: r });
     }
 
-    const inserted = await rowRepo.appendMany(params.datasetId, toAppend);
+    const inserted = await rowRepo.appendMany(datasetId, toAppend);
     const resp: UpsertStarshipDatasetRowsResponse = { inserted: inserted.inserted, updated: 0 };
     sendSuccess(res, resp, 200);
   } catch (error) {
     handleError(error, res, 'upsert dataset rows');
   }
-});
+  }
+);
 
 export default router;
 

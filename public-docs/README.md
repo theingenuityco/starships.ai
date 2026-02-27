@@ -16,6 +16,9 @@ This folder contains documentation for the Starships workflow system, including 
 - **Views**
   - [Views](./views/README.md)
 
+- **Data**
+  - [Starship datasets (tabular)](./data/datasets.md)
+
 Audience and access modes
 
 These docs are used by two audiences:

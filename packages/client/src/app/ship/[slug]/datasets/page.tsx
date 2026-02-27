@@ -80,7 +80,7 @@ export default function TablesIndexPage(): React.JSX.Element {
       setName('')
       setDescription('')
       setPrimaryKey('')
-      router.push(`/ship/${encodeURIComponent(slug)}/tables/${encodeURIComponent(created.id)}`)
+      router.push(`/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(created.id)}`)
     } catch (e) {
       toast.error('Failed to create dataset', { description: getSafeErrorMessage(e) })
     }
@@ -101,7 +101,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                     <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                       <Icon name="table" weight="bold" className="h-4 w-4" />
                     </span>
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Tables</h3>
+                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Datasets</h3>
                   </div>
                   <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
                     <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
@@ -115,7 +115,7 @@ export default function TablesIndexPage(): React.JSX.Element {
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={!canCreate}>
                 <Icon name="plus" className="h-4 w-4 mr-1.5" />
-                New table
+                New dataset
               </Button>
             </div>
           </div>
@@ -141,20 +141,20 @@ export default function TablesIndexPage(): React.JSX.Element {
           ) : sorted.length === 0 ? (
             <Card className="border-border/60">
               <CardHeader>
-                <CardTitle className="text-base">No tables yet</CardTitle>
+                <CardTitle className="text-base">No datasets yet</CardTitle>
                 <CardDescription>Create a dataset to store and share tabular data in this starship.</CardDescription>
               </CardHeader>
               <CardContent className="pt-0 flex flex-col sm:flex-row gap-2">
                 <Button onClick={() => setOpen(true)} disabled={!canCreate} variant="outline">
                   <Icon name="plus" className="h-4 w-4 mr-1.5" />
-                  New table
+                  New dataset
                 </Button>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {sorted.map(d => {
-                const href = `/ship/${encodeURIComponent(slug)}/tables/${encodeURIComponent(d.id)}`
+                const href = `/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(d.id)}`
                 return (
                   <Card key={d.id} className={cn('border-border/60 hover:shadow-sm transition-shadow')}>
                     <CardHeader className="pb-4">
@@ -186,7 +186,7 @@ export default function TablesIndexPage(): React.JSX.Element {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
-            <DialogTitle>Create table</DialogTitle>
+            <DialogTitle>Create dataset</DialogTitle>
             <DialogDescription>Define columns now. You can append/upsert rows later.</DialogDescription>
           </DialogHeader>
 
@@ -198,7 +198,7 @@ export default function TablesIndexPage(): React.JSX.Element {
 
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground">Description</div>
-              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this table used for?" rows={3} />
+              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this dataset used for?" rows={3} />
             </div>
 
             <div className="space-y-2">

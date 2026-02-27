@@ -38,6 +38,10 @@ export { updateViewWidgetToolTemplate } from './update-view-widget';
 export { connectorSearchToolTemplate } from './search-connector';
 export { generateCharacterVariantToolTemplate } from './generate-character-variant';
 export { readConversationMessagesToolTemplate } from './read-conversation-messages';
+export { createDatasetToolTemplate } from './create-dataset';
+export { listDatasetsToolTemplate } from './list-datasets';
+export { getDatasetRowsToolTemplate } from './get-dataset-rows';
+export { upsertDatasetRowsToolTemplate } from './upsert-dataset-rows';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -75,6 +79,10 @@ import { updateViewWidgetToolTemplate } from './update-view-widget';
 import { connectorSearchToolTemplate } from './search-connector';
 import { generateCharacterVariantToolTemplate } from './generate-character-variant';
 import { readConversationMessagesToolTemplate } from './read-conversation-messages';
+import { createDatasetToolTemplate } from './create-dataset';
+import { listDatasetsToolTemplate } from './list-datasets';
+import { getDatasetRowsToolTemplate } from './get-dataset-rows';
+import { upsertDatasetRowsToolTemplate } from './upsert-dataset-rows';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -112,4 +120,8 @@ export const ALL_TOOL_TEMPLATES = [
   connectorSearchToolTemplate,
   generateCharacterVariantToolTemplate,
   readConversationMessagesToolTemplate,
+  createDatasetToolTemplate,
+  listDatasetsToolTemplate,
+  getDatasetRowsToolTemplate,
+  upsertDatasetRowsToolTemplate,
 ];

@@ -3,7 +3,7 @@ import { BaseRepository } from './BaseRepository';
 import { StarshipDatasetEntity } from '@/entities/StarshipDatasetEntity';
 import { NotFoundError } from '@starships/errors';
 import { nanoid } from 'nanoid';
-import { fromDatabase, fromDatabaseArray, toEntityInstance } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 
 type DbRow = Record<string, unknown>;

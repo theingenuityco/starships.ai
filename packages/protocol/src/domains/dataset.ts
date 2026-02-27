@@ -13,13 +13,9 @@ export type StarshipDatasetColumnType = 'string' | 'number' | 'boolean' | 'date'
 
 export interface StarshipDatasetColumn {
   /**
-   * Stable key used in row objects.
+   * Stable key used in row objects and shown in tables.
    */
-  key: string;
-  /**
-   * Human label shown in tables.
-   */
-  label: string;
+  name: string;
   format?: StarshipDatasetColumnFormat;
   type?: StarshipDatasetColumnType;
 }
@@ -32,7 +28,7 @@ export interface StarshipDatasetModel {
   description: string;
   columns: StarshipDatasetColumn[];
   /**
-   * Optional column key that acts as a primary key for upsert semantics.
+   * Optional column name that acts as a primary key for upsert semantics.
    */
   primaryKey?: string | null;
   archived: boolean;
@@ -56,7 +52,6 @@ export interface StarshipDatasetRowModel {
 export type CreateStarshipDatasetRequest = {
   starshipId: string;
   name: string;
-  slug?: string;
   description?: string;
   columns: StarshipDatasetColumn[];
   primaryKey?: string | null;
@@ -64,7 +59,6 @@ export type CreateStarshipDatasetRequest = {
 
 export type UpdateStarshipDatasetRequest = {
   name?: string;
-  slug?: string;
   description?: string;
   columns?: StarshipDatasetColumn[];
   primaryKey?: string | null;

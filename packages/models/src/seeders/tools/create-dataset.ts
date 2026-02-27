@@ -9,14 +9,13 @@ export const createDatasetTool: ToolParams = {
   name: 'Create Dataset',
   slug: 'create-dataset',
   description:
-    'Create a dataset for the current starship. Accepts { name, description?, slug?, columns, primaryKey? } and returns the created dataset.',
+    'Create a dataset for the current starship. Accepts { name, description?, columns, primaryKey? } and returns the created dataset.',
   parameters: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Dataset name' },
       description: { type: 'string', description: 'Dataset description' },
-      slug: { type: 'string', description: 'Optional dataset slug' },
-      columns: { type: 'array', description: 'Column definitions: [{ key, label, format?, type? }]' },
+      columns: { type: 'array', description: 'Column definitions: [{ name, format?, type? }]' },
       primaryKey: { type: ['string', 'null'], description: 'Optional primary key column key (for upserts)' },
     },
     required: ['name', 'columns'],
@@ -37,7 +36,6 @@ export const createDatasetTool: ToolParams = {
               if (!name) throw new Error('name is required');
 
               const description = typeof input.description === 'string' ? input.description.trim() : '';
-              const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
 
               const columns = Array.isArray(input.columns) ? input.columns : null;
               if (!columns || columns.length === 0) throw new Error('columns is required (non-empty array)');
@@ -50,7 +48,6 @@ export const createDatasetTool: ToolParams = {
 
               const out = { starshipId: starshipId.trim(), name, columns };
               if (description) out.description = description;
-              if (slug) out.slug = slug;
               if (input.primaryKey !== undefined) out.primaryKey = primaryKey || null;
               return out;
             }
@@ -112,7 +109,7 @@ export const createDatasetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
   version: '1.0.0',
   category: 'data',
   exampleUsage:
-    '{ "name": "Leads", "description": "Sales leads", "primaryKey": "email", "columns": [{ "key": "email", "label": "Email" }, { "key": "status", "label": "Status" }] }',
+    '{ "name": "Leads", "description": "Sales leads", "primaryKey": "email", "columns": [{ "name": "email" }, { "name": "status" }] }',
   requiresApiKey: false,
   configurationFields: [],
 };

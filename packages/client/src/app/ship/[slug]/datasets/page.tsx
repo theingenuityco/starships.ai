@@ -28,12 +28,9 @@ function parseColumnsText(text: string): StarshipDatasetColumn[] {
 
   const cols: StarshipDatasetColumn[] = []
   for (const line of lines) {
-    // format: key: Label (optional)  OR  key
-    const [left, ...rest] = line.split(':')
-    const key = String(left || '').trim()
-    if (!key) continue
-    const label = String(rest.join(':') || key).trim()
-    cols.push({ key, label })
+    const name = String(line || '').trim()
+    if (!name) continue
+    cols.push({ name })
   }
   return cols
 }
@@ -60,7 +57,7 @@ export default function TablesIndexPage(): React.JSX.Element {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [primaryKey, setPrimaryKey] = useState('')
-  const [columnsText, setColumnsText] = useState('id: ID\nname: Name\n')
+  const [columnsText, setColumnsText] = useState('id\nname\n')
 
   async function onCreate() {
     if (!canCreate) return
@@ -211,11 +208,11 @@ export default function TablesIndexPage(): React.JSX.Element {
               <Textarea
                 value={columnsText}
                 onChange={e => setColumnsText(e.target.value)}
-                placeholder="email: Email\nstatus: Status"
+                placeholder="email\nstatus"
                 rows={8}
               />
               <div className="text-[11px] text-muted-foreground">
-                Format: <code className="font-mono">key: Label</code> (label optional). Keys should be alphanumeric/underscore.
+                Format: <code className="font-mono">name</code> (one per line). Names should be alphanumeric/underscore.
               </div>
             </div>
           </div>

@@ -20,7 +20,7 @@ function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; 
   for (const raw of arr) {
     if (!raw || typeof raw !== 'object') continue
     const r = raw as Record<string, any>
-    const key = typeof r.name === 'string' && r.name.trim() ? r.name.trim() : typeof r.key === 'string' && r.key.trim() ? r.key.trim() : ''
+    const key = typeof r.name === 'string' && r.name.trim() ? r.name.trim() : ''
     if (!key) continue
     out.push({ key, label: key, format: r.format })
   }

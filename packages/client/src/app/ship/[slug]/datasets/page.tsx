@@ -28,9 +28,7 @@ function parseColumnsText(text: string): StarshipDatasetColumn[] {
 
   const cols: StarshipDatasetColumn[] = []
   for (const line of lines) {
-    // format: name (preferred) OR legacy: key: Label
-    const [left] = line.split(':')
-    const name = String(left || '').trim()
+    const name = String(line || '').trim()
     if (!name) continue
     cols.push({ name })
   }

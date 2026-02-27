@@ -3,12 +3,15 @@
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCallback, useEffect, useState } from 'react'
-import { HeroMarketplaceCarouselView } from '@/app/components/HeroMarketplaceCarousel'
-import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
+import dynamic from 'next/dynamic'
+import { HeroMarketplaceCarouselView } from '@/app/components/HeroMarketplaceCarouselView'
 import { HeroCtaButton } from '@/app/components/HeroCtaButton'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
+
+/** Load only on client so useAgentTemplates never runs during SSR (avoids QueryClient error when fetch returns []). */
+const HeroMarketplaceCarousel = dynamic(() => import('@/app/components/HeroMarketplaceCarousel'), { ssr: false })
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
@@ -30,7 +33,12 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [])
 
   const selectedAgentName = String(selectedAgentTemplate?.name || '').trim() || 'this agent'
-  const defaultPlaceholder = selectedAgentTemplate ? `Describe what you want ${selectedAgentName} to research, plan, or execute…` : 'Describe what you want an agent to research, plan, or execute…'
+  const selectedAgentRole = String((selectedAgentTemplate as any)?.role ?? '').trim()
+  const defaultPlaceholder = selectedAgentTemplate
+    ? selectedAgentRole
+      ? `How can ${selectedAgentName}, the ${selectedAgentRole} help you today?`
+      : `How can ${selectedAgentName} help you today?`
+    : 'How can I help you today?'
   const examplePrompts = (selectedAgentTemplate?.previewPrompts ?? []).filter(Boolean)
   const [tryPromptsOpen, setTryPromptsOpen] = useState(false)
 
@@ -55,26 +63,28 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             .
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
-            Chat with your team, delegate work to agents, and ship faster across your tools.
+            Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-8 justify-center w-full min-w-0">
             <div className="w-full max-w-2xl mx-auto flex flex-col gap-2 items-stretch text-left">
-              {/* Input + submit button with comfortable padding so button isn’t stuck to edges */}
-              <div className="flex items-end gap-3 rounded-xl border border-border/60 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.45)] min-h-[160px] pl-2 pr-4 pt-2 pb-2">
-                <Textarea
-                  value={heroInputValue}
-                  onChange={event => setHeroInputValue(event.target.value)}
-                  rows={3}
-                  placeholder={defaultPlaceholder}
-                  className="flex-1 min-h-[140px] w-full rounded-lg border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-2 pt-2 pr-3 pb-2 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
-                />
-                <button
-                  type="button"
-                  className="flex-shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
-                  aria-label="Submit"
-                >
-                  <span className="text-lg leading-none">↑</span>
-                </button>
+              {/* Input + submit with hero-style glow using a pseudo-element (same pattern as DelegationDemo) */}
+              <div className="relative hero-input-glow rounded-[24px]">
+                <div className="relative z-10 flex items-end gap-3 rounded-xl border border-border/80 bg-background/95 min-h-[160px] pl-2 pr-4 pt-2 pb-2">
+                  <Textarea
+                    value={heroInputValue}
+                    onChange={event => setHeroInputValue(event.target.value)}
+                    rows={3}
+                    placeholder={defaultPlaceholder}
+                    className="flex-1 min-h-[140px] w-full rounded-lg border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pl-2 pt-2 pr-3 pb-2 text-sm sm:text-base resize-none placeholder:text-muted-foreground/80"
+                  />
+                  <button
+                    type="button"
+                    className="flex-shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
+                    aria-label="Submit"
+                  >
+                    <span className="text-lg leading-none">↑</span>
+                  </button>
+                </div>
               </div>
               <div className="flex items-center justify-between gap-2 px-1">
                 <Popover open={tryPromptsOpen} onOpenChange={setTryPromptsOpen}>
@@ -104,15 +114,11 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               </div>
             </div>
 
-            {/* SSR-safe: use View with server data so we never call useAgentTemplates on the server */}
+            {/* SSR-safe: View when we have server data; otherwise carousel only after mount via dynamic(ssr: false) */}
             {initialAgentTemplates.length > 0 ? (
-              <HeroMarketplaceCarouselView
-                agentTemplates={initialAgentTemplates}
-                autoPlay={false}
-                onSelectionChange={handleAgentSelection}
-              />
+              <HeroMarketplaceCarouselView agentTemplates={initialAgentTemplates} autoPlay={false} onSelectionChange={handleAgentSelection} />
             ) : mounted ? (
-              <HeroMarketplaceCarousel autoPlay={false} onSelectionChange={handleAgentSelection} />
+              <HeroMarketplaceCarousel initialAgentTemplates={[]} autoPlay={false} onSelectionChange={handleAgentSelection} />
             ) : (
               <div className="w-full max-w-2xl mx-auto flex justify-center gap-2" aria-hidden>
                 {[1, 2, 3, 4, 5].map(i => (
@@ -278,7 +284,18 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           }
         }
 
-        /* Glow styles moved to global CSS for earlier paint */
+        /* Hero input glow – reuse the DelegationDemo glow pattern but tighter around the textbox */
+        .hero-input-glow::before {
+          content: '';
+          position: absolute;
+          inset: -8px;
+          border-radius: inherit;
+          background: conic-gradient(from 0deg at 50% 50%, rgba(99, 102, 241, 0.75), rgba(217, 70, 239, 0.75), rgba(245, 158, 11, 0.6), rgba(99, 102, 241, 0.75));
+          filter: blur(22px);
+          opacity: 0.8;
+          pointer-events: none;
+          z-index: 0;
+        }
       `}</style>
     </section>
   )

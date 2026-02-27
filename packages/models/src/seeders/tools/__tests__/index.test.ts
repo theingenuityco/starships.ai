@@ -21,6 +21,10 @@ describe('Tool Templates Test Suite', () => {
       // Test Tool template is currently named "Test Tool"
       expect(toolNames).toContain('Test Tool');
       expect(toolNames).toContain('List Tools');
+      expect(toolNames).toContain('Create Dataset');
+      expect(toolNames).toContain('List Datasets');
+      expect(toolNames).toContain('Get Dataset Rows');
+      expect(toolNames).toContain('Upsert Dataset Rows');
     });
 
     it('should have unique tool names', () => {

@@ -311,6 +311,12 @@ export function Navigation(props: NavigationProps) {
               icon: 'users',
               isActive: isMembersRoute,
             },
+            {
+              href: `/ship/${starshipSlug}/tables`,
+              label: 'Tables',
+              icon: 'table',
+              isActive: pathname.startsWith(`/ship/${starshipSlug}/tables`),
+            },
           ]
         : []),
       ...(isAuthenticated && starshipSlug && canManageConnectors

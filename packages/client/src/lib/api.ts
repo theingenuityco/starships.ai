@@ -380,6 +380,17 @@ import {
   type ScheduleModel,
   type CreateScheduleRequest,
   type UpdateScheduleRequest,
+  type TaskBoardModel,
+  type TaskBoardDetailsResponse,
+  type TaskCardModel,
+  type TaskColumnModel,
+  type CreateTaskBoardRequest,
+  type UpdateTaskBoardRequest,
+  type CreateTaskColumnRequest,
+  type UpdateTaskColumnRequest,
+  type CreateTaskCardRequest,
+  type UpdateTaskCardRequest,
+  type MoveTaskCardRequest,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
@@ -584,6 +595,79 @@ export const scheduleAPI = {
 
   deactivate: async (scheduleId: string): Promise<void> => {
     await api.delete(`/api/v1/schedules/${scheduleId}`)
+  },
+}
+
+export const taskBoardAPI = {
+  listBoardsByStarship: async (starshipId: string, args?: { includeArchived?: boolean }): Promise<TaskBoardModel[]> => {
+    const includeArchived = Boolean(args?.includeArchived)
+    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards`, {
+      params: includeArchived ? { includeArchived: 'true' } : {},
+    })
+    const data = extractResponseData<{ boards: TaskBoardModel[] }>(res as FetchResponse<ApiResponse<{ boards: TaskBoardModel[] }>>)
+    return Array.isArray(data?.boards) ? data.boards : []
+  },
+
+  createBoard: async (payload: CreateTaskBoardRequest): Promise<TaskBoardDetailsResponse> => {
+    const { starshipId, ...body } = payload
+    const res = await api.post(`/api/v1/starships/${starshipId}/task-boards`, body)
+    return extractResponseData<TaskBoardDetailsResponse>(res as FetchResponse<ApiResponse<TaskBoardDetailsResponse>>)
+  },
+
+  getBoard: async (boardId: string): Promise<TaskBoardDetailsResponse> => {
+    const res = await api.get(`/api/v1/task-boards/${boardId}`)
+    return extractResponseData<TaskBoardDetailsResponse>(res as FetchResponse<ApiResponse<TaskBoardDetailsResponse>>)
+  },
+
+  updateBoard: async (boardId: string, updates: UpdateTaskBoardRequest): Promise<TaskBoardModel> => {
+    const res = await api.patch(`/api/v1/task-boards/${boardId}`, updates)
+    return extractResponseData<TaskBoardModel>(res as FetchResponse<ApiResponse<TaskBoardModel>>)
+  },
+
+  archiveBoard: async (boardId: string): Promise<TaskBoardModel> => {
+    const res = await api.delete(`/api/v1/task-boards/${boardId}`)
+    return extractResponseData<TaskBoardModel>(res as FetchResponse<ApiResponse<TaskBoardModel>>)
+  },
+
+  createColumn: async (boardId: string, payload: Omit<CreateTaskColumnRequest, 'boardId'>): Promise<TaskColumnModel> => {
+    const res = await api.post(`/api/v1/task-boards/${boardId}/columns`, payload)
+    return extractResponseData<TaskColumnModel>(res as FetchResponse<ApiResponse<TaskColumnModel>>)
+  },
+
+  updateColumn: async (columnId: string, updates: UpdateTaskColumnRequest): Promise<TaskColumnModel> => {
+    const res = await api.patch(`/api/v1/task-columns/${columnId}`, updates)
+    return extractResponseData<TaskColumnModel>(res as FetchResponse<ApiResponse<TaskColumnModel>>)
+  },
+
+  deleteColumn: async (columnId: string): Promise<void> => {
+    await api.delete(`/api/v1/task-columns/${columnId}`)
+  },
+
+  listCards: async (boardId: string, args?: { includeArchived?: boolean }): Promise<TaskCardModel[]> => {
+    const includeArchived = Boolean(args?.includeArchived)
+    const res = await api.get(`/api/v1/task-boards/${boardId}/cards`, { params: includeArchived ? { includeArchived: 'true' } : {} })
+    const data = extractResponseData<{ cards: TaskCardModel[] }>(res as FetchResponse<ApiResponse<{ cards: TaskCardModel[] }>>)
+    return Array.isArray(data?.cards) ? data.cards : []
+  },
+
+  createCard: async (boardId: string, payload: Omit<CreateTaskCardRequest, 'boardId'>): Promise<TaskCardModel> => {
+    const res = await api.post(`/api/v1/task-boards/${boardId}/cards`, payload)
+    return extractResponseData<TaskCardModel>(res as FetchResponse<ApiResponse<TaskCardModel>>)
+  },
+
+  updateCard: async (cardId: string, updates: UpdateTaskCardRequest): Promise<TaskCardModel> => {
+    const res = await api.patch(`/api/v1/task-cards/${cardId}`, updates)
+    return extractResponseData<TaskCardModel>(res as FetchResponse<ApiResponse<TaskCardModel>>)
+  },
+
+  moveCard: async (cardId: string, move: MoveTaskCardRequest): Promise<TaskCardModel> => {
+    const res = await api.post(`/api/v1/task-cards/${cardId}/move`, move)
+    return extractResponseData<TaskCardModel>(res as FetchResponse<ApiResponse<TaskCardModel>>)
+  },
+
+  archiveCard: async (cardId: string): Promise<TaskCardModel> => {
+    const res = await api.delete(`/api/v1/task-cards/${cardId}`)
+    return extractResponseData<TaskCardModel>(res as FetchResponse<ApiResponse<TaskCardModel>>)
   },
 }
 

@@ -85,7 +85,7 @@ function KanbanColumn({
 }: {
   column: TaskColumnModel
   cards: TaskCardModel[]
-  onCreateCard?: (columnId: string, title: string) => Promise<void> | void
+  onCreateCard?: (columnName: string, title: string) => Promise<void> | void
   onArchiveCard?: (cardId: string) => Promise<void> | void
 }): React.JSX.Element {
   const [adding, setAdding] = useState(false)
@@ -128,7 +128,7 @@ function KanbanColumn({
               if (!t) return
               setTitle('')
               setAdding(false)
-              await onCreateCard?.(column.id, t)
+              await onCreateCard?.(column.title, t)
             }}
           >
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Card title" className="h-8" />
@@ -162,14 +162,15 @@ export function KanbanBoard({
 }: {
   columns: TaskColumnModel[]
   cards: TaskCardModel[]
-  onMoveCard?: (args: { cardId: string; toColumnId: string; toPos: number }) => Promise<void> | void
-  onCreateCard?: (columnId: string, title: string) => Promise<void> | void
+  onMoveCard?: (args: { cardId: string; toColumnName: string; toPos: number }) => Promise<void> | void
+  onCreateCard?: (columnName: string, title: string) => Promise<void> | void
   onArchiveCard?: (cardId: string) => Promise<void> | void
   className?: string
 }): React.JSX.Element {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   const sortedColumns = useMemo(() => [...columns].sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0)), [columns])
+  const columnTitleById = useMemo(() => new Map(sortedColumns.map((c) => [c.id, c.title] as const)), [sortedColumns])
   const cardsByColumn = useMemo(() => {
     const map = new Map<string, TaskCardModel[]>()
     for (const c of sortedColumns) map.set(c.id, [])
@@ -222,7 +223,7 @@ export function KanbanBoard({
 
     if (!localCardsByColumn.has(toColumnId)) return
 
-    let moveInfo: { cardId: string; toColumnId: string; toPos: number } | null = null
+    let moveInfo: { cardId: string; toColumnName: string; toPos: number } | null = null
 
     setLocalCardsByColumn((prev) => {
       const next = new Map(prev)
@@ -253,7 +254,9 @@ export function KanbanBoard({
 
       const newIndex = toList.findIndex((c) => c.id === activeId)
       const toPos = computeNewPos(toList, newIndex)
-      moveInfo = { cardId: activeId, toColumnId, toPos }
+      const toColumnName = String(columnTitleById.get(toColumnId) || '').trim()
+      if (!toColumnName) return prev
+      moveInfo = { cardId: activeId, toColumnName, toPos }
 
       return next
     })

@@ -314,7 +314,7 @@ export function Navigation(props: NavigationProps) {
             {
               href: `/ship/${starshipSlug}/datasets`,
               label: 'Datasets',
-              icon: 'table',
+              icon: 'database',
               isActive: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
             },
           ]

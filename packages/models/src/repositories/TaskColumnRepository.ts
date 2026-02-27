@@ -40,6 +40,57 @@ export class TaskColumnRepository extends BaseRepository {
     );
   }
 
+  async findByTitle(boardId: string, title: string): Promise<TaskColumnModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `SELECT *
+             FROM task_columns
+            WHERE board_id = $1
+              AND lower(btrim(title)) = lower(btrim($2))
+            LIMIT 1`,
+          [boardId, title]
+        );
+        return row ? fromDatabase(TaskColumnEntity, row) : null;
+      },
+      'findByTitle',
+      'TaskColumn',
+      `${boardId}:${title}`
+    );
+  }
+
+  async titleExists(boardId: string, title: string, opts?: { excludeId?: string }): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const excludeId = typeof opts?.excludeId === 'string' && opts.excludeId.trim() ? opts.excludeId.trim() : null;
+        const row = excludeId
+          ? await connection.queryOne<{ ok: number }>(
+              `SELECT 1 as ok
+                 FROM task_columns
+                WHERE board_id = $1
+                  AND lower(btrim(title)) = lower(btrim($2))
+                  AND id <> $3
+                LIMIT 1`,
+              [boardId, title, excludeId]
+            )
+          : await connection.queryOne<{ ok: number }>(
+              `SELECT 1 as ok
+                 FROM task_columns
+                WHERE board_id = $1
+                  AND lower(btrim(title)) = lower(btrim($2))
+                LIMIT 1`,
+              [boardId, title]
+            );
+        return Boolean(row?.ok);
+      },
+      'titleExists',
+      'TaskColumn',
+      `${boardId}:${title}`
+    );
+  }
+
   private async computeNextPos(boardId: string): Promise<number> {
     const connection = this.getConnection();
     const row = await connection.queryOne<{ max: number | null }>(`SELECT COALESCE(MAX(pos), 0) AS max FROM task_columns WHERE board_id = $1`, [

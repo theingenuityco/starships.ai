@@ -312,10 +312,10 @@ export function Navigation(props: NavigationProps) {
               isActive: isMembersRoute,
             },
             {
-              href: `/ship/${starshipSlug}/tables`,
-              label: 'Tables',
-              icon: 'table',
-              isActive: pathname.startsWith(`/ship/${starshipSlug}/tables`),
+              href: `/ship/${starshipSlug}/datasets`,
+              label: 'Datasets',
+              icon: 'database',
+              isActive: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
             },
           ]
         : []),

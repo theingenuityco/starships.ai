@@ -37,20 +37,20 @@ const taskBoardsClient = {
     const res = await api.post(`/api/v1/starships/${starshipId}/task-boards`, body)
     return unwrapApiData<TaskBoardDetailsResponse>(res)
   },
-  getBoard: async (boardId: string): Promise<TaskBoardDetailsResponse> => {
-    const res = await api.get(`/api/v1/task-boards/${boardId}`)
+  getBoard: async (starshipId: string, boardIdOrSlug: string): Promise<TaskBoardDetailsResponse> => {
+    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}`)
     return unwrapApiData<TaskBoardDetailsResponse>(res)
   },
-  listCards: async (boardId: string): Promise<TaskCardModel[]> => {
-    const res = await api.get(`/api/v1/task-boards/${boardId}/cards`)
+  listCards: async (starshipId: string, boardIdOrSlug: string): Promise<TaskCardModel[]> => {
+    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/cards`)
     const data = unwrapApiData<{ cards: TaskCardModel[] }>(res)
     return Array.isArray(data?.cards) ? data.cards : []
   },
-  createCard: async (boardId: string, payload: { columnId: string; title: string }): Promise<TaskCardModel> => {
-    const res = await api.post(`/api/v1/task-boards/${boardId}/cards`, payload)
+  createCard: async (starshipId: string, boardIdOrSlug: string, payload: { columnName: string; title: string }): Promise<TaskCardModel> => {
+    const res = await api.post(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/cards`, payload)
     return unwrapApiData<TaskCardModel>(res)
   },
-  moveCard: async (cardId: string, move: { toColumnId: string; toPos: number }): Promise<TaskCardModel> => {
+  moveCard: async (cardId: string, move: { toColumnName: string; toPos: number }): Promise<TaskCardModel> => {
     const res = await api.post(`/api/v1/task-cards/${cardId}/move`, move)
     return unwrapApiData<TaskCardModel>(res)
   },
@@ -88,22 +88,24 @@ export default function StarshipTasksPage(): React.JSX.Element {
   }, [boards, selectedBoardId])
 
   const { data: boardDetails, isLoading: boardLoading } = useQuery<TaskBoardDetailsResponse>({
-    queryKey: ['task-board', effectiveBoardId],
+    queryKey: ['task-board', starshipId, effectiveBoardId],
     queryFn: async () => {
       if (!effectiveBoardId) throw new Error('No board selected')
-      return await taskBoardsClient.getBoard(effectiveBoardId)
+      if (!starshipId) throw new Error('Missing starship id')
+      return await taskBoardsClient.getBoard(starshipId, effectiveBoardId)
     },
-    enabled: !!effectiveBoardId,
+    enabled: !!starshipId && !!effectiveBoardId,
     staleTime: 10_000,
   })
 
   const { data: cards = [], isLoading: cardsLoading } = useQuery<TaskCardModel[]>({
-    queryKey: ['task-cards', effectiveBoardId],
+    queryKey: ['task-cards', starshipId, effectiveBoardId],
     queryFn: async () => {
       if (!effectiveBoardId) return []
-      return await taskBoardsClient.listCards(effectiveBoardId)
+      if (!starshipId) return []
+      return await taskBoardsClient.listCards(starshipId, effectiveBoardId)
     },
-    enabled: !!effectiveBoardId,
+    enabled: !!starshipId && !!effectiveBoardId,
     staleTime: 5_000,
   })
 
@@ -128,21 +130,22 @@ export default function StarshipTasksPage(): React.JSX.Element {
   })
 
   const createCardMutation = useMutation({
-    mutationFn: async (args: { columnId: string; title: string }) => {
+    mutationFn: async (args: { columnName: string; title: string }) => {
       if (!effectiveBoardId) throw new Error('No board selected')
-      return await taskBoardsClient.createCard(effectiveBoardId, { columnId: args.columnId, title: args.title })
+      if (!starshipId) throw new Error('Missing starship id')
+      return await taskBoardsClient.createCard(starshipId, effectiveBoardId, { columnName: args.columnName, title: args.title })
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['task-cards', effectiveBoardId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId, effectiveBoardId] })
     },
   })
 
   const moveCardMutation = useMutation({
-    mutationFn: async (args: { cardId: string; toColumnId: string; toPos: number }) => {
-      return await taskBoardsClient.moveCard(args.cardId, { toColumnId: args.toColumnId, toPos: args.toPos })
+    mutationFn: async (args: { cardId: string; toColumnName: string; toPos: number }) => {
+      return await taskBoardsClient.moveCard(args.cardId, { toColumnName: args.toColumnName, toPos: args.toPos })
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['task-cards', effectiveBoardId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId, effectiveBoardId] })
     },
   })
 
@@ -151,7 +154,7 @@ export default function StarshipTasksPage(): React.JSX.Element {
       return await taskBoardsClient.archiveCard(cardId)
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['task-cards', effectiveBoardId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId, effectiveBoardId] })
     },
   })
 
@@ -313,11 +316,11 @@ export default function StarshipTasksPage(): React.JSX.Element {
                     <KanbanBoard
                       columns={boardDetails.columns || []}
                       cards={cards}
-                      onCreateCard={async (columnId, title) => {
-                        await createCardMutation.mutateAsync({ columnId, title })
+                      onCreateCard={async (columnName, title) => {
+                        await createCardMutation.mutateAsync({ columnName, title })
                       }}
-                      onMoveCard={async ({ cardId, toColumnId, toPos }) => {
-                        await moveCardMutation.mutateAsync({ cardId, toColumnId, toPos })
+                      onMoveCard={async ({ cardId, toColumnName, toPos }) => {
+                        await moveCardMutation.mutateAsync({ cardId, toColumnName, toPos })
                       }}
                       onArchiveCard={async cardId => {
                         await archiveCardMutation.mutateAsync(cardId)

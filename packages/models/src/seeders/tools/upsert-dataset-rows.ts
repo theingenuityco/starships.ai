@@ -9,16 +9,17 @@ export const upsertDatasetRowsTool: ToolParams = {
   name: 'Upsert Dataset Rows',
   slug: 'upsert-dataset-rows',
   description:
-    'Append or upsert rows in a dataset. For upserts, the dataset must define primaryKey. Accepts { datasetId, rows, mode? }.',
+    'Append or upsert rows in a dataset. For upserts, the dataset must define primaryKey. Accepts { datasetSlug|datasetId, rows, mode? }.',
   parameters: {
     type: 'object',
     properties: {
       starshipId: { type: 'string', description: 'Starship ID (optional; defaults to runtime STARSHIP_ID)' },
-      datasetId: { type: 'string', description: 'Dataset id' },
+      datasetId: { type: 'string', description: 'Dataset id (optional if datasetSlug provided)' },
+      datasetSlug: { type: 'string', description: 'Dataset slug (optional if datasetId provided)' },
       rows: { type: 'array', description: 'Array of row objects' },
       mode: { type: 'string', description: '"append" (default) or "upsert"' },
     },
-    required: ['datasetId', 'rows'],
+    required: ['rows'],
   },
   blueprint: {
     nodes: [
@@ -33,7 +34,9 @@ export const upsertDatasetRowsTool: ToolParams = {
             async function main(ctx) {
               const input = ctx.input || {};
               const datasetId = typeof input.datasetId === 'string' ? input.datasetId.trim() : '';
-              if (!datasetId) throw new Error('datasetId is required');
+              const datasetSlug = typeof input.datasetSlug === 'string' ? input.datasetSlug.trim() : '';
+              const datasetIdOrSlug = datasetSlug || datasetId;
+              if (!datasetIdOrSlug) throw new Error('datasetSlug or datasetId is required');
               const rows = Array.isArray(input.rows) ? input.rows : null;
               if (!rows || rows.length === 0) throw new Error('rows is required (non-empty array)');
               const mode = typeof input.mode === 'string' && input.mode.trim() ? input.mode.trim() : 'append';
@@ -44,7 +47,10 @@ export const upsertDatasetRowsTool: ToolParams = {
                 : ctx.env('STARSHIP_ID');
               if (!starshipId || typeof starshipId !== 'string' || !String(starshipId).trim()) throw new Error('STARSHIP_ID is required');
 
-              return { starshipId: String(starshipId).trim(), datasetId, rows, mode };
+              const out = { starshipId: String(starshipId).trim(), rows, mode };
+              if (datasetSlug) out.datasetSlug = datasetSlug;
+              if (!datasetSlug) out.datasetId = datasetIdOrSlug;
+              return out;
             }
           `,
           timeout: 3000,
@@ -103,7 +109,7 @@ export const upsertDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   slug: upsertDatasetRowsTool.slug,
   version: '1.0.0',
   category: 'data',
-  exampleUsage: '{ "datasetId": "dataset_123", "mode": "upsert", "rows": [{ "email": "a@b.com", "status": "new" }] }',
+  exampleUsage: '{ "datasetSlug": "leads", "mode": "upsert", "rows": [{ "email": "a@b.com", "status": "new" }] }',
   requiresApiKey: false,
   configurationFields: [],
 };

@@ -13,11 +13,12 @@ export const getDatasetRowsTool: ToolParams = {
     type: 'object',
     properties: {
       starshipId: { type: 'string', description: 'Starship ID (optional; defaults to runtime STARSHIP_ID)' },
-      datasetId: { type: 'string', description: 'Dataset id' },
+      datasetId: { type: 'string', description: 'Dataset id (optional if datasetSlug provided)' },
+      datasetSlug: { type: 'string', description: 'Dataset slug (optional if datasetId provided)' },
       limit: { type: 'number', description: 'Max rows to return (0-200)' },
       offset: { type: 'number', description: 'Offset (0+) for pagination' },
     },
-    required: ['datasetId'],
+    required: [],
   },
   blueprint: {
     nodes: [
@@ -32,7 +33,9 @@ export const getDatasetRowsTool: ToolParams = {
             async function main(ctx) {
               const input = ctx.input || {};
               const datasetId = typeof input.datasetId === 'string' ? input.datasetId.trim() : '';
-              if (!datasetId) throw new Error('datasetId is required');
+              const datasetSlug = typeof input.datasetSlug === 'string' ? input.datasetSlug.trim() : '';
+              const datasetIdOrSlug = datasetSlug || datasetId;
+              if (!datasetIdOrSlug) throw new Error('datasetSlug or datasetId is required');
 
               const starshipId = typeof input.starshipId === 'string' && input.starshipId.trim()
                 ? input.starshipId.trim()
@@ -44,7 +47,9 @@ export const getDatasetRowsTool: ToolParams = {
               const offset = input.offset == null ? undefined : Math.max(0, Math.floor(Number(input.offset)));
               if (offset !== undefined && !Number.isFinite(offset)) throw new Error('offset must be a number');
 
-              const out = { starshipId: String(starshipId).trim(), datasetId };
+              const out = { starshipId: String(starshipId).trim() };
+              if (datasetSlug) out.datasetSlug = datasetSlug;
+              if (!datasetSlug) out.datasetId = datasetIdOrSlug;
               if (limit !== undefined) out.limit = limit;
               if (offset !== undefined) out.offset = offset;
               return out;
@@ -106,7 +111,7 @@ export const getDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   slug: getDatasetRowsTool.slug,
   version: '1.0.0',
   category: 'data',
-  exampleUsage: '{ "datasetId": "dataset_123", "limit": 50, "offset": 0 }',
+  exampleUsage: '{ "datasetSlug": "leads", "limit": 50, "offset": 0 }',
   requiresApiKey: false,
   configurationFields: [],
 };

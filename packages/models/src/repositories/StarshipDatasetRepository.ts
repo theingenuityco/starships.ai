@@ -111,13 +111,11 @@ export class StarshipDatasetRepository extends BaseRepository {
       async () => {
         const id = nanoid();
         const now = new Date().toISOString();
-        const slug = data.slug
-          ? String(data.slug)
-          : await generateUniqueSlugIncremental(
-              String(data.name || 'dataset'),
-              async (candidate: string) => Boolean(await this.findBySlug(candidate, data.starshipId)),
-              { fallbackBase: 'dataset', maxLength: 100 }
-            );
+        const slug = await generateUniqueSlugIncremental(
+          String(data.name || 'dataset'),
+          async (candidate: string) => Boolean(await this.findBySlug(candidate, data.starshipId)),
+          { fallbackBase: 'dataset', maxLength: 100 }
+        );
 
         const datasetData: StarshipDatasetModel = {
           id,
@@ -189,10 +187,6 @@ export class StarshipDatasetRepository extends BaseRepository {
         if (patch.description !== undefined) {
           sets.push(`description = $${i++}`);
           values.push(patch.description);
-        }
-        if (patch.slug !== undefined) {
-          sets.push(`slug = $${i++}`);
-          values.push(patch.slug);
         }
         if (patch.columns !== undefined) {
           sets.push(`columns_json = $${i++}::jsonb`);

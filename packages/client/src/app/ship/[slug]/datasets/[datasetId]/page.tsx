@@ -14,6 +14,19 @@ import { cn } from '@/lib/utils'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useDataset, useDatasetRows } from '@/hooks/useDatasets'
 
+function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; format?: any }> {
+  const arr = Array.isArray(cols) ? cols : []
+  const out: Array<{ key: string; label: string; format?: any }> = []
+  for (const raw of arr) {
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, any>
+    const key = typeof r.name === 'string' && r.name.trim() ? r.name.trim() : ''
+    if (!key) continue
+    out.push({ key, label: key, format: r.format })
+  }
+  return out
+}
+
 export default function DatasetViewerPage(): React.JSX.Element {
   const router = useRouter()
   const params = useParams<{ slug: string; datasetId: string }>()
@@ -38,6 +51,8 @@ export default function DatasetViewerPage(): React.JSX.Element {
     const cols = rowsPage?.columns ?? dataset?.columns ?? []
     return Array.isArray(cols) ? cols : []
   }, [dataset?.columns, rowsPage?.columns])
+
+  const tableColumns = useMemo(() => toDataTableColumns(columns), [columns])
 
   const data = useMemo(() => {
     const d = rowsPage?.data ?? []
@@ -124,7 +139,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
               <DataTable
                 title={dataset.name}
                 description={dataset.slug}
-                columns={columns as any}
+                columns={tableColumns as any}
                 data={data as any}
                 pageSize={0}
                 striped={true}

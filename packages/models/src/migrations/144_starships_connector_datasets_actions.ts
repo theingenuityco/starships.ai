@@ -301,7 +301,8 @@ export async function down(client: DbClient): Promise<void> {
 
     // Best-effort legacy cleanup
     const legacyEndpoints: Endpoint[] = Array.isArray(rows[0].endpoints_json) ? (rows[0].endpoints_json as Endpoint[]) : [];
-    const nextLegacy = legacyEndpoints.filter((e) => !ACTION_NAMES.includes(String(e?.name || '') as any));
+    const actionNameSet = new Set<string>(ACTION_NAMES as unknown as string[]);
+    const nextLegacy = legacyEndpoints.filter((e) => !actionNameSet.has(String(e?.name || '')));
     await client.query(`UPDATE connector_templates SET endpoints_json = $1::jsonb, updated_at = NOW() WHERE id = $2;`, [
       JSON.stringify(nextLegacy),
       templateId,

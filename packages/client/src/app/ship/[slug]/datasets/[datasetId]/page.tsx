@@ -60,7 +60,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
                       <Icon name="table" weight="bold" className="h-4 w-4" />
                     </span>
                     <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                      {dataset?.name || 'Table'}
+                      {dataset?.name || 'Dataset'}
                     </h3>
                   </div>
                   <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
@@ -73,7 +73,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/tables`)}>
+              <Button variant="outline" size="sm" onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/datasets`)}>
                 <Icon name="chevron-left" className="h-4 w-4 mr-1.5" />
                 Back
               </Button>

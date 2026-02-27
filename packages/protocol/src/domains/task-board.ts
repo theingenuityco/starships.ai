@@ -55,6 +55,20 @@ export interface TaskCardModel {
   updatedAt: string;
 }
  
+/**
+ * Unified assignee reference for task cards.
+ *
+ * - `type: "agent"` uses `slug` = Agent slug (e.g. "kepler-9x2m")
+ * - `type: "user"` uses `slug` = "u:<userId>" (mirrors message mention tokens like `<@u:USER_ID>`)
+ *
+ * Note: The database stores assignees as ids (`assigneeAgentId`/`assigneeUserId`). This ref is intended
+ * for API ergonomics (human/agent-friendly payloads) and may be echoed back by the server.
+ */
+export type TaskAssigneeRef = {
+  type: 'user' | 'agent';
+  slug: string;
+};
+
 // ----------------------------------------------------------------------------
 // Requests / responses
 // ----------------------------------------------------------------------------
@@ -115,13 +129,19 @@ export type UpdateTaskColumnRequest = {
  
 export type CreateTaskCardRequest = {
   boardId: string;
-  columnId: string;
+  /**
+   * Task column title/name (unique per board).
+   */
+  columnName: string;
   title: string;
   description?: string;
   pos?: number;
   priority?: number | null;
-  assigneeAgentId?: string | null;
-  assigneeUserId?: string | null;
+  /**
+   * Preferred unified assignee reference.
+   * Servers should map this to `assigneeAgentId`/`assigneeUserId` internally.
+   */
+  assignee?: TaskAssigneeRef | null;
 };
  
 export type UpdateTaskCardRequest = {
@@ -129,16 +149,20 @@ export type UpdateTaskCardRequest = {
   description?: string;
   pos?: number;
   priority?: number | null;
-  assigneeAgentId?: string | null;
-  assigneeUserId?: string | null;
+  /**
+   * Preferred unified assignee reference.
+   * - Omit to leave unchanged
+   * - Set to null to clear assignee
+   */
+  assignee?: TaskAssigneeRef | null;
   archived?: boolean;
 };
  
 export type MoveTaskCardRequest = {
   /**
-   * Destination column id (must belong to the same board as the card).
+   * Preferred: destination task column title/name (unique per board).
    */
-  toColumnId: string;
+  toColumnName: string;
   /**
    * Destination position value. If omitted, the server may place at end of column.
    */

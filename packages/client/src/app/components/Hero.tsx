@@ -120,16 +120,16 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-white [&_svg]:!w-12 [&_svg]:!h-12 bg-primary hover:bg-primary/90 disabled:opacity-100 disabled:bg-primary disabled:text-white"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
               aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
             >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-white">
                 <StarshipsLogo
                   width={48}
                   height={48}
-                  className="text-primary-foreground"
+                  className="text-white"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
                   activeStroke="currentColor"
@@ -140,12 +140,12 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               {shouldBlockCtaWhileResolving ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Loading your starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-white/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
                 </span>
               ) : isAuthenticated ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Enter my starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-white/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
                 </span>
               ) : (
                 'Get started for free'
@@ -183,11 +183,9 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           --warp-delay: 0ms;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) var(--warp-delay) both,
-            /* Keep these independent of per-letter entry delay */
-            gradient-shift 8s ease-in-out 1.2s infinite,
+            /* Keep these independent of per-letter entry delay */ gradient-shift 8s ease-in-out 1.2s infinite,
             warp-blur 3.6s ease-in-out 1.3s infinite,
-            /* Continuous subtle warping after entry finishes */
-            warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
+            /* Continuous subtle warping after entry finishes */ warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
           will-change: transform, opacity, filter, background-position;
           background: linear-gradient(120deg, rgba(168, 85, 247, 0.95) 0%, rgba(139, 92, 246, 0.9) 35%, rgba(124, 58, 237, 0.9) 70%, rgba(168, 85, 247, 0.95) 100%);
           background-size: 250% 250%;

@@ -6,6 +6,7 @@ import { StarTheme } from '@/components/theme-context'
 import { USE_CASES_BY_SLUG } from '@/app/use-cases/use-cases.data'
 import { UseCaseSections } from '@/app/use-cases/components/UseCaseSections'
 import { LeadGenerationHero } from '@/app/use-cases/lead-generation/LeadGenerationHero'
+import { fetchPublicAgentTemplateBySlug } from '@/lib/server/public-templates'
 
 export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
@@ -42,10 +43,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function LeadGenerationUseCasePage() {
+export default async function LeadGenerationUseCasePage() {
+  const piper = useCase.primaryTemplateSlug ? await fetchPublicAgentTemplateBySlug({ slug: useCase.primaryTemplateSlug }) : null
+  const previewPrompts = piper?.previewPrompts ?? []
+
   return (
     <StarTheme theme="light">
-      <div className="min-h-[100dvh] bg-background relative">
+      <div className="min-h-screen bg-background relative">
         <div
           className="absolute inset-x-0 top-0 h-[620px] pointer-events-none z-[1]"
           aria-hidden
@@ -70,12 +74,18 @@ export default function LeadGenerationUseCasePage() {
         />
 
         <div className="relative z-10">
-          <PublicHeader />
+          <div className="fixed top-0 left-0 right-0 z-50">
+            <PublicHeader />
+          </div>
 
-          <main className="pb-12 sm:pb-16">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10">
-              <LeadGenerationHero useCase={useCase} />
-              <UseCaseSections useCase={useCase} />
+          <main className="overflow-x-hidden">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+              <div className="min-h-[95vh]">
+                <LeadGenerationHero useCase={useCase} typewriterPrompts={previewPrompts} previewPromptTitles={useCase.previewPromptTitles} />
+              </div>
+              <div className="pb-12 sm:pb-16">
+                <UseCaseSections useCase={useCase} previewPrompts={previewPrompts} />
+              </div>
             </div>
           </main>
 
@@ -86,4 +96,3 @@ export default function LeadGenerationUseCasePage() {
     </StarTheme>
   )
 }
-

@@ -24,7 +24,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   // When we render with server-provided `initialAgentTemplates`, do not let any pre-existing
   // client-side React Query cache override them. Otherwise, on hydration we can "swap" to a
   // stale/incomplete cached list (e.g. missing `avatarUrl`) and images appear to disappear.
-  const agentTemplates = (useServerInitial ? initialAgentTemplates : data ?? []) as AgentTemplateModel[]
+  const agentTemplates = (useServerInitial ? initialAgentTemplates : (data ?? [])) as AgentTemplateModel[]
   const agentTemplatesLoading = isLoading && !useServerInitial
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
@@ -161,14 +161,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
-                          <AgentAvatar
-                            seed={name}
-                            imageUrl={avatarUrl}
-                            instanceId={`hero-marketplace-${template.id}-${idx}`}
-                            fill
-                            clip
-                            className="w-full h-full rounded-2xl"
-                          />
+                          <AgentAvatar seed={name} imageUrl={avatarUrl} instanceId={`hero-marketplace-${template.id}-${idx}`} fill clip className="w-full h-full rounded-2xl" />
                         </div>
                         <div className="min-w-0 w-full px-1 text-left">
                           <div className="text-sm font-semibold leading-tight truncate max-w-[20ch]">{primaryLabel}</div>

@@ -101,14 +101,6 @@ export function PublicHeader(): React.JSX.Element {
         </button>
 
         <nav className="hidden sm:flex items-center gap-3 md:gap-6 text-sm leading-none">
-          <Link
-            href="/"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/', variant: 'desktop' })}
-            className={`hidden md:inline ${pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
-            aria-current={pathname === '/' ? 'page' : undefined}
-          >
-            Home
-          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -168,6 +160,15 @@ export function PublicHeader(): React.JSX.Element {
           >
             Login
           </Link>
+          {pathname !== '/' ? (
+            <Link
+              href="/login"
+              onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
+              className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+            >
+              Get Started
+            </Link>
+          ) : null}
         </nav>
 
         {/* Mobile menu toggle */}
@@ -201,16 +202,6 @@ export function PublicHeader(): React.JSX.Element {
 
           {mobileMenuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg p-1 z-[60]">
-              <Link
-                href="/"
-                onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/', variant: 'mobile' })
-                  setMobileMenuOpen(false)
-                }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
-              >
-                Home
-              </Link>
               <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground">Use cases</div>
               <Link
                 href="/use-cases/lead-generation"
@@ -252,6 +243,18 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Login
               </Link>
+              {pathname !== '/' ? (
+                <Link
+                  href="/login"
+                  onClick={() => {
+                    track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
+                    setMobileMenuOpen(false)
+                  }}
+                  className="block px-3 py-2 rounded-md text-sm font-medium text-center bg-primary text-white hover:bg-primary/90"
+                >
+                  Get Started
+                </Link>
+              ) : null}
             </div>
           )}
         </div>

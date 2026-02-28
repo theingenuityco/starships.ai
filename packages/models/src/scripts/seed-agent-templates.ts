@@ -48,6 +48,7 @@ export async function seedAgentTemplates(): Promise<void> {
             assignedToolSlugs: template.assignedToolSlugs,
             role: template.role,
             version: template.version, // Copy version from seeder
+            ...(template.reasoning != null && { reasoning: template.reasoning }),
           };
           // Only pass name if it actually changed; otherwise we'd regenerate slug on every seed run.
           if (existingTemplate.name !== template.name) {
@@ -77,6 +78,7 @@ export async function seedAgentTemplates(): Promise<void> {
             assignedToolSlugs: template.assignedToolSlugs,
             role: template.role,
             version: template.version, // Include version in creation
+            ...(template.reasoning != null && { reasoning: template.reasoning }),
           };
           const created = await templateRepo.create(payload);
           addedCount++;

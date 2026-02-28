@@ -2,143 +2,217 @@ import Link from 'next/link'
 
 import type { UseCaseModel } from '@/app/use-cases/use-cases.data'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
+import { PromptEditorBlock } from './PromptCardWithCopy'
 
-export function UseCaseSections(props: { useCase: UseCaseModel }) {
-  const useCase = props.useCase
+const FALLBACK_PROSPECTING_CARDS = [
+  { title: 'Build Lead Lists', description: 'Create lead lists that match your target audience. Spot companies that look like your best customers and are active right now.' },
+  { title: 'Find Contact Info', description: 'Pull direct contact details for key decision-makers so you can reach the right people without hours of manual research.' },
+  { title: 'Personalize Your Outreach', description: 'Draft short, specific messages that reference recent activity, website copy, or product changes—no generic spray-and-pray.' },
+  { title: 'Meeting Prep', description: 'Walk into every call with context: company summary, key initiatives, recent news, and likely pain points in one place.' },
+  { title: 'Recruiting', description: 'Source candidates who match your ideal profile, then personalize outreach and follow-up so hiring pipelines stay warm.' },
+]
+
+export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?: string[] }) {
+  const { useCase, previewPrompts = [] } = props
+
+  const isLeadGeneration = useCase.slug === 'lead-generation'
+
+  const contentCards =
+    isLeadGeneration && previewPrompts.length > 0
+      ? previewPrompts.map((prompt, idx) => ({
+          title:
+            useCase.previewPromptTitles?.[idx] ??
+            prompt
+              .slice(0, 50)
+              .trim()
+              .replace(/\s+\S*$/, '') + '…',
+          description: prompt,
+        }))
+      : isLeadGeneration
+        ? FALLBACK_PROSPECTING_CARDS
+        : []
+
+  const leadGenerationProspectingCards =
+    contentCards.length > 0
+      ? [
+          ...contentCards,
+          {
+            title: 'See more prompts',
+            description: 'Explore additional workflows and prompt ideas you can adapt for your own segments, offers, and channels.',
+          },
+        ]
+      : []
 
   return (
     <>
-      <section className="mt-12">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">How this playbook runs</h2>
-            <p className="mt-2 text-sm text-muted-foreground max-w-[70ch]">
-              Use agents to draft, research, and summarize; use automations to schedule, enrich, and keep the workflow consistent.
-            </p>
-          </div>
-          <Badge variant="outline" className="rounded-full bg-background/40 border-border/60 text-muted-foreground">
-            Reusable workflow
-          </Badge>
-        </div>
+      {isLeadGeneration ? (
+        <section className="mt-8 sm:mt-10 bg-white dark:bg-slate-950" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">{useCase.workflowsSectionHeading ?? 'Lead generation workflows'}</h2>
+              <p className="mt-2 text-base sm:text-lg text-muted-foreground max-w-[70ch]">
+                {useCase.workflowsSectionSubheading ??
+                  'Simple workflows from first touch to booked meeting. Use agents to discover, enrich, personalize, and follow up—without living in spreadsheets.'}
+              </p>
+            </div>
 
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <section className="lg:col-span-2">
-            <Card className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-sm overflow-hidden">
-              <div className="p-6 sm:p-7">
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {leadGenerationProspectingCards.map(card => {
+                const isHighlight = card.title === 'See more prompts'
+
+                return (
+                  <Card
+                    key={card.title}
+                    className={
+                      isHighlight
+                        ? 'rounded-3xl border border-amber-500 bg-amber-500 dark:bg-amber-400 text-amber-950 dark:text-slate-950 shadow-sm transition-colors h-full'
+                        : 'rounded-2xl border-0 bg-[#F7F7F2] dark:bg-slate-900/40 shadow-sm transition-colors h-full'
+                    }
+                  >
+                    <div className={isHighlight ? 'p-6 sm:p-8 flex flex-col h-full items-center justify-center text-center' : 'p-6 sm:p-8 flex flex-col h-full text-left'}>
+                      {isHighlight ? (
+                        <>
+                          <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">Explore more capabilities</h3>
+
+                          <div className="mt-6">
+                            <Button asChild size="sm" className="h-10 rounded-full px-6 bg-white text-slate-900 hover:bg-white/90 shadow-sm font-medium">
+                              <Link href={useCase.primaryTemplateSlug ? `/explore/agents/${useCase.primaryTemplateSlug}` : '/explore/agents'}>
+                                Get Started
+                                <Icon name="chevron-right" className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-800 dark:text-slate-200 mb-4">{card.title}</h3>
+                          <PromptEditorBlock prompt={card.description} className="flex-1 min-h-0" />
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isLeadGeneration && useCase.videoEmbedUrl ? (
+        <section className="mt-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            <div className="order-2 lg:order-1">
+              <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-foreground">
+                See how it
+                <br />
+                <span className="text-primary">works</span>
+              </h2>
+              <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-[42ch]">
+                Watch a quick walkthrough of Piper in action—from writing your first prompt to getting qualified leads. No setup required.
+              </p>
+              <div className="mt-6">
+                <Button asChild size="lg" className="h-11 rounded-full text-white">
+                  <Link href="/login">Sign up free</Link>
+                </Button>
+              </div>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="relative w-full aspect-video rounded-3xl overflow-hidden border border-border/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 shadow-lg">
+                <iframe
+                  src={useCase.videoEmbedUrl}
+                  title="Lead generation demo"
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="mt-20 bg-white dark:bg-slate-950" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">The workflow</h2>
+            <p className="mt-2 text-base sm:text-lg text-muted-foreground max-w-[70ch]">Agents research and draft. Automations schedule and enrich. Simple and consistent.</p>
+          </div>
+
+          <div className="mt-6">
+            <Card className="rounded-2xl border-0 bg-[#F7F7F2] dark:bg-slate-900/40 shadow-sm overflow-hidden">
+              <div className="p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-semibold tracking-tight text-foreground">Workflow</div>
                   <div className="text-xs text-muted-foreground">{useCase.steps.length} steps</div>
                 </div>
 
-                <ol className="mt-5 relative pl-6">
-                  <div
-                    className="pointer-events-none absolute left-[11px] top-0 bottom-0 w-px"
-                    style={{
-                      backgroundImage: 'linear-gradient(to bottom, rgba(168,85,247,0.55), rgba(59,130,246,0.45), rgba(245,158,11,0.35))',
-                    }}
-                    aria-hidden
-                  />
-                  {useCase.steps.map((s, idx) => (
-                    <li key={`${useCase.slug}-step-${idx}`} className="relative pb-5 last:pb-0">
-                      <div className="absolute left-0 top-0 h-6 w-6 rounded-full bg-background/70 ring-1 ring-border/60 flex items-center justify-center">
-                        <span className="text-[11px] font-semibold text-foreground tabular-nums">{idx + 1}</span>
-                      </div>
-                      <div className="ml-6 rounded-xl border border-border/60 bg-background/35 p-4">
-                        <div className="text-sm font-semibold text-foreground">{s.title}</div>
-                        <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{s.description}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            </Card>
-          </section>
-
-          <aside>
-            <Card className="rounded-2xl border border-border/60 bg-card/70 backdrop-blur-sm">
-              <div className="p-6 sm:p-7">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold tracking-tight text-foreground">Outputs</div>
-                  <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div className="mt-4 space-y-2.5">
-                  {useCase.outputs.map((o, idx) => (
-                    <div key={`${useCase.slug}-out-${idx}`} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Icon name="check-circle" className="mt-0.5 h-4 w-4 text-emerald-400" />
-                      <span className="leading-relaxed">{o}</span>
+                <ol className="mt-4 relative pl-6">
+                <div
+                  className="pointer-events-none absolute left-[11px] top-0 bottom-0 w-px"
+                  style={{
+                    backgroundImage: 'linear-gradient(to bottom, rgba(168,85,247,0.55), rgba(59,130,246,0.45), rgba(245,158,11,0.35))',
+                  }}
+                  aria-hidden
+                />
+                {useCase.steps.map((s, idx) => (
+                  <li
+                    key={`${useCase.slug}-step-${idx}`}
+                    className="relative pb-3 last:pb-0 animate-workflow-step"
+                    style={{ animationDelay: `${idx * 0.12}s` }}
+                  >
+                    <div className="absolute left-0 top-0 h-6 w-6 rounded-full bg-white dark:bg-slate-900 ring-1 ring-emerald-400/30 flex items-center justify-center">
+                      <span className="text-[11px] font-semibold text-foreground tabular-nums">{idx + 1}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="ml-6 flex gap-2.5 rounded-lg border border-border/60 border-l-2 border-l-emerald-400/40 bg-white dark:bg-slate-900 px-3 py-2.5">
+                      <Icon name="check-circle" className="h-4 w-4 text-emerald-500/80 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">{s.title}</div>
+                        <p className="mt-0.5 text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
 
                 {useCase.tip ? (
-                  <div className="mt-7 rounded-xl border border-border/60 bg-background/35 p-4">
-                    <div className="text-xs font-semibold text-muted-foreground">Tip</div>
-                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{useCase.tip}</p>
+                <div className="mt-5 rounded-lg border border-border/60 bg-white dark:bg-slate-900 p-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <Icon name="lightbulb" className="h-4 w-4 text-amber-500 shrink-0" />
+                    Tip
                   </div>
-                ) : null}
+                  <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{useCase.tip}</p>
+                </div>
+              ) : null}
+                </div>
+            </Card>
+          </div>
+
+          <div className="mt-12 relative group">
+            <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-90 blur-md transition-opacity duration-500 group-hover:opacity-100" />
+            <Card className="relative overflow-hidden rounded-2xl border-0 shadow-lg bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500">
+              <div className="p-7 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 text-white">
+                <div>
+                  <div className="text-xs font-semibold text-white/90">Next step</div>
+                  <h2 className="mt-2 text-xl sm:text-2xl font-semibold tracking-tight text-white">{useCase.nextTitle}</h2>
+                  <p className="mt-2 text-base sm:text-lg text-white/90 max-w-[90ch]">{useCase.nextDescription}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {useCase.nextLinks.map(l => (
+                    <Button key={l.href} asChild size="lg" variant="outline" className="h-11 px-6 rounded-full bg-white text-slate-900 hover:bg-white/90 border-white/30">
+                      <Link href={l.href}>
+                        {l.label}
+                        <Icon name="chevron-right" className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </Card>
-          </aside>
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">Example prompts</h2>
-            <p className="mt-2 text-sm text-muted-foreground max-w-[70ch]">Copy these as a starting point, then tweak inputs for your segment, offer, and tone.</p>
           </div>
-          <Badge variant="outline" className="rounded-full bg-background/40 border-border/60 text-muted-foreground">
-            {useCase.examplePrompts.length} prompts
-          </Badge>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {useCase.examplePrompts.map((p, idx) => (
-            <div key={`${useCase.slug}-prompt-${idx}`} className="relative group">
-              <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-indigo-500/45 via-fuchsia-500/45 to-amber-500/35 opacity-10 blur-md transition-opacity duration-500 group-hover:opacity-35" />
-              <Card className="relative rounded-2xl border border-border/60 bg-card/70 backdrop-blur-sm overflow-hidden">
-                <div className="p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold text-muted-foreground">Prompt {idx + 1}</div>
-                    <Icon name="sparkles" className="h-4 w-4 text-primary" />
-                  </div>
-                  <p className="mt-3 text-sm text-foreground leading-relaxed font-medium">{p}</p>
-                </div>
-              </Card>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <div className="relative group">
-          <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-25 blur-md transition-opacity duration-500 group-hover:opacity-60" />
-          <Card className="relative overflow-hidden rounded-2xl border-0 shadow-lg bg-gradient-to-r from-indigo-500/15 via-fuchsia-500/15 to-amber-500/15">
-            <div className="p-7 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div>
-                <div className="text-xs font-semibold text-muted-foreground">Next step</div>
-                <h2 className="mt-2 text-xl sm:text-2xl font-semibold tracking-tight text-foreground">{useCase.nextTitle}</h2>
-                <p className="mt-2 text-sm text-muted-foreground max-w-[90ch]">{useCase.nextDescription}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {useCase.nextLinks.map(l => (
-                  <Button key={l.href} asChild size="lg" variant="outline" className="h-11 px-6 rounded-full bg-background/40">
-                    <Link href={l.href}>
-                      {l.label}
-                      <Icon name="chevron-right" className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </Card>
         </div>
       </section>
     </>
   )
 }
-

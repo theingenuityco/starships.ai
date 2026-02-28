@@ -35,6 +35,16 @@ export type UseCaseModel = {
   tag?: string
   heroSubtitle: string
   heroPrompt?: UseCaseHeroPrompt
+  /** Optional marketing/demo video embed URL (e.g. YouTube) for the use case page. */
+  videoEmbedUrl?: string
+  /** Slug of agent template whose previewPrompts drive the workflow cards (e.g. piper). */
+  primaryTemplateSlug?: string
+  /** Titles for each preview prompt (order matches template's previewPrompts). */
+  previewPromptTitles?: string[]
+  /** Section heading for the workflow cards (e.g. "Lead generation workflows"). */
+  workflowsSectionHeading?: string
+  /** Section subheading for the workflow cards. */
+  workflowsSectionSubheading?: string
   tip?: string
   outputs: string[]
   steps: UseCaseStep[]
@@ -52,7 +62,12 @@ export const USE_CASES: UseCaseModel[] = [
     title: 'Lead generation',
     cardDescription: 'Source prospects, personalize outreach, and keep your pipeline warm with agents + automations.',
     tag: 'Growth',
-    heroSubtitle: 'A practical workflow to research prospects, personalize outreach, and keep a clean pipeline—without living in spreadsheets.',
+    heroSubtitle: 'Source, enrich, and reach the right people, without the guesswork.',
+    videoEmbedUrl: 'https://www.youtube.com/embed/VIDEO_ID',
+    primaryTemplateSlug: 'piper',
+    previewPromptTitles: ['Batch Enrichment', 'Build Lead Lists', 'Find Contact Info', 'Research Companies', 'Personalize Your Outreach'],
+    workflowsSectionHeading: 'Try it yourself:',
+    workflowsSectionSubheading: 'Copy these prompts to get started. Tweak them for your segment, offer, and tone.',
     heroPrompt: {
       placeholder: 'Find finance decision makers at Series A SaaS startups…',
       examples: [
@@ -62,14 +77,14 @@ export const USE_CASES: UseCaseModel[] = [
         { label: 'Meeting prep', prompt: 'Create a 1-page meeting brief for each prospect: company context, key initiatives, likely pain points, and 3 tailored questions.' },
       ],
     },
-    tip: 'Start narrow: one vertical + one role + one offer. Expand only after you see replies.',
-    outputs: ['Prospect list with signals + fit score', 'Personalized first-touch messages', 'Follow-up sequences + reminders', 'Weekly learnings + next experiments'],
+    tip: 'Focus on one industry and one role first. Add more once you get replies.',
+    outputs: ['Prospect lists + fit scores', 'Personalized messages', 'Sequences + learnings'],
     steps: [
-      { title: 'Target + source', description: 'Define your ICP, pick sources (directories, LinkedIn, job boards), and generate a structured prospect list.' },
-      { title: 'Enrich + qualify', description: 'Add firmographic signals, validate contact details, and score prospects so the team focuses on best-fit leads.' },
-      { title: 'Personalize outreach', description: 'Generate short, specific messages tied to each prospect’s context—no generic spray-and-pray.' },
-      { title: 'Follow up automatically', description: 'Schedule sequences and reminders, then hand off replies to a human (or a specialist agent) when needed.' },
-      { title: 'Track + improve', description: 'Summarize learnings weekly: which segments respond, which angles work, and what to test next.' },
+      { title: 'Target audience', description: 'Define your ICP and generate a prospect list.' },
+      { title: 'Enrich leads', description: 'Validate contacts and score leads by fit.' },
+      { title: 'Personalize outreach', description: 'Draft messages tied to each prospect, no spray-and-pray.' },
+      { title: 'Follow up automatically', description: 'Schedule sequences; hand off replies when needed.' },
+      { title: 'Iterate', description: 'Learn which segments and angles work.' },
     ],
     examplePrompts: [
       'Build a list of 50 SaaS startups (10–50 employees) hiring for RevOps, with website + LinkedIn + 1 sentence “why now”.',
@@ -77,14 +92,9 @@ export const USE_CASES: UseCaseModel[] = [
       'Turn these notes into a 5-touch follow-up sequence (email + LinkedIn), with a gentle CTA for a 15-minute chat.',
       'Given our ICP and offer, propose 3 lead magnets and outline the landing page copy for each.',
     ],
-    nextTitle: 'Next: install starting points',
-    nextDescription:
-      'Use Explore to install agents/automations you can adapt for sourcing, enrichment, outreach, and follow-up. Then wire them into a repeatable sequence.',
-    nextLinks: [
-      { href: '/explore/agents', label: 'Browse agents' },
-      { href: '/explore/automations', label: 'Browse automations' },
-      { href: '/explore/connectors', label: 'Browse connectors' },
-    ],
+    nextTitle: 'Ready for better leads?',
+    nextDescription: 'Run this workflow on repeat with agents and automations. Start free upgrade as your team grows.',
+    nextLinks: [{ href: '/login', label: 'Sign up free' }],
     seo: {
       title: 'Lead generation | Use cases | Starships.ai',
       description: 'A practical lead generation workflow: research, personalize outreach, follow up, and keep a clean pipeline with agents + automations.',
@@ -138,7 +148,8 @@ export const USE_CASES_BY_SLUG: Record<UseCaseSlug, UseCaseModel> = USE_CASES.re
 )
 
 export function getUseCaseBySlug(slug: string): UseCaseModel | null {
-  const s = String(slug || '').trim().toLowerCase() as UseCaseSlug
+  const s = String(slug || '')
+    .trim()
+    .toLowerCase() as UseCaseSlug
   return (USE_CASES_BY_SLUG as any)[s] ?? null
 }
-

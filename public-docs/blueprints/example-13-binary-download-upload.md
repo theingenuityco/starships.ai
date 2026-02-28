@@ -8,6 +8,8 @@ This relies on:
 - A second `http_request` with `bodyFromBinaryKey` to upload those bytes as a raw body
 - The Engine keeping binary **in-flight only** (bytes are stripped from `execution.results` / events to stay JSON-safe)
 
+Note: this pattern uses binary request/response bodies and is **not compatible** with `useWebUnlocker: true` (web-unlocking gateway path).
+
 Code
 
 ```ts

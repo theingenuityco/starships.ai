@@ -76,3 +76,9 @@ const out = await engine.executeBlueprint(blueprint, exec);
 // out[0].json → { id, title }
 ```
 
+Optional (runner): route this request through the runner’s web-unlocking gateway.
+
+- Set `useWebUnlocker: true` on the `http_request` node.
+
+See: `node-http-request.md`.
+

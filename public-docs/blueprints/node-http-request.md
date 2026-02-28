@@ -1,6 +1,6 @@
 ## Node: HttpRequest
 
-What it is: Typed HTTP client node using native `fetch`, producing structured responses and failing on non-2xx results.
+What it is: Typed HTTP client node that delegates execution to the host runtime (typically server-side `fetch`), producing structured responses and failing on non-2xx results.
 
 Specification (authoritative)
 
@@ -13,6 +13,7 @@ Specification (authoritative)
   - bodyFromBinaryKey?: string (optional) — if set, uses `input?.[0]?.binary[key]` bytes as the raw request body
   - responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64' (optional)
   - binaryKey?: string (optional; default `"data"`) — where to store binary responses when `responseType: "arrayBuffer"`
+  - useWebUnlocker?: boolean (optional; default false) — when true, the host runtime may route the request through a web-unlocking gateway instead of direct server-side fetch (host-dependent)
   - timeout?: number (ms; default 30000)
   - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, responseType
 
@@ -67,6 +68,21 @@ Error behavior
 - Non-2xx responses => throws `Error("HTTP request failed: METHOD URL -> STATUS STATUS_TEXT | body: <snippet>")`
 - Network/timeouts => throws `Error("HTTP request failed: METHOD URL -> <reason>")`
 - Timeout uses AbortController; default 30000ms.
+
+### Web-unlocking routing (runner)
+
+When running via `@starships/autopilot-runner`, `useWebUnlocker: true` is a first-class knob on `http_request` to route that single request through the runner’s configured web-unlocking gateway.
+
+Runner env required (only when `useWebUnlocker: true`):
+
+- `BRIGHTDATA_API_KEY`
+- `BRIGHTDATA_ZONE`
+
+Runner behavior and limitations when `useWebUnlocker: true`:
+
+- Blocks `localhost` / `.localhost` and private/loopback IP literal hosts.
+- Not supported with `responseType: "arrayBuffer"` or `responseType: "base64"`.
+- Not supported with binary/FormData request bodies.
 
 Validation rules
 

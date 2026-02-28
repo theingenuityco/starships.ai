@@ -327,6 +327,8 @@ Blueprints are built from specialized node types, each designed for specific wor
 - **Use `http_request`** when you need a raw HTTP call to an **absolute** `http(s)://...` URL and you can provide everything needed in the node (method/headers/body), like public APIs, webhooks, or simple integrations.
 - **Use `connector_action`** when calling a **Starships connector** action (defined by connector templates) so the runtime can handle base URLs, auth/credentials injection, argument validation, and standardized request/response mapping—especially for integrations that should not embed secrets directly in blueprints.
 
+Optional (runner-only): `http_request` supports `useWebUnlocker: true` to route that single request through the runner’s configured web-unlocking gateway. When enabled, the runner requires `BRIGHTDATA_API_KEY` and `BRIGHTDATA_ZONE`.
+
 ---
 
 ## Advanced Workflow Patterns

@@ -278,6 +278,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       body?: unknown;
       timeoutMs?: number;
     };
+    const useWebUnlocker = (request as { useWebUnlocker?: unknown } | null | undefined)?.useWebUnlocker === true;
     // Backward/forward compatible: older @starships/autopilot types may not include this field.
     const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
     const responseType =
@@ -378,6 +379,190 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
+
+      const getHeaderValue = (h: Record<string, unknown> | undefined, name: string): string | undefined => {
+        if (!h) return undefined;
+        const direct = h[name];
+        if (typeof direct === 'string') return direct;
+        const alt = h[name.toLowerCase()];
+        if (typeof alt === 'string') return alt;
+        const alt2 = h[name.toUpperCase()];
+        if (typeof alt2 === 'string') return alt2;
+        const target = name.toLowerCase();
+        for (const [k, v] of Object.entries(h)) {
+          if (k.toLowerCase() === target && typeof v === 'string') return v;
+        }
+        return undefined;
+      };
+
+      const normalizeHeadersToStrings = (h: Record<string, unknown>): Record<string, string> => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(h || {})) {
+          if (!k) continue;
+          if (v === undefined || v === null) continue;
+          if (typeof v === 'string') out[k] = v;
+          else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
+          else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
+          else out[k] = String(v);
+        }
+        return out;
+      };
+
+      const looksLikeJson = (s: string): boolean => {
+        const t = s.trim();
+        if (!t) return false;
+        return t.startsWith('{') || t.startsWith('[');
+      };
+
+      if (useWebUnlocker) {
+        const apiKey = process.env.BRIGHTDATA_API_KEY;
+        const zone = process.env.BRIGHTDATA_ZONE;
+        if (!apiKey || !apiKey.trim()) {
+          throw new Error('BRIGHTDATA_API_KEY is required when useWebUnlocker=true');
+        }
+        if (!zone || !zone.trim()) {
+          throw new Error('BRIGHTDATA_ZONE is required when useWebUnlocker=true');
+        }
+
+        let u: URL;
+        try {
+          u = new URL(finalUrl);
+        } catch {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        const hostLower = u.hostname.toLowerCase();
+        if (hostLower === 'localhost' || hostLower.endsWith('.localhost')) {
+          throw new Error('Blocked URL for useWebUnlocker=true: localhost is not allowed');
+        }
+        if (isPrivateIp(hostLower)) {
+          throw new Error('Blocked URL for useWebUnlocker=true: private/loopback IPs are not allowed');
+        }
+
+        if (responseType === 'arrayBuffer' || responseType === 'base64') {
+          throw new Error(`useWebUnlocker=true does not support responseType="${responseType}"`);
+        }
+        if (
+          body instanceof ArrayBuffer ||
+          ArrayBuffer.isView(body as ArrayBufferLike) ||
+          (typeof Blob !== 'undefined' && body instanceof Blob) ||
+          (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+          (typeof FormData !== 'undefined' && body instanceof FormData)
+        ) {
+          throw new Error('useWebUnlocker=true does not support binary/FormData request bodies');
+        }
+
+        const safeTargetUrl = redactUrlForLogs(finalUrl);
+        const safeHeaders = redactHeadersForLogs(finalHeaders);
+
+        const unlockerPayload: Record<string, unknown> = {
+          zone: zone.trim(),
+          url: finalUrl,
+          format: 'raw',
+          method: finalMethod,
+        };
+
+        const hdrs = normalizeHeadersToStrings(finalHeaders);
+        if (Object.keys(hdrs).length > 0) unlockerPayload.headers = hdrs;
+
+        if (finalMethod !== 'GET' && finalMethod !== 'HEAD' && body !== undefined) {
+          unlockerPayload.body = typeof body === 'string' ? body : JSON.stringify(body);
+        }
+
+        let resp: Response;
+        try {
+          resp = await fetch('https://api.brightdata.com/request', {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${apiKey.trim()}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(unlockerPayload),
+            signal: combinedSignal,
+          });
+        } catch (e: unknown) {
+          if (options.signal?.aborted) {
+            throw new CancelledError('cancelled');
+          }
+          if (timeoutController.signal.aborted) {
+            const err = new Error(`HTTP (Web Unlocker) timed out after ${timeout}ms: ${finalMethod} ${safeTargetUrl}`);
+            console.error('[RunnerHostRuntime.http] web_unlocker_timeout', {
+              method: finalMethod,
+              url: safeTargetUrl,
+              timeoutMs: timeout,
+            });
+            throw err;
+          }
+
+          const summary = summarizeFetchError(e);
+          console.error('[RunnerHostRuntime.http] web_unlocker_failed', {
+            method: finalMethod,
+            url: safeTargetUrl,
+            timeoutMs: timeout,
+            headers: safeHeaders,
+            error: summary,
+          });
+
+          const wrapped = new Error(`HTTP (Web Unlocker) failed: ${finalMethod} ${safeTargetUrl} (${summary.summary})`) as Error & {
+            cause?: unknown;
+          };
+          wrapped.cause = e;
+          throw wrapped;
+        }
+
+        const bdHeaders: Record<string, string> = {};
+        resp.headers.forEach((value, key) => {
+          bdHeaders[key] = value;
+        });
+
+        let payload: unknown;
+        try {
+          payload = await resp.json();
+        } catch {
+          payload = await resp.text();
+        }
+
+        const payloadObj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null;
+        const resultRaw = payloadObj ? payloadObj.result : undefined;
+        const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
+        const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
+        const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
+        const targetContentType = (getHeaderValue(targetHeaders as unknown as Record<string, unknown>, 'content-type') ?? '').toLowerCase();
+
+        const resultText = resultRaw === undefined || resultRaw === null ? '' : typeof resultRaw === 'string' ? resultRaw : (() => {
+          try {
+            return JSON.stringify(resultRaw);
+          } catch {
+            return String(resultRaw);
+          }
+        })();
+
+        let responseBody: unknown;
+        if (responseType === 'text') {
+          responseBody = resultText;
+        } else {
+          // Default/json: parse JSON if we can infer it, otherwise return text
+          if (targetContentType.includes('application/json') || looksLikeJson(resultText)) {
+            try {
+              responseBody = JSON.parse(resultText);
+            } catch {
+              responseBody = resultText;
+            }
+          } else {
+            responseBody = resultText;
+          }
+        }
+
+        return {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: targetHeaders,
+          body: responseBody,
+          url: targetUrl,
+        };
+      }
 
       const init: RequestInit = {
         method: finalMethod,

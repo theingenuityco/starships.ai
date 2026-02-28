@@ -94,6 +94,12 @@ export interface HostRuntime {
     body?: unknown;
     timeoutMs?: number;
     /**
+     * Optional host-specific routing hint. When true, the host runtime may route
+     * this request through a web unlocking provider (e.g., Bright Data Web Unlocker)
+     * instead of a direct server-side fetch.
+     */
+    useWebUnlocker?: boolean;
+    /**
      * Controls how the host returns the response body.
      * - json: parse JSON when possible (default)
      * - text: always return string body

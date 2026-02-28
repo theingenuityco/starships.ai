@@ -16,6 +16,12 @@ Env:
 - RUNNER_CONCURRENCY (default 4)
 - RUNNER_AUTH_TOKEN (optional, `Authorization: Bearer <token>`)
 - RUNNER_FASTPATH_ENABLED (default true)
+- BRIGHTDATA_API_KEY (required only when `http_request.useWebUnlocker: true`)
+- BRIGHTDATA_ZONE (required only when `http_request.useWebUnlocker: true`)
+
+## Bright Data Web Unlocker (optional)
+
+When an `http_request` node includes `useWebUnlocker: true`, the runner routes that request through Bright Data Web Unlocker (`POST https://api.brightdata.com/request`) instead of direct server-side fetch. See [Bright Data Web Unlocker](https://brightdata.com/products/web-unlocker).
 
 ## API
 

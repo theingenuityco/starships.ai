@@ -88,6 +88,12 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
    */
   responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64';
 
+  /**
+   * When true, the host runtime may route this request through Bright Data Web Unlocker
+   * (instead of direct server-side fetch). Behavior is host/runtime dependent.
+   */
+  useWebUnlocker?: boolean;
+
   // Custom properties for convenience
   timeout?: number;
 }

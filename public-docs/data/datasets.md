@@ -207,7 +207,7 @@ Notes:
 Body:
 
 ```json
-{ "mode": "append", "rows": [ { "id": "1", "status": "todo" } ] }
+{ "mode": "append", "rows": [{ "id": "1", "status": "todo" }] }
 ```
 
 Response includes counts and optional row-level errors:
@@ -216,9 +216,7 @@ Response includes counts and optional row-level errors:
 {
   "inserted": 10,
   "updated": 2,
-  "errors": [
-    { "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }
-  ]
+  "errors": [{ "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }]
 }
 ```
 
@@ -236,9 +234,11 @@ Body:
 ```
 
 ---
+
 title: Starship Datasets (Tabular)
 slug: datasets
 category: data
+
 ---
 
 # Starship Datasets (Tabular)
@@ -400,9 +400,11 @@ Notes:
 - For `mode: "upsert"`, the dataset must have `primaryKey` set, and each row must include a non-empty value for that key.
 
 ---
+
 title: Starship Datasets (Tabular Data)
 slug: data/datasets
 category: data
+
 ---
 
 # Starship Datasets (Tabular Data)
@@ -410,6 +412,7 @@ category: data
 Starship datasets are **starship-scoped tables** that both **humans and agents** can read/write.
 
 They are designed for:
+
 - Agent work logs and structured outputs (e.g. leads, backlog items, research results)
 - Human review in the product UI (Tables screen)
 - Binding into Views via `DataTable` (optional)
@@ -481,9 +484,11 @@ Body:
 ```
 
 - `mode: "append"` (default): always inserts new rows.\n- `mode: "upsert"`: requires dataset `primaryKey` and each row must include that field.\n
+
 ## UI (Tables)
 
 The product renders datasets at:
+
 - `/ship/:slug/tables` (list + create)\n- `/ship/:slug/tables/:datasetId` (viewer)
 
 ## Views integration (optional)

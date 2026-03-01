@@ -19,8 +19,10 @@ import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipTools } from '@/hooks/useTools'
 
+const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
+
 export default function RoomsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams()
+  const params = useParams<{ slug: string; roomSlug?: string; threadId?: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuthContext()
@@ -30,7 +32,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
 
   // Desktop side pane width (draggable resizer) - match Channels thread pane behavior
-  const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
   const [resourcesPaneWidthPx, setResourcesPaneWidthPx] = useState<number>(() => {
     if (typeof window === 'undefined') return 600
     const w = window.innerWidth
@@ -170,9 +171,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     () => ({
       slug: params.slug as string,
       roomSlug: params.roomSlug as string | undefined,
-      threadId: (params as any)?.threadId as string | undefined,
+      threadId: params.threadId,
     }),
-    [params.slug, params.roomSlug, (params as any)?.threadId]
+    [params.slug, params.roomSlug, params.threadId]
   )
   const isRoomsIndexRoute = useMemo(() => {
     const raw = typeof routeParams.roomSlug === 'string' ? routeParams.roomSlug : ''
@@ -599,8 +600,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             pinnedViews={pinsData?.views ?? null}
             pinnedDatasets={pinsData?.datasets ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}
-            pinnedAgents={(pinsData as any)?.agents ?? null}
-            pinnedTools={(pinsData as any)?.tools ?? null}
+            pinnedAgents={pinsData?.agents ?? null}
+            pinnedTools={pinsData?.tools ?? null}
             viewLabelById={viewLabelById}
             datasetLabelById={datasetLabelById}
             taskBoardLabelById={taskBoardLabelById}
@@ -681,8 +682,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   pinnedViews={pinsData?.views ?? null}
                   pinnedDatasets={pinsData?.datasets ?? null}
                   pinnedTaskBoards={pinsData?.taskBoards ?? null}
-                  pinnedAgents={(pinsData as any)?.agents ?? null}
-                  pinnedTools={(pinsData as any)?.tools ?? null}
+                  pinnedAgents={pinsData?.agents ?? null}
+                  pinnedTools={pinsData?.tools ?? null}
                   viewLabelById={viewLabelById}
                   datasetLabelById={datasetLabelById}
                   taskBoardLabelById={taskBoardLabelById}
@@ -740,8 +741,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               pinnedViews={pinsData?.views ?? null}
               pinnedDatasets={pinsData?.datasets ?? null}
               pinnedTaskBoards={pinsData?.taskBoards ?? null}
-              pinnedAgents={(pinsData as any)?.agents ?? null}
-              pinnedTools={(pinsData as any)?.tools ?? null}
+              pinnedAgents={pinsData?.agents ?? null}
+              pinnedTools={pinsData?.tools ?? null}
               viewLabelById={viewLabelById}
               datasetLabelById={datasetLabelById}
               taskBoardLabelById={taskBoardLabelById}

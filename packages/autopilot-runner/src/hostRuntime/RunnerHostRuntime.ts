@@ -19,11 +19,145 @@ import { invokeAzureAiFoundry } from './azure-ai-foundry';
 import { Pool } from 'pg';
 import type { FieldDef, PoolClient } from 'pg';
 import { lookup } from 'node:dns/promises';
+import { STATUS_CODES } from 'node:http';
 import { Socket } from 'node:net';
 import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
 
 function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
   return (endpoint as { kind?: unknown }).kind === 'sql';
+}
+
+const SENSITIVE_HEADER_KEYS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'api-key',
+  'apikey',
+  'x-auth-token',
+]);
+
+const SENSITIVE_URL_PARAM_KEYS = new Set([
+  'token',
+  'access_token',
+  'auth',
+  'authorization',
+  'api_key',
+  'apikey',
+  'key',
+  'secret',
+  'signature',
+]);
+
+function redactHeadersForLogs(h: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(h)) {
+    const lk = k.toLowerCase();
+    out[k] = SENSITIVE_HEADER_KEYS.has(lk) ? '[REDACTED]' : v;
+  }
+  return out;
+}
+
+function redactUrlForLogs(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    for (const [k] of u.searchParams) {
+      if (SENSITIVE_URL_PARAM_KEYS.has(k.toLowerCase())) {
+        u.searchParams.set(k, '[REDACTED]');
+      }
+    }
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function summarizeFetchError(err: unknown): Record<string, unknown> {
+  const e =
+    err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
+  const cause = e?.cause;
+  const pick = (x: unknown): Record<string, unknown> => {
+    if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+    const rec = x as Record<string, unknown>;
+    return {
+      name: typeof rec.name === 'string' ? rec.name : undefined,
+      message: typeof rec.message === 'string' ? rec.message : undefined,
+      code: typeof rec.code === 'string' ? rec.code : undefined,
+      errno: typeof rec.errno === 'number' ? rec.errno : undefined,
+      syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
+      address: typeof rec.address === 'string' ? rec.address : undefined,
+      port: typeof rec.port === 'number' ? rec.port : undefined,
+      hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
+    };
+  };
+
+  const primary = pick(e);
+  const underlying = pick(cause);
+  const code = (underlying.code ?? primary.code) as string | undefined;
+  const msg = (underlying.message ?? primary.message) as string | undefined;
+
+  // A compact one-liner that is safe to embed in Error.message.
+  const summary = code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
+
+  return {
+    summary,
+    error: primary,
+    cause: underlying,
+  };
+}
+
+function getHeaderValue(h: Record<string, unknown> | undefined, name: string): string | undefined {
+  if (!h) return undefined;
+  const direct = h[name];
+  if (typeof direct === 'string') return direct;
+  const alt = h[name.toLowerCase()];
+  if (typeof alt === 'string') return alt;
+  const alt2 = h[name.toUpperCase()];
+  if (typeof alt2 === 'string') return alt2;
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(h)) {
+    if (k.toLowerCase() === target && typeof v === 'string') return v;
+  }
+  return undefined;
+}
+
+function normalizeHeadersToStrings(h: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(h || {})) {
+    if (!k) continue;
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string') out[k] = v;
+    else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
+    else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
+    else out[k] = String(v);
+  }
+  return out;
+}
+
+function looksLikeJson(s: string): boolean {
+  const t = s.trim();
+  if (!t) return false;
+  return t.startsWith('{') || t.startsWith('[');
+}
+
+function coerceHttpStatusCode(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const n = Math.floor(v);
+    return n >= 100 && n <= 599 ? n : null;
+  }
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n)) {
+      const m = Math.floor(n);
+      return m >= 100 && m <= 599 ? m : null;
+    }
+  }
+  return null;
+}
+
+function statusTextFromCode(code: number): string {
+  return STATUS_CODES[code] ?? String(code);
 }
 
 /**
@@ -299,85 +433,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       responseTypeRaw === 'base64'
         ? responseTypeRaw
         : undefined;
-    const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
-      const out: Record<string, unknown> = {};
-      const sensitive = new Set([
-        'authorization',
-        'proxy-authorization',
-        'cookie',
-        'set-cookie',
-        'x-api-key',
-        'api-key',
-        'apikey',
-        'x-auth-token',
-      ]);
-      for (const [k, v] of Object.entries(h)) {
-        const lk = k.toLowerCase();
-        out[k] = sensitive.has(lk) ? '[REDACTED]' : v;
-      }
-      return out;
-    };
-
-    const redactUrlForLogs = (rawUrl: string): string => {
-      try {
-        const u = new URL(rawUrl);
-        const sensitiveParams = new Set([
-          'token',
-          'access_token',
-          'auth',
-          'authorization',
-          'api_key',
-          'apikey',
-          'key',
-          'secret',
-          'signature',
-        ]);
-        for (const [k] of u.searchParams) {
-          if (sensitiveParams.has(k.toLowerCase())) {
-            u.searchParams.set(k, '[REDACTED]');
-          }
-        }
-        return u.toString();
-      } catch {
-        return rawUrl;
-      }
-    };
-
-    const summarizeFetchError = (err: unknown): Record<string, unknown> => {
-      const e =
-        err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
-      const cause = e?.cause;
-      const pick = (x: unknown): Record<string, unknown> => {
-        if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
-        const rec = x as Record<string, unknown>;
-        return {
-          name: typeof rec.name === 'string' ? rec.name : undefined,
-          message: typeof rec.message === 'string' ? rec.message : undefined,
-          code: typeof rec.code === 'string' ? rec.code : undefined,
-          errno: typeof rec.errno === 'number' ? rec.errno : undefined,
-          syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
-          address: typeof rec.address === 'string' ? rec.address : undefined,
-          port: typeof rec.port === 'number' ? rec.port : undefined,
-          hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
-        };
-      };
-
-      const primary = pick(e);
-      const underlying = pick(cause);
-      const code = (underlying.code ?? primary.code) as string | undefined;
-      const msg = (underlying.message ?? primary.message) as string | undefined;
-
-      // A compact one-liner that is safe to embed in Error.message.
-      const summary =
-        code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
-
-      return {
-        summary,
-        error: primary,
-        cause: underlying,
-      };
-    };
-
     const timeoutController = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
@@ -390,40 +445,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
-
-      const getHeaderValue = (h: Record<string, unknown> | undefined, name: string): string | undefined => {
-        if (!h) return undefined;
-        const direct = h[name];
-        if (typeof direct === 'string') return direct;
-        const alt = h[name.toLowerCase()];
-        if (typeof alt === 'string') return alt;
-        const alt2 = h[name.toUpperCase()];
-        if (typeof alt2 === 'string') return alt2;
-        const target = name.toLowerCase();
-        for (const [k, v] of Object.entries(h)) {
-          if (k.toLowerCase() === target && typeof v === 'string') return v;
-        }
-        return undefined;
-      };
-
-      const normalizeHeadersToStrings = (h: Record<string, unknown>): Record<string, string> => {
-        const out: Record<string, string> = {};
-        for (const [k, v] of Object.entries(h || {})) {
-          if (!k) continue;
-          if (v === undefined || v === null) continue;
-          if (typeof v === 'string') out[k] = v;
-          else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
-          else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
-          else out[k] = String(v);
-        }
-        return out;
-      };
-
-      const looksLikeJson = (s: string): boolean => {
-        const t = s.trim();
-        if (!t) return false;
-        return t.startsWith('{') || t.startsWith('[');
-      };
 
       if (useWebUnlocker) {
         const apiKey = options.webUnlocker?.apiKey ?? process.env.BRIGHTDATA_API_KEY;
@@ -528,6 +549,22 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
           bdHeaders[key] = value;
         });
 
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          const snippet = errText.length > 1200 ? `${errText.slice(0, 1200)}…` : errText;
+          console.error('[RunnerHostRuntime.http] web_unlocker_gateway_non_2xx', {
+            status: resp.status,
+            statusText: resp.statusText,
+            url: 'https://api.brightdata.com/request',
+            targetUrl: safeTargetUrl,
+          });
+          throw new Error(
+            `HTTP (Web Unlocker) gateway returned ${resp.status} ${resp.statusText} for ${finalMethod} ${safeTargetUrl}${
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
+
         // Web Unlocker responses are typically JSON like:
         //   { result: "<html>...</html>", headers: {...}, url: "..." }
         // But some flows can return the unlocked page body directly (raw HTML/text).
@@ -546,6 +583,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         }
 
         const resultRaw = payloadObj?.result ?? payloadObj?.body;
+        const targetStatus =
+          coerceHttpStatusCode(payloadObj?.status_code) ??
+          coerceHttpStatusCode(payloadObj?.statusCode) ??
+          coerceHttpStatusCode(payloadObj?.status) ??
+          resp.status;
         const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
         const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
         const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
@@ -583,8 +625,8 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         }
 
         return {
-          status: resp.status,
-          statusText: resp.statusText,
+          status: targetStatus,
+          statusText: statusTextFromCode(targetStatus),
           headers: targetHeaders,
           body: responseBody,
           url: targetUrl,

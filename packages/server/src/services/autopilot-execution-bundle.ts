@@ -111,10 +111,10 @@ export async function buildAutopilotExecutionBundle(args: {
     : undefined;
 
   const webUnlocker =
-    process.env.BRIGHTDATA_API_KEY && process.env.BRIGHTDATA_ZONE
+    env.BRIGHTDATA_API_KEY && env.BRIGHTDATA_ZONE
       ? {
-          apiKey: process.env.BRIGHTDATA_API_KEY,
-          zone: process.env.BRIGHTDATA_ZONE,
+          apiKey: env.BRIGHTDATA_API_KEY,
+          zone: env.BRIGHTDATA_ZONE,
         }
       : undefined;
 

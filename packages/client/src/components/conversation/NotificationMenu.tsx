@@ -19,12 +19,18 @@ import { useMemo } from 'react'
 
 export type NotificationLevel = 'all' | 'mentions' | 'mute'
 
-export type NotificationMenuType = 'channel' | 'thread'
+export type NotificationMenuType = 'channel' | 'room' | 'thread'
 
 type NotificationMenuProps =
   | {
       type: 'channel'
       channelId: string
+      starshipId: string
+      className?: string
+    }
+  | {
+      type: 'room'
+      roomId: string
       starshipId: string
       className?: string
     }
@@ -39,12 +45,18 @@ const getQueryKey = (type: NotificationMenuType, id: string) => {
   if (type === 'channel') {
     return ['channels', 'notification-level', id] as const
   }
+  if (type === 'room') {
+    return ['rooms', 'notification-level', id] as const
+  }
   return ['conversations', 'notification-level', id] as const
 }
 
 const getApiPath = (type: NotificationMenuType, id: string) => {
   if (type === 'channel') {
     return `/api/v1/channels/${encodeURIComponent(id)}/notification-level`
+  }
+  if (type === 'room') {
+    return `/api/v1/rooms/${encodeURIComponent(id)}/notification-level`
   }
   return `/api/v1/conversations/${encodeURIComponent(id)}/notification-level`
 }
@@ -103,7 +115,7 @@ function getBadgeCountForConversation(unread: any, conversationId: string): numb
 
 export function NotificationMenu(props: NotificationMenuProps) {
   const type = props.type
-  const id = type === 'channel' ? props.channelId : props.conversationId
+  const id = type === 'channel' ? props.channelId : type === 'room' ? props.roomId : props.conversationId
   const starshipId = String(props.starshipId || '').trim()
   const qc = useQueryClient()
 

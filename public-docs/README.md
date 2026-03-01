@@ -21,6 +21,12 @@ This folder contains documentation for the Starships workflow system, including 
 
 - **Data**
   - [Starship datasets (tabular)](./data/datasets.md)
+    - [Schema & columns](./data/datasets/schema.md)
+    - [Rows, coercion, and upserts](./data/datasets/rows.md)
+    - [HTTP API](./data/datasets/api.md)
+    - [Connector actions & agent tools](./data/datasets/connector-actions.md)
+    - [UI + Views integration](./data/datasets/ui-and-views.md)
+    - [Troubleshooting](./data/datasets/troubleshooting.md)
 
 Audience and access modes
 

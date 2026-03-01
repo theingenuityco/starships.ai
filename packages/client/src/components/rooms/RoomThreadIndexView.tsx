@@ -81,7 +81,7 @@ export function RoomThreadIndexView(props: {
     if (!effectiveStarshipSlug) return
     const roomSlug = String(props.roomSlug || '').trim()
     if (roomSlug) {
-      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}?thread=draft`)
+      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}/thread/draft`)
       return
     }
     router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.roomConversationId)}?thread=draft`)

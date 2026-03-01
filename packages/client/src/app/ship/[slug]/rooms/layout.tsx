@@ -4,6 +4,7 @@ import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
+import Icon from '@/components/primitives/Icon'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
 import { usePinRoomAgent, usePinRoomDataset, usePinRoomTaskBoard, usePinRoomTool, usePinRoomView, useRoomPins, useStarshipRooms, useStarshipTaskBoards, useUnpinRoomAgent, useUnpinRoomDataset, useUnpinRoomTaskBoard, useUnpinRoomTool, useUnpinRoomView } from '@/hooks/useRooms'
@@ -30,8 +31,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     () => ({
       slug: params.slug as string,
       roomSlug: params.roomSlug as string | undefined,
+      threadId: (params as any)?.threadId as string | undefined,
     }),
-    [params.slug, params.roomSlug]
+    [params.slug, params.roomSlug, (params as any)?.threadId]
   )
   const isRoomsIndexRoute = useMemo(() => {
     const raw = typeof routeParams.roomSlug === 'string' ? routeParams.roomSlug : ''
@@ -75,7 +77,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeConversationId])
 
-  const threadKey = useMemo(() => {
+  const routeThreadKey = useMemo(() => {
+    const raw = typeof routeParams.threadId === 'string' ? routeParams.threadId : ''
+    const v = String(raw || '').trim()
+    return v.length > 0 ? v : null
+  }, [routeParams.threadId])
+
+  // Back-compat: support old `?thread=` URLs by navigating to the new route.
+  const legacyThreadKey = useMemo(() => {
     const raw = searchParams.get('thread')
     const v = typeof raw === 'string' ? raw.trim() : ''
     return v.length > 0 ? v : null
@@ -87,6 +96,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
 
+  const threadKey = routeThreadKey
   const isDraftThreadOpen = threadKey === 'draft'
   const threadConversationId = useMemo(() => {
     if (!threadKey) return null
@@ -96,20 +106,22 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const isViewPaneOpen = Boolean(viewKey)
 
+  const roomBasePath = useMemo(() => {
+    return routeParams.roomSlug && String(routeParams.roomSlug).trim()
+      ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
+      : `/ship/${routeParams.slug}/rooms`
+  }, [routeParams.roomSlug, routeParams.slug])
+
   const setThreadKeyInUrl = useCallback(
     (nextThreadKey: string | null) => {
-      const next = new URLSearchParams(searchParams.toString())
-      if (nextThreadKey) next.set('thread', nextThreadKey)
-      else next.delete('thread')
-      next.delete('view')
-      const qs = next.toString()
-      const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim()
-          ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
-          : `/ship/${routeParams.slug}/rooms`
-      router.push(qs ? `${basePath}?${qs}` : basePath)
+      if (nextThreadKey) {
+        router.push(`${roomBasePath}/thread/${encodeURIComponent(String(nextThreadKey))}`)
+        return
+      }
+      // Clear thread route entirely.
+      router.push(roomBasePath)
     },
-    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+    [router, roomBasePath]
   )
 
   const setViewKeyInUrl = useCallback(
@@ -127,6 +139,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     },
     [router, routeParams.roomSlug, routeParams.slug, searchParams]
   )
+
+  useEffect(() => {
+    if (!legacyThreadKey) return
+    if (routeThreadKey) return
+    if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
+    router.replace(`${roomBasePath}/thread/${encodeURIComponent(String(legacyThreadKey))}`)
+  }, [legacyThreadKey, roomBasePath, routeParams.roomSlug, routeThreadKey, router])
 
   // Default parent for draft threads is the active room conversation id.
   useEffect(() => {
@@ -355,7 +374,23 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           onAgentChange={setThreadAgent}
           onThreadCreated={handleThreadCreated}
           onClose={handleCloseThread}
+          titlePrefix={
+            <span className="inline-flex items-baseline gap-2">
+              <button
+                type="button"
+                className="inline-flex h-4 w-4 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                onClick={handleCloseThread}
+                aria-label="Back to room"
+                title="Back to room"
+              >
+                <Icon name="arrow-left" className="h-4 w-4" />
+              </button>
+              <span className="text-muted-foreground">{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}/</span>
+            </span>
+          }
+          mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
           titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+          hideCloseButton={true}
           className="h-full"
         />
       ) : activeConversationId ? (

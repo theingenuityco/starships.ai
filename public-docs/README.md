@@ -16,6 +16,9 @@ This folder contains documentation for the Starships workflow system, including 
 - **Views**
   - [Views](./views/README.md)
 
+- **Tasks**
+  - [Task boards (kanban)](./tasks/README.md)
+
 - **Data**
   - [Starship datasets (tabular)](./data/datasets.md)
 
@@ -70,6 +73,7 @@ Blueprint examples live under [Blueprints reference](./blueprints/README.md#exam
 
 Notes:
 
+- Slugs prefer a doc's frontmatter `slug:` when present; otherwise they fall back to the file path (without extension).
 - Template expressions use `{{ ... }}` and are resolved by the Engine prior to handler execution (full-only mode). Inline fields are executed post-handler; see Engine.
 - Execution input/output items are arrays of `ExecutionItem` internally; examples show plain JSON for clarity.
 

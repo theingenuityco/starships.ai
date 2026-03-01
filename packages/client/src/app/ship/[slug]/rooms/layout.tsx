@@ -383,6 +383,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           onCreateDraftThread={() => {
             setThreadKeyInUrl('draft')
           }}
+          onThreadConversationStarted={({ conversationId, selectedAgent }) => {
+            setThreadAgent(selectedAgent ?? null)
+            setThreadKeyInUrl(String(conversationId))
+          }}
         />
       ) : null}
 

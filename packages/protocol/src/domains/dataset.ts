@@ -86,6 +86,10 @@ export interface StarshipDatasetColumn {
    * Stable key used in row objects and shown in tables.
    */
   name: string;
+  /**
+   * Optional human-readable help text for this column.
+   */
+  description?: string;
   format?: StarshipDatasetColumnFormat;
   type?: StarshipDatasetColumnType;
   constraints?: StarshipDatasetColumnConstraints;

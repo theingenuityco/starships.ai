@@ -47,14 +47,18 @@ export function formatDataCellValue(
   }
 
   if (format === 'date') {
-    const asDate = new Date(value)
+    const dateInput: string | number | Date =
+      value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? value : String(value)
+    const asDate = new Date(dateInput)
     return Number.isNaN(asDate.getTime())
       ? String(value)
       : asDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   }
 
   if (format === 'datetime') {
-    const asDate = new Date(value as any)
+    const dateInput: string | number | Date =
+      value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? value : String(value)
+    const asDate = new Date(dateInput)
     return Number.isNaN(asDate.getTime())
       ? String(value)
       : asDate.toLocaleString('en-US', {

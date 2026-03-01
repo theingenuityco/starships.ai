@@ -377,18 +377,18 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           titlePrefix={
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center -ml-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
               onClick={handleCloseThread}
               aria-label="Back to room"
               title="Back to room"
             >
-              <Icon name="arrow-left" className="h-5 w-5" />
+              <Icon name="arrow-left" className="h-4 w-4" />
             </button>
           }
           titlePrepend={
-            <span className="inline-flex items-center whitespace-nowrap">
+            <span className="inline-flex items-center whitespace-nowrap text-foreground">
               <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
-              <span className="mx-1 opacity-60">/</span>
+              <span className="mx-1">/</span>
             </span>
           }
           mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}

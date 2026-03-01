@@ -247,7 +247,11 @@ export function ThreadPane(props: {
                 ? Number((selectedAgent as any).maxTokens)
                 : null
           }
-          fallbackTitle={draftTitle ?? 'New thread'}
+          // IMPORTANT:
+          // - For real thread conversations (conversationId present), do NOT pass a fallback title so the
+          //   placeholder header uses "Loading..." until the conversation detail arrives.
+          // - For draft threads (conversationId null), use draftTitle/default.
+          fallbackTitle={effectiveConversationId ? undefined : draftTitle ?? 'New thread'}
           fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
           participantsOverride={draftParticipants}
           participantsHint={participantsHint}

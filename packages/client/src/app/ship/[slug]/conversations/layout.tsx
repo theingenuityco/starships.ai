@@ -700,7 +700,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             const rawInput = String((linkedMessage as any)?.content ?? '')
             const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
-            const title = snippet ? `Thread: ${snippet}` : 'New thread'
+            const title = snippet ? snippet : 'New thread'
             setThreadDraftTitle(title)
             pendingThreadStateRef.current = {
               threadKey: 'draft',

@@ -5,7 +5,6 @@ import { ConversationSummaryBar } from '@/components/conversation/ConversationSu
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
@@ -32,6 +31,7 @@ export function RoomThreadIndexView(props: {
   toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
   canManagePins?: boolean | null
+  onOpenResourcesPane?: () => void
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
@@ -58,7 +58,6 @@ export function RoomThreadIndexView(props: {
   const router = useRouter()
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
-  const [pinsOpen, setPinsOpen] = useState(false)
   const [pickViewId, setPickViewId] = useState<string>('')
   const [pickDatasetId, setPickDatasetId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
@@ -92,6 +91,46 @@ export function RoomThreadIndexView(props: {
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedAgents = (props.pinnedAgents || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const hasAnyResources = pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
+
+  const openPinnedAgent = (agentId: string) => {
+    const id = String(agentId || '').trim()
+    if (!id) return
+    const agentSlug = props.agentSlugById?.get(id) || ''
+    const peerKey = agentSlug ? agentSlug : `a:${id}`
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedView = (viewId: string) => {
+    const id = String(viewId || '').trim()
+    if (!id) return
+    props.onOpenPinnedView?.(id)
+  }
+
+  const openPinnedDataset = (datasetId: string) => {
+    const id = String(datasetId || '').trim()
+    if (!id) return
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(id)}` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedBoard = () => {
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedTool = (toolId: string) => {
+    const id = String(toolId || '').trim()
+    if (!id) return
+    const toolSlug = props.toolSlugById?.get(id) || ''
+    const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
+    if (!href) return
+    router.push(href)
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -112,249 +151,15 @@ export function RoomThreadIndexView(props: {
         fallbackTitle={label}
         rightSlot={
           <div className="flex items-center gap-2">
-            {props.canManagePins ? (
-              <Button type="button" size="sm" variant="outline" onClick={() => setPinsOpen(true)}>
+            {props.canManagePins || hasAnyResources ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
-                Pins
+                Resources
               </Button>
             ) : null}
           </div>
         }
       />
-
-      <Dialog open={pinsOpen} onOpenChange={setPinsOpen}>
-        <DialogContent className="sm:max-w-[720px]">
-          <DialogHeader>
-            <DialogTitle>Room pins</DialogTitle>
-            <DialogDescription>Pin agents, tools, views, datasets, and task boards to this room.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pin an agent</div>
-              <div className="flex items-center gap-2">
-                <Select value={pickAgentId} onValueChange={setPickAgentId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select an agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(props.availableAgents || []).map(a => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const id = pickAgentId.trim()
-                    if (!id) return
-                    props.onPinAgent?.(id)
-                    setPickAgentId('')
-                  }}
-                  disabled={!pickAgentId.trim()}
-                >
-                  Pin
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pin a tool</div>
-              <div className="flex items-center gap-2">
-                <Select value={pickToolId} onValueChange={setPickToolId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a tool" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(props.availableTools || []).map(t => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const id = pickToolId.trim()
-                    if (!id) return
-                    props.onPinTool?.(id)
-                    setPickToolId('')
-                  }}
-                  disabled={!pickToolId.trim()}
-                >
-                  Pin
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pin a view</div>
-              <div className="flex items-center gap-2">
-                <Select value={pickViewId} onValueChange={setPickViewId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a view" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(props.availableViews || []).map(v => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const id = pickViewId.trim()
-                    if (!id) return
-                    props.onPinView?.(id)
-                    setPickViewId('')
-                  }}
-                  disabled={!pickViewId.trim()}
-                >
-                  Pin
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pin a dataset</div>
-              <div className="flex items-center gap-2">
-                <Select value={pickDatasetId} onValueChange={setPickDatasetId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a dataset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(props.availableDatasets || []).map(d => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const id = pickDatasetId.trim()
-                    if (!id) return
-                    props.onPinDataset?.(id)
-                    setPickDatasetId('')
-                  }}
-                  disabled={!pickDatasetId.trim()}
-                >
-                  Pin
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Pin a task board</div>
-              <div className="flex items-center gap-2">
-                <Select value={pickBoardId} onValueChange={setPickBoardId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a board" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(props.availableTaskBoards || []).map(b => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    const id = pickBoardId.trim()
-                    if (!id) return
-                    props.onPinTaskBoard?.(id)
-                    setPickBoardId('')
-                  }}
-                  disabled={!pickBoardId.trim()}
-                >
-                  Pin
-                </Button>
-              </div>
-            </div>
-
-            <div className="border-t border-border/60 pt-3 space-y-2">
-              <div className="text-xs font-medium text-muted-foreground">Currently pinned</div>
-              <div className="space-y-2">
-                {pinnedAgents.length === 0 && pinnedTools.length === 0 && pinnedViews.length === 0 && pinnedDatasets.length === 0 && pinnedBoards.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No pins yet.</div>
-                ) : (
-                  <>
-                    {pinnedAgents.map(p => (
-                      <div key={`pa:${p.agentId}`} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">
-                          <span className="text-muted-foreground mr-2">Agent</span>
-                          {props.agentLabelById?.get(String(p.agentId)) || String(p.agentId)}
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinAgent?.(String(p.agentId))}>
-                          Unpin
-                        </Button>
-                      </div>
-                    ))}
-                    {pinnedTools.map(p => (
-                      <div key={`pt:${p.toolId}`} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">
-                          <span className="text-muted-foreground mr-2">Tool</span>
-                          {props.toolLabelById?.get(String(p.toolId)) || String(p.toolId)}
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTool?.(String(p.toolId))}>
-                          Unpin
-                        </Button>
-                      </div>
-                    ))}
-                    {pinnedViews.map(p => (
-                      <div key={`pv:${p.viewId}`} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">
-                          <span className="text-muted-foreground mr-2">View</span>
-                          {props.viewLabelById?.get(String(p.viewId)) || String(p.viewId)}
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinView?.(String(p.viewId))}>
-                          Unpin
-                        </Button>
-                      </div>
-                    ))}
-                    {pinnedDatasets.map(p => (
-                      <div key={`pd:${p.datasetId}`} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">
-                          <span className="text-muted-foreground mr-2">Dataset</span>
-                          {props.datasetLabelById?.get(String(p.datasetId)) || String(p.datasetId)}
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinDataset?.(String(p.datasetId))}>
-                          Unpin
-                        </Button>
-                      </div>
-                    ))}
-                    {pinnedBoards.map(p => (
-                      <div key={`pb:${p.boardId}`} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">
-                          <span className="text-muted-foreground mr-2">Board</span>
-                          {props.taskBoardLabelById?.get(String(p.boardId)) || String(p.boardId)}
-                        </div>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTaskBoard?.(String(p.boardId))}>
-                          Unpin
-                        </Button>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPinsOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 ? (
         <div className="border-b border-border/60 bg-card/40 px-4 py-2">

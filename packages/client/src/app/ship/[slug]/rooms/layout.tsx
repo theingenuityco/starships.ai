@@ -4,6 +4,7 @@ import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
+import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import Icon from '@/components/primitives/Icon'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
@@ -96,6 +97,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
 
+  const roomPaneKey = useMemo(() => {
+    const raw = searchParams.get('pane')
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v.length > 0 ? v : null
+  }, [searchParams])
+  const isResourcesPaneOpen = roomPaneKey === 'resources'
+
   const threadKey = routeThreadKey
   const isDraftThreadOpen = threadKey === 'draft'
   const threadConversationId = useMemo(() => {
@@ -129,6 +137,24 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       const next = new URLSearchParams(searchParams.toString())
       if (nextViewKey) next.set('view', nextViewKey)
       else next.delete('view')
+      next.delete('pane')
+      next.delete('thread')
+      const qs = next.toString()
+      const basePath =
+        routeParams.roomSlug && String(routeParams.roomSlug).trim()
+          ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
+          : `/ship/${routeParams.slug}/rooms`
+      router.push(qs ? `${basePath}?${qs}` : basePath)
+    },
+    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+  )
+
+  const setRoomPaneInUrl = useCallback(
+    (nextPaneKey: string | null) => {
+      const next = new URLSearchParams(searchParams.toString())
+      if (nextPaneKey) next.set('pane', nextPaneKey)
+      else next.delete('pane')
+      next.delete('view')
       next.delete('thread')
       const qs = next.toString()
       const basePath =
@@ -397,50 +423,91 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           className="h-full"
         />
       ) : activeConversationId ? (
-        <RoomThreadIndexView
-          starshipId={starshipData.id}
-          roomConversationId={activeConversationId}
-          roomSlug={activeRoom?.slug ?? null}
-          roomName={activeRoom?.name ?? null}
-          roomIsPrivate={Boolean(activeRoom?.isPrivate)}
-          starshipSlug={routeParams.slug}
-          pinnedViews={pinsData?.views ?? null}
-          pinnedDatasets={pinsData?.datasets ?? null}
-          pinnedTaskBoards={pinsData?.taskBoards ?? null}
-          pinnedAgents={(pinsData as any)?.agents ?? null}
-          pinnedTools={(pinsData as any)?.tools ?? null}
-          viewLabelById={viewLabelById}
-          datasetLabelById={datasetLabelById}
-          taskBoardLabelById={taskBoardLabelById}
-          agentLabelById={agentLabelById}
-          toolLabelById={toolLabelById}
-          agentSlugById={agentSlugById}
-          toolSlugById={toolSlugById}
-          onOpenPinnedView={onOpenPinnedView}
-          canManagePins={canManagePins}
-          availableViews={availableViews}
-          availableDatasets={availableDatasets}
-          availableTaskBoards={availableTaskBoards}
-          availableAgents={availableAgents}
-          availableTools={availableTools}
-          onPinView={(viewId) => pinView.mutate({ viewId })}
-          onUnpinView={(viewId) => unpinView.mutate(viewId)}
-          onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
-          onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
-          onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
-          onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
-          onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
-          onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
-          onPinTool={(toolId) => pinTool.mutate({ toolId })}
-          onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
-          onCreateDraftThread={() => {
-            setThreadKeyInUrl('draft')
-          }}
-          onThreadConversationStarted={({ conversationId, selectedAgent }) => {
-            setThreadAgent(selectedAgent ?? null)
-            setThreadKeyInUrl(String(conversationId))
-          }}
-        />
+        isResourcesPaneOpen ? (
+          <RoomResourcesPane
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomConversationId={activeConversationId}
+            roomSlug={activeRoom?.slug ?? null}
+            roomName={activeRoom?.name ?? null}
+            pinnedViews={pinsData?.views ?? null}
+            pinnedDatasets={pinsData?.datasets ?? null}
+            pinnedTaskBoards={pinsData?.taskBoards ?? null}
+            pinnedAgents={(pinsData as any)?.agents ?? null}
+            pinnedTools={(pinsData as any)?.tools ?? null}
+            viewLabelById={viewLabelById}
+            datasetLabelById={datasetLabelById}
+            taskBoardLabelById={taskBoardLabelById}
+            agentLabelById={agentLabelById}
+            toolLabelById={toolLabelById}
+            agentSlugById={agentSlugById}
+            toolSlugById={toolSlugById}
+            onOpenPinnedView={onOpenPinnedView}
+            canManagePins={canManagePins}
+            availableViews={availableViews}
+            availableDatasets={availableDatasets}
+            availableTaskBoards={availableTaskBoards}
+            availableAgents={availableAgents}
+            availableTools={availableTools}
+            onPinView={(viewId) => pinView.mutate({ viewId })}
+            onUnpinView={(viewId) => unpinView.mutate(viewId)}
+            onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
+            onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
+            onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
+            onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
+            onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
+            onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
+            onPinTool={(toolId) => pinTool.mutate({ toolId })}
+            onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+            onClose={() => setRoomPaneInUrl(null)}
+          />
+        ) : (
+          <RoomThreadIndexView
+            starshipId={starshipData.id}
+            roomConversationId={activeConversationId}
+            roomSlug={activeRoom?.slug ?? null}
+            roomName={activeRoom?.name ?? null}
+            roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+            starshipSlug={routeParams.slug}
+            pinnedViews={pinsData?.views ?? null}
+            pinnedDatasets={pinsData?.datasets ?? null}
+            pinnedTaskBoards={pinsData?.taskBoards ?? null}
+            pinnedAgents={(pinsData as any)?.agents ?? null}
+            pinnedTools={(pinsData as any)?.tools ?? null}
+            viewLabelById={viewLabelById}
+            datasetLabelById={datasetLabelById}
+            taskBoardLabelById={taskBoardLabelById}
+            agentLabelById={agentLabelById}
+            toolLabelById={toolLabelById}
+            agentSlugById={agentSlugById}
+            toolSlugById={toolSlugById}
+            onOpenPinnedView={onOpenPinnedView}
+            canManagePins={canManagePins}
+            onOpenResourcesPane={() => setRoomPaneInUrl('resources')}
+            availableViews={availableViews}
+            availableDatasets={availableDatasets}
+            availableTaskBoards={availableTaskBoards}
+            availableAgents={availableAgents}
+            availableTools={availableTools}
+            onPinView={(viewId) => pinView.mutate({ viewId })}
+            onUnpinView={(viewId) => unpinView.mutate(viewId)}
+            onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
+            onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
+            onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
+            onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
+            onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
+            onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
+            onPinTool={(toolId) => pinTool.mutate({ toolId })}
+            onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+            onCreateDraftThread={() => {
+              setThreadKeyInUrl('draft')
+            }}
+            onThreadConversationStarted={({ conversationId, selectedAgent }) => {
+              setThreadAgent(selectedAgent ?? null)
+              setThreadKeyInUrl(String(conversationId))
+            }}
+          />
+        )
       ) : null}
 
       {/* Side pane overlays */}

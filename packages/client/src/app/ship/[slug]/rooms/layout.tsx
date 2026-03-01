@@ -11,9 +11,10 @@ import { useMarkConversationRead } from '@/hooks/useNotifications'
 import { usePinRoomAgent, usePinRoomDataset, usePinRoomTaskBoard, usePinRoomTool, usePinRoomView, useRoomPins, useStarshipRooms, useStarshipTaskBoards, useUnpinRoomAgent, useUnpinRoomDataset, useUnpinRoomTaskBoard, useUnpinRoomTool, useUnpinRoomView } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
+import { cn } from '@/lib/utils'
 import type { AgentModel, RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipTools } from '@/hooks/useTools'
@@ -27,6 +28,143 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
+
+  // Desktop side pane width (draggable resizer) - match Channels thread pane behavior
+  const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
+  const [resourcesPaneWidthPx, setResourcesPaneWidthPx] = useState<number>(() => {
+    if (typeof window === 'undefined') return 600
+    const w = window.innerWidth
+    if (w >= 1536) return 720
+    if (w >= 1280) return 660
+    if (w >= 1024) return 600
+    return 480
+  })
+  const [isResizingResourcesPane, setIsResizingResourcesPane] = useState<boolean>(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
+  const resizeCleanupRef = useRef<null | (() => void)>(null)
+  const resizeRafRef = useRef<number | null>(null)
+  const pendingResourcesPaneWidthPxRef = useRef<number | null>(null)
+
+  const clampResourcesPaneWidthPx = useCallback((w: number) => {
+    const min = 320
+    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
+    const max = Math.min(900, Math.max(min, viewportW - 360))
+    const next = Math.round(w)
+    return Math.max(min, Math.min(max, next))
+  }, [])
+
+  const clampResourcesPaneWidthPxRef = useRef(clampResourcesPaneWidthPx)
+  useEffect(() => {
+    clampResourcesPaneWidthPxRef.current = clampResourcesPaneWidthPx
+  }, [clampResourcesPaneWidthPx])
+
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(RESOURCES_PANE_WIDTH_STORAGE_KEY) : null
+      const parsed = raw ? Number(raw) : NaN
+      const hasStored = Number.isFinite(parsed) && parsed > 0
+      const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
+      const defaultWidth = viewportW >= 1536 ? 720 : viewportW >= 1280 ? 660 : viewportW >= 1024 ? 600 : 480
+      setResourcesPaneWidthPx(clampResourcesPaneWidthPx(hasStored ? parsed : defaultWidth))
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      window.localStorage.setItem(RESOURCES_PANE_WIDTH_STORAGE_KEY, String(resourcesPaneWidthPx))
+    } catch {
+      // ignore
+    }
+  }, [resourcesPaneWidthPx])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onResize = () => setResourcesPaneWidthPx(prev => clampResourcesPaneWidthPxRef.current(prev))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      try {
+        resizeCleanupRef.current?.()
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
+
+  const handleResourcesResizePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      if (typeof window === 'undefined') return
+
+      resizeCleanupRef.current?.()
+
+      const startX = e.clientX
+      const startWidth = resourcesPaneWidthPx
+      setIsResizingResourcesPane(true)
+
+      const prevUserSelect = document.body.style.userSelect
+      document.body.style.userSelect = 'none'
+
+      resizeStateRef.current = { startX, startWidth, prevUserSelect }
+
+      const applyWidth = (w: number) => {
+        try {
+          rootRef.current?.style.setProperty('--thread-pane-width', `${w}px`)
+        } catch {
+          // ignore
+        }
+      }
+
+      const onMove = (ev: PointerEvent) => {
+        const state = resizeStateRef.current
+        if (!state) return
+        const dx = ev.clientX - state.startX
+        const next = clampResourcesPaneWidthPx(state.startWidth - dx)
+        pendingResourcesPaneWidthPxRef.current = next
+        if (resizeRafRef.current != null) return
+        resizeRafRef.current = window.requestAnimationFrame(() => {
+          resizeRafRef.current = null
+          const w = pendingResourcesPaneWidthPxRef.current
+          if (typeof w === 'number') applyWidth(w)
+        })
+      }
+
+      const cleanup = () => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        if (resizeRafRef.current != null) {
+          window.cancelAnimationFrame(resizeRafRef.current)
+          resizeRafRef.current = null
+        }
+        const state = resizeStateRef.current
+        if (state) document.body.style.userSelect = state.prevUserSelect
+        resizeStateRef.current = null
+        resizeCleanupRef.current = null
+        const finalW = pendingResourcesPaneWidthPxRef.current
+        pendingResourcesPaneWidthPxRef.current = null
+        if (typeof finalW === 'number') {
+          applyWidth(finalW)
+          setResourcesPaneWidthPx(finalW)
+        }
+        setIsResizingResourcesPane(false)
+      }
+
+      const onUp = () => cleanup()
+
+      resizeCleanupRef.current = cleanup
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [clampResourcesPaneWidthPx, resourcesPaneWidthPx]
+  )
 
   const routeParams = useMemo(
     () => ({
@@ -103,6 +241,27 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
   const isResourcesPaneOpen = roomPaneKey === 'resources'
+  const paneKind = (isResourcesPaneOpen ? 'resources' : null) as 'resources' | null
+  const isSidePaneOpen = Boolean(paneKind)
+  const PANE_ANIM_MS = 300
+  const PANE_OPEN_CONTENT_DELAY_MS = 120
+  const [isSidePaneMounted, setIsSidePaneMounted] = useState<boolean>(isSidePaneOpen)
+  const openMountTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (isSidePaneOpen) {
+      if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+      openMountTimerRef.current = window.setTimeout(() => setIsSidePaneMounted(true), PANE_OPEN_CONTENT_DELAY_MS)
+      return () => {
+        if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+        openMountTimerRef.current = null
+      }
+    }
+    if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
+    openMountTimerRef.current = null
+    const t = window.setTimeout(() => setIsSidePaneMounted(false), PANE_ANIM_MS)
+    return () => window.clearTimeout(t)
+  }, [isSidePaneOpen])
 
   const threadKey = routeThreadKey
   const isDraftThreadOpen = threadKey === 'draft'
@@ -388,80 +547,48 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="relative h-full w-full flex flex-col min-w-0">
-      {activeConversationId && threadKey ? (
-        <ThreadPane
-          starshipId={starshipData.id}
-          starshipSlug={routeParams.slug}
-          conversationId={threadConversationId}
-          draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-          draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-          selectedAgent={threadAgent}
-          onAgentChange={setThreadAgent}
-          onThreadCreated={handleThreadCreated}
-          onClose={handleCloseThread}
-          titlePrefix={
-            <button
-              type="button"
-              className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-              onClick={handleCloseThread}
-              aria-label="Back to room"
-              title="Back to room"
-            >
-              <Icon name="arrow-left" className="h-4 w-4" />
-            </button>
-          }
-          titlePrepend={
-            <span className="inline-flex items-center whitespace-nowrap text-foreground">
-              <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
-              <span className="mx-1">/</span>
-            </span>
-          }
-          mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
-          titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
-          hideCloseButton={true}
-          className="h-full"
-        />
-      ) : activeConversationId ? (
-        isResourcesPaneOpen ? (
-          <RoomResourcesPane
+    <div
+      ref={rootRef}
+      className="relative h-full w-full flex flex-col md:flex-row min-w-0 overflow-x-hidden"
+      style={{
+        ['--thread-pane-width' as any]: `${resourcesPaneWidthPx}px`,
+      }}
+    >
+      <div className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}>
+        {activeConversationId && threadKey ? (
+          <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
-            roomConversationId={activeConversationId}
-            roomSlug={activeRoom?.slug ?? null}
-            roomName={activeRoom?.name ?? null}
-            pinnedViews={pinsData?.views ?? null}
-            pinnedDatasets={pinsData?.datasets ?? null}
-            pinnedTaskBoards={pinsData?.taskBoards ?? null}
-            pinnedAgents={(pinsData as any)?.agents ?? null}
-            pinnedTools={(pinsData as any)?.tools ?? null}
-            viewLabelById={viewLabelById}
-            datasetLabelById={datasetLabelById}
-            taskBoardLabelById={taskBoardLabelById}
-            agentLabelById={agentLabelById}
-            toolLabelById={toolLabelById}
-            agentSlugById={agentSlugById}
-            toolSlugById={toolSlugById}
-            onOpenPinnedView={onOpenPinnedView}
-            canManagePins={canManagePins}
-            availableViews={availableViews}
-            availableDatasets={availableDatasets}
-            availableTaskBoards={availableTaskBoards}
-            availableAgents={availableAgents}
-            availableTools={availableTools}
-            onPinView={(viewId) => pinView.mutate({ viewId })}
-            onUnpinView={(viewId) => unpinView.mutate(viewId)}
-            onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
-            onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
-            onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
-            onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
-            onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
-            onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
-            onPinTool={(toolId) => pinTool.mutate({ toolId })}
-            onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
-            onClose={() => setRoomPaneInUrl(null)}
+            conversationId={threadConversationId}
+            draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+            draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+            selectedAgent={threadAgent}
+            onAgentChange={setThreadAgent}
+            onThreadCreated={handleThreadCreated}
+            onClose={handleCloseThread}
+            titlePrefix={
+              <button
+                type="button"
+                className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                onClick={handleCloseThread}
+                aria-label="Back to room"
+                title="Back to room"
+              >
+                <Icon name="arrow-left" className="h-4 w-4" />
+              </button>
+            }
+            titlePrepend={
+              <span className="inline-flex items-center whitespace-nowrap text-foreground">
+                <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                <span className="mx-1">/</span>
+              </span>
+            }
+            mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
+            titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+            hideCloseButton={true}
+            className="h-full"
           />
-        ) : (
+        ) : activeConversationId ? (
           <RoomThreadIndexView
             starshipId={starshipData.id}
             roomConversationId={activeConversationId}
@@ -507,8 +634,145 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               setThreadKeyInUrl(String(conversationId))
             }}
           />
-        )
-      ) : null}
+        ) : null}
+      </div>
+
+      {/* Resources split pane (desktop/tablet) - match Channels thread pane behavior */}
+      <>
+        <div
+          className={`hidden md:block h-full flex-shrink-0 ${isResizingResourcesPane ? '' : 'transition-all duration-300 ease-in-out'}`}
+          style={{
+            width: isSidePaneOpen ? 'var(--thread-pane-width)' : 0,
+            willChange: 'width',
+          }}
+          aria-hidden="true"
+        />
+
+        <aside
+          className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{
+            width: 'var(--thread-pane-width)',
+            transform: isSidePaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
+            transition: isResizingResourcesPane ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out',
+            willChange: 'transform, opacity',
+            contain: 'layout style paint',
+          }}
+          aria-hidden={!isSidePaneOpen}
+        >
+          <div className="absolute inset-y-0 left-0 w-[1px] bg-border" aria-hidden="true" />
+          <div
+            className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize side pane"
+            onPointerDown={handleResourcesResizePointerDown}
+            title="Drag to resize"
+          />
+
+          <div className="h-full pl-[1px]">
+            {isSidePaneMounted ? (
+              paneKind === 'resources' ? (
+                <RoomResourcesPane
+                  starshipId={starshipData.id}
+                  starshipSlug={routeParams.slug}
+                  roomConversationId={activeConversationId || ''}
+                  roomSlug={activeRoom?.slug ?? null}
+                  roomName={activeRoom?.name ?? null}
+                  pinnedViews={pinsData?.views ?? null}
+                  pinnedDatasets={pinsData?.datasets ?? null}
+                  pinnedTaskBoards={pinsData?.taskBoards ?? null}
+                  pinnedAgents={(pinsData as any)?.agents ?? null}
+                  pinnedTools={(pinsData as any)?.tools ?? null}
+                  viewLabelById={viewLabelById}
+                  datasetLabelById={datasetLabelById}
+                  taskBoardLabelById={taskBoardLabelById}
+                  agentLabelById={agentLabelById}
+                  toolLabelById={toolLabelById}
+                  agentSlugById={agentSlugById}
+                  toolSlugById={toolSlugById}
+                  onOpenPinnedView={onOpenPinnedView}
+                  canManagePins={canManagePins}
+                  availableViews={availableViews}
+                  availableDatasets={availableDatasets}
+                  availableTaskBoards={availableTaskBoards}
+                  availableAgents={availableAgents}
+                  availableTools={availableTools}
+                  onPinView={(viewId) => pinView.mutate({ viewId })}
+                  onUnpinView={(viewId) => unpinView.mutate(viewId)}
+                  onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
+                  onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
+                  onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
+                  onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
+                  onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
+                  onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
+                  onPinTool={(toolId) => pinTool.mutate({ toolId })}
+                  onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+                  onClose={() => setRoomPaneInUrl(null)}
+                />
+              ) : null
+            ) : (
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+            )}
+          </div>
+        </aside>
+      </>
+
+      {/* Resources full-screen overlay (mobile) */}
+      <aside
+        className={cn(
+          'md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden',
+          isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+        style={{
+          transition: 'opacity 200ms ease-out',
+          willChange: 'opacity',
+        }}
+        aria-hidden={!isSidePaneOpen}
+      >
+        {isSidePaneMounted ? (
+          paneKind === 'resources' ? (
+            <RoomResourcesPane
+              starshipId={starshipData.id}
+              starshipSlug={routeParams.slug}
+              roomConversationId={activeConversationId || ''}
+              roomSlug={activeRoom?.slug ?? null}
+              roomName={activeRoom?.name ?? null}
+              pinnedViews={pinsData?.views ?? null}
+              pinnedDatasets={pinsData?.datasets ?? null}
+              pinnedTaskBoards={pinsData?.taskBoards ?? null}
+              pinnedAgents={(pinsData as any)?.agents ?? null}
+              pinnedTools={(pinsData as any)?.tools ?? null}
+              viewLabelById={viewLabelById}
+              datasetLabelById={datasetLabelById}
+              taskBoardLabelById={taskBoardLabelById}
+              agentLabelById={agentLabelById}
+              toolLabelById={toolLabelById}
+              agentSlugById={agentSlugById}
+              toolSlugById={toolSlugById}
+              onOpenPinnedView={onOpenPinnedView}
+              canManagePins={canManagePins}
+              availableViews={availableViews}
+              availableDatasets={availableDatasets}
+              availableTaskBoards={availableTaskBoards}
+              availableAgents={availableAgents}
+              availableTools={availableTools}
+              onPinView={(viewId) => pinView.mutate({ viewId })}
+              onUnpinView={(viewId) => unpinView.mutate(viewId)}
+              onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
+              onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
+              onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
+              onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
+              onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
+              onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
+              onPinTool={(toolId) => pinTool.mutate({ toolId })}
+              onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+              onClose={() => setRoomPaneInUrl(null)}
+            />
+          ) : null
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+        )}
+      </aside>
 
       {/* Side pane overlays */}
       {isViewPaneOpen ? (

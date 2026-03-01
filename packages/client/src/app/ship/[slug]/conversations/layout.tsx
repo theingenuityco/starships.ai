@@ -3,6 +3,7 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useStarshipRooms } from '@/hooks/useRooms'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
@@ -209,6 +210,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -493,6 +495,15 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return slug || null
   }, [channelsData?.channels, routeParams.conversationId])
 
+  const roomSlugForCurrentConversationId = useMemo(() => {
+    const cid = typeof routeParams.conversationId === 'string' ? String(routeParams.conversationId) : ''
+    if (!cid) return null
+    const rooms = roomsData?.rooms ?? []
+    const match = rooms.find((r: any) => String(r?.conversationId || '') === cid) ?? null
+    const slug = match?.slug ? String(match.slug) : ''
+    return slug || null
+  }, [roomsData?.rooms, routeParams.conversationId])
+
   const hasAutoNavigatedRef = useRef(false)
   useEffect(() => {
     if (hasAutoNavigatedRef.current) return
@@ -518,6 +529,23 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     hasAutoNavigatedRef.current = true
     router.replace('/explore')
   }, [agentFromUrl, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
+
+  // If the user is on /conversations/:id but that id is a room-backed conversation, redirect to /rooms/:roomSlug.
+  useEffect(() => {
+    if (!starshipData?.id) return
+    if (roomsLoading) return
+    if (!routeParams.conversationId) return
+    if (!roomSlugForCurrentConversationId) return
+    const next = new URLSearchParams()
+    const thread = (searchParams.get('thread') || '').trim()
+    if (thread) next.set('thread', thread)
+    const qs = next.toString()
+    router.replace(
+      qs
+        ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlugForCurrentConversationId)}?${qs}`
+        : `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlugForCurrentConversationId)}`
+    )
+  }, [roomSlugForCurrentConversationId, roomsLoading, routeParams.conversationId, routeParams.slug, router, searchParams, starshipData?.id])
 
   // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
   useEffect(() => {
@@ -571,6 +599,17 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         }
 
         const cid = String(newConversationId)
+        const rooms = roomsData?.rooms ?? []
+        const roomMatch = rooms.find((r: any) => String(r?.conversationId || '') === cid) ?? null
+        const roomSlug = roomMatch?.slug ? String(roomMatch.slug) : ''
+        if (roomSlug) {
+          const next = new URLSearchParams()
+          const thread = (sp.get('thread') || '').trim()
+          if (thread) next.set('thread', thread)
+          const qs = next.toString()
+          router.push(qs ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlug)}?${qs}` : `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlug)}`)
+          return
+        }
         const channels = channelsData?.channels ?? []
         const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
         const channelSlug = match?.slug ? String(match.slug) : ''
@@ -590,7 +629,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
       }
     },
-    [agentsData, channelsData?.channels, router, routeParams.slug, searchParams]
+    [agentsData, channelsData?.channels, roomsData?.rooms, router, routeParams.slug, searchParams]
   )
 
   if (!starshipData) {

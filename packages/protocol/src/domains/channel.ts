@@ -4,7 +4,7 @@
  * Channels are conversation-backed rooms (Slack/Discord-like) within a starship.
  */
 
-export type ChannelType = 'chat' | 'forum';
+export type ChannelType = 'chat';
 
 export interface Channel {
   slug: string;
@@ -18,7 +18,6 @@ export interface Channel {
   attachedViewId?: string | null;
   /**
    * Optional on create; defaults to `chat` server-side.
-   * `forum` channels render as thread/card indexes (Discord-forum style).
    */
   channelType?: ChannelType;
 }

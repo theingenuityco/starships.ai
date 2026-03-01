@@ -5,7 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
-import { ForumChannelView } from '@/components/conversation/ForumChannelView'
 import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
 import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
 import type { SearchResult } from '@/components/conversation/conversationSearch'
@@ -319,13 +318,9 @@ export function ConversationInterface({
     return Boolean(currentChannel.isPrivate)
   }, [currentChannel])
 
-  const isForumChannel = useMemo(() => {
-    return currentChannel?.channelType === 'forum'
-  }, [currentChannel])
-
   // Child conversation approvals: if any child conversation is awaiting tool approval,
   // show a compact callout above the parent composer.
-  const shouldCheckChildApprovals = Boolean(currentConversationId && !isForumChannel)
+  const shouldCheckChildApprovals = Boolean(currentConversationId)
   const { children: childPendingApprovals = [] } = useChildConversationsPendingApprovals(currentConversationId, {
     enabled: shouldCheckChildApprovals,
     limit: 10,
@@ -932,29 +927,6 @@ export function ConversationInterface({
     )
   }
 
-  // Forum channel view (cards/threads, no chat timeline).
-  if (isForumChannel && currentConversationId) {
-    return (
-      <div className="relative flex flex-col h-full">
-        <ForumChannelView
-          starshipId={starshipId}
-          channelConversationId={currentConversationId}
-          channelSlug={currentChannel?.slug ?? null}
-          channelName={currentChannel?.name ?? null}
-          channelIsPrivate={Boolean(currentChannel?.isPrivate)}
-          starshipSlug={starshipSlug ?? null}
-          onCreateDraftThread={() => {
-            // Open a draft thread in the thread pane without persisting a conversation yet.
-            // The conversation is created on the first message send from the thread composer.
-            // Default agent selection is dynamic; do not force a global default here.
-            const defaultAgent = selectedAgent ?? null
-            onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
-          }}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex flex-col h-full">
       {/* Main column (shrinks when thread pane is open) */}
@@ -1109,7 +1081,7 @@ export function ConversationInterface({
                       : null
                   }
                   bottomPaddingPx={inputHeight + 12}
-                  enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                  enableChannelMessageThreads={Boolean(isChannelConversation)}
                   activeThreadConversationId={activeThreadConversationId}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                   submittedQuery={submittedQuery.trim() || undefined}

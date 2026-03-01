@@ -7,6 +7,7 @@ import {
   type ConnectorSession,
   type LlmRuntimeConfig,
   type ProviderRoute,
+  type WebUnlockerRuntimeConfig,
 } from '../hostRuntime/RunnerHostRuntime';
 import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
@@ -57,6 +58,11 @@ export class InProcessExecutor implements Executor {
        */
       llm?: LlmRuntimeConfig;
       /**
+       * Optional web-unlocking gateway configuration used by HostRuntime.http.
+       * When set, the runner does not need to read web unlocker keys from its own env.
+       */
+      webUnlocker?: WebUnlockerRuntimeConfig;
+      /**
        * AWS runtime configuration for Bedrock.
        */
       aws?: AwsRuntimeConfig;
@@ -79,6 +85,7 @@ export class InProcessExecutor implements Executor {
       connectorSessions,
       connectorMetadata,
       llm,
+      webUnlocker,
       aws,
       azureAiFoundry,
       modelRoutes,
@@ -94,6 +101,7 @@ export class InProcessExecutor implements Executor {
       connectorMetadata: connectorMetadata ?? {},
       runtimeEnv: runtimeEnv ?? {},
       llm,
+      webUnlocker,
       aws,
       azureAiFoundry,
       modelRoutes,

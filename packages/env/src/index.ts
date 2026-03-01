@@ -92,6 +92,9 @@ export function getEnvConfig(): EnvironmentConfig {
 
     // LLM Provider Configuration
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    // Web-unlocking gateway (optional)
+    BRIGHTDATA_API_KEY: process.env.BRIGHTDATA_API_KEY,
+    BRIGHTDATA_ZONE: process.env.BRIGHTDATA_ZONE,
     AVATAR_GENERATION_MODE: resolvedAvatarGenerationMode,
 
     // AWS Bedrock Configuration (optional; used by autopilot execution bundle)

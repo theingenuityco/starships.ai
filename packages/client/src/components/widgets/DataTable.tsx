@@ -67,6 +67,19 @@ function safeJsonString(value: unknown): string {
   }
 }
 
+function inferIsoDateKind(value: unknown): 'date' | 'datetime' | null {
+  if (typeof value !== 'string') return null
+  const s = value.trim()
+  if (!s) return null
+
+  // Strict-ish ISO patterns to avoid false positives.
+  // Date: 2026-03-01
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return 'date'
+  // Datetime: 2026-03-01T12:34 or 2026-03-01 12:34:56(.789)Z?
+  if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?$/.test(s)) return 'datetime'
+  return null
+}
+
 export function DataTable({
   columns,
   data,
@@ -127,20 +140,23 @@ export function DataTable({
       if (v === null || v === undefined) return { kind: 'empty' }
       if (typeof v === 'boolean') return { kind: 'number', v: v ? 1 : 0 }
 
-      if (fmt === 'number' || fmt === 'currency' || fmt === 'percentage') {
+      const inferred = fmt === 'text' ? inferIsoDateKind(v) : null
+      const effectiveFmt = inferred ?? fmt
+
+      if (effectiveFmt === 'number' || effectiveFmt === 'currency' || effectiveFmt === 'percentage') {
         const n = Number(v)
         if (Number.isFinite(n)) return { kind: 'number', v: n }
         return { kind: 'string', v: String(v).toLowerCase() }
       }
 
-      if (fmt === 'date' || fmt === 'datetime') {
+      if (effectiveFmt === 'date' || effectiveFmt === 'datetime') {
         const t = new Date(v as any).getTime()
         if (Number.isFinite(t)) return { kind: 'date', v: t }
         return { kind: 'string', v: String(v).toLowerCase() }
       }
 
       if (typeof v === 'number' && Number.isFinite(v)) return { kind: 'number', v }
-      return { kind: 'string', v: formatDataCellValue(v, fmt).toLowerCase() }
+      return { kind: 'string', v: formatDataCellValue(v, effectiveFmt).toLowerCase() }
     }
 
     const dir = sort.dir === 'desc' ? -1 : 1
@@ -193,7 +209,9 @@ export function DataTable({
   const rowClickable = typeof onRowClick === 'function'
 
   const renderCell = (raw: unknown, column: DataColumn): { node: React.ReactNode; title?: string } => {
-    const fmt = column.format ?? 'text'
+    const baseFmt = column.format ?? 'text'
+    const inferred = baseFmt === 'text' ? inferIsoDateKind(raw) : null
+    const fmt = inferred ?? baseFmt
 
     if (raw === null || raw === undefined) {
       return { node: <span className="text-muted-foreground">—</span> }

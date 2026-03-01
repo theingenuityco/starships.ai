@@ -61,7 +61,19 @@ function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; 
     const r = raw as Record<string, any>
     const key = typeof r.name === 'string' && r.name.trim() ? r.name.trim() : ''
     if (!key) continue
-    out.push({ key, label: key, format: r.format })
+    const type = typeof r.type === 'string' ? r.type : ''
+    const format =
+      r.format ??
+      (type === 'date'
+        ? 'date'
+        : type === 'datetime'
+          ? 'datetime'
+          : type === 'number'
+            ? 'number'
+            : type === 'boolean'
+              ? 'text'
+              : 'text')
+    out.push({ key, label: key, format })
   }
   return out
 }
@@ -404,6 +416,14 @@ export default function DatasetViewerPage(): React.JSX.Element {
                                 onCheckedChange={(v) => setCol({ constraints: { ...constraints, unique: Boolean(v) } })}
                               />
                               Unique {isPk ? '' : '(primaryKey only)'}
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={Boolean(constraints.autoincrement)}
+                                disabled={!isPk || typeVal !== 'number'}
+                                onCheckedChange={(v) => setCol({ constraints: { ...constraints, autoincrement: Boolean(v) } })}
+                              />
+                              Autoincrement {isPk && typeVal === 'number' ? '' : '(number primaryKey only)'}
                             </label>
                           </div>
 

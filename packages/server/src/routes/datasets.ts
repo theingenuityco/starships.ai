@@ -101,6 +101,51 @@ function isEmptyValue(value: unknown): boolean {
   return false;
 }
 
+function wantsAutoincrement(col: StarshipDatasetColumn): boolean {
+  return Boolean((col as any)?.constraints?.autoincrement);
+}
+
+async function allocateAutoincrementBlock(args: {
+  datasetId: string;
+  columnName: string;
+  count: number;
+}): Promise<bigint> {
+  const count = Math.max(0, Math.floor(args.count));
+  if (count <= 0) throw new Error('count must be > 0');
+
+  const conn = getConnection();
+  const row = await conn.queryOne<{ start_value: string | number | bigint }>(
+    `
+      INSERT INTO starship_dataset_autoincrement (dataset_id, column_name, next_value, updated_at)
+      VALUES ($1, $2, $3::bigint + 1, NOW())
+      ON CONFLICT (dataset_id, column_name)
+      DO UPDATE SET next_value = starship_dataset_autoincrement.next_value + $3::bigint, updated_at = NOW()
+      RETURNING (next_value - $3::bigint) AS start_value
+    `,
+    [args.datasetId, args.columnName, count]
+  );
+  if (!row || row.start_value === null || row.start_value === undefined) throw new Error('Failed to allocate autoincrement block');
+  const v = row.start_value;
+  if (typeof v === 'bigint') return v;
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v) || !Number.isInteger(v)) throw new Error('Invalid autoincrement start_value');
+    return BigInt(v);
+  }
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) throw new Error('Invalid autoincrement start_value');
+    return BigInt(s);
+  }
+  throw new Error('Invalid autoincrement start_value');
+}
+
+function toSafeJsNumber(v: bigint): number | null {
+  const max = BigInt(Number.MAX_SAFE_INTEGER);
+  const min = BigInt(Number.MIN_SAFE_INTEGER);
+  if (v > max || v < min) return null;
+  return Number(v);
+}
+
 function normalizeReferenceValue(value: unknown): Record<string, unknown> | null {
   if (!isPlainObject(value)) return null;
   const kind = String((value as any).kind || '').trim();
@@ -145,12 +190,13 @@ function coerceValidateRow(args: {
     }
 
     const required = Boolean((constraints as any).required);
+    const autoincrement = wantsAutoincrement(col);
     const nullable = Boolean((constraints as any).nullable);
 
     const has = Object.prototype.hasOwnProperty.call(out, name);
     const value = has ? out[name] : undefined;
 
-    if (required && isEmptyValue(value)) {
+    if (required && isEmptyValue(value) && !autoincrement) {
       issues.push({ index, column: name, code: 'REQUIRED', message: 'Value is required' });
       continue;
     }
@@ -284,6 +330,7 @@ const DatasetColumnSchema: z.ZodType<StarshipDatasetColumn> = z
         required: z.boolean().optional(),
         nullable: z.boolean().optional(),
         unique: z.boolean().optional(),
+        autoincrement: z.boolean().optional(),
         default: z.unknown().optional(),
         min: z.number().finite().optional(),
         max: z.number().finite().optional(),
@@ -359,6 +406,15 @@ function validateColumnsConstraints(cols: StarshipDatasetColumn[], ctx: z.Refine
         ctx.addIssue({ code: 'custom', message: 'formula columns require formula.expr', path: ['columns', i, 'formula', 'expr'] });
       }
     }
+
+    if (wantsAutoincrement(c)) {
+      if (t !== 'number') {
+        ctx.addIssue({ code: 'custom', message: 'constraints.autoincrement is only supported for number columns', path: ['columns', i, 'constraints', 'autoincrement'] });
+      }
+      if (c?.constraints && Object.prototype.hasOwnProperty.call(c.constraints as any, 'default')) {
+        ctx.addIssue({ code: 'custom', message: 'constraints.autoincrement cannot be combined with constraints.default', path: ['columns', i, 'constraints', 'default'] });
+      }
+    }
   }
 }
 
@@ -392,6 +448,31 @@ function validateUniqueConstraints(args: { cols: StarshipDatasetColumn[]; primar
   }
 }
 
+function validateAutoincrementConstraints(args: { cols: StarshipDatasetColumn[]; primaryKey?: string | null; ctx: z.RefinementCtx }) {
+  const { cols, primaryKey, ctx } = args;
+  const autoCols = cols
+    .map((c, idx) => ({ c, idx }))
+    .filter(({ c }) => wantsAutoincrement(c));
+
+  if (autoCols.length === 0) return;
+  if (autoCols.length > 1) {
+    ctx.addIssue({ code: 'custom', message: 'Only one autoincrement column is supported per dataset', path: ['columns'] });
+    return;
+  }
+
+  const only = autoCols[0]!;
+  const name = String(only.c?.name || '').trim();
+  const pk = typeof primaryKey === 'string' ? primaryKey.trim() : '';
+
+  if (!pk) {
+    ctx.addIssue({ code: 'custom', message: 'autoincrement requires dataset primaryKey to be set', path: ['primaryKey'] });
+    return;
+  }
+  if (name !== pk) {
+    ctx.addIssue({ code: 'custom', message: 'autoincrement is only supported for the dataset primaryKey column', path: ['columns', only.idx, 'constraints', 'autoincrement'] });
+  }
+}
+
 const CreateDatasetSchema = z
   .object({
     name: z.string().trim().min(1).max(200).refine(noXSS, { message: XSS_ERROR_MESSAGE }),
@@ -414,6 +495,7 @@ const CreateDatasetSchema = z
     validateColumnsConstraints(v.columns ?? [], ctx);
     validatePrimaryKeyAgainstColumns({ cols: v.columns ?? [], primaryKey: v.primaryKey, ctx });
     validateUniqueConstraints({ cols: v.columns ?? [], primaryKey: v.primaryKey, ctx });
+    validateAutoincrementConstraints({ cols: v.columns ?? [], primaryKey: v.primaryKey, ctx });
   });
 
 const UpdateDatasetSchema = z
@@ -647,6 +729,24 @@ router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddlewa
           return;
         }
       }
+
+      // Guardrail: autoincrement is only supported for the primaryKey column.
+      const autoCols = nextCols.filter((c) => wantsAutoincrement(c));
+      if (autoCols.length > 1) {
+        sendError(res, 'VALIDATION_ERROR', 'Only one autoincrement column is supported per dataset', 400);
+        return;
+      }
+      if (autoCols.length === 1) {
+        const name = String(autoCols[0]?.name || '').trim();
+        if (!nextPk) {
+          sendError(res, 'VALIDATION_ERROR', 'autoincrement requires dataset primaryKey to be set', 400);
+          return;
+        }
+        if (name !== nextPk) {
+          sendError(res, 'VALIDATION_ERROR', 'autoincrement is only supported for the dataset primaryKey column', 400, { column: name, primaryKey: nextPk });
+          return;
+        }
+      }
     }
 
     const updates: UpdateStarshipDatasetRequest = body as unknown as UpdateStarshipDatasetRequest;
@@ -765,6 +865,9 @@ router.post(
 
     const schemaColumns: StarshipDatasetColumn[] = (required.dataset.columns ?? []) as StarshipDatasetColumn[];
 
+    const pkCol = primaryKey ? schemaColumns.find((c) => String(c?.name || '') === primaryKey) : null;
+    const pkAutoincrement = Boolean(primaryKey && pkCol && pkCol.type === 'number' && wantsAutoincrement(pkCol));
+
     if (mode === 'upsert') {
       if (!primaryKey || !primaryKey.trim()) {
         sendError(res, 'VALIDATION_ERROR', 'Dataset primaryKey is required for upsert mode', 400, { mode, primaryKey });
@@ -772,7 +875,7 @@ router.post(
       }
 
       const issues: RowIssue[] = [];
-      const toUpsert: Array<{ rowKey: string; data: Record<string, unknown> }> = [];
+      const validatedRows: Array<{ index: number; data: Record<string, unknown>; needsAuto: boolean }> = [];
       for (let idx = 0; idx < rows.length; idx++) {
         const r = rows[idx];
         if (!isPlainObject(r)) {
@@ -786,13 +889,36 @@ router.post(
           continue;
         }
 
-        const pkVal = (validated.data as any)[primaryKey];
-        if (pkVal === null || pkVal === undefined || String(pkVal).trim().length === 0) {
+        const pkVal = validated.data[primaryKey];
+        const needsAuto = pkAutoincrement && isEmptyValue(pkVal);
+        if (!needsAuto && (pkVal === null || pkVal === undefined || String(pkVal).trim().length === 0)) {
           issues.push({ index: idx, column: primaryKey, code: 'REQUIRED', message: `Row is missing primary key field: ${primaryKey}` });
           continue;
         }
+        validatedRows.push({ index: idx, data: validated.data, needsAuto });
+      }
 
-        toUpsert.push({ rowKey: String(pkVal), data: validated.data });
+      if (pkAutoincrement) {
+        const needs = validatedRows.filter((r) => r.needsAuto);
+        if (needs.length > 0) {
+          const start = await allocateAutoincrementBlock({ datasetId, columnName: primaryKey, count: needs.length });
+          for (let i = 0; i < needs.length; i++) {
+            const val = start + BigInt(i);
+            const n = toSafeJsNumber(val);
+            if (n === null) {
+              issues.push({ index: needs[i]!.index, column: primaryKey, code: 'AUTOINCREMENT_OVERFLOW', message: 'Autoincrement value exceeds JS safe integer range' });
+              continue;
+            }
+            needs[i]!.data[primaryKey] = n;
+          }
+        }
+      }
+
+      const toUpsert: Array<{ rowKey: string; data: Record<string, unknown> }> = [];
+      for (const vr of validatedRows) {
+        const pkVal = vr.data[primaryKey];
+        if (pkVal === null || pkVal === undefined || String(pkVal).trim().length === 0) continue; // errored
+        toUpsert.push({ rowKey: String(pkVal), data: vr.data });
       }
 
       const result = toUpsert.length > 0 ? await rowRepo.upsertManyByRowKey(datasetId, toUpsert) : { inserted: 0, updated: 0 };
@@ -808,6 +934,7 @@ router.post(
     // append
     const issues: RowIssue[] = [];
     const toAppend: Array<{ rowKey?: string | null; data: Record<string, unknown> }> = [];
+    const needsAuto: Array<{ inputIndex: number; appendIndex: number }> = [];
     for (let idx = 0; idx < rows.length; idx++) {
       const r = rows[idx];
       if (!isPlainObject(r)) {
@@ -821,9 +948,14 @@ router.post(
         continue;
       }
 
+      if (pkAutoincrement && primaryKey) {
+        const pkVal = validated.data[primaryKey];
+        if (isEmptyValue(pkVal)) needsAuto.push({ inputIndex: idx, appendIndex: toAppend.length });
+      }
+
       let rowKey: string | null = null;
       if (primaryKey && primaryKey.trim()) {
-        const pkVal = (validated.data as any)[primaryKey];
+        const pkVal = validated.data[primaryKey];
         if (pkVal !== null && pkVal !== undefined && String(pkVal).trim().length > 0) {
           rowKey = String(pkVal);
         }
@@ -831,7 +963,36 @@ router.post(
       toAppend.push({ rowKey, data: validated.data });
     }
 
-    const inserted = toAppend.length > 0 ? await rowRepo.appendMany(datasetId, toAppend) : { inserted: 0 };
+    if (pkAutoincrement && primaryKey) {
+      const count = needsAuto.length;
+      if (count > 0) {
+        const start = await allocateAutoincrementBlock({ datasetId, columnName: primaryKey, count });
+        for (let i = 0; i < needsAuto.length; i++) {
+          const entry = needsAuto[i]!;
+          const arrIdx = entry.appendIndex;
+          const val = start + BigInt(i);
+          const n = toSafeJsNumber(val);
+          if (n === null) {
+            issues.push({
+              index: entry.inputIndex,
+              column: primaryKey,
+              code: 'AUTOINCREMENT_OVERFLOW',
+              message: 'Autoincrement value exceeds JS safe integer range',
+            });
+            continue;
+          }
+          toAppend[arrIdx]!.data[primaryKey] = n;
+          toAppend[arrIdx]!.rowKey = String(n);
+        }
+      }
+    }
+
+    const finalToAppend =
+      pkAutoincrement && primaryKey
+        ? toAppend.filter((r) => !isEmptyValue(r.data[primaryKey]))
+        : toAppend;
+
+    const inserted = finalToAppend.length > 0 ? await rowRepo.appendMany(datasetId, finalToAppend) : { inserted: 0 };
     const resp: UpsertStarshipDatasetRowsResponse = {
       inserted: inserted.inserted,
       updated: 0,

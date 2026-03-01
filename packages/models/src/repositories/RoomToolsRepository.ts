@@ -20,9 +20,9 @@ function fromDb(r: DbRow): RoomPinnedTool {
   };
 }
 
-export class RoomPinnedToolsRepository extends BaseRepository {
+export class RoomToolsRepository extends BaseRepository {
   constructor() {
-    super('RoomPinnedToolsRepository');
+    super('RoomToolsRepository');
   }
 
   async list(roomConversationId: string): Promise<RoomPinnedTool[]> {
@@ -30,40 +30,40 @@ export class RoomPinnedToolsRepository extends BaseRepository {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
         `SELECT room_conversation_id, tool_id, position, created_at, created_by
-           FROM room_pinned_tools
+           FROM room_tools
           WHERE room_conversation_id = $1
           ORDER BY position ASC, created_at ASC`,
         [roomConversationId]
       );
       return rows.map(fromDb);
-    }, 'list', 'room_pinned_tools', roomConversationId);
+    }, 'list', 'room_tools', roomConversationId);
   }
 
   async upsert(args: { roomConversationId: string; toolId: string; position: number; createdBy?: string | null }): Promise<RoomPinnedTool> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const row = await conn.queryOne<DbRow>(
-        `INSERT INTO room_pinned_tools (room_conversation_id, tool_id, position, created_by)
+        `INSERT INTO room_tools (room_conversation_id, tool_id, position, created_by)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (room_conversation_id, tool_id) DO UPDATE SET
            position = EXCLUDED.position
          RETURNING room_conversation_id, tool_id, position, created_at, created_by`,
         [args.roomConversationId, args.toolId, Math.trunc(args.position), args.createdBy ?? null]
       );
-      if (!row) throw new Error('Failed to upsert pinned tool');
+      if (!row) throw new Error('Failed to upsert room tool');
       return fromDb(row);
-    }, 'upsert', 'room_pinned_tools');
+    }, 'upsert', 'room_tools');
   }
 
   async remove(roomConversationId: string, toolId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const result = await conn.queryWithResult(`DELETE FROM room_pinned_tools WHERE room_conversation_id = $1 AND tool_id = $2`, [
+      const result = await conn.queryWithResult(`DELETE FROM room_tools WHERE room_conversation_id = $1 AND tool_id = $2`, [
         roomConversationId,
         toolId,
       ]);
       return (result.rowCount ?? 0) > 0;
-    }, 'remove', 'room_pinned_tools');
+    }, 'remove', 'room_tools');
   }
 }
 

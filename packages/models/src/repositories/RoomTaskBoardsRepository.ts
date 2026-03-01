@@ -20,9 +20,9 @@ function fromDb(r: DbRow): RoomPinnedTaskBoard {
   };
 }
 
-export class RoomPinnedTaskBoardsRepository extends BaseRepository {
+export class RoomTaskBoardsRepository extends BaseRepository {
   constructor() {
-    super('RoomPinnedTaskBoardsRepository');
+    super('RoomTaskBoardsRepository');
   }
 
   async list(roomConversationId: string): Promise<RoomPinnedTaskBoard[]> {
@@ -30,40 +30,40 @@ export class RoomPinnedTaskBoardsRepository extends BaseRepository {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
         `SELECT room_conversation_id, board_id, position, created_at, created_by
-           FROM room_pinned_task_boards
+           FROM room_task_boards
           WHERE room_conversation_id = $1
           ORDER BY position ASC, created_at ASC`,
         [roomConversationId]
       );
       return rows.map(fromDb);
-    }, 'list', 'room_pinned_task_boards', roomConversationId);
+    }, 'list', 'room_task_boards', roomConversationId);
   }
 
   async upsert(args: { roomConversationId: string; boardId: string; position: number; createdBy?: string | null }): Promise<RoomPinnedTaskBoard> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const row = await conn.queryOne<DbRow>(
-        `INSERT INTO room_pinned_task_boards (room_conversation_id, board_id, position, created_by)
+        `INSERT INTO room_task_boards (room_conversation_id, board_id, position, created_by)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (room_conversation_id, board_id) DO UPDATE SET
            position = EXCLUDED.position
          RETURNING room_conversation_id, board_id, position, created_at, created_by`,
         [args.roomConversationId, args.boardId, Math.trunc(args.position), args.createdBy ?? null]
       );
-      if (!row) throw new Error('Failed to upsert pinned task board');
+      if (!row) throw new Error('Failed to upsert room task board');
       return fromDb(row);
-    }, 'upsert', 'room_pinned_task_boards');
+    }, 'upsert', 'room_task_boards');
   }
 
   async remove(roomConversationId: string, boardId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const result = await conn.queryWithResult(
-        `DELETE FROM room_pinned_task_boards WHERE room_conversation_id = $1 AND board_id = $2`,
+        `DELETE FROM room_task_boards WHERE room_conversation_id = $1 AND board_id = $2`,
         [roomConversationId, boardId]
       );
       return (result.rowCount ?? 0) > 0;
-    }, 'remove', 'room_pinned_task_boards');
+    }, 'remove', 'room_task_boards');
   }
 }
 

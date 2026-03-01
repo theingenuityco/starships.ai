@@ -1,5 +1,46 @@
 import type { Client } from 'pg';
 
+type MigrationConn = {
+  query: (text: string, params?: unknown[]) => Promise<unknown>;
+  transaction?: <T>(
+    callback: (tx: { query: (text: string, params?: unknown[]) => Promise<unknown> }) => Promise<T>
+  ) => Promise<T>;
+};
+
+function extractRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  if (result && typeof result === 'object') {
+    const maybe = result as { rows?: unknown };
+    if (Array.isArray(maybe.rows)) return maybe.rows as T[];
+  }
+  return [];
+}
+
+function makeQueryRows(conn: MigrationConn) {
+  return async function queryRows<T>(text: string, params: unknown[] = []): Promise<T[]> {
+    const result = await conn.query(text, params);
+    return extractRows<T>(result);
+  };
+}
+
+async function withMigrationConn(conn: MigrationConn, fn: (c: MigrationConn) => Promise<void>): Promise<void> {
+  if (typeof conn.transaction === 'function') {
+    await conn.transaction(async (tx) => {
+      await fn({ query: tx.query });
+    });
+    return;
+  }
+
+  await conn.query('BEGIN');
+  try {
+    await fn(conn);
+  } catch (e) {
+    await conn.query('ROLLBACK');
+    throw e;
+  }
+  await conn.query('COMMIT');
+}
+
 /**
  * Migration 155: Rename room join tables to remove the `pinned` keyword.
  *
@@ -13,48 +54,20 @@ import type { Client } from 'pg';
  * Also renames the common indexes created by migrations 153/154 where present.
  */
 export async function up(client: Client): Promise<void> {
-  // NOTE: migrations are executed with our PostgresConnection abstraction,
-  // whose `query()` returns rows (T[]) directly (not a pg QueryResult).
-  // We keep this helper compatible with both shapes for safety.
-  const queryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
-    const r: any = await (client as any).query(text, params);
-    if (Array.isArray(r)) return r as T[];
-    if (r && Array.isArray(r.rows)) return r.rows as T[];
-    return [];
-  };
+  const conn = client as unknown as MigrationConn;
+  await withMigrationConn(conn, async (c) => {
+    const q = makeQueryRows(c);
+    const exec = async (text: string, params: unknown[] = []): Promise<void> => {
+      await c.query(text, params);
+    };
 
-  const run = async (fn: (q: (text: string, params?: unknown[]) => Promise<any[]>) => Promise<void>) => {
-    const anyClient: any = client as any;
-    if (typeof anyClient.transaction === 'function') {
-      await anyClient.transaction(async (tx: any) => {
-        const txQueryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
-          const rr: any = await tx.query(text, params);
-          if (Array.isArray(rr)) return rr as T[];
-          if (rr && Array.isArray(rr.rows)) return rr.rows as T[];
-          return [];
-        };
-        await fn(txQueryRows);
-      });
-      return;
-    }
-    await (client as any).query('BEGIN');
-    try {
-      await fn(queryRows);
-    } catch (e) {
-      await (client as any).query('ROLLBACK');
-      throw e;
-    }
-    await (client as any).query('COMMIT');
-  };
-
-  await run(async (q) => {
     const tableExists = async (name: string): Promise<boolean> => {
-      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      const rows = await q<{ exists: boolean }>(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name]);
       return Boolean(rows?.[0]?.exists);
     };
 
     const indexExists = async (name: string): Promise<boolean> => {
-      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      const rows = await q<{ exists: boolean }>(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name]);
       return Boolean(rows?.[0]?.exists);
     };
 
@@ -62,13 +75,13 @@ export async function up(client: Client): Promise<void> {
       if (!(await tableExists(from))) return;
       if (await tableExists(to)) return;
       // Identifiers here are fixed (not user input) but we still quote them defensively.
-      await (client as any).query(`ALTER TABLE "${from}" RENAME TO "${to}"`);
+      await exec(`ALTER TABLE "${from}" RENAME TO "${to}"`);
     };
 
     const renameIndexIfExists = async (from: string, to: string) => {
       if (!(await indexExists(from))) return;
       if (await indexExists(to)) return;
-      await (client as any).query(`ALTER INDEX "${from}" RENAME TO "${to}"`);
+      await exec(`ALTER INDEX "${from}" RENAME TO "${to}"`);
     };
 
     await renameTableIfExists('room_pinned_views', 'room_views');
@@ -97,58 +110,33 @@ export async function up(client: Client): Promise<void> {
 }
 
 export async function down(client: Client): Promise<void> {
-  const queryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
-    const r: any = await (client as any).query(text, params);
-    if (Array.isArray(r)) return r as T[];
-    if (r && Array.isArray(r.rows)) return r.rows as T[];
-    return [];
-  };
+  const conn = client as unknown as MigrationConn;
+  await withMigrationConn(conn, async (c) => {
+    const q = makeQueryRows(c);
+    const exec = async (text: string, params: unknown[] = []): Promise<void> => {
+      await c.query(text, params);
+    };
 
-  const run = async (fn: (q: (text: string, params?: unknown[]) => Promise<any[]>) => Promise<void>) => {
-    const anyClient: any = client as any;
-    if (typeof anyClient.transaction === 'function') {
-      await anyClient.transaction(async (tx: any) => {
-        const txQueryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
-          const rr: any = await tx.query(text, params);
-          if (Array.isArray(rr)) return rr as T[];
-          if (rr && Array.isArray(rr.rows)) return rr.rows as T[];
-          return [];
-        };
-        await fn(txQueryRows);
-      });
-      return;
-    }
-    await (client as any).query('BEGIN');
-    try {
-      await fn(queryRows);
-    } catch (e) {
-      await (client as any).query('ROLLBACK');
-      throw e;
-    }
-    await (client as any).query('COMMIT');
-  };
-
-  await run(async (q) => {
     const tableExists = async (name: string): Promise<boolean> => {
-      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      const rows = await q<{ exists: boolean }>(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name]);
       return Boolean(rows?.[0]?.exists);
     };
 
     const indexExists = async (name: string): Promise<boolean> => {
-      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      const rows = await q<{ exists: boolean }>(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name]);
       return Boolean(rows?.[0]?.exists);
     };
 
     const renameTableIfExists = async (from: string, to: string) => {
       if (!(await tableExists(from))) return;
       if (await tableExists(to)) return;
-      await (client as any).query(`ALTER TABLE "${from}" RENAME TO "${to}"`);
+      await exec(`ALTER TABLE "${from}" RENAME TO "${to}"`);
     };
 
     const renameIndexIfExists = async (from: string, to: string) => {
       if (!(await indexExists(from))) return;
       if (await indexExists(to)) return;
-      await (client as any).query(`ALTER INDEX "${from}" RENAME TO "${to}"`);
+      await exec(`ALTER INDEX "${from}" RENAME TO "${to}"`);
     };
 
     await renameTableIfExists('room_views', 'room_pinned_views');

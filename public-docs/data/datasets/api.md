@@ -11,6 +11,20 @@ All endpoints require:
 - JWT authentication
 - The authenticated user must have collaborator access to the starship
 
+## Response envelope
+
+All server responses use a standard envelope:
+
+```json
+{ "success": true, "data": { } }
+```
+
+Errors use:
+
+```json
+{ "success": false, "error": { "code": "...", "message": "..." } }
+```
+
 ## Identifiers: `:datasetIdOrSlug`
 
 Most dataset endpoints accept `:datasetIdOrSlug`, which may be either:
@@ -31,7 +45,12 @@ Query params:
 Response body (`data`):
 
 ```json
-{ "datasets": [{ "id": "...", "name": "...", "slug": "...", "columns": [], "primaryKey": null, "archived": false }] }
+{
+  "success": true,
+  "data": {
+    "datasets": [{ "id": "...", "name": "...", "slug": "...", "columns": [], "primaryKey": null, "archived": false }]
+  }
+}
 ```
 
 ### Create dataset
@@ -55,7 +74,12 @@ Body:
 Response body (`data`):
 
 ```json
-{ "dataset": { "id": "...", "slug": "leads", "columns": [], "primaryKey": "email", "archived": false } }
+{
+  "success": true,
+  "data": {
+    "dataset": { "id": "...", "slug": "leads", "columns": [], "primaryKey": "email", "archived": false }
+  }
+}
 ```
 
 ### Get dataset details
@@ -65,7 +89,10 @@ Response body (`data`):
 Response body (`data`):
 
 ```json
-{ "dataset": { "id": "...", "name": "...", "slug": "...", "columns": [] } }
+{
+  "success": true,
+  "data": { "dataset": { "id": "...", "name": "...", "slug": "...", "columns": [] } }
+}
 ```
 
 ### Update dataset
@@ -99,9 +126,12 @@ Response body (`data`):
 
 ```json
 {
-  "columns": [{ "name": "email", "type": "string" }],
-  "data": [{ "email": "a@b.com" }],
-  "pagination": { "limit": 50, "offset": 0, "total": 123 }
+  "success": true,
+  "data": {
+    "columns": [{ "name": "email", "type": "string" }],
+    "data": [{ "email": "a@b.com" }],
+    "pagination": { "limit": 50, "offset": 0, "total": 123 }
+  }
 }
 ```
 
@@ -128,7 +158,14 @@ Notes:
 Response body (`data`):
 
 ```json
-{ "inserted": 10, "updated": 2, "errors": [{ "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }] }
+{
+  "success": true,
+  "data": {
+    "inserted": 10,
+    "updated": 2,
+    "errors": [{ "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }]
+  }
+}
 ```
 
 ### Batch resolve references (optional)
@@ -147,5 +184,10 @@ Body:
 Response body (`data`):
 
 ```json
-{ "resolved": { "dataset_row:accounts:acct_123": { "label": "Acme Inc.", "data": { "name": "Acme Inc." } } } }
+{
+  "success": true,
+  "data": {
+    "resolved": { "dataset_row:accounts:acct_123": { "label": "Acme Inc.", "data": { "name": "Acme Inc." } } }
+  }
+}
 ```

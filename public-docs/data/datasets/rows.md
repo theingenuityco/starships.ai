@@ -41,6 +41,7 @@ Body:
 
 - Always inserts new row records.
 - If the dataset has a `primaryKey` and a row contains a non-empty value for that key, the server also stores `row_key`.
+- Because the DB enforces `UNIQUE(dataset_id, row_key)`, appending multiple rows with the same `row_key` can fail with a uniqueness violation. If you want “insert or update” behavior for a primary key, use `mode: "upsert"`.
 - If a row fails validation, it is **skipped** and added to `errors[]` (other rows may still be written).
 
 ### `mode: "upsert"`
@@ -112,11 +113,14 @@ Row writes return counts and optional row-level errors:
 
 ```json
 {
-  "inserted": 10,
-  "updated": 2,
-  "errors": [
-    { "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }
-  ]
+  "success": true,
+  "data": {
+    "inserted": 10,
+    "updated": 2,
+    "errors": [
+      { "index": 3, "column": "createdAt", "code": "TYPE", "message": "Expected ISO8601 datetime with offset or Z" }
+    ]
+  }
 }
 ```
 

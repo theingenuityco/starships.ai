@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import Icon from '@/components/primitives/Icon'
 import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
@@ -38,6 +39,33 @@ export interface DataTableProps {
 }
 
 type SortState = { key: string; dir: 'asc' | 'desc' } | null
+
+type RefValue =
+  | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
+  | { kind: 'task_card'; cardId: string; label?: string; url?: string }
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false
+  if (Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+function isRefValue(value: unknown): value is RefValue {
+  if (!isPlainObject(value)) return false
+  const kind = String((value as any).kind || '').trim()
+  if (kind === 'dataset_row') return typeof (value as any).datasetIdOrSlug === 'string' && typeof (value as any).key === 'string'
+  if (kind === 'task_card') return typeof (value as any).cardId === 'string'
+  return false
+}
+
+function safeJsonString(value: unknown): string {
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
 
 export function DataTable({
   columns,
@@ -163,6 +191,124 @@ export function DataTable({
 
   const canExport = safeColumns.length > 0 && safeData.length > 0
   const rowClickable = typeof onRowClick === 'function'
+
+  const renderCell = (raw: unknown, column: DataColumn): { node: React.ReactNode; title?: string } => {
+    const fmt = column.format ?? 'text'
+
+    if (raw === null || raw === undefined) {
+      return { node: <span className="text-muted-foreground">—</span> }
+    }
+
+    if (isRefValue(raw)) {
+      const label =
+        typeof raw.label === 'string' && raw.label.trim().length > 0
+          ? raw.label.trim()
+          : raw.kind === 'task_card'
+            ? String(raw.cardId || '')
+            : String(raw.key || '')
+
+      const chip = (
+        <Badge variant="connected" className="gap-1 max-w-full">
+          <Icon name="link" className="h-3.5 w-3.5" />
+          <span className="truncate">{label}</span>
+          {raw.url ? <Icon name="external-link" className="h-3.5 w-3.5 opacity-70" /> : null}
+        </Badge>
+      )
+
+      if (raw.url) {
+        return {
+          node: (
+            <a
+              href={raw.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex max-w-full hover:opacity-90"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {chip}
+            </a>
+          ),
+          title: label,
+        }
+      }
+
+      return { node: chip, title: label }
+    }
+
+    if (typeof raw === 'boolean') {
+      const label = raw ? 'Yes' : 'No'
+      return {
+        node: (
+          <Badge
+            variant="secondary"
+            className={cn(
+              'border-transparent',
+              raw ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'
+            )}
+          >
+            {label}
+          </Badge>
+        ),
+        title: label,
+      }
+    }
+
+    if (typeof raw === 'object') {
+      const full = safeJsonString(raw)
+      const preview = full.length > 200 ? `${full.slice(0, 200)}…` : full
+      return {
+        node: (
+          <code className="block max-w-[42rem] rounded-md border bg-muted/30 px-2 py-1 text-xs font-mono text-foreground/90 line-clamp-2">
+            {preview}
+          </code>
+        ),
+        title: full,
+      }
+    }
+
+    const text = formatDataCellValue(raw, fmt)
+
+    if (fmt === 'date') {
+      return {
+        node: (
+          <span className="inline-flex items-center gap-1.5 tabular-nums text-foreground">
+            <Icon name="calendar" className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="line-clamp-1">{text}</span>
+          </span>
+        ),
+        title: text,
+      }
+    }
+
+    if (fmt === 'datetime') {
+      return {
+        node: (
+          <span className="inline-flex items-center gap-1.5 tabular-nums text-foreground">
+            <Icon name="clock" className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="line-clamp-1">{text}</span>
+          </span>
+        ),
+        title: text,
+      }
+    }
+
+    if (fmt === 'currency' || fmt === 'number' || fmt === 'percentage') {
+      const n = Number(raw)
+      return {
+        node: (
+          <span className={cn('tabular-nums', Number.isFinite(n) && n < 0 && 'text-destructive')}>
+            {text}
+          </span>
+        ),
+        title: text,
+      }
+    }
+
+    return {
+      node: <span className="block max-w-[52rem] line-clamp-2">{text}</span>,
+      title: text,
+    }
+  }
 
   return (
     <div className={cn('w-full max-w-none', className)}>
@@ -354,7 +500,8 @@ export function DataTable({
                   >
                     {visibleColumns.map((column) => {
                       const isNumeric = column.format === 'number' || column.format === 'currency' || column.format === 'percentage'
-                      const value = formatDataCellValue((row as any)[column.key], column.format ?? 'text')
+                      const raw = (row as any)[column.key]
+                      const rendered = renderCell(raw, column)
                       return (
                         <td
                           key={`${pageStart + tableRowIndex}-${column.key}`}
@@ -363,9 +510,9 @@ export function DataTable({
                             isNumeric ? 'text-right tabular-nums' : 'text-left',
                             'whitespace-normal break-words'
                           )}
-                          title={value === '-' ? undefined : value}
+                          title={rendered.title}
                         >
-                          {value}
+                          {rendered.node}
                         </td>
                       )
                     })}

@@ -53,7 +53,7 @@ async function resolveRoomAccessArgs(args: { roomConversationId: string }): Prom
   const conn = getConnection();
   const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [args.roomConversationId]);
   const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
-  return { room, conversationStarshipId || null };
+  return { room, conversationStarshipId: conversationStarshipId || null };
 }
 
 /**

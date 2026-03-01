@@ -5,13 +5,15 @@ import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
-import { usePinRoomDataset, usePinRoomTaskBoard, usePinRoomView, useRoomPins, useStarshipRooms, useStarshipTaskBoards, useUnpinRoomDataset, useUnpinRoomTaskBoard, useUnpinRoomView } from '@/hooks/useRooms'
+import { usePinRoomAgent, usePinRoomDataset, usePinRoomTaskBoard, usePinRoomTool, usePinRoomView, useRoomPins, useStarshipRooms, useStarshipTaskBoards, useUnpinRoomAgent, useUnpinRoomDataset, useUnpinRoomTaskBoard, useUnpinRoomTool, useUnpinRoomView } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import type { AgentModel, RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipTools } from '@/hooks/useTools'
 
 export default function RoomsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -159,6 +161,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: datasets = [] } = useStarshipDatasets(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: agents = [] } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: tools = [] } = useStarshipTools(starshipData?.id ?? '', Boolean(starshipData?.id))
 
   const canManagePins = useMemo(() => {
     const uid = typeof user?.id === 'string' ? user.id : ''
@@ -172,6 +176,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const unpinDataset = useUnpinRoomDataset(activeConversationId || '')
   const pinBoard = usePinRoomTaskBoard(activeConversationId || '')
   const unpinBoard = useUnpinRoomTaskBoard(activeConversationId || '')
+  const pinAgent = usePinRoomAgent(activeConversationId || '')
+  const unpinAgent = useUnpinRoomAgent(activeConversationId || '')
+  const pinTool = usePinRoomTool(activeConversationId || '')
+  const unpinTool = useUnpinRoomTool(activeConversationId || '')
 
   const viewLabelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -206,6 +214,52 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return m
   }, [taskBoards])
 
+  const agentLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const a of Array.isArray(agents) ? agents : []) {
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      if (!id) continue
+      const name = String((a as any)?.name || (a as any)?.slug || 'Agent').trim()
+      m.set(id, name)
+    }
+    return m
+  }, [agents])
+
+  const agentSlugById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const a of Array.isArray(agents) ? agents : []) {
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      if (!id) continue
+      const slug = String((a as any)?.slug || '').trim()
+      if (!slug) continue
+      m.set(id, slug)
+    }
+    return m
+  }, [agents])
+
+  const toolLabelById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of Array.isArray(tools) ? tools : []) {
+      const id = typeof (t as any)?.id === 'string' ? String((t as any).id).trim() : ''
+      if (!id) continue
+      const name = String((t as any)?.name || (t as any)?.slug || 'Tool').trim()
+      m.set(id, name)
+    }
+    return m
+  }, [tools])
+
+  const toolSlugById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of Array.isArray(tools) ? tools : []) {
+      const id = typeof (t as any)?.id === 'string' ? String((t as any).id).trim() : ''
+      if (!id) continue
+      const slug = String((t as any)?.slug || '').trim()
+      if (!slug) continue
+      m.set(id, slug)
+    }
+    return m
+  }, [tools])
+
   const availableViews = useMemo(() => {
     const list = Array.isArray(starshipViews) ? starshipViews : []
     return list
@@ -229,6 +283,22 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       .filter((b) => Boolean(b.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [taskBoards])
+
+  const availableAgents = useMemo(() => {
+    const list = Array.isArray(agents) ? agents : []
+    return list
+      .map((a: any) => ({ id: String(a?.id || '').trim(), name: String(a?.name || a?.slug || 'Agent').trim() }))
+      .filter((a) => Boolean(a.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [agents])
+
+  const availableTools = useMemo(() => {
+    const list = Array.isArray(tools) ? tools : []
+    return list
+      .map((t: any) => ({ id: String(t?.id || '').trim(), name: String(t?.name || t?.slug || 'Tool').trim() }))
+      .filter((t) => Boolean(t.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [tools])
 
   const handleThreadCreated = useCallback(
     (cid: string) => {
@@ -297,20 +367,32 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           pinnedViews={pinsData?.views ?? null}
           pinnedDatasets={pinsData?.datasets ?? null}
           pinnedTaskBoards={pinsData?.taskBoards ?? null}
+          pinnedAgents={(pinsData as any)?.agents ?? null}
+          pinnedTools={(pinsData as any)?.tools ?? null}
           viewLabelById={viewLabelById}
           datasetLabelById={datasetLabelById}
           taskBoardLabelById={taskBoardLabelById}
+          agentLabelById={agentLabelById}
+          toolLabelById={toolLabelById}
+          agentSlugById={agentSlugById}
+          toolSlugById={toolSlugById}
           onOpenPinnedView={onOpenPinnedView}
           canManagePins={canManagePins}
           availableViews={availableViews}
           availableDatasets={availableDatasets}
           availableTaskBoards={availableTaskBoards}
+          availableAgents={availableAgents}
+          availableTools={availableTools}
           onPinView={(viewId) => pinView.mutate({ viewId })}
           onUnpinView={(viewId) => unpinView.mutate(viewId)}
           onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
           onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
           onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
           onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
+          onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
+          onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
+          onPinTool={(toolId) => pinTool.mutate({ toolId })}
+          onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
           onCreateDraftThread={() => {
             setThreadKeyInUrl('draft')
           }}

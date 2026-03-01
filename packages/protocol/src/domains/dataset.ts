@@ -26,6 +26,15 @@ export type StarshipDatasetColumnConstraints = {
    */
   required?: boolean;
   /**
+   * When true, the server will generate an incrementing integer value on write
+   * when the field is missing.
+   *
+   * Recommended usage:
+   * - Use only on a `number` column
+   * - Use only on the dataset `primaryKey` column
+   */
+  autoincrement?: boolean;
+  /**
    * When true, null is allowed as an explicit value.
    */
   nullable?: boolean;

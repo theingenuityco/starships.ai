@@ -528,27 +528,43 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
           bdHeaders[key] = value;
         });
 
-        let payload: unknown;
+        // Web Unlocker responses are typically JSON like:
+        //   { result: "<html>...</html>", headers: {...}, url: "..." }
+        // But some flows can return the unlocked page body directly (raw HTML/text).
+        // Read once to avoid Undici "Body has already been read".
+        const respText = await resp.text();
+
+        // Try to interpret as JSON wrapper; fall back to raw text otherwise.
+        let payloadObj: Record<string, unknown> | null = null;
         try {
-          payload = await resp.json();
+          const parsed = JSON.parse(respText);
+          if (parsed && typeof parsed === 'object') {
+            payloadObj = parsed as Record<string, unknown>;
+          }
         } catch {
-          payload = await resp.text();
+          payloadObj = null;
         }
 
-        const payloadObj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null;
-        const resultRaw = payloadObj ? payloadObj.result : undefined;
+        const resultRaw = payloadObj?.result ?? payloadObj?.body;
         const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
         const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
         const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
         const targetContentType = (getHeaderValue(targetHeaders as unknown as Record<string, unknown>, 'content-type') ?? '').toLowerCase();
 
-        const resultText = resultRaw === undefined || resultRaw === null ? '' : typeof resultRaw === 'string' ? resultRaw : (() => {
-          try {
-            return JSON.stringify(resultRaw);
-          } catch {
-            return String(resultRaw);
-          }
-        })();
+        const resultText =
+          resultRaw === undefined
+            ? respText // raw HTML/text response path
+            : resultRaw === null
+              ? ''
+              : typeof resultRaw === 'string'
+                ? resultRaw
+                : (() => {
+                    try {
+                      return JSON.stringify(resultRaw);
+                    } catch {
+                      return String(resultRaw);
+                    }
+                  })();
 
         let responseBody: unknown;
         if (responseType === 'text') {
@@ -668,15 +684,17 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       } else if (responseType === 'text') {
         responseBody = await resp.text();
       } else {
-        // Default: best-effort JSON, otherwise text
+        // Default: best-effort JSON, otherwise text. Read once to avoid
+        // Undici "Body has already been read" when JSON parsing fails.
+        const text = await resp.text();
         if (contentType.includes('application/json')) {
           try {
-            responseBody = await resp.json();
+            responseBody = text.trim().length ? JSON.parse(text) : text;
           } catch {
-            responseBody = await resp.text();
+            responseBody = text;
           }
         } else {
-          responseBody = await resp.text();
+          responseBody = text;
         }
       }
 

@@ -169,5 +169,21 @@ describe('RunnerHostRuntime Web Unlocker', () => {
     const resp = await rt.http({ method: 'GET', url: 'https://example.com/json', useWebUnlocker: true });
     expect(resp.body).toEqual({ a: 1 });
   });
+
+  it('returns raw text when gateway returns non-JSON body', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        text: '<html><body>ok</body></html>',
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({ method: 'GET', url: 'https://example.com', useWebUnlocker: true, responseType: 'text' });
+    expect(resp.body).toBe('<html><body>ok</body></html>');
+  });
 });
 

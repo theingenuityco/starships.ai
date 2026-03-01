@@ -7,10 +7,7 @@ import { ConversationMessageInput } from '@/components/conversation/Conversation
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { useChildConversationsPaged } from '@/hooks/useConversations'
-import type { AgentModel, ConversationModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
-import { formatDistanceToNow } from 'date-fns'
+import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -69,32 +66,12 @@ export function RoomThreadIndexView(props: {
   const [pickToolId, setPickToolId] = useState<string>('')
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
 
-  const { conversations: children, isLoading, isError, error, hasMoreBefore, isFetchingNextPage, fetchNextPage, refetch } = useChildConversationsPaged(props.roomConversationId, {
-    enabled: true,
-    limit: 10,
-  })
-
-  const sortedChildren = useMemo(() => {
-    const list = Array.isArray(children) ? children.slice() : []
-    list.sort((a: any, b: any) => {
-      const aAt = Date.parse(String((a as any)?.updatedAt || (a as any)?.createdAt || '0'))
-      const bAt = Date.parse(String((b as any)?.updatedAt || (b as any)?.createdAt || '0'))
-      return bAt - aAt
-    })
-    return list as Array<ConversationModel & { agents: AgentModel[] }>
-  }, [children])
-
   const label = useMemo(() => {
     const name = String(props.roomName || '').trim()
     if (name) return name
     const slug = String(props.roomSlug || '').trim()
     return slug || 'Room'
   }, [props.roomName, props.roomSlug])
-
-  const onOpenChild = (conversationId: string) => {
-    if (!effectiveStarshipSlug) return
-    router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(conversationId)}`)
-  }
 
   const onCreateThread = () => {
     if (props.onCreateDraftThread) {
@@ -310,7 +287,7 @@ export function RoomThreadIndexView(props: {
             <div className="border-t border-border/60 pt-3 space-y-2">
               <div className="text-xs font-medium text-muted-foreground">Currently pinned</div>
               <div className="space-y-2">
-                {(pinnedAgents.length === 0 && pinnedTools.length === 0 && pinnedViews.length === 0 && pinnedDatasets.length === 0 && pinnedBoards.length === 0) ? (
+                {pinnedAgents.length === 0 && pinnedTools.length === 0 && pinnedViews.length === 0 && pinnedDatasets.length === 0 && pinnedBoards.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No pins yet.</div>
                 ) : (
                   <>
@@ -383,10 +360,10 @@ export function RoomThreadIndexView(props: {
         </DialogContent>
       </Dialog>
 
-      {(pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0) ? (
+      {pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 ? (
         <div className="border-b border-border/60 bg-card/40 px-4 py-2">
           <div className="w-full max-w-4xl mx-auto flex flex-wrap gap-2 items-center">
-            {pinnedAgents.map((p) => {
+            {pinnedAgents.map(p => {
               const name = props.agentLabelById?.get(String(p.agentId)) || `Agent ${String(p.agentId).slice(0, 8)}`
               const agentSlug = props.agentSlugById?.get(String(p.agentId)) || ''
               const peerKey = agentSlug ? agentSlug : `a:${String(p.agentId)}`
@@ -398,7 +375,7 @@ export function RoomThreadIndexView(props: {
                 </Button>
               )
             })}
-            {pinnedViews.map((p) => {
+            {pinnedViews.map(p => {
               const name = props.viewLabelById?.get(String(p.viewId)) || `View ${String(p.viewId).slice(0, 8)}`
               return (
                 <Button key={`view:${p.viewId}`} type="button" size="sm" variant="outline" onClick={() => props.onOpenPinnedView?.(String(p.viewId))}>
@@ -407,7 +384,7 @@ export function RoomThreadIndexView(props: {
                 </Button>
               )
             })}
-            {pinnedDatasets.map((p) => {
+            {pinnedDatasets.map(p => {
               const name = props.datasetLabelById?.get(String(p.datasetId)) || `Dataset ${String(p.datasetId).slice(0, 8)}`
               const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(String(p.datasetId))}` : null
               return (
@@ -417,7 +394,7 @@ export function RoomThreadIndexView(props: {
                 </Button>
               )
             })}
-            {pinnedBoards.map((p) => {
+            {pinnedBoards.map(p => {
               const name = props.taskBoardLabelById?.get(String(p.boardId)) || `Board ${String(p.boardId).slice(0, 8)}`
               const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
               return (
@@ -427,7 +404,7 @@ export function RoomThreadIndexView(props: {
                 </Button>
               )
             })}
-            {pinnedTools.map((p) => {
+            {pinnedTools.map(p => {
               const name = props.toolLabelById?.get(String(p.toolId)) || `Tool ${String(p.toolId).slice(0, 8)}`
               const toolSlug = props.toolSlugById?.get(String(p.toolId)) || ''
               const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
@@ -443,9 +420,9 @@ export function RoomThreadIndexView(props: {
       ) : null}
 
       {/* Room starter (conversation-starter style) */}
-      <div className="border-b border-border/60 bg-background px-4 py-6">
-        <div className="w-full max-w-4xl mx-auto">
-          <div className="w-full sm:max-w-3xl sm:mx-auto">
+      <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
+        <div className="w-full max-w-4xl mx-auto h-full flex">
+          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col justify-center flex-1">
             <div className="mb-6 text-center">
               <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
               <p className="text-sm text-muted-foreground mt-2">Your first message creates a new thread in this room.</p>
@@ -459,7 +436,7 @@ export function RoomThreadIndexView(props: {
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
               newConversationTitleOverride="New thread"
-              onConversationStart={(conversationId) => {
+              onConversationStart={conversationId => {
                 const cid = String(conversationId || '').trim()
                 if (!cid) return
                 props.onThreadConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
@@ -468,91 +445,6 @@ export function RoomThreadIndexView(props: {
           </div>
         </div>
       </div>
-
-      <div className="flex-1 min-h-0 overflow-auto px-4 py-4">
-        <div className="w-full max-w-4xl mx-auto">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
-                <Icon name="warning" className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-foreground">Couldn’t load threads</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-md break-words">
-                {(() => {
-                  const msg = (error as any)?.message ? String((error as any).message) : ''
-                  return msg || 'Please try again.'
-                })()}
-              </p>
-              <Button className="mt-4" type="button" variant="outline" onClick={() => refetch()}>
-                Retry
-              </Button>
-            </div>
-          ) : sortedChildren.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
-                <Icon name="message-square" className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-foreground">No threads yet</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm">Create a thread to start a new conversation.</p>
-              <Button className="mt-4" type="button" onClick={onCreateThread} disabled={!effectiveStarshipSlug}>
-                <Icon name="plus" className="h-4 w-4 mr-1" />
-                New thread
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                {sortedChildren.map(child => {
-                  const id = String((child as any)?.id || '')
-                  const title = String((child as any)?.title || '').trim() || `Conversation ${id.slice(0, 8)}`
-                  const agents = Array.isArray((child as any)?.agents) ? ((child as any).agents as AgentModel[]) : []
-                  const updatedAt = String((child as any)?.updatedAt || (child as any)?.createdAt || '')
-                  const when = updatedAt ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true }) : ''
-
-                  const agentLabel = agents
-                    .map(a => String((a as any)?.name || (a as any)?.slug || '').trim())
-                    .filter(Boolean)
-                    .slice(0, 3)
-                    .join(', ')
-
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => onOpenChild(id)}
-                      className="group text-left rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate group-hover:text-foreground">{title}</p>
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{agentLabel ? `Agents: ${agentLabel}` : 'Agents: —'}</p>
-                        </div>
-                        <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      {when ? <p className="text-[11px] text-muted-foreground mt-2">{when}</p> : null}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {hasMoreBefore ? (
-                <div className="flex justify-center pt-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                    {isFetchingNextPage ? 'Loading…' : 'Load more threads'}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
-

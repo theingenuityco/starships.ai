@@ -17,8 +17,8 @@ export const DATASET_QUERY_KEYS = {
   all: ['datasets'] as const,
   byStarship: (starshipId: string) => [...DATASET_QUERY_KEYS.all, 'starship', starshipId] as const,
   byId: (starshipId: string, datasetId: string) => [...DATASET_QUERY_KEYS.byStarship(starshipId), 'detail', datasetId] as const,
-  rows: (starshipId: string, datasetId: string, limit: number, offset: number) =>
-    [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows', { limit, offset }] as const,
+  rows: (starshipId: string, datasetId: string, limit: number, offset: number, expand?: string) =>
+    [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows', { limit, offset, expand: expand ?? '' }] as const,
 } as const
 
 export function useStarshipDatasets(starshipId: string, enabled: boolean = true, opts?: { includeArchived?: boolean }) {
@@ -53,12 +53,12 @@ export function useDataset(starshipId: string, datasetId: string, enabled: boole
 
 export function useDatasetRows(starshipId: string, datasetId: string, limit: number, offset: number, enabled: boolean = true) {
   return useQuery({
-    queryKey: DATASET_QUERY_KEYS.rows(starshipId, datasetId, limit, offset),
+    queryKey: DATASET_QUERY_KEYS.rows(starshipId, datasetId, limit, offset, 'refs'),
     queryFn: async (): Promise<StarshipDatasetRowsPageResponse> => {
       const response: FetchResponse<ApiResponse<StarshipDatasetRowsPageResponse>> = await api.get(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}/rows`,
         {
-          params: { limit, offset },
+          params: { limit, offset, expand: 'refs' },
         }
       )
       return response.data.data

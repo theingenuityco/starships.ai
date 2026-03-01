@@ -8,11 +8,17 @@ import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleBu
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { DataTable } from '@/components/widgets/DataTable'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows } from '@/hooks/useDatasets'
+import { useDataset, useDatasetRows, useUpdateDataset } from '@/hooks/useDatasets'
+import type { StarshipDatasetColumn } from '@starships/protocol'
 
 function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; format?: any }> {
   const arr = Array.isArray(cols) ? cols : []
@@ -37,11 +43,58 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const starshipId = starship?.id ? String(starship.id) : ''
 
   const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
+  const updateDataset = useUpdateDataset(starshipId, datasetId)
 
   const [limit, setLimit] = useState(50)
   const [offset, setOffset] = useState(0)
 
   const { data: rowsPage, isLoading: rowsLoading } = useDatasetRows(starshipId, datasetId, limit, offset, Boolean(starshipId && datasetId))
+
+  const [schemaOpen, setSchemaOpen] = useState(false)
+  const [primaryKeyText, setPrimaryKeyText] = useState('')
+  const [columnsJsonText, setColumnsJsonText] = useState('[]')
+
+  const canSaveSchema = Boolean(starshipId && datasetId) && !updateDataset.isPending
+
+  function openSchemaEditor() {
+    const pk = dataset?.primaryKey ? String(dataset.primaryKey) : ''
+    setPrimaryKeyText(pk)
+    setColumnsJsonText(JSON.stringify(dataset?.columns ?? [], null, 2))
+    setSchemaOpen(true)
+  }
+
+  async function onSaveSchema() {
+    if (!canSaveSchema) return
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(columnsJsonText)
+    } catch (e) {
+      toast.error('Invalid columns JSON', { description: getSafeErrorMessage(e) })
+      return
+    }
+    if (!Array.isArray(parsed)) {
+      toast.error('Columns JSON must be an array')
+      return
+    }
+    const cols: StarshipDatasetColumn[] = []
+    for (const raw of parsed) {
+      if (!raw || typeof raw !== 'object') {
+        toast.error('Each column must be an object')
+        return
+      }
+      cols.push(raw as StarshipDatasetColumn)
+    }
+    try {
+      await updateDataset.mutateAsync({
+        columns: cols,
+        primaryKey: primaryKeyText.trim() ? primaryKeyText.trim() : null,
+      })
+      toast.success('Schema updated')
+      setSchemaOpen(false)
+    } catch (e) {
+      toast.error('Failed to update schema', { description: getSafeErrorMessage(e) })
+    }
+  }
 
   const total = rowsPage?.pagination?.total ?? 0
   const canPrev = offset > 0
@@ -91,6 +144,10 @@ export default function DatasetViewerPage(): React.JSX.Element {
               <Button variant="outline" size="sm" onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/datasets`)}>
                 <Icon name="chevron-left" className="h-4 w-4 mr-1.5" />
                 Back
+              </Button>
+              <Button variant="outline" size="sm" onClick={openSchemaEditor} disabled={!dataset || updateDataset.isPending}>
+                <Icon name="settings" className="h-4 w-4 mr-1.5" />
+                Schema
               </Button>
             </div>
           </div>
@@ -149,6 +206,52 @@ export default function DatasetViewerPage(): React.JSX.Element {
           )}
         </div>
       </div>
+
+      <Dialog open={schemaOpen} onOpenChange={setSchemaOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit dataset schema</DialogTitle>
+            <DialogDescription>
+              Update columns JSON and primary key. This controls validation, reference hydration, and formula projection.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Primary key</div>
+              <Input
+                value={primaryKeyText}
+                onChange={(e) => setPrimaryKeyText(e.target.value)}
+                placeholder="e.g. id"
+              />
+              <div className="text-xs text-muted-foreground">
+                Used for upsert mode and for dataset-row references (row_key).
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Columns JSON</div>
+              <Textarea
+                value={columnsJsonText}
+                onChange={(e) => setColumnsJsonText(e.target.value)}
+                className="min-h-[320px] font-mono text-xs"
+              />
+              <div className="text-xs text-muted-foreground">
+                Example: <code>{`[{ "name": "price", "type": "number", "format": "currency" }]`}</code>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSchemaOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={onSaveSchema} disabled={!canSaveSchema}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

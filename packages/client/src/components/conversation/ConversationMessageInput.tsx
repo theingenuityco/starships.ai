@@ -2649,17 +2649,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
         </div>
 
-        {/* Cost hint (non-minimal) - moved below the composer */}
-        {!minimal && (
-          <div className="mt-2 px-1 text-xs text-muted-foreground text-right">
-            Each user message costs
-            {'\u00A0'}
-            <span className="ml-1 font-semibold text-muted-foreground">
-              <Icon name="coins" className="inline-block h-3 w-3 align-text-bottom text-muted-foreground mr-1" />
-              {CREDITS_PER_MESSAGE} credits
-            </span>
-          </div>
-        )}
+        {/* Cost hint removed (per product/UI request). */}
       </div>
     )
   }

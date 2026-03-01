@@ -118,10 +118,6 @@ export function RoomThreadIndexView(props: {
                 Pins
               </Button>
             ) : null}
-            <Button type="button" size="sm" onClick={onCreateThread} disabled={!effectiveStarshipSlug} className="shrink-0">
-              <Icon name="plus" className="h-4 w-4 mr-1" />
-              New thread
-            </Button>
           </div>
         }
       />

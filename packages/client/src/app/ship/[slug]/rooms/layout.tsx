@@ -10,7 +10,7 @@ import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import type { AgentModel, RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipTools } from '@/hooks/useTools'
@@ -32,6 +32,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     }),
     [params.slug, params.roomSlug]
   )
+  const isRoomsIndexRoute = useMemo(() => {
+    const raw = typeof routeParams.roomSlug === 'string' ? routeParams.roomSlug : ''
+    return raw.trim().length === 0
+  }, [routeParams.roomSlug])
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -132,27 +136,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     setThreadDraftParentConversationId(parent)
     setThreadDraftTitle('New thread')
   }, [activeConversationId, isDraftThreadOpen, threadDraftParentConversationId])
-
-  const pickAutoRoomSlug = useMemo(() => {
-    const rooms = roomsData?.rooms ?? []
-    const firstSlug = rooms.length > 0 ? String((rooms[0] as any)?.slug || '') : ''
-    return firstSlug || null
-  }, [roomsData?.rooms])
-
-  // Auto-navigate /rooms -> first room (if any), otherwise fall back to /ship (channels redirect will handle).
-  const hasAutoNavigatedRef = useRef(false)
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (routeParams.roomSlug) return
-    if (roomsLoading) return
-    if (hasAutoNavigatedRef.current) return
-    hasAutoNavigatedRef.current = true
-    if (pickAutoRoomSlug) {
-      router.replace(`/ship/${routeParams.slug}/rooms/${encodeURIComponent(pickAutoRoomSlug)}`)
-      return
-    }
-    router.replace(`/ship/${routeParams.slug}`)
-  }, [pickAutoRoomSlug, roomsLoading, routeParams.roomSlug, routeParams.slug, router, starshipData?.id])
 
   // If slug is present but doesn't match a room, show a not-found UI (hard cutover; no redirects).
   const isInvalidRoomSlug = Boolean(routeParams.roomSlug && !roomsLoading && !activeRoom)
@@ -323,6 +306,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     },
     [setViewKeyInUrl]
   )
+
+  if (isRoomsIndexRoute) {
+    return <>{children}</>
+  }
 
   if (!starshipData) {
     return null

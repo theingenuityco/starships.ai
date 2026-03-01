@@ -66,11 +66,11 @@ export { ConnectorEventRepository } from './repositories/ConnectorEventRepositor
 export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebhookBindingRepository';
 export { ChannelRepository } from './repositories/ChannelRepository';
 export { RoomRepository } from './repositories/RoomRepository';
-export { RoomPinnedViewsRepository } from './repositories/RoomPinnedViewsRepository';
-export { RoomPinnedDatasetsRepository } from './repositories/RoomPinnedDatasetsRepository';
-export { RoomPinnedTaskBoardsRepository } from './repositories/RoomPinnedTaskBoardsRepository';
-export { RoomPinnedAgentsRepository } from './repositories/RoomPinnedAgentsRepository';
-export { RoomPinnedToolsRepository } from './repositories/RoomPinnedToolsRepository';
+export { RoomViewsRepository } from './repositories/RoomViewsRepository';
+export { RoomDatasetsRepository } from './repositories/RoomDatasetsRepository';
+export { RoomTaskBoardsRepository } from './repositories/RoomTaskBoardsRepository';
+export { RoomAgentsRepository } from './repositories/RoomAgentsRepository';
+export { RoomToolsRepository } from './repositories/RoomToolsRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';
 export { MessageRepository } from './repositories/MessageRepository';

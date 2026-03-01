@@ -12,11 +12,11 @@ import {
   ConversationMemberRepository,
   ConversationNotificationPrefRepository,
   ConversationParticipantRepository,
-  RoomPinnedAgentsRepository,
-  RoomPinnedDatasetsRepository,
-  RoomPinnedTaskBoardsRepository,
-  RoomPinnedToolsRepository,
-  RoomPinnedViewsRepository,
+  RoomAgentsRepository,
+  RoomDatasetsRepository,
+  RoomTaskBoardsRepository,
+  RoomToolsRepository,
+  RoomViewsRepository,
   RoomRepository,
   StarshipDatasetRepository,
   TaskBoardRepository,
@@ -701,11 +701,11 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     )
       return;
 
-    const viewsRepo = new RoomPinnedViewsRepository();
-    const datasetsRepo = new RoomPinnedDatasetsRepository();
-    const boardsRepo = new RoomPinnedTaskBoardsRepository();
-    const agentsRepo = new RoomPinnedAgentsRepository();
-    const toolsRepo = new RoomPinnedToolsRepository();
+    const viewsRepo = new RoomViewsRepository();
+    const datasetsRepo = new RoomDatasetsRepository();
+    const boardsRepo = new RoomTaskBoardsRepository();
+    const agentsRepo = new RoomAgentsRepository();
+    const toolsRepo = new RoomToolsRepository();
 
     const [views, datasets, taskBoards, agents, tools] = await Promise.all([
       viewsRepo.list(room.conversationId),
@@ -756,7 +756,7 @@ router.post('/rooms/:roomId/pins/agents', jwtAuthMiddleware, async (req: Request
       return;
     }
 
-    const pinnedRepo = new RoomPinnedAgentsRepository();
+    const pinnedRepo = new RoomAgentsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const position = body.position !== undefined ? body.position : existing.length;
     const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, agentId: body.agentId, position, createdBy: authUserId });
@@ -783,7 +783,7 @@ router.delete('/rooms/:roomId/pins/agents/:agentId', jwtAuthMiddleware, async (r
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedAgentsRepository();
+    const pinnedRepo = new RoomAgentsRepository();
     const removed = await pinnedRepo.remove(room.conversationId, params.agentId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
@@ -826,7 +826,7 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       return;
     }
 
-    const pinnedRepo = new RoomPinnedToolsRepository();
+    const pinnedRepo = new RoomToolsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const position = body.position !== undefined ? body.position : existing.length;
     const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, toolId: body.toolId, position, createdBy: authUserId });
@@ -853,7 +853,7 @@ router.delete('/rooms/:roomId/pins/tools/:toolId', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedToolsRepository();
+    const pinnedRepo = new RoomToolsRepository();
     const removed = await pinnedRepo.remove(room.conversationId, params.toolId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
@@ -896,7 +896,7 @@ router.post('/rooms/:roomId/pins/views', jwtAuthMiddleware, async (req: Request,
       return;
     }
 
-    const pinnedViewsRepo = new RoomPinnedViewsRepository();
+    const pinnedViewsRepo = new RoomViewsRepository();
     const existing = await pinnedViewsRepo.list(room.conversationId);
     const position = body.position !== undefined ? body.position : existing.length;
     const pin = await pinnedViewsRepo.upsert({ roomConversationId: room.conversationId, viewId: body.viewId, position, createdBy: authUserId });
@@ -923,7 +923,7 @@ router.delete('/rooms/:roomId/pins/views/:viewId', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedViewsRepo = new RoomPinnedViewsRepository();
+    const pinnedViewsRepo = new RoomViewsRepository();
     const removed = await pinnedViewsRepo.remove(room.conversationId, params.viewId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
@@ -966,7 +966,7 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
       return;
     }
 
-    const pinnedRepo = new RoomPinnedDatasetsRepository();
+    const pinnedRepo = new RoomDatasetsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const position = body.position !== undefined ? body.position : existing.length;
     const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, datasetId: body.datasetId, position, createdBy: authUserId });
@@ -993,7 +993,7 @@ router.delete('/rooms/:roomId/pins/datasets/:datasetId', jwtAuthMiddleware, asyn
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedDatasetsRepository();
+    const pinnedRepo = new RoomDatasetsRepository();
     const removed = await pinnedRepo.remove(room.conversationId, params.datasetId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
@@ -1036,7 +1036,7 @@ router.post('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Re
       return;
     }
 
-    const pinnedRepo = new RoomPinnedTaskBoardsRepository();
+    const pinnedRepo = new RoomTaskBoardsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const position = body.position !== undefined ? body.position : existing.length;
     const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, boardId: body.boardId, position, createdBy: authUserId });
@@ -1063,7 +1063,7 @@ router.delete('/rooms/:roomId/pins/task-boards/:boardId', jwtAuthMiddleware, asy
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedTaskBoardsRepository();
+    const pinnedRepo = new RoomTaskBoardsRepository();
     const removed = await pinnedRepo.remove(room.conversationId, params.boardId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
@@ -1091,7 +1091,7 @@ router.post('/rooms/:roomId/pins/views/reorder', jwtAuthMiddleware, async (req: 
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedViewsRepository();
+    const pinnedRepo = new RoomViewsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const existingIds = existing.map((p: { viewId: string }) => String(p.viewId));
     const nextIds = body.viewIds.map((x) => String(x));
@@ -1116,14 +1116,14 @@ router.post('/rooms/:roomId/pins/views/reorder', jwtAuthMiddleware, async (req: 
     const args = [room.conversationId, ...nextIds];
 
     await conn.query(
-      `UPDATE room_pinned_views
+      `UPDATE room_views
           SET position = CASE view_id ${caseTemp} ELSE position END
         WHERE room_conversation_id = $1
           AND view_id IN (${inList})`,
       args
     );
     await conn.query(
-      `UPDATE room_pinned_views
+      `UPDATE room_views
           SET position = CASE view_id ${caseFinal} ELSE position END
         WHERE room_conversation_id = $1
           AND view_id IN (${inList})`,
@@ -1157,7 +1157,7 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedDatasetsRepository();
+    const pinnedRepo = new RoomDatasetsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const existingIds = existing.map((p: { datasetId: string }) => String(p.datasetId));
     const nextIds = body.datasetIds.map((x) => String(x));
@@ -1182,14 +1182,14 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
     const args = [room.conversationId, ...nextIds];
 
     await conn.query(
-      `UPDATE room_pinned_datasets
+      `UPDATE room_datasets
           SET position = CASE dataset_id ${caseTemp} ELSE position END
         WHERE room_conversation_id = $1
           AND dataset_id IN (${inList})`,
       args
     );
     await conn.query(
-      `UPDATE room_pinned_datasets
+      `UPDATE room_datasets
           SET position = CASE dataset_id ${caseFinal} ELSE position END
         WHERE room_conversation_id = $1
           AND dataset_id IN (${inList})`,
@@ -1223,7 +1223,7 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedTaskBoardsRepository();
+    const pinnedRepo = new RoomTaskBoardsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const existingIds = existing.map((p: { boardId: string }) => String(p.boardId));
     const nextIds = body.boardIds.map((x) => String(x));
@@ -1248,14 +1248,14 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     const args = [room.conversationId, ...nextIds];
 
     await conn.query(
-      `UPDATE room_pinned_task_boards
+      `UPDATE room_task_boards
           SET position = CASE board_id ${caseTemp} ELSE position END
         WHERE room_conversation_id = $1
           AND board_id IN (${inList})`,
       args
     );
     await conn.query(
-      `UPDATE room_pinned_task_boards
+      `UPDATE room_task_boards
           SET position = CASE board_id ${caseFinal} ELSE position END
         WHERE room_conversation_id = $1
           AND board_id IN (${inList})`,
@@ -1289,7 +1289,7 @@ router.post('/rooms/:roomId/pins/agents/reorder', jwtAuthMiddleware, async (req:
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedAgentsRepository();
+    const pinnedRepo = new RoomAgentsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const existingIds = existing.map((p: { agentId: string }) => String(p.agentId));
     const nextIds = body.agentIds.map((x) => String(x));
@@ -1314,14 +1314,14 @@ router.post('/rooms/:roomId/pins/agents/reorder', jwtAuthMiddleware, async (req:
     const args = [room.conversationId, ...nextIds];
 
     await conn.query(
-      `UPDATE room_pinned_agents
+      `UPDATE room_agents
           SET position = CASE agent_id ${caseTemp} ELSE position END
         WHERE room_conversation_id = $1
           AND agent_id IN (${inList})`,
       args
     );
     await conn.query(
-      `UPDATE room_pinned_agents
+      `UPDATE room_agents
           SET position = CASE agent_id ${caseFinal} ELSE position END
         WHERE room_conversation_id = $1
           AND agent_id IN (${inList})`,
@@ -1355,7 +1355,7 @@ router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: 
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomPinnedToolsRepository();
+    const pinnedRepo = new RoomToolsRepository();
     const existing = await pinnedRepo.list(room.conversationId);
     const existingIds = existing.map((p: { toolId: string }) => String(p.toolId));
     const nextIds = body.toolIds.map((x) => String(x));
@@ -1380,14 +1380,14 @@ router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: 
     const args = [room.conversationId, ...nextIds];
 
     await conn.query(
-      `UPDATE room_pinned_tools
+      `UPDATE room_tools
           SET position = CASE tool_id ${caseTemp} ELSE position END
         WHERE room_conversation_id = $1
           AND tool_id IN (${inList})`,
       args
     );
     await conn.query(
-      `UPDATE room_pinned_tools
+      `UPDATE room_tools
           SET position = CASE tool_id ${caseFinal} ELSE position END
         WHERE room_conversation_id = $1
           AND tool_id IN (${inList})`,

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
-import type { AgentModel, ConversationModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView } from '@starships/protocol'
+import type { AgentModel, ConversationModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
@@ -23,20 +23,32 @@ export function RoomThreadIndexView(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
+  pinnedAgents?: RoomPinnedAgent[] | null
+  pinnedTools?: RoomPinnedTool[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
+  agentLabelById?: Map<string, string> | null
+  toolLabelById?: Map<string, string> | null
+  agentSlugById?: Map<string, string> | null
+  toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
   canManagePins?: boolean | null
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
+  availableAgents?: Array<{ id: string; name: string }> | null
+  availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
   onPinDataset?: (datasetId: string) => void
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
+  onPinAgent?: (agentId: string) => void
+  onUnpinAgent?: (agentId: string) => void
+  onPinTool?: (toolId: string) => void
+  onUnpinTool?: (toolId: string) => void
   /** Open a draft thread (no persistence until first message). */
   onCreateDraftThread?: () => void
 }) {
@@ -47,6 +59,8 @@ export function RoomThreadIndexView(props: {
   const [pickViewId, setPickViewId] = useState<string>('')
   const [pickDatasetId, setPickDatasetId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
+  const [pickAgentId, setPickAgentId] = useState<string>('')
+  const [pickToolId, setPickToolId] = useState<string>('')
 
   const { conversations: children, isLoading, isError, error, hasMoreBefore, isFetchingNextPage, fetchNextPage, refetch } = useChildConversationsPaged(props.roomConversationId, {
     enabled: true,
@@ -92,6 +106,8 @@ export function RoomThreadIndexView(props: {
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedAgents = (props.pinnedAgents || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -130,10 +146,70 @@ export function RoomThreadIndexView(props: {
         <DialogContent className="sm:max-w-[720px]">
           <DialogHeader>
             <DialogTitle>Room pins</DialogTitle>
-            <DialogDescription>Pin views, datasets, and task boards to this room.</DialogDescription>
+            <DialogDescription>Pin agents, tools, views, datasets, and task boards to this room.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Pin an agent</div>
+              <div className="flex items-center gap-2">
+                <Select value={pickAgentId} onValueChange={setPickAgentId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select an agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(props.availableAgents || []).map(a => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const id = pickAgentId.trim()
+                    if (!id) return
+                    props.onPinAgent?.(id)
+                    setPickAgentId('')
+                  }}
+                  disabled={!pickAgentId.trim()}
+                >
+                  Pin
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Pin a tool</div>
+              <div className="flex items-center gap-2">
+                <Select value={pickToolId} onValueChange={setPickToolId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select a tool" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(props.availableTools || []).map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const id = pickToolId.trim()
+                    if (!id) return
+                    props.onPinTool?.(id)
+                    setPickToolId('')
+                  }}
+                  disabled={!pickToolId.trim()}
+                >
+                  Pin
+                </Button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground">Pin a view</div>
               <div className="flex items-center gap-2">
@@ -227,10 +303,32 @@ export function RoomThreadIndexView(props: {
             <div className="border-t border-border/60 pt-3 space-y-2">
               <div className="text-xs font-medium text-muted-foreground">Currently pinned</div>
               <div className="space-y-2">
-                {(pinnedViews.length === 0 && pinnedDatasets.length === 0 && pinnedBoards.length === 0) ? (
+                {(pinnedAgents.length === 0 && pinnedTools.length === 0 && pinnedViews.length === 0 && pinnedDatasets.length === 0 && pinnedBoards.length === 0) ? (
                   <div className="text-sm text-muted-foreground">No pins yet.</div>
                 ) : (
                   <>
+                    {pinnedAgents.map(p => (
+                      <div key={`pa:${p.agentId}`} className="flex items-center justify-between gap-2">
+                        <div className="text-sm truncate">
+                          <span className="text-muted-foreground mr-2">Agent</span>
+                          {props.agentLabelById?.get(String(p.agentId)) || String(p.agentId)}
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinAgent?.(String(p.agentId))}>
+                          Unpin
+                        </Button>
+                      </div>
+                    ))}
+                    {pinnedTools.map(p => (
+                      <div key={`pt:${p.toolId}`} className="flex items-center justify-between gap-2">
+                        <div className="text-sm truncate">
+                          <span className="text-muted-foreground mr-2">Tool</span>
+                          {props.toolLabelById?.get(String(p.toolId)) || String(p.toolId)}
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTool?.(String(p.toolId))}>
+                          Unpin
+                        </Button>
+                      </div>
+                    ))}
                     {pinnedViews.map(p => (
                       <div key={`pv:${p.viewId}`} className="flex items-center justify-between gap-2">
                         <div className="text-sm truncate">
@@ -278,9 +376,21 @@ export function RoomThreadIndexView(props: {
         </DialogContent>
       </Dialog>
 
-      {(pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0) ? (
+      {(pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0) ? (
         <div className="border-b border-border/60 bg-card/40 px-4 py-2">
           <div className="w-full max-w-4xl mx-auto flex flex-wrap gap-2 items-center">
+            {pinnedAgents.map((p) => {
+              const name = props.agentLabelById?.get(String(p.agentId)) || `Agent ${String(p.agentId).slice(0, 8)}`
+              const agentSlug = props.agentSlugById?.get(String(p.agentId)) || ''
+              const peerKey = agentSlug ? agentSlug : `a:${String(p.agentId)}`
+              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
+              return (
+                <Button key={`agent:${p.agentId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
             {pinnedViews.map((p) => {
               const name = props.viewLabelById?.get(String(p.viewId)) || `View ${String(p.viewId).slice(0, 8)}`
               return (
@@ -306,6 +416,17 @@ export function RoomThreadIndexView(props: {
               return (
                 <Button key={`board:${p.boardId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
                   <Icon name="list" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+            {pinnedTools.map((p) => {
+              const name = props.toolLabelById?.get(String(p.toolId)) || `Tool ${String(p.toolId).slice(0, 8)}`
+              const toolSlug = props.toolSlugById?.get(String(p.toolId)) || ''
+              const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
+              return (
+                <Button key={`tool:${p.toolId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="workflow" className="h-4 w-4 mr-1.5" />
                   {name}
                 </Button>
               )

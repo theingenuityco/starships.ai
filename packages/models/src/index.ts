@@ -69,6 +69,8 @@ export { RoomRepository } from './repositories/RoomRepository';
 export { RoomPinnedViewsRepository } from './repositories/RoomPinnedViewsRepository';
 export { RoomPinnedDatasetsRepository } from './repositories/RoomPinnedDatasetsRepository';
 export { RoomPinnedTaskBoardsRepository } from './repositories/RoomPinnedTaskBoardsRepository';
+export { RoomPinnedAgentsRepository } from './repositories/RoomPinnedAgentsRepository';
+export { RoomPinnedToolsRepository } from './repositories/RoomPinnedToolsRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';
 export { MessageRepository } from './repositories/MessageRepository';

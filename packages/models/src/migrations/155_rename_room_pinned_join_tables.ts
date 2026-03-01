@@ -13,36 +13,62 @@ import type { Client } from 'pg';
  * Also renames the common indexes created by migrations 153/154 where present.
  */
 export async function up(client: Client): Promise<void> {
-  await client.query('BEGIN');
-  try {
+  // NOTE: migrations are executed with our PostgresConnection abstraction,
+  // whose `query()` returns rows (T[]) directly (not a pg QueryResult).
+  // We keep this helper compatible with both shapes for safety.
+  const queryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
+    const r: any = await (client as any).query(text, params);
+    if (Array.isArray(r)) return r as T[];
+    if (r && Array.isArray(r.rows)) return r.rows as T[];
+    return [];
+  };
+
+  const run = async (fn: (q: (text: string, params?: unknown[]) => Promise<any[]>) => Promise<void>) => {
+    const anyClient: any = client as any;
+    if (typeof anyClient.transaction === 'function') {
+      await anyClient.transaction(async (tx: any) => {
+        const txQueryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
+          const rr: any = await tx.query(text, params);
+          if (Array.isArray(rr)) return rr as T[];
+          if (rr && Array.isArray(rr.rows)) return rr.rows as T[];
+          return [];
+        };
+        await fn(txQueryRows);
+      });
+      return;
+    }
+    await (client as any).query('BEGIN');
+    try {
+      await fn(queryRows);
+    } catch (e) {
+      await (client as any).query('ROLLBACK');
+      throw e;
+    }
+    await (client as any).query('COMMIT');
+  };
+
+  await run(async (q) => {
+    const tableExists = async (name: string): Promise<boolean> => {
+      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      return Boolean(rows?.[0]?.exists);
+    };
+
+    const indexExists = async (name: string): Promise<boolean> => {
+      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      return Boolean(rows?.[0]?.exists);
+    };
+
     const renameTableIfExists = async (from: string, to: string) => {
-      await client.query(
-        `
-        DO $$
-        BEGIN
-          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $1)
-             AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $2) THEN
-            EXECUTE format('ALTER TABLE %I RENAME TO %I', $1, $2);
-          END IF;
-        END $$;
-        `,
-        [from, to]
-      );
+      if (!(await tableExists(from))) return;
+      if (await tableExists(to)) return;
+      // Identifiers here are fixed (not user input) but we still quote them defensively.
+      await (client as any).query(`ALTER TABLE "${from}" RENAME TO "${to}"`);
     };
 
     const renameIndexIfExists = async (from: string, to: string) => {
-      await client.query(
-        `
-        DO $$
-        BEGIN
-          IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'i' AND relname = $1)
-             AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'i' AND relname = $2) THEN
-            EXECUTE format('ALTER INDEX %I RENAME TO %I', $1, $2);
-          END IF;
-        END $$;
-        `,
-        [from, to]
-      );
+      if (!(await indexExists(from))) return;
+      if (await indexExists(to)) return;
+      await (client as any).query(`ALTER INDEX "${from}" RENAME TO "${to}"`);
     };
 
     await renameTableIfExists('room_pinned_views', 'room_views');
@@ -67,44 +93,62 @@ export async function up(client: Client): Promise<void> {
 
     await renameIndexIfExists('idx_room_pinned_tools_room', 'idx_room_tools_room');
     await renameIndexIfExists('uq_room_pinned_tools_room_position', 'uq_room_tools_room_position');
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  }
-  await client.query('COMMIT');
+  });
 }
 
 export async function down(client: Client): Promise<void> {
-  await client.query('BEGIN');
-  try {
+  const queryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
+    const r: any = await (client as any).query(text, params);
+    if (Array.isArray(r)) return r as T[];
+    if (r && Array.isArray(r.rows)) return r.rows as T[];
+    return [];
+  };
+
+  const run = async (fn: (q: (text: string, params?: unknown[]) => Promise<any[]>) => Promise<void>) => {
+    const anyClient: any = client as any;
+    if (typeof anyClient.transaction === 'function') {
+      await anyClient.transaction(async (tx: any) => {
+        const txQueryRows = async <T = any>(text: string, params: unknown[] = []): Promise<T[]> => {
+          const rr: any = await tx.query(text, params);
+          if (Array.isArray(rr)) return rr as T[];
+          if (rr && Array.isArray(rr.rows)) return rr.rows as T[];
+          return [];
+        };
+        await fn(txQueryRows);
+      });
+      return;
+    }
+    await (client as any).query('BEGIN');
+    try {
+      await fn(queryRows);
+    } catch (e) {
+      await (client as any).query('ROLLBACK');
+      throw e;
+    }
+    await (client as any).query('COMMIT');
+  };
+
+  await run(async (q) => {
+    const tableExists = async (name: string): Promise<boolean> => {
+      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      return Boolean(rows?.[0]?.exists);
+    };
+
+    const indexExists = async (name: string): Promise<boolean> => {
+      const rows = (await q(`SELECT to_regclass('public.' || $1) IS NOT NULL AS exists`, [name])) as Array<{ exists: boolean }>;
+      return Boolean(rows?.[0]?.exists);
+    };
+
     const renameTableIfExists = async (from: string, to: string) => {
-      await client.query(
-        `
-        DO $$
-        BEGIN
-          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $1)
-             AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = $2) THEN
-            EXECUTE format('ALTER TABLE %I RENAME TO %I', $1, $2);
-          END IF;
-        END $$;
-        `,
-        [from, to]
-      );
+      if (!(await tableExists(from))) return;
+      if (await tableExists(to)) return;
+      await (client as any).query(`ALTER TABLE "${from}" RENAME TO "${to}"`);
     };
 
     const renameIndexIfExists = async (from: string, to: string) => {
-      await client.query(
-        `
-        DO $$
-        BEGIN
-          IF EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'i' AND relname = $1)
-             AND NOT EXISTS (SELECT 1 FROM pg_class WHERE relkind = 'i' AND relname = $2) THEN
-            EXECUTE format('ALTER INDEX %I RENAME TO %I', $1, $2);
-          END IF;
-        END $$;
-        `,
-        [from, to]
-      );
+      if (!(await indexExists(from))) return;
+      if (await indexExists(to)) return;
+      await (client as any).query(`ALTER INDEX "${from}" RENAME TO "${to}"`);
     };
 
     await renameTableIfExists('room_views', 'room_pinned_views');
@@ -127,10 +171,6 @@ export async function down(client: Client): Promise<void> {
 
     await renameIndexIfExists('idx_room_tools_room', 'idx_room_pinned_tools_room');
     await renameIndexIfExists('uq_room_tools_room_position', 'uq_room_pinned_tools_room_position');
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  }
-  await client.query('COMMIT');
+  });
 }
 

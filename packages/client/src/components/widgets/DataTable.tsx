@@ -14,18 +14,18 @@ export type DataCellValue = string | number | boolean | null | undefined
 export interface DataColumn {
   key: string
   label: string
-  format?: 'text' | 'number' | 'currency' | 'date' | 'percentage'
+  format?: 'text' | 'number' | 'currency' | 'date' | 'datetime' | 'percentage'
 }
 
 export interface DataTableProps {
   columns?: DataColumn[]
-  data?: Array<Record<string, DataCellValue>>
+  data?: Array<Record<string, unknown>>
   title?: string
   description?: string
   pageSize?: number
   striped?: boolean
   className?: string
-  onRowClick?: (payload: { row: Record<string, DataCellValue>; rowIndex: number }) => void
+  onRowClick?: (payload: { row: Record<string, unknown>; rowIndex: number }) => void
 }
 
 export function DataTable({
@@ -41,7 +41,7 @@ export function DataTable({
   const [currentPage, setCurrentPage] = useState(1)
 
   const safeColumns: DataColumn[] = Array.isArray(columns) ? columns : []
-  const safeData: Array<Record<string, DataCellValue>> = Array.isArray(data) ? data : []
+  const safeData: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
 
   const safePageSize = Number.isFinite(pageSize) ? Math.max(0, Math.floor(pageSize)) : 10
   const totalPages = safePageSize === 0 ? 1 : Math.max(1, Math.ceil(safeData.length / safePageSize))
@@ -136,7 +136,7 @@ export function DataTable({
                           key={`${tableRowIndex}-${column.key}`}
                           className="px-4 py-3 text-sm text-left whitespace-normal break-words"
                         >
-                          {formatDataCellValue(row[column.key], column.format ?? 'text')}
+                          {formatDataCellValue((row as any)[column.key], column.format ?? 'text')}
                         </td>
                       ))}
                     </tr>

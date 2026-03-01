@@ -39,16 +39,32 @@ export class RoomTaskBoardsRepository extends BaseRepository {
     }, 'list', 'room_task_boards', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; boardId: string; position: number; createdBy?: string | null }): Promise<RoomPinnedTaskBoard> {
+  async upsert(args: { roomConversationId: string; boardId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTaskBoard> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const row = await conn.queryOne<DbRow>(
         `INSERT INTO room_task_boards (room_conversation_id, board_id, position, created_by)
-         VALUES ($1, $2, $3, $4)
+         VALUES (
+           $1,
+           $2,
+           COALESCE(
+             $3,
+             (SELECT COALESCE(MAX(position) + 1, 0) FROM room_task_boards WHERE room_conversation_id = $1)
+           ),
+           $4
+         )
          ON CONFLICT (room_conversation_id, board_id) DO UPDATE SET
-           position = EXCLUDED.position
+          position = CASE
+            WHEN $3 IS NULL THEN room_task_boards.position
+            ELSE EXCLUDED.position
+          END
          RETURNING room_conversation_id, board_id, position, created_at, created_by`,
-        [args.roomConversationId, args.boardId, Math.trunc(args.position), args.createdBy ?? null]
+        [
+          args.roomConversationId,
+          args.boardId,
+          typeof args.position === 'number' ? Math.trunc(args.position) : null,
+          args.createdBy ?? null,
+        ]
       );
       if (!row) throw new Error('Failed to upsert room task board');
       return fromDb(row);

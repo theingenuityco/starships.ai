@@ -30,6 +30,8 @@ interface ConversationSummaryBarProps {
   maxTokens?: number | null
   /** Optional prefix shown before the title (e.g. "#" for channels). */
   titlePrefix?: ReactNode
+  /** Optional content prepended inside the title text (e.g. "room/"). */
+  titlePrepend?: ReactNode
   /**
    * Optional mobile-only left slot (replaces the hamburger/menu toggle).
    * Useful for "Back" when a thread is open on small screens.
@@ -100,6 +102,7 @@ export function ConversationSummaryBar({
   modelId: _modelId,
   maxTokens: _maxTokens,
   titlePrefix,
+  titlePrepend,
   mobileLeftSlot,
   titleRightSlot,
   rightSlot,
@@ -634,6 +637,7 @@ export function ConversationSummaryBar({
                         </span>
                       ) : null}
                       <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                        {titlePrepend ? <span className="text-muted-foreground">{titlePrepend}</span> : null}
                         <span className="opacity-50">{effectiveFallbackTitle}</span>
                       </h3>
                     </div>
@@ -841,7 +845,10 @@ export function ConversationSummaryBar({
                         {titlePrefix}
                       </span>
                     ) : null}
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">{title}</h3>
+                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                      {titlePrepend ? <span className="text-muted-foreground">{titlePrepend}</span> : null}
+                      {title}
+                    </h3>
                   </div>
 
                   {/* Agents + updated row */}

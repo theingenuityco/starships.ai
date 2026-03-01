@@ -1,6 +1,7 @@
 'use client'
 
 import { ThreadPane } from '@/components/conversation/ThreadPane'
+import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -93,7 +94,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return threadKey
   }, [threadKey])
 
-  const isSidePaneOpen = Boolean(threadKey || viewKey)
+  const isViewPaneOpen = Boolean(viewKey)
 
   const setThreadKeyInUrl = useCallback(
     (nextThreadKey: string | null) => {
@@ -343,7 +344,21 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="relative h-full w-full flex flex-col min-w-0">
-      {activeConversationId ? (
+      {activeConversationId && threadKey ? (
+        <ThreadPane
+          starshipId={starshipData.id}
+          starshipSlug={routeParams.slug}
+          conversationId={threadConversationId}
+          draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+          draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+          selectedAgent={threadAgent}
+          onAgentChange={setThreadAgent}
+          onThreadCreated={handleThreadCreated}
+          onClose={handleCloseThread}
+          titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+          className="h-full"
+        />
+      ) : activeConversationId ? (
         <RoomThreadIndexView
           starshipId={starshipData.id}
           roomConversationId={activeConversationId}
@@ -391,24 +406,11 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       ) : null}
 
       {/* Side pane overlays */}
-      {isSidePaneOpen ? (
+      {isViewPaneOpen ? (
         <div className="absolute inset-0 z-[30] bg-background/80 backdrop-blur-sm">
-          <div className="absolute inset-0" onClick={() => (threadKey ? handleCloseThread() : setViewKeyInUrl(null))} />
+          <div className="absolute inset-0" onClick={() => setViewKeyInUrl(null)} />
           <div className="absolute inset-y-0 right-0 w-full md:w-[720px] bg-background border-l border-border/60 shadow-xl">
-            {threadKey ? (
-              <ThreadPane
-                starshipId={starshipData.id}
-                starshipSlug={routeParams.slug}
-                conversationId={threadConversationId}
-                draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-                draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-                selectedAgent={threadAgent}
-                onAgentChange={setThreadAgent}
-                onThreadCreated={handleThreadCreated}
-                onClose={handleCloseThread}
-                className="h-full"
-              />
-            ) : viewKey ? (
+            {viewKey ? (
               <ViewPane
                 starshipId={starshipData.id}
                 viewId={viewKey}

@@ -169,8 +169,8 @@ export function NotificationMenu(props: NotificationMenuProps) {
   const showBadge = badgeCount > 0
   const showDot = !showBadge && hasUnread
 
-  const menuLabel = type === 'channel' ? 'Notifications' : 'Thread notifications'
-  const ariaLabelPrefix = type === 'channel' ? 'Channel notifications' : 'Thread notifications'
+  const menuLabel = type === 'channel' ? 'Channel notifications' : type === 'room' ? 'Room notifications' : 'Thread notifications'
+  const ariaLabelPrefix = type === 'channel' ? 'Channel notifications' : type === 'room' ? 'Room notifications' : 'Thread notifications'
 
   return (
     <DropdownMenu>

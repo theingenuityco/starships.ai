@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import type { MessageModel } from '@starships/protocol'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 export function ThreadPane(props: {
   starshipId: string
@@ -25,10 +25,12 @@ export function ThreadPane(props: {
   selectedAgent: AgentModel | null
   onAgentChange: (agent: AgentModel | null) => void
   onClose: () => void
+  /** Override the header's notification menu slot (default is thread notification menu). Use `null` to hide. */
+  titleRightSlot?: ReactNode
   /** Optional extra classes for the outer container (header+body+composer live inside). */
   className?: string
 }) {
-  const { starshipId, starshipSlug, conversationId, pinnedFirstMessage, draftParentConversationId, draftTitle, onThreadCreated, selectedAgent, onAgentChange, onClose, className } = props
+  const { starshipId, starshipSlug, conversationId, pinnedFirstMessage, draftParentConversationId, draftTitle, onThreadCreated, selectedAgent, onAgentChange, onClose, titleRightSlot, className } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
@@ -201,7 +203,11 @@ export function ThreadPane(props: {
           starshipId={starshipId}
           modelId={(selectedAgent as any)?.model ?? null}
           titleRightSlot={
-            effectiveConversationId ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} /> : null
+            titleRightSlot !== undefined
+              ? titleRightSlot
+              : effectiveConversationId
+                ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} />
+                : null
           }
           mobileLeftSlot={
             <button

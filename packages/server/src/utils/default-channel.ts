@@ -25,7 +25,6 @@ export async function ensureDefaultChannelForStarship(args: {
       slug: string;
       name: string;
       is_private: boolean;
-      channel_type?: string | null;
       topic: string | null;
       created_at: string;
       updated_at: string;
@@ -56,12 +55,7 @@ export async function ensureDefaultChannelForStarship(args: {
       slug: String(existing.slug),
       name: String(existing.name),
       isPrivate: Boolean(existing.is_private),
-      channelType:
-        String(existing.channel_type || 'chat')
-          .trim()
-          .toLowerCase() === 'forum'
-          ? 'forum'
-          : 'chat',
+      channelType: 'chat',
       topic: existing.topic ?? null,
       createdAt: String(existing.created_at),
       updatedAt: String(existing.updated_at),
@@ -106,7 +100,6 @@ export async function ensureDefaultChannelForStarship(args: {
         slug: string;
         name: string;
         is_private: boolean;
-        channel_type?: string | null;
         topic: string | null;
         created_at: string;
         updated_at: string;
@@ -137,12 +130,7 @@ export async function ensureDefaultChannelForStarship(args: {
       slug: String(winner.slug),
       name: String(winner.name),
       isPrivate: Boolean(winner.is_private),
-      channelType:
-        String(winner.channel_type || 'chat')
-          .trim()
-          .toLowerCase() === 'forum'
-          ? 'forum'
-          : 'chat',
+      channelType: 'chat',
       topic: winner.topic ?? null,
       createdAt: String(winner.created_at),
       updatedAt: String(winner.updated_at),

@@ -38,8 +38,8 @@ export class ChannelEntity implements ChannelModel {
 
   @Expose()
   @IsString()
-  @IsIn(['chat', 'forum'])
-  channelType!: 'chat' | 'forum';
+  @IsIn(['chat'])
+  channelType!: 'chat';
 
   @Expose()
   @IsOptional()
@@ -75,7 +75,7 @@ export class ChannelEntity implements ChannelModel {
         slug: dataRecord.slug || '',
         name: dataRecord.name || '',
         isPrivate: Boolean(dataRecord.isPrivate),
-        channelType: (dataRecord.channelType as 'chat' | 'forum' | undefined) ?? 'chat',
+        channelType: 'chat',
         topic: (dataRecord.topic as string | null | undefined) ?? null,
         attachedViewId: (dataRecord.attachedViewId as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),

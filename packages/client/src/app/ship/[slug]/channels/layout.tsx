@@ -543,31 +543,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     }
   }, [starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
-  // If the channel slug is invalid (no matching channel), redirect to default channel.
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (channelsLoading) return
-    if (!routeParams.channelSlug) return
-    if (activeChannel) return
-    if (!pickAutoChannelSlug) return
-    // When redirecting to a channel, only carry channel-relevant query params.
-    const next = new URLSearchParams()
-    const thread = (searchParams.get('thread') || '').trim()
-    if (thread) next.set('thread', thread)
-    const view = (searchParams.get('view') || '').trim()
-    if (view) next.set('view', view)
-    const qs = next.toString()
-    const href = qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
-    let cancelled = false
-    queueMicrotask(() => {
-      if (cancelled) return
-      router.replace(href)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [activeChannel, channelsLoading, pickAutoChannelSlug, routeParams.channelSlug, routeParams.slug, router, searchParams, starshipData?.id])
-
   // Handle conversation change from ConversationInterface:
   // - If it maps to a channel, stay in /channels/:channelSlug
   // - Otherwise (DM or non-channel conversation), go to /conversations/:conversationId
@@ -611,6 +586,23 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   if (!starshipData) {
     return null
+  }
+
+  const isInvalidChannelSlug = Boolean(routeParams.channelSlug && !channelsLoading && !activeChannel)
+  if (isInvalidChannelSlug) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center space-y-3">
+          <div className="text-lg font-semibold">Channel not found</div>
+          <div className="text-sm text-muted-foreground">This channel doesn’t exist.</div>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button type="button" className="text-sm underline underline-offset-2" onClick={() => router.replace(`/ship/${routeParams.slug}`)}>
+              Go to starship
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Prevent a brief "starter screen" flash on hard reloads inside a channel:
@@ -684,7 +676,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
             const rawInput = String((linkedMessage as any)?.content ?? '')
             const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
-            const title = snippet ? `Thread: ${snippet}` : 'New thread'
+            const title = snippet ? snippet : 'New thread'
             setThreadDraftTitle(title)
             pendingThreadStateRef.current = {
               threadKey: 'draft',

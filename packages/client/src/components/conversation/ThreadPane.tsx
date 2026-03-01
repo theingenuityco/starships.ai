@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import type { MessageModel } from '@starships/protocol'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 export function ThreadPane(props: {
   starshipId: string
@@ -25,10 +25,40 @@ export function ThreadPane(props: {
   selectedAgent: AgentModel | null
   onAgentChange: (agent: AgentModel | null) => void
   onClose: () => void
+  /** Optional prefix shown before the title (e.g. "#" for channels, or a back button). */
+  titlePrefix?: ReactNode
+  /** Optional content prepended inside the title text (e.g. "room/"). */
+  titlePrepend?: ReactNode
+  /** Optional mobile-only left slot (replaces the hamburger/menu toggle). */
+  mobileLeftSlot?: ReactNode
+  /** Override the header's notification menu slot (default is thread notification menu). Use `null` to hide. */
+  titleRightSlot?: ReactNode
+  /** Override the header's right controls (default includes a close button). Use `null` to hide. */
+  rightSlot?: ReactNode
+  /** When true, omit the default close button (ignored if `rightSlot` is provided). */
+  hideCloseButton?: boolean
   /** Optional extra classes for the outer container (header+body+composer live inside). */
   className?: string
 }) {
-  const { starshipId, starshipSlug, conversationId, pinnedFirstMessage, draftParentConversationId, draftTitle, onThreadCreated, selectedAgent, onAgentChange, onClose, className } = props
+  const {
+    starshipId,
+    starshipSlug,
+    conversationId,
+    pinnedFirstMessage,
+    draftParentConversationId,
+    draftTitle,
+    onThreadCreated,
+    selectedAgent,
+    onAgentChange,
+    onClose,
+    titlePrefix,
+    titlePrepend,
+    mobileLeftSlot,
+    titleRightSlot,
+    rightSlot,
+    hideCloseButton,
+    className,
+  } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
@@ -200,22 +230,15 @@ export function ThreadPane(props: {
           conversationId={effectiveConversationId}
           starshipId={starshipId}
           modelId={(selectedAgent as any)?.model ?? null}
+          titlePrefix={titlePrefix}
+          titlePrepend={titlePrepend}
+          mobileLeftSlot={mobileLeftSlot}
           titleRightSlot={
-            effectiveConversationId ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} /> : null
-          }
-          mobileLeftSlot={
-            <button
-              type="button"
-              className={cn(
-                'mx-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-              )}
-              onClick={onClose}
-              aria-label="Back to conversation"
-              title="Back"
-            >
-              <Icon name="arrow-left" className="h-5 w-5" />
-            </button>
+            titleRightSlot !== undefined
+              ? titleRightSlot
+              : effectiveConversationId
+                ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} />
+                : null
           }
           maxTokens={
             typeof (selectedAgent as any)?.maxTokens === 'number'
@@ -224,12 +247,18 @@ export function ThreadPane(props: {
                 ? Number((selectedAgent as any).maxTokens)
                 : null
           }
-          fallbackTitle={draftTitle ?? 'New thread'}
+          // IMPORTANT:
+          // - For real thread conversations (conversationId present), do NOT pass a fallback title so the
+          //   placeholder header uses "Loading..." until the conversation detail arrives.
+          // - For draft threads (conversationId null), use draftTitle/default.
+          fallbackTitle={effectiveConversationId ? undefined : draftTitle ?? 'New thread'}
           fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
           participantsOverride={draftParticipants}
           participantsHint={participantsHint}
           rightSlot={
-            <>
+            rightSlot !== undefined ? (
+              rightSlot
+            ) : hideCloseButton ? null : (
               <button
                 type="button"
                 className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
@@ -239,7 +268,7 @@ export function ThreadPane(props: {
               >
                 <Icon name="x" className="h-4 w-4" />
               </button>
-            </>
+            )
           }
         />
 

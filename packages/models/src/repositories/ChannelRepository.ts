@@ -49,7 +49,7 @@ export class ChannelRepository extends BaseRepository {
           slug: args.slug,
           name: args.name,
           isPrivate: Boolean(args.isPrivate),
-          channelType: (args.channelType as 'chat' | 'forum' | undefined) ?? 'chat',
+          channelType: 'chat' as const,
           ...(args.topic !== undefined ? { topic: args.topic } : {}),
           createdAt: now,
           updatedAt: now,

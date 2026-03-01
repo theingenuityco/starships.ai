@@ -1,0 +1,251 @@
+'use client'
+
+import Icon from '@/components/primitives/Icon'
+import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { NotificationMenu } from '@/components/conversation/NotificationMenu'
+import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import { useParams, useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
+
+export function RoomThreadIndexView(props: {
+  starshipId: string
+  roomConversationId: string
+  roomSlug?: string | null
+  roomName?: string | null
+  roomIsPrivate?: boolean | null
+  starshipSlug?: string | null
+  pinnedViews?: RoomPinnedView[] | null
+  pinnedDatasets?: RoomPinnedDataset[] | null
+  pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
+  pinnedAgents?: RoomPinnedAgent[] | null
+  pinnedTools?: RoomPinnedTool[] | null
+  viewLabelById?: Map<string, string> | null
+  datasetLabelById?: Map<string, string> | null
+  taskBoardLabelById?: Map<string, string> | null
+  agentLabelById?: Map<string, string> | null
+  toolLabelById?: Map<string, string> | null
+  agentSlugById?: Map<string, string> | null
+  toolSlugById?: Map<string, string> | null
+  onOpenPinnedView?: (viewId: string) => void
+  canManagePins?: boolean | null
+  onOpenResourcesPane?: () => void
+  availableViews?: Array<{ id: string; name: string }> | null
+  availableDatasets?: Array<{ id: string; name: string }> | null
+  availableTaskBoards?: Array<{ id: string; name: string }> | null
+  availableAgents?: Array<{ id: string; name: string }> | null
+  availableTools?: Array<{ id: string; name: string }> | null
+  onPinView?: (viewId: string) => void
+  onUnpinView?: (viewId: string) => void
+  onPinDataset?: (datasetId: string) => void
+  onUnpinDataset?: (datasetId: string) => void
+  onPinTaskBoard?: (boardId: string) => void
+  onUnpinTaskBoard?: (boardId: string) => void
+  onPinAgent?: (agentId: string) => void
+  onUnpinAgent?: (agentId: string) => void
+  onPinTool?: (toolId: string) => void
+  onUnpinTool?: (toolId: string) => void
+  /** Open a draft thread (no persistence until first message). */
+  onCreateDraftThread?: () => void
+  /**
+   * Called when the user starts a brand-new thread conversation from the room starter composer.
+   * The returned `conversationId` is the newly created child conversation (thread).
+   */
+  onThreadConversationStarted?: (args: { conversationId: string; selectedAgent: AgentModel | null }) => void
+}) {
+  const router = useRouter()
+  const params = useParams()
+  const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
+  const [pickViewId, setPickViewId] = useState<string>('')
+  const [pickDatasetId, setPickDatasetId] = useState<string>('')
+  const [pickBoardId, setPickBoardId] = useState<string>('')
+  const [pickAgentId, setPickAgentId] = useState<string>('')
+  const [pickToolId, setPickToolId] = useState<string>('')
+  const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
+
+  const label = useMemo(() => {
+    const name = String(props.roomName || '').trim()
+    if (name) return name
+    const slug = String(props.roomSlug || '').trim()
+    return slug || 'Room'
+  }, [props.roomName, props.roomSlug])
+
+  const onCreateThread = () => {
+    if (props.onCreateDraftThread) {
+      props.onCreateDraftThread()
+      return
+    }
+    if (!effectiveStarshipSlug) return
+    const roomSlug = String(props.roomSlug || '').trim()
+    if (roomSlug) {
+      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}/thread/draft`)
+      return
+    }
+    router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.roomConversationId)}?thread=draft`)
+  }
+
+  const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedAgents = (props.pinnedAgents || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const hasAnyResources = pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
+
+  const openPinnedAgent = (agentId: string) => {
+    const id = String(agentId || '').trim()
+    if (!id) return
+    const agentSlug = props.agentSlugById?.get(id) || ''
+    const peerKey = agentSlug ? agentSlug : `a:${id}`
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedView = (viewId: string) => {
+    const id = String(viewId || '').trim()
+    if (!id) return
+    props.onOpenPinnedView?.(id)
+  }
+
+  const openPinnedDataset = (datasetId: string) => {
+    const id = String(datasetId || '').trim()
+    if (!id) return
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(id)}` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedBoard = () => {
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  const openPinnedTool = (toolId: string) => {
+    const id = String(toolId || '').trim()
+    if (!id) return
+    const toolSlug = props.toolSlugById?.get(id) || ''
+    const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
+    if (!href) return
+    router.push(href)
+  }
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <ConversationSummaryBar
+        conversationId={props.roomConversationId}
+        starshipId={props.starshipId}
+        titleRightSlot={<NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />}
+        titlePrefix={
+          <span className="relative inline-flex items-center justify-center h-4 w-4">
+            <Icon name="hash" className="h-4 w-4" />
+            {props.roomIsPrivate ? (
+              <span className="absolute bottom-0.5 right-0.5 inline-flex h-2 w-2 items-center justify-center rounded-[2px] bg-card text-foreground" title="Private room" aria-label="Private room">
+                <Icon name="lock" weight="fill" label="Private room" className="h-2 w-2" />
+              </span>
+            ) : null}
+          </span>
+        }
+        fallbackTitle={label}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            {props.canManagePins || hasAnyResources ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
+                <Icon name="pin" className="h-4 w-4 mr-1" />
+                Resources
+              </Button>
+            ) : null}
+          </div>
+        }
+      />
+
+      {pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 ? (
+        <div className="border-b border-border/60 bg-card/40 px-4 py-2">
+          <div className="w-full max-w-4xl mx-auto flex flex-wrap gap-2 items-center">
+            {pinnedAgents.map(p => {
+              const name = props.agentLabelById?.get(String(p.agentId)) || `Agent ${String(p.agentId).slice(0, 8)}`
+              const agentSlug = props.agentSlugById?.get(String(p.agentId)) || ''
+              const peerKey = agentSlug ? agentSlug : `a:${String(p.agentId)}`
+              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
+              return (
+                <Button key={`agent:${p.agentId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+            {pinnedViews.map(p => {
+              const name = props.viewLabelById?.get(String(p.viewId)) || `View ${String(p.viewId).slice(0, 8)}`
+              return (
+                <Button key={`view:${p.viewId}`} type="button" size="sm" variant="outline" onClick={() => props.onOpenPinnedView?.(String(p.viewId))}>
+                  <Icon name="layout" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+            {pinnedDatasets.map(p => {
+              const name = props.datasetLabelById?.get(String(p.datasetId)) || `Dataset ${String(p.datasetId).slice(0, 8)}`
+              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(String(p.datasetId))}` : null
+              return (
+                <Button key={`dataset:${p.datasetId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="database" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+            {pinnedBoards.map(p => {
+              const name = props.taskBoardLabelById?.get(String(p.boardId)) || `Board ${String(p.boardId).slice(0, 8)}`
+              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
+              return (
+                <Button key={`board:${p.boardId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="list" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+            {pinnedTools.map(p => {
+              const name = props.toolLabelById?.get(String(p.toolId)) || `Tool ${String(p.toolId).slice(0, 8)}`
+              const toolSlug = props.toolSlugById?.get(String(p.toolId)) || ''
+              const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
+              return (
+                <Button key={`tool:${p.toolId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
+                  <Icon name="workflow" className="h-4 w-4 mr-1.5" />
+                  {name}
+                </Button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Room starter (conversation-starter style) */}
+      <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
+        <div className="w-full max-w-4xl mx-auto h-full flex">
+          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col justify-center flex-1">
+            <div className="mb-6 text-center">
+              <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
+              <p className="text-sm text-muted-foreground mt-2">Your first message creates a new thread in this room.</p>
+            </div>
+
+            <ConversationMessageInput
+              selectedAgent={starterSelectedAgent}
+              onAgentChange={setStarterSelectedAgent}
+              starshipId={props.starshipId}
+              conversationId={null}
+              starshipSlug={effectiveStarshipSlug}
+              newConversationParentConversationId={props.roomConversationId}
+              newConversationTitleOverride="New thread"
+              onConversationStart={conversationId => {
+                const cid = String(conversationId || '').trim()
+                if (!cid) return
+                props.onThreadConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

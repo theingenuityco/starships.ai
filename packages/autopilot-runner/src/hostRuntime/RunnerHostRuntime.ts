@@ -59,6 +59,11 @@ export interface AzureAiFoundryRuntimeConfig {
   defaultHeaders?: Record<string, string>;
 }
 
+export interface WebUnlockerRuntimeConfig {
+  apiKey: string;
+  zone: string;
+}
+
 export interface ProviderRoute {
   provider: 'openrouter' | 'aws_bedrock' | 'azure_ai_foundry';
   providerModelId: string;
@@ -93,6 +98,12 @@ export interface RunnerHostRuntimeOptions {
    * use this instead of reading from process.env.
    */
   llm?: LlmRuntimeConfig;
+
+  /**
+   * Optional web-unlocking gateway configuration for HostRuntime.http. When provided,
+   * the runner will use this instead of reading from process.env.
+   */
+  webUnlocker?: WebUnlockerRuntimeConfig;
 
   /**
    * AWS runtime configuration for Bedrock.
@@ -415,8 +426,8 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       };
 
       if (useWebUnlocker) {
-        const apiKey = process.env.BRIGHTDATA_API_KEY;
-        const zone = process.env.BRIGHTDATA_ZONE;
+        const apiKey = options.webUnlocker?.apiKey ?? process.env.BRIGHTDATA_API_KEY;
+        const zone = options.webUnlocker?.zone ?? process.env.BRIGHTDATA_ZONE;
         if (!apiKey || !apiKey.trim()) {
           throw new Error('BRIGHTDATA_API_KEY is required when useWebUnlocker=true');
         }

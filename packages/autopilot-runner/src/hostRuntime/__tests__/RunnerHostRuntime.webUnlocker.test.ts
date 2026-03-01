@@ -102,9 +102,6 @@ describe('RunnerHostRuntime Web Unlocker', () => {
   });
 
   it('routes through Bright Data when useWebUnlocker=true', async () => {
-    process.env.BRIGHTDATA_API_KEY = 'test-key';
-    process.env.BRIGHTDATA_ZONE = 'test-zone';
-
     const fetchMock = jest.fn(async (_url: string, _init: RequestInit) =>
       makeResponse({
         status: 200,
@@ -120,7 +117,7 @@ describe('RunnerHostRuntime Web Unlocker', () => {
     );
     Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
 
-    const rt = createRunnerHostRuntime();
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
     const resp = await rt.http({
       method: 'GET',
       url: 'https://example.com',
@@ -154,9 +151,6 @@ describe('RunnerHostRuntime Web Unlocker', () => {
   });
 
   it('parses JSON result when target content-type is application/json', async () => {
-    process.env.BRIGHTDATA_API_KEY = 'test-key';
-    process.env.BRIGHTDATA_ZONE = 'test-zone';
-
     const fetchMock = jest.fn(async () =>
       makeResponse({
         status: 200,
@@ -171,7 +165,7 @@ describe('RunnerHostRuntime Web Unlocker', () => {
     );
     Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
 
-    const rt = createRunnerHostRuntime();
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
     const resp = await rt.http({ method: 'GET', url: 'https://example.com/json', useWebUnlocker: true });
     expect(resp.body).toEqual({ a: 1 });
   });

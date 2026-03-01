@@ -13,7 +13,7 @@ Specification (authoritative)
   - bodyFromBinaryKey?: string (optional) — if set, uses `input?.[0]?.binary[key]` bytes as the raw request body
   - responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64' (optional)
   - binaryKey?: string (optional; default `"data"`) — where to store binary responses when `responseType: "arrayBuffer"`
-  - useWebUnlocker?: boolean (optional; default false) — when true, the host runtime may route the request through a web-unlocking gateway instead of direct server-side fetch (host-dependent)
+  - useWebUnlocker?: boolean (optional; default false) — when true, the host runtime may route the request through a web-unlocking gateway instead of direct server-side fetch (host-dependent). Use this for public web pages/APIs that frequently block automation (e.g. repeated 403/429/503, bot checks) where a normal server fetch is unreliable.
   - timeout?: number (ms; default 30000)
   - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, responseType
 
@@ -72,6 +72,18 @@ Error behavior
 ### Web-unlocking routing (runner)
 
 When running via `@starships/autopilot-runner`, `useWebUnlocker: true` is a first-class knob on `http_request` to route that single request through the runner’s configured web-unlocking gateway.
+
+When to set `useWebUnlocker: true`:
+
+- When the target is **public web content** that often blocks datacenter/server traffic (common signals: frequent `403`, `429`, `503`, bot-check pages, CAPTCHA pages, intermittent `502`/gateway errors).
+- When you want **higher success rate** and more “browser-like” access characteristics without changing the blueprint shape (still returns `{ status, headers, body, url }`).
+- When scraping/searching is part of a tool/workflow and you need **stability over raw speed/cost**.
+
+When NOT to set it:
+
+- When you’re calling your own internal services, VPC resources, or anything that should stay on private networks.
+- When the request/response is binary (use `responseType: "arrayBuffer"` or `"base64"`) or you’re uploading binary/FormData bodies.
+- When the target is a well-behaved API that already works reliably with normal server-side fetch.
 
 Runner env required (only when `useWebUnlocker: true`):
 

@@ -113,6 +113,7 @@ describe('RunnerHostRuntime Web Unlocker', () => {
         headers: { 'content-type': 'application/json' },
         json: {
           result: '<html>ok</html>',
+          status_code: 200,
           headers: { 'content-type': 'text/html; charset=utf-8' },
           url: 'https://example.com',
         },
@@ -161,6 +162,7 @@ describe('RunnerHostRuntime Web Unlocker', () => {
         headers: { 'content-type': 'application/json' },
         json: {
           result: '{"a":1}',
+          status_code: 200,
           headers: { 'content-type': 'application/json' },
           url: 'https://example.com/json',
         },
@@ -171,6 +173,46 @@ describe('RunnerHostRuntime Web Unlocker', () => {
     const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
     const resp = await rt.http({ method: 'GET', url: 'https://example.com/json', useWebUnlocker: true });
     expect(resp.body).toEqual({ a: 1 });
+  });
+
+  it('returns target status_code from envelope (e.g. 404)', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        json: {
+          result: 'Not Found',
+          status_code: 404,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+          url: 'https://example.com/missing',
+        },
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({ method: 'GET', url: 'https://example.com/missing', useWebUnlocker: true, responseType: 'text' });
+    expect(resp.status).toBe(404);
+    expect(resp.statusText).toMatch(/Not Found|404/);
+    expect(resp.body).toBe('Not Found');
+  });
+
+  it('throws when gateway returns non-2xx (e.g. 401)', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { 'content-type': 'application/json' },
+        text: JSON.stringify({ error: 'unauthorized' }),
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'bad', zone: 'bad' } });
+    await expect(
+      rt.http({ method: 'GET', url: 'https://example.com', useWebUnlocker: true, responseType: 'text' })
+    ).rejects.toThrow(/gateway returned 401/i);
   });
 
   it('returns raw text when gateway returns non-JSON body', async () => {

@@ -71,6 +71,15 @@ If you see `errors[]` in the response:
 
 If you mark other columns as `unique`, you should expect a validation error when updating schema.
 
+## Append mode vs primaryKey uniqueness
+
+If a dataset has `primaryKey` set, the DB enforces `UNIQUE(dataset_id, row_key)`.
+
+That means:
+
+- `mode: "append"` can fail if you append rows that produce a duplicate `row_key` (i.e., the same primaryKey value).
+- Use `mode: "upsert"` when you want to write by primary key repeatedly.
+
 ## Formula gotchas
 
 - Formula columns are **computed on read**, not stored.

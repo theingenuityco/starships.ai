@@ -549,7 +549,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
           bdHeaders[key] = value;
         });
 
-        if (!resp.ok) {
+        // NOTE:
+        // Do not rely on `Response.ok` here. In our Jest tests, `fetch` is mocked with a minimal
+        // Response-like object that omits `ok`, which would incorrectly trip `!resp.ok` for 200s.
+        // Use status code semantics directly instead.
+        if (resp.status < 200 || resp.status >= 300) {
           const errText = await resp.text().catch(() => '');
           const snippet = errText.length > 1200 ? `${errText.slice(0, 1200)}…` : errText;
           console.error('[RunnerHostRuntime.http] web_unlocker_gateway_non_2xx', {

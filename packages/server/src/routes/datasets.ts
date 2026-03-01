@@ -272,6 +272,11 @@ const DatasetColumnSchema: z.ZodType<StarshipDatasetColumn> = z
       .min(1)
       .max(100)
       .regex(/^[a-zA-Z0-9_]+$/, 'Column name must be alphanumeric/underscore'),
+    description: z
+      .string()
+      .max(2000)
+      .optional()
+      .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
     format: z.enum(['text', 'number', 'currency', 'date', 'datetime', 'percentage']).optional(),
     type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum', 'reference', 'formula']).optional(),
     constraints: z

@@ -367,6 +367,15 @@ export default function TablesIndexPage(): React.JSX.Element {
                               </Button>
                             </div>
 
+                            <div className="space-y-1">
+                              <div className="text-[11px] text-muted-foreground">Description (optional)</div>
+                              <Input
+                                value={String(col?.description ?? '')}
+                                onChange={(e) => setCol({ description: e.target.value })}
+                                placeholder="What does this column represent?"
+                              />
+                            </div>
+
                             <div className="flex flex-wrap items-center gap-4">
                               <label className="flex items-center gap-2 text-sm">
                                 <Checkbox

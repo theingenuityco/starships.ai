@@ -28,6 +28,7 @@ Column shape (high-level):
 ```json
 {
   "name": "status",
+  "description": "Current workflow stage for the item",
   "type": "enum",
   "format": "text",
   "constraints": { "required": true },
@@ -261,13 +262,14 @@ A dataset:
 - `name`: string
 - `slug`: string (server-generated, unique per starship)
 - `description`: string
-- `columns`: `{ name, type?, format? }[]`
+- `columns`: `{ name, description?, type?, format? }[]`
 - `primaryKey?`: string | null
 - `archived`: boolean
 
 Column rules (server enforced):
 
 - `name`: `^[a-zA-Z0-9_]+$` (alphanumeric + underscore), max 100 chars
+- `description` (optional): max 2000 chars
 - `type` (optional): `string | number | boolean | date | json`
 - `format` (optional): `text | number | currency | date | percentage`
 
@@ -310,9 +312,9 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
           "name": "Leads",
           "description": "Inbound leads captured by agents",
           "columns": [
-            { "name": "email", "type": "string" },
-            { "name": "status", "type": "string" },
-            { "name": "score", "type": "number", "format": "number" }
+            { "name": "email", "type": "string", "description": "Primary contact email for the lead" },
+            { "name": "status", "type": "string", "description": "Lead lifecycle state" },
+            { "name": "score", "type": "number", "format": "number", "description": "Qualification score (higher is better)" }
           ],
           "primaryKey": "email"
         }
@@ -450,8 +452,8 @@ Body:
   "description": "Sales leads",
   "primaryKey": "email",
   "columns": [
-    { "key": "email", "label": "Email" },
-    { "key": "status", "label": "Status" }
+    { "name": "email", "type": "string", "description": "Primary contact email for the lead" },
+    { "name": "status", "type": "string", "description": "Lead lifecycle state" }
   ]
 }
 ```
@@ -464,7 +466,7 @@ Response:
 
 ```json
 {
-  "columns": [{ "key": "email", "label": "Email" }],
+  "columns": [{ "name": "email", "type": "string", "description": "Primary contact email for the lead" }],
   "data": [{ "email": "a@b.com" }],
   "pagination": { "limit": 50, "offset": 0, "total": 123 }
 }

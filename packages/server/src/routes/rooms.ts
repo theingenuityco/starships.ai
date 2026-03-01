@@ -41,6 +41,21 @@ const RoomSlugSchema = z
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 
+async function resolveRoomAccessArgs(args: { roomConversationId: string }): Promise<{
+  room: RoomModel | null;
+  conversationStarshipId: string | null;
+}> {
+  const roomRepo = new RoomRepository();
+  const room = await roomRepo.findByConversationId(args.roomConversationId);
+  if (!room) return { room: null, conversationStarshipId: null };
+
+  // Resolve starshipId from authoritative conversation row (defense-in-depth).
+  const conn = getConnection();
+  const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [args.roomConversationId]);
+  const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+  return { room, conversationStarshipId || null };
+}
+
 /**
  * GET /starships/:starshipId/rooms
  *
@@ -317,7 +332,7 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
     const nextTopic = body.topic !== undefined ? (body.topic ?? null) : undefined;
 
     const setParts: string[] = [];
-    const values: any[] = [];
+    const values: Array<string | boolean | null> = [];
     let i = 1;
     if (nextName !== undefined) {
       setParts.push(`name = $${i++}`);
@@ -462,16 +477,11 @@ router.get('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
       return;
     }
 
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
     if (!room) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
       return;
     }
-
-    const conn = getConnection();
-    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.roomId]);
-    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
     if (!conversationStarshipId) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
       return;
@@ -496,7 +506,9 @@ router.get('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
 
     const prefRepo = new ConversationNotificationPrefRepository();
     const pref = await prefRepo.get(params.roomId, authUserId);
-    const level = (pref?.level as any) || 'mentions';
+    const rawLevel = typeof pref?.level === 'string' ? String(pref.level) : '';
+    const level: z.infer<typeof RoomNotificationLevelSchema> =
+      rawLevel === 'all' || rawLevel === 'mentions' || rawLevel === 'mute' ? rawLevel : 'mentions';
     sendSuccess(res, { level }, 200);
   } catch (error) {
     handleError(error, res, 'fetching room notification level');
@@ -520,16 +532,11 @@ router.put('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
     const body = validateData(z.object({ level: RoomNotificationLevelSchema }), req.body, res, 'notification level body');
     if (!body) return;
 
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
     if (!room) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
       return;
     }
-
-    const conn = getConnection();
-    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.roomId]);
-    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
     if (!conversationStarshipId) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
       return;
@@ -682,18 +689,25 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
       return;
     }
 
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
     if (!room) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
       return;
     }
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
+      return;
+    }
+    if (String(room.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+      return;
+    }
 
-    if (!(await verifyStarshipAccess(room.starshipId, authUserId, res))) return;
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
     if (
       !(await enforcePrivateRoomMembership({
         conversationId: params.roomId,
-        conversationStarshipId: room.starshipId,
+        conversationStarshipId,
         userId: authUserId,
         req,
         res,
@@ -747,19 +761,22 @@ router.post('/rooms/:roomId/pins/agents', jwtAuthMiddleware, async (req: Request
       sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
       return;
     }
-    if (String((agent as any).starshipId) !== String(room.starshipId)) {
+    if (String(agent.starshipId) !== String(room.starshipId)) {
       sendError(res, 'VALIDATION_ERROR', 'Pinned agent must belong to the same starship as the room', 400, {
         agentId: body.agentId,
         roomStarshipId: room.starshipId,
-        agentStarshipId: (agent as any).starshipId,
+        agentStarshipId: agent.starshipId,
       });
       return;
     }
 
     const pinnedRepo = new RoomAgentsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const position = body.position !== undefined ? body.position : existing.length;
-    const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, agentId: body.agentId, position, createdBy: authUserId });
+    const pin = await pinnedRepo.upsert({
+      roomConversationId: room.conversationId,
+      agentId: body.agentId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
     handleError(error, res, 'pinning agent');
@@ -817,19 +834,22 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       sendError(res, 'VALIDATION_ERROR', 'Tool not found', 400, { toolId: body.toolId });
       return;
     }
-    if (String((tool as any).starshipId) !== String(room.starshipId)) {
+    if (String(tool.starshipId) !== String(room.starshipId)) {
       sendError(res, 'VALIDATION_ERROR', 'Pinned tool must belong to the same starship as the room', 400, {
         toolId: body.toolId,
         roomStarshipId: room.starshipId,
-        toolStarshipId: (tool as any).starshipId,
+        toolStarshipId: tool.starshipId,
       });
       return;
     }
 
     const pinnedRepo = new RoomToolsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const position = body.position !== undefined ? body.position : existing.length;
-    const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, toolId: body.toolId, position, createdBy: authUserId });
+    const pin = await pinnedRepo.upsert({
+      roomConversationId: room.conversationId,
+      toolId: body.toolId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
     handleError(error, res, 'pinning tool');
@@ -897,9 +917,12 @@ router.post('/rooms/:roomId/pins/views', jwtAuthMiddleware, async (req: Request,
     }
 
     const pinnedViewsRepo = new RoomViewsRepository();
-    const existing = await pinnedViewsRepo.list(room.conversationId);
-    const position = body.position !== undefined ? body.position : existing.length;
-    const pin = await pinnedViewsRepo.upsert({ roomConversationId: room.conversationId, viewId: body.viewId, position, createdBy: authUserId });
+    const pin = await pinnedViewsRepo.upsert({
+      roomConversationId: room.conversationId,
+      viewId: body.viewId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
     handleError(error, res, 'pinning view');
@@ -967,9 +990,12 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
     }
 
     const pinnedRepo = new RoomDatasetsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const position = body.position !== undefined ? body.position : existing.length;
-    const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, datasetId: body.datasetId, position, createdBy: authUserId });
+    const pin = await pinnedRepo.upsert({
+      roomConversationId: room.conversationId,
+      datasetId: body.datasetId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
     handleError(error, res, 'pinning dataset');
@@ -1037,9 +1063,12 @@ router.post('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Re
     }
 
     const pinnedRepo = new RoomTaskBoardsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const position = body.position !== undefined ? body.position : existing.length;
-    const pin = await pinnedRepo.upsert({ roomConversationId: room.conversationId, boardId: body.boardId, position, createdBy: authUserId });
+    const pin = await pinnedRepo.upsert({
+      roomConversationId: room.conversationId,
+      boardId: body.boardId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
     handleError(error, res, 'pinning task board');
@@ -1115,20 +1144,27 @@ router.post('/rooms/:roomId/pins/views/reorder', jwtAuthMiddleware, async (req: 
     const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
     const args = [room.conversationId, ...nextIds];
 
-    await conn.query(
-      `UPDATE room_views
-          SET position = CASE view_id ${caseTemp} ELSE position END
-        WHERE room_conversation_id = $1
-          AND view_id IN (${inList})`,
-      args
-    );
-    await conn.query(
-      `UPDATE room_views
-          SET position = CASE view_id ${caseFinal} ELSE position END
-        WHERE room_conversation_id = $1
-          AND view_id IN (${inList})`,
-      args
-    );
+    await conn.query('BEGIN');
+    try {
+      await conn.query(
+        `UPDATE room_views
+            SET position = CASE view_id ${caseTemp} ELSE position END
+          WHERE room_conversation_id = $1
+            AND view_id IN (${inList})`,
+        args
+      );
+      await conn.query(
+        `UPDATE room_views
+            SET position = CASE view_id ${caseFinal} ELSE position END
+          WHERE room_conversation_id = $1
+            AND view_id IN (${inList})`,
+        args
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     const views = await pinnedRepo.list(room.conversationId);
     sendSuccess(res, { views }, 200);
@@ -1181,20 +1217,27 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
     const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
     const args = [room.conversationId, ...nextIds];
 
-    await conn.query(
-      `UPDATE room_datasets
-          SET position = CASE dataset_id ${caseTemp} ELSE position END
-        WHERE room_conversation_id = $1
-          AND dataset_id IN (${inList})`,
-      args
-    );
-    await conn.query(
-      `UPDATE room_datasets
-          SET position = CASE dataset_id ${caseFinal} ELSE position END
-        WHERE room_conversation_id = $1
-          AND dataset_id IN (${inList})`,
-      args
-    );
+    await conn.query('BEGIN');
+    try {
+      await conn.query(
+        `UPDATE room_datasets
+            SET position = CASE dataset_id ${caseTemp} ELSE position END
+          WHERE room_conversation_id = $1
+            AND dataset_id IN (${inList})`,
+        args
+      );
+      await conn.query(
+        `UPDATE room_datasets
+            SET position = CASE dataset_id ${caseFinal} ELSE position END
+          WHERE room_conversation_id = $1
+            AND dataset_id IN (${inList})`,
+        args
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     const datasets = await pinnedRepo.list(room.conversationId);
     sendSuccess(res, { datasets }, 200);
@@ -1247,20 +1290,27 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
     const args = [room.conversationId, ...nextIds];
 
-    await conn.query(
-      `UPDATE room_task_boards
-          SET position = CASE board_id ${caseTemp} ELSE position END
-        WHERE room_conversation_id = $1
-          AND board_id IN (${inList})`,
-      args
-    );
-    await conn.query(
-      `UPDATE room_task_boards
-          SET position = CASE board_id ${caseFinal} ELSE position END
-        WHERE room_conversation_id = $1
-          AND board_id IN (${inList})`,
-      args
-    );
+    await conn.query('BEGIN');
+    try {
+      await conn.query(
+        `UPDATE room_task_boards
+            SET position = CASE board_id ${caseTemp} ELSE position END
+          WHERE room_conversation_id = $1
+            AND board_id IN (${inList})`,
+        args
+      );
+      await conn.query(
+        `UPDATE room_task_boards
+            SET position = CASE board_id ${caseFinal} ELSE position END
+          WHERE room_conversation_id = $1
+            AND board_id IN (${inList})`,
+        args
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     const taskBoards = await pinnedRepo.list(room.conversationId);
     sendSuccess(res, { taskBoards }, 200);
@@ -1313,20 +1363,27 @@ router.post('/rooms/:roomId/pins/agents/reorder', jwtAuthMiddleware, async (req:
     const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
     const args = [room.conversationId, ...nextIds];
 
-    await conn.query(
-      `UPDATE room_agents
-          SET position = CASE agent_id ${caseTemp} ELSE position END
-        WHERE room_conversation_id = $1
-          AND agent_id IN (${inList})`,
-      args
-    );
-    await conn.query(
-      `UPDATE room_agents
-          SET position = CASE agent_id ${caseFinal} ELSE position END
-        WHERE room_conversation_id = $1
-          AND agent_id IN (${inList})`,
-      args
-    );
+    await conn.query('BEGIN');
+    try {
+      await conn.query(
+        `UPDATE room_agents
+            SET position = CASE agent_id ${caseTemp} ELSE position END
+          WHERE room_conversation_id = $1
+            AND agent_id IN (${inList})`,
+        args
+      );
+      await conn.query(
+        `UPDATE room_agents
+            SET position = CASE agent_id ${caseFinal} ELSE position END
+          WHERE room_conversation_id = $1
+            AND agent_id IN (${inList})`,
+        args
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     const agents = await pinnedRepo.list(room.conversationId);
     sendSuccess(res, { agents }, 200);
@@ -1379,20 +1436,27 @@ router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: 
     const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
     const args = [room.conversationId, ...nextIds];
 
-    await conn.query(
-      `UPDATE room_tools
-          SET position = CASE tool_id ${caseTemp} ELSE position END
-        WHERE room_conversation_id = $1
-          AND tool_id IN (${inList})`,
-      args
-    );
-    await conn.query(
-      `UPDATE room_tools
-          SET position = CASE tool_id ${caseFinal} ELSE position END
-        WHERE room_conversation_id = $1
-          AND tool_id IN (${inList})`,
-      args
-    );
+    await conn.query('BEGIN');
+    try {
+      await conn.query(
+        `UPDATE room_tools
+            SET position = CASE tool_id ${caseTemp} ELSE position END
+          WHERE room_conversation_id = $1
+            AND tool_id IN (${inList})`,
+        args
+      );
+      await conn.query(
+        `UPDATE room_tools
+            SET position = CASE tool_id ${caseFinal} ELSE position END
+          WHERE room_conversation_id = $1
+            AND tool_id IN (${inList})`,
+        args
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     const tools = await pinnedRepo.list(room.conversationId);
     sendSuccess(res, { tools }, 200);

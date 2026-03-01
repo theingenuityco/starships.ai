@@ -39,16 +39,32 @@ export class RoomAgentsRepository extends BaseRepository {
     }, 'list', 'room_agents', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; agentId: string; position: number; createdBy?: string | null }): Promise<RoomPinnedAgent> {
+  async upsert(args: { roomConversationId: string; agentId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedAgent> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const row = await conn.queryOne<DbRow>(
         `INSERT INTO room_agents (room_conversation_id, agent_id, position, created_by)
-         VALUES ($1, $2, $3, $4)
+         VALUES (
+           $1,
+           $2,
+           COALESCE(
+             $3,
+             (SELECT COALESCE(MAX(position) + 1, 0) FROM room_agents WHERE room_conversation_id = $1)
+           ),
+           $4
+         )
          ON CONFLICT (room_conversation_id, agent_id) DO UPDATE SET
-           position = EXCLUDED.position
+          position = CASE
+            WHEN $3 IS NULL THEN room_agents.position
+            ELSE EXCLUDED.position
+          END
          RETURNING room_conversation_id, agent_id, position, created_at, created_by`,
-        [args.roomConversationId, args.agentId, Math.trunc(args.position), args.createdBy ?? null]
+        [
+          args.roomConversationId,
+          args.agentId,
+          typeof args.position === 'number' ? Math.trunc(args.position) : null,
+          args.createdBy ?? null,
+        ]
       );
       if (!row) throw new Error('Failed to upsert room agent');
       return fromDb(row);

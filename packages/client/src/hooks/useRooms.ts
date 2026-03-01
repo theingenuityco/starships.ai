@@ -42,8 +42,8 @@ export function useRoomPins(roomConversationId: string, enabled: boolean = true)
         views: response.data.data?.views || [],
         datasets: response.data.data?.datasets || [],
         taskBoards: response.data.data?.taskBoards || [],
-        agents: (response.data.data as any)?.agents || [],
-        tools: (response.data.data as any)?.tools || [],
+        agents: response.data.data?.agents || [],
+        tools: response.data.data?.tools || [],
       }
     },
     enabled: !!roomConversationId && enabled,
@@ -301,7 +301,7 @@ export function useReorderPinnedRoomAgents(roomId: string) {
       const response: FetchResponse<ApiResponse<{ agents: RoomPinnedAgent[] }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/agents/reorder`, {
         agentIds,
       })
-      return (response.data.data as any)?.agents || []
+      return response.data.data?.agents || []
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
@@ -316,7 +316,7 @@ export function useReorderPinnedRoomTools(roomId: string) {
       const response: FetchResponse<ApiResponse<{ tools: RoomPinnedTool[] }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/tools/reorder`, {
         toolIds,
       })
-      return (response.data.data as any)?.tools || []
+      return response.data.data?.tools || []
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })

@@ -39,16 +39,32 @@ export class RoomToolsRepository extends BaseRepository {
     }, 'list', 'room_tools', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; toolId: string; position: number; createdBy?: string | null }): Promise<RoomPinnedTool> {
+  async upsert(args: { roomConversationId: string; toolId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTool> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const row = await conn.queryOne<DbRow>(
         `INSERT INTO room_tools (room_conversation_id, tool_id, position, created_by)
-         VALUES ($1, $2, $3, $4)
+         VALUES (
+           $1,
+           $2,
+           COALESCE(
+             $3,
+             (SELECT COALESCE(MAX(position) + 1, 0) FROM room_tools WHERE room_conversation_id = $1)
+           ),
+           $4
+         )
          ON CONFLICT (room_conversation_id, tool_id) DO UPDATE SET
-           position = EXCLUDED.position
+          position = CASE
+            WHEN $3 IS NULL THEN room_tools.position
+            ELSE EXCLUDED.position
+          END
          RETURNING room_conversation_id, tool_id, position, created_at, created_by`,
-        [args.roomConversationId, args.toolId, Math.trunc(args.position), args.createdBy ?? null]
+        [
+          args.roomConversationId,
+          args.toolId,
+          typeof args.position === 'number' ? Math.trunc(args.position) : null,
+          args.createdBy ?? null,
+        ]
       );
       if (!row) throw new Error('Failed to upsert room tool');
       return fromDb(row);

@@ -77,9 +77,9 @@ export function useUpdateRoom(starshipId: string) {
   return useMutation({
     mutationFn: async (args: { roomId: string; name?: string; isPrivate?: boolean; topic?: string | null }) => {
       const response: FetchResponse<ApiResponse<{ room: RoomModel }>> = await api.patch(`/api/v1/rooms/${encodeURIComponent(args.roomId)}`, {
-        ...(args.name !== undefined ? { name: args.name } : null),
-        ...(args.isPrivate !== undefined ? { isPrivate: args.isPrivate } : null),
-        ...(args.topic !== undefined ? { topic: args.topic } : null),
+        ...(args.name !== undefined ? { name: args.name } : {}),
+        ...(args.isPrivate !== undefined ? { isPrivate: args.isPrivate } : {}),
+        ...(args.topic !== undefined ? { topic: args.topic } : {}),
       })
       return response.data.data
     },
@@ -114,7 +114,7 @@ export function usePinRoomView(roomId: string, starshipId: string) {
     mutationFn: async (args: { viewId: string; position?: number }) => {
       const response: FetchResponse<ApiResponse<{ pin: RoomPinnedView }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/views`, {
         viewId: args.viewId,
-        ...(args.position !== undefined ? { position: args.position } : null),
+        ...(args.position !== undefined ? { position: args.position } : {}),
       })
       return response.data.data?.pin
     },
@@ -152,7 +152,7 @@ export function usePinRoomDataset(roomId: string) {
     mutationFn: async (args: { datasetId: string; position?: number }) => {
       const response: FetchResponse<ApiResponse<{ pin: RoomPinnedDataset }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/datasets`, {
         datasetId: args.datasetId,
-        ...(args.position !== undefined ? { position: args.position } : null),
+        ...(args.position !== undefined ? { position: args.position } : {}),
       })
       return response.data.data?.pin
     },
@@ -189,7 +189,7 @@ export function usePinRoomTaskBoard(roomId: string) {
     mutationFn: async (args: { boardId: string; position?: number }) => {
       const response: FetchResponse<ApiResponse<{ pin: RoomPinnedTaskBoard }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/task-boards`, {
         boardId: args.boardId,
-        ...(args.position !== undefined ? { position: args.position } : null),
+        ...(args.position !== undefined ? { position: args.position } : {}),
       })
       return response.data.data?.pin
     },
@@ -226,7 +226,7 @@ export function usePinRoomAgent(roomId: string) {
     mutationFn: async (args: { agentId: string; position?: number }) => {
       const response: FetchResponse<ApiResponse<{ pin: RoomPinnedAgent }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/agents`, {
         agentId: args.agentId,
-        ...(args.position !== undefined ? { position: args.position } : null),
+        ...(args.position !== undefined ? { position: args.position } : {}),
       })
       return response.data.data?.pin
     },
@@ -263,7 +263,7 @@ export function usePinRoomTool(roomId: string) {
     mutationFn: async (args: { toolId: string; position?: number }) => {
       const response: FetchResponse<ApiResponse<{ pin: RoomPinnedTool }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/tools`, {
         toolId: args.toolId,
-        ...(args.position !== undefined ? { position: args.position } : null),
+        ...(args.position !== undefined ? { position: args.position } : {}),
       })
       return response.data.data?.pin
     },

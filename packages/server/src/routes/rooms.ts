@@ -271,6 +271,7 @@ router.get('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Respon
         conversationId: params.roomId,
         conversationStarshipId,
         userId: authUserId,
+        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
         req,
         res,
       }))
@@ -498,6 +499,7 @@ router.get('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
         conversationId: params.roomId,
         conversationStarshipId,
         userId: authUserId,
+        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
         req,
         res,
       }))
@@ -553,6 +555,7 @@ router.put('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
         conversationId: params.roomId,
         conversationStarshipId,
         userId: authUserId,
+        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
         req,
         res,
       }))
@@ -1146,6 +1149,7 @@ router.post('/rooms/:roomId/pins/views/reorder', jwtAuthMiddleware, async (req: 
 
     await conn.query('BEGIN');
     try {
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_views:${room.conversationId}`]);
       await conn.query(
         `UPDATE room_views
             SET position = CASE view_id ${caseTemp} ELSE position END
@@ -1219,6 +1223,7 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
 
     await conn.query('BEGIN');
     try {
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_datasets:${room.conversationId}`]);
       await conn.query(
         `UPDATE room_datasets
             SET position = CASE dataset_id ${caseTemp} ELSE position END
@@ -1292,6 +1297,7 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
 
     await conn.query('BEGIN');
     try {
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_task_boards:${room.conversationId}`]);
       await conn.query(
         `UPDATE room_task_boards
             SET position = CASE board_id ${caseTemp} ELSE position END
@@ -1365,6 +1371,7 @@ router.post('/rooms/:roomId/pins/agents/reorder', jwtAuthMiddleware, async (req:
 
     await conn.query('BEGIN');
     try {
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_agents:${room.conversationId}`]);
       await conn.query(
         `UPDATE room_agents
             SET position = CASE agent_id ${caseTemp} ELSE position END
@@ -1438,6 +1445,7 @@ router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: 
 
     await conn.query('BEGIN');
     try {
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tools:${room.conversationId}`]);
       await conn.query(
         `UPDATE room_tools
             SET position = CASE tool_id ${caseTemp} ELSE position END

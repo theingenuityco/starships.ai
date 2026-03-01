@@ -42,32 +42,123 @@ export class RoomDatasetsRepository extends BaseRepository {
   async upsert(args: { roomConversationId: string; datasetId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedDataset> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const row = await conn.queryOne<DbRow>(
-        `INSERT INTO room_datasets (room_conversation_id, dataset_id, position, created_by)
-         VALUES (
-           $1,
-           $2,
-           COALESCE(
-             $3,
-             (SELECT COALESCE(MAX(position) + 1, 0) FROM room_datasets WHERE room_conversation_id = $1)
-           ),
-           $4
-         )
-         ON CONFLICT (room_conversation_id, dataset_id) DO UPDATE SET
-          position = CASE
-            WHEN $3 IS NULL THEN room_datasets.position
-            ELSE EXCLUDED.position
-          END
-         RETURNING room_conversation_id, dataset_id, position, created_at, created_by`,
-        [
-          args.roomConversationId,
-          args.datasetId,
-          typeof args.position === 'number' ? Math.trunc(args.position) : null,
-          args.createdBy ?? null,
-        ]
-      );
-      if (!row) throw new Error('Failed to upsert room dataset');
-      return fromDb(row);
+      const roomConversationId = String(args.roomConversationId || '').trim();
+      const datasetId = String(args.datasetId || '').trim();
+      const createdBy = args.createdBy ?? null;
+      const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
+
+      await conn.query('BEGIN');
+      try {
+        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_datasets:${roomConversationId}`]);
+
+        const existing = await conn.queryOne<{ position: number }>(
+          `SELECT position FROM room_datasets WHERE room_conversation_id = $1 AND dataset_id = $2`,
+          [roomConversationId, datasetId]
+        );
+
+        if (existing && requestedPosition == null) {
+          const row = await conn.queryOne<DbRow>(
+            `SELECT room_conversation_id, dataset_id, position, created_at, created_by
+               FROM room_datasets
+              WHERE room_conversation_id = $1 AND dataset_id = $2`,
+            [roomConversationId, datasetId]
+          );
+          if (!row) throw new Error('Failed to upsert room dataset');
+          await conn.query('COMMIT');
+          return fromDb(row);
+        }
+
+        if (!existing) {
+          const desired =
+            requestedPosition != null
+              ? requestedPosition
+              : Number(
+                  (
+                    await conn.queryOne<{ next_pos: number }>(
+                      `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos
+                         FROM room_datasets
+                        WHERE room_conversation_id = $1`,
+                      [roomConversationId]
+                    )
+                  )?.next_pos ?? 0
+                );
+
+          await conn.query(
+            `UPDATE room_datasets
+                SET position = position + 1
+              WHERE room_conversation_id = $1
+                AND position >= $2`,
+            [roomConversationId, desired]
+          );
+
+          const inserted = await conn.queryOne<DbRow>(
+            `INSERT INTO room_datasets (room_conversation_id, dataset_id, position, created_by)
+             VALUES ($1, $2, $3, $4)
+             RETURNING room_conversation_id, dataset_id, position, created_at, created_by`,
+            [roomConversationId, datasetId, desired, createdBy]
+          );
+          if (!inserted) throw new Error('Failed to upsert room dataset');
+          await conn.query('COMMIT');
+          return fromDb(inserted);
+        }
+
+        const current = Number(existing.position) || 0;
+        const desired = requestedPosition ?? current;
+
+        if (desired !== current) {
+          const tmpRow = await conn.queryOne<{ tmp: number }>(
+            `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp
+               FROM room_datasets
+              WHERE room_conversation_id = $1`,
+            [roomConversationId]
+          );
+          const tmp = Number(tmpRow?.tmp ?? -1);
+          await conn.query(`UPDATE room_datasets SET position = $3 WHERE room_conversation_id = $1 AND dataset_id = $2`, [
+            roomConversationId,
+            datasetId,
+            tmp,
+          ]);
+
+          if (desired < current) {
+            await conn.query(
+              `UPDATE room_datasets
+                  SET position = position + 1
+                WHERE room_conversation_id = $1
+                  AND position >= $2
+                  AND position < $3`,
+              [roomConversationId, desired, current]
+            );
+          } else {
+            await conn.query(
+              `UPDATE room_datasets
+                  SET position = position - 1
+                WHERE room_conversation_id = $1
+                  AND position <= $2
+                  AND position > $3`,
+              [roomConversationId, desired, current]
+            );
+          }
+
+          await conn.query(`UPDATE room_datasets SET position = $3 WHERE room_conversation_id = $1 AND dataset_id = $2`, [
+            roomConversationId,
+            datasetId,
+            desired,
+          ]);
+        }
+
+        const row = await conn.queryOne<DbRow>(
+          `SELECT room_conversation_id, dataset_id, position, created_at, created_by
+             FROM room_datasets
+            WHERE room_conversation_id = $1 AND dataset_id = $2`,
+          [roomConversationId, datasetId]
+        );
+        if (!row) throw new Error('Failed to upsert room dataset');
+        await conn.query('COMMIT');
+        return fromDb(row);
+      } catch (e) {
+        await conn.query('ROLLBACK');
+        throw e;
+      }
     }, 'upsert', 'room_datasets');
   }
 

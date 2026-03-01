@@ -86,10 +86,16 @@ export async function enforcePrivateRoomMembership(args: {
   userId: string;
   req: Request;
   res: Response;
+  /** Optional already-fetched room to avoid redundant DB lookup. */
+  room?: { starshipId: string; isPrivate: boolean } | null;
 }): Promise<boolean> {
   try {
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(args.conversationId).catch(() => null);
+    const room =
+      args.room ??
+      (await (async () => {
+        const roomRepo = new RoomRepository();
+        return await roomRepo.findByConversationId(args.conversationId).catch(() => null);
+      })());
     if (!room || !room.isPrivate) return true;
 
     if (String(room.starshipId) !== String(args.conversationStarshipId)) {

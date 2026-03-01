@@ -5,19 +5,18 @@
 jest.mock(
   '@starships/autopilot',
   () => {
-  class CancelledError extends Error {
-    constructor(message = 'cancelled') {
-      super(message);
-      this.name = 'CancelledError';
+    class CancelledError extends Error {
+      constructor(message = 'cancelled') {
+        super(message);
+        this.name = 'CancelledError';
+      }
     }
-  }
-  return { CancelledError };
+    return { CancelledError };
   },
   { virtual: true }
 );
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createRunnerHostRuntime } = require('../RunnerHostRuntime') as typeof import('../RunnerHostRuntime');
+let createRunnerHostRuntime: typeof import('../RunnerHostRuntime').createRunnerHostRuntime;
 
 type MockResponseInit = {
   status?: number;
@@ -68,6 +67,10 @@ const makeResponse = (init: MockResponseInit) => {
 describe('RunnerHostRuntime Web Unlocker', () => {
   const envSnapshot = { ...process.env };
   const fetchSnapshot = (globalThis as unknown as { fetch?: unknown }).fetch;
+
+  beforeAll(async () => {
+    ({ createRunnerHostRuntime } = await import('../RunnerHostRuntime'));
+  });
 
   afterEach(() => {
     process.env = { ...envSnapshot };

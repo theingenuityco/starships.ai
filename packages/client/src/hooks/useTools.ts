@@ -11,6 +11,19 @@ export const TOOL_QUERY_KEYS = {
   detail: (starshipId: string, slug: string) => [...TOOL_QUERY_KEYS.all, 'detail', starshipId, slug] as const,
 } as const
 
+export function useStarshipTools(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: TOOL_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<ToolModel[]> => {
+      const res: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`)
+      return res.data.data
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: 10_000,
+    gcTime: 2 * 60 * 1000,
+  })
+}
+
 export function getStarshipToolQuery(starshipId: string, slug: string) {
   return {
     queryKey: TOOL_QUERY_KEYS.detail(starshipId, slug),

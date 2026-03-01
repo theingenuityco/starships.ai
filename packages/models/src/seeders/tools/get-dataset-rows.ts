@@ -17,6 +17,7 @@ export const getDatasetRowsTool: ToolParams = {
       datasetSlug: { type: 'string', description: 'Dataset slug (optional if datasetId provided)' },
       limit: { type: 'number', description: 'Max rows to return (0-200)' },
       offset: { type: 'number', description: 'Offset (0+) for pagination' },
+      expandRefs: { type: 'boolean', description: 'If true, expands refs (expand=refs) to hydrate reference values' },
     },
     required: [],
   },
@@ -46,12 +47,14 @@ export const getDatasetRowsTool: ToolParams = {
               if (limit !== undefined && !Number.isFinite(limit)) throw new Error('limit must be a number');
               const offset = input.offset == null ? undefined : Math.max(0, Math.floor(Number(input.offset)));
               if (offset !== undefined && !Number.isFinite(offset)) throw new Error('offset must be a number');
+              const expandRefs = input.expandRefs === true;
 
               const out = { starshipId: String(starshipId).trim() };
               if (datasetSlug) out.datasetSlug = datasetSlug;
               if (!datasetSlug) out.datasetId = datasetIdOrSlug;
               if (limit !== undefined) out.limit = limit;
               if (offset !== undefined) out.offset = offset;
+              if (expandRefs) out.expandRefs = true;
               return out;
             }
           `,
@@ -111,7 +114,7 @@ export const getDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   slug: getDatasetRowsTool.slug,
   version: '1.0.0',
   category: 'data',
-  exampleUsage: '{ "datasetSlug": "leads", "limit": 50, "offset": 0 }',
+  exampleUsage: '{ "datasetSlug": "leads", "limit": 50, "offset": 0, "expandRefs": true }',
   requiresApiKey: false,
   configurationFields: [],
 };

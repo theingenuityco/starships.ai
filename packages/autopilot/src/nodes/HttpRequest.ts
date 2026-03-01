@@ -99,6 +99,7 @@ export class HttpRequest implements NodeHandler {
       body: bodyData ?? undefined,
       timeoutMs,
       responseType: this.params.responseType,
+      useWebUnlocker: this.params.useWebUnlocker,
     });
 
     const getHeaderValue = (h: Record<string, unknown> | undefined, name: string): string | undefined => {

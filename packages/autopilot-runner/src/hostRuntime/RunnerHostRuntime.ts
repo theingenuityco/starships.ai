@@ -19,11 +19,145 @@ import { invokeAzureAiFoundry } from './azure-ai-foundry';
 import { Pool } from 'pg';
 import type { FieldDef, PoolClient } from 'pg';
 import { lookup } from 'node:dns/promises';
+import { STATUS_CODES } from 'node:http';
 import { Socket } from 'node:net';
 import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
 
 function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
   return (endpoint as { kind?: unknown }).kind === 'sql';
+}
+
+const SENSITIVE_HEADER_KEYS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'api-key',
+  'apikey',
+  'x-auth-token',
+]);
+
+const SENSITIVE_URL_PARAM_KEYS = new Set([
+  'token',
+  'access_token',
+  'auth',
+  'authorization',
+  'api_key',
+  'apikey',
+  'key',
+  'secret',
+  'signature',
+]);
+
+function redactHeadersForLogs(h: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(h)) {
+    const lk = k.toLowerCase();
+    out[k] = SENSITIVE_HEADER_KEYS.has(lk) ? '[REDACTED]' : v;
+  }
+  return out;
+}
+
+function redactUrlForLogs(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    for (const [k] of u.searchParams) {
+      if (SENSITIVE_URL_PARAM_KEYS.has(k.toLowerCase())) {
+        u.searchParams.set(k, '[REDACTED]');
+      }
+    }
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function summarizeFetchError(err: unknown): Record<string, unknown> {
+  const e =
+    err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
+  const cause = e?.cause;
+  const pick = (x: unknown): Record<string, unknown> => {
+    if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+    const rec = x as Record<string, unknown>;
+    return {
+      name: typeof rec.name === 'string' ? rec.name : undefined,
+      message: typeof rec.message === 'string' ? rec.message : undefined,
+      code: typeof rec.code === 'string' ? rec.code : undefined,
+      errno: typeof rec.errno === 'number' ? rec.errno : undefined,
+      syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
+      address: typeof rec.address === 'string' ? rec.address : undefined,
+      port: typeof rec.port === 'number' ? rec.port : undefined,
+      hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
+    };
+  };
+
+  const primary = pick(e);
+  const underlying = pick(cause);
+  const code = (underlying.code ?? primary.code) as string | undefined;
+  const msg = (underlying.message ?? primary.message) as string | undefined;
+
+  // A compact one-liner that is safe to embed in Error.message.
+  const summary = code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
+
+  return {
+    summary,
+    error: primary,
+    cause: underlying,
+  };
+}
+
+function getHeaderValue(h: Record<string, unknown> | undefined, name: string): string | undefined {
+  if (!h) return undefined;
+  const direct = h[name];
+  if (typeof direct === 'string') return direct;
+  const alt = h[name.toLowerCase()];
+  if (typeof alt === 'string') return alt;
+  const alt2 = h[name.toUpperCase()];
+  if (typeof alt2 === 'string') return alt2;
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(h)) {
+    if (k.toLowerCase() === target && typeof v === 'string') return v;
+  }
+  return undefined;
+}
+
+function normalizeHeadersToStrings(h: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(h || {})) {
+    if (!k) continue;
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string') out[k] = v;
+    else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
+    else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
+    else out[k] = String(v);
+  }
+  return out;
+}
+
+function looksLikeJson(s: string): boolean {
+  const t = s.trim();
+  if (!t) return false;
+  return t.startsWith('{') || t.startsWith('[');
+}
+
+function coerceHttpStatusCode(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const n = Math.floor(v);
+    return n >= 100 && n <= 599 ? n : null;
+  }
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n)) {
+      const m = Math.floor(n);
+      return m >= 100 && m <= 599 ? m : null;
+    }
+  }
+  return null;
+}
+
+function statusTextFromCode(code: number): string {
+  return STATUS_CODES[code] ?? String(code);
 }
 
 /**
@@ -57,6 +191,11 @@ export interface AzureAiFoundryRuntimeConfig {
   endpoint: string;
   apiVersion?: string;
   defaultHeaders?: Record<string, string>;
+}
+
+export interface WebUnlockerRuntimeConfig {
+  apiKey: string;
+  zone: string;
 }
 
 export interface ProviderRoute {
@@ -93,6 +232,12 @@ export interface RunnerHostRuntimeOptions {
    * use this instead of reading from process.env.
    */
   llm?: LlmRuntimeConfig;
+
+  /**
+   * Optional web-unlocking gateway configuration for HostRuntime.http. When provided,
+   * the runner will use this instead of reading from process.env.
+   */
+  webUnlocker?: WebUnlockerRuntimeConfig;
 
   /**
    * AWS runtime configuration for Bedrock.
@@ -278,6 +423,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       body?: unknown;
       timeoutMs?: number;
     };
+    const useWebUnlocker = (request as { useWebUnlocker?: unknown } | null | undefined)?.useWebUnlocker === true;
     // Backward/forward compatible: older @starships/autopilot types may not include this field.
     const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
     const responseType =
@@ -287,85 +433,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       responseTypeRaw === 'base64'
         ? responseTypeRaw
         : undefined;
-    const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
-      const out: Record<string, unknown> = {};
-      const sensitive = new Set([
-        'authorization',
-        'proxy-authorization',
-        'cookie',
-        'set-cookie',
-        'x-api-key',
-        'api-key',
-        'apikey',
-        'x-auth-token',
-      ]);
-      for (const [k, v] of Object.entries(h)) {
-        const lk = k.toLowerCase();
-        out[k] = sensitive.has(lk) ? '[REDACTED]' : v;
-      }
-      return out;
-    };
-
-    const redactUrlForLogs = (rawUrl: string): string => {
-      try {
-        const u = new URL(rawUrl);
-        const sensitiveParams = new Set([
-          'token',
-          'access_token',
-          'auth',
-          'authorization',
-          'api_key',
-          'apikey',
-          'key',
-          'secret',
-          'signature',
-        ]);
-        for (const [k] of u.searchParams) {
-          if (sensitiveParams.has(k.toLowerCase())) {
-            u.searchParams.set(k, '[REDACTED]');
-          }
-        }
-        return u.toString();
-      } catch {
-        return rawUrl;
-      }
-    };
-
-    const summarizeFetchError = (err: unknown): Record<string, unknown> => {
-      const e =
-        err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
-      const cause = e?.cause;
-      const pick = (x: unknown): Record<string, unknown> => {
-        if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
-        const rec = x as Record<string, unknown>;
-        return {
-          name: typeof rec.name === 'string' ? rec.name : undefined,
-          message: typeof rec.message === 'string' ? rec.message : undefined,
-          code: typeof rec.code === 'string' ? rec.code : undefined,
-          errno: typeof rec.errno === 'number' ? rec.errno : undefined,
-          syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
-          address: typeof rec.address === 'string' ? rec.address : undefined,
-          port: typeof rec.port === 'number' ? rec.port : undefined,
-          hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
-        };
-      };
-
-      const primary = pick(e);
-      const underlying = pick(cause);
-      const code = (underlying.code ?? primary.code) as string | undefined;
-      const msg = (underlying.message ?? primary.message) as string | undefined;
-
-      // A compact one-liner that is safe to embed in Error.message.
-      const summary =
-        code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
-
-      return {
-        summary,
-        error: primary,
-        cause: underlying,
-      };
-    };
-
     const timeoutController = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
@@ -378,6 +445,193 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
+
+      if (useWebUnlocker) {
+        const apiKey = options.webUnlocker?.apiKey ?? process.env.BRIGHTDATA_API_KEY;
+        const zone = options.webUnlocker?.zone ?? process.env.BRIGHTDATA_ZONE;
+        if (!apiKey || !apiKey.trim()) {
+          throw new Error('BRIGHTDATA_API_KEY is required when useWebUnlocker=true');
+        }
+        if (!zone || !zone.trim()) {
+          throw new Error('BRIGHTDATA_ZONE is required when useWebUnlocker=true');
+        }
+
+        let u: URL;
+        try {
+          u = new URL(finalUrl);
+        } catch {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        const hostLower = u.hostname.toLowerCase();
+        if (hostLower === 'localhost' || hostLower.endsWith('.localhost')) {
+          throw new Error('Blocked URL for useWebUnlocker=true: localhost is not allowed');
+        }
+        if (isPrivateIp(hostLower)) {
+          throw new Error('Blocked URL for useWebUnlocker=true: private/loopback IPs are not allowed');
+        }
+
+        if (responseType === 'arrayBuffer' || responseType === 'base64') {
+          throw new Error(`useWebUnlocker=true does not support responseType="${responseType}"`);
+        }
+        if (
+          body instanceof ArrayBuffer ||
+          ArrayBuffer.isView(body as ArrayBufferLike) ||
+          (typeof Blob !== 'undefined' && body instanceof Blob) ||
+          (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+          (typeof FormData !== 'undefined' && body instanceof FormData)
+        ) {
+          throw new Error('useWebUnlocker=true does not support binary/FormData request bodies');
+        }
+
+        const safeTargetUrl = redactUrlForLogs(finalUrl);
+        const safeHeaders = redactHeadersForLogs(finalHeaders);
+
+        const unlockerPayload: Record<string, unknown> = {
+          zone: zone.trim(),
+          url: finalUrl,
+          format: 'raw',
+          method: finalMethod,
+        };
+
+        const hdrs = normalizeHeadersToStrings(finalHeaders);
+        if (Object.keys(hdrs).length > 0) unlockerPayload.headers = hdrs;
+
+        if (finalMethod !== 'GET' && finalMethod !== 'HEAD' && body !== undefined) {
+          unlockerPayload.body = typeof body === 'string' ? body : JSON.stringify(body);
+        }
+
+        let resp: Response;
+        try {
+          resp = await fetch('https://api.brightdata.com/request', {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${apiKey.trim()}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(unlockerPayload),
+            signal: combinedSignal,
+          });
+        } catch (e: unknown) {
+          if (options.signal?.aborted) {
+            throw new CancelledError('cancelled');
+          }
+          if (timeoutController.signal.aborted) {
+            const err = new Error(`HTTP (Web Unlocker) timed out after ${timeout}ms: ${finalMethod} ${safeTargetUrl}`);
+            console.error('[RunnerHostRuntime.http] web_unlocker_timeout', {
+              method: finalMethod,
+              url: safeTargetUrl,
+              timeoutMs: timeout,
+            });
+            throw err;
+          }
+
+          const summary = summarizeFetchError(e);
+          console.error('[RunnerHostRuntime.http] web_unlocker_failed', {
+            method: finalMethod,
+            url: safeTargetUrl,
+            timeoutMs: timeout,
+            headers: safeHeaders,
+            error: summary,
+          });
+
+          const wrapped = new Error(`HTTP (Web Unlocker) failed: ${finalMethod} ${safeTargetUrl} (${summary.summary})`) as Error & {
+            cause?: unknown;
+          };
+          wrapped.cause = e;
+          throw wrapped;
+        }
+
+        const bdHeaders: Record<string, string> = {};
+        resp.headers.forEach((value, key) => {
+          bdHeaders[key] = value;
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text().catch(() => '');
+          const snippet = errText.length > 1200 ? `${errText.slice(0, 1200)}…` : errText;
+          console.error('[RunnerHostRuntime.http] web_unlocker_gateway_non_2xx', {
+            status: resp.status,
+            statusText: resp.statusText,
+            url: 'https://api.brightdata.com/request',
+            targetUrl: safeTargetUrl,
+          });
+          throw new Error(
+            `HTTP (Web Unlocker) gateway returned ${resp.status} ${resp.statusText} for ${finalMethod} ${safeTargetUrl}${
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
+
+        // Web Unlocker responses are typically JSON like:
+        //   { result: "<html>...</html>", headers: {...}, url: "..." }
+        // But some flows can return the unlocked page body directly (raw HTML/text).
+        // Read once to avoid Undici "Body has already been read".
+        const respText = await resp.text();
+
+        // Try to interpret as JSON wrapper; fall back to raw text otherwise.
+        let payloadObj: Record<string, unknown> | null = null;
+        try {
+          const parsed = JSON.parse(respText);
+          if (parsed && typeof parsed === 'object') {
+            payloadObj = parsed as Record<string, unknown>;
+          }
+        } catch {
+          payloadObj = null;
+        }
+
+        const resultRaw = payloadObj?.result ?? payloadObj?.body;
+        const targetStatus =
+          coerceHttpStatusCode(payloadObj?.status_code) ??
+          coerceHttpStatusCode(payloadObj?.statusCode) ??
+          coerceHttpStatusCode(payloadObj?.status) ??
+          resp.status;
+        const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
+        const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
+        const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
+        const targetContentType = (getHeaderValue(targetHeaders as unknown as Record<string, unknown>, 'content-type') ?? '').toLowerCase();
+
+        const resultText =
+          resultRaw === undefined
+            ? respText // raw HTML/text response path
+            : resultRaw === null
+              ? ''
+              : typeof resultRaw === 'string'
+                ? resultRaw
+                : (() => {
+                    try {
+                      return JSON.stringify(resultRaw);
+                    } catch {
+                      return String(resultRaw);
+                    }
+                  })();
+
+        let responseBody: unknown;
+        if (responseType === 'text') {
+          responseBody = resultText;
+        } else {
+          // Default/json: parse JSON if we can infer it, otherwise return text
+          if (targetContentType.includes('application/json') || looksLikeJson(resultText)) {
+            try {
+              responseBody = JSON.parse(resultText);
+            } catch {
+              responseBody = resultText;
+            }
+          } else {
+            responseBody = resultText;
+          }
+        }
+
+        return {
+          status: targetStatus,
+          statusText: statusTextFromCode(targetStatus),
+          headers: targetHeaders,
+          body: responseBody,
+          url: targetUrl,
+        };
+      }
 
       const init: RequestInit = {
         method: finalMethod,
@@ -472,15 +726,17 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       } else if (responseType === 'text') {
         responseBody = await resp.text();
       } else {
-        // Default: best-effort JSON, otherwise text
+        // Default: best-effort JSON, otherwise text. Read once to avoid
+        // Undici "Body has already been read" when JSON parsing fails.
+        const text = await resp.text();
         if (contentType.includes('application/json')) {
           try {
-            responseBody = await resp.json();
+            responseBody = text.trim().length ? JSON.parse(text) : text;
           } catch {
-            responseBody = await resp.text();
+            responseBody = text;
           }
         } else {
-          responseBody = await resp.text();
+          responseBody = text;
         }
       }
 

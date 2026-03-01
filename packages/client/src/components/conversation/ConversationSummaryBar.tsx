@@ -630,14 +630,14 @@ export function ConversationSummaryBar({
                   <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
-                    <div className="flex items-baseline gap-2 min-w-0 w-full">
+                    <div className="flex items-center gap-2 min-w-0 w-full">
                       {titlePrefix ? (
                         <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                           {titlePrefix}
                         </span>
                       ) : null}
                       <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                        {titlePrepend ? <span className="text-muted-foreground">{titlePrepend}</span> : null}
+                      {titlePrepend ? <span className="text-muted-foreground">{titlePrepend}</span> : null}
                         <span className="opacity-50">{effectiveFallbackTitle}</span>
                       </h3>
                     </div>
@@ -835,11 +835,11 @@ export function ConversationSummaryBar({
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
-              <div className="flex min-w-0 w-full gap-2 items-center">
+                <div className="flex min-w-0 w-full gap-2 items-center">
                 <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}
-                  <div className="flex items-baseline gap-2 min-w-0 w-full">
+                    <div className="flex items-center gap-2 min-w-0 w-full">
                     {titlePrefix ? (
                       <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                         {titlePrefix}

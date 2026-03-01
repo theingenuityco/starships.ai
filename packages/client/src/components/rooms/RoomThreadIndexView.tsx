@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
+import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -51,6 +52,11 @@ export function RoomThreadIndexView(props: {
   onUnpinTool?: (toolId: string) => void
   /** Open a draft thread (no persistence until first message). */
   onCreateDraftThread?: () => void
+  /**
+   * Called when the user starts a brand-new thread conversation from the room starter composer.
+   * The returned `conversationId` is the newly created child conversation (thread).
+   */
+  onThreadConversationStarted?: (args: { conversationId: string; selectedAgent: AgentModel | null }) => void
 }) {
   const router = useRouter()
   const params = useParams()
@@ -61,6 +67,7 @@ export function RoomThreadIndexView(props: {
   const [pickBoardId, setPickBoardId] = useState<string>('')
   const [pickAgentId, setPickAgentId] = useState<string>('')
   const [pickToolId, setPickToolId] = useState<string>('')
+  const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
 
   const { conversations: children, isLoading, isError, error, hasMoreBefore, isFetchingNextPage, fetchNextPage, refetch } = useChildConversationsPaged(props.roomConversationId, {
     enabled: true,
@@ -434,6 +441,33 @@ export function RoomThreadIndexView(props: {
           </div>
         </div>
       ) : null}
+
+      {/* Room starter (conversation-starter style) */}
+      <div className="border-b border-border/60 bg-background px-4 py-6">
+        <div className="w-full max-w-4xl mx-auto">
+          <div className="w-full sm:max-w-3xl sm:mx-auto">
+            <div className="mb-6 text-center">
+              <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
+              <p className="text-sm text-muted-foreground mt-2">Your first message creates a new thread in this room.</p>
+            </div>
+
+            <ConversationMessageInput
+              selectedAgent={starterSelectedAgent}
+              onAgentChange={setStarterSelectedAgent}
+              starshipId={props.starshipId}
+              conversationId={null}
+              starshipSlug={effectiveStarshipSlug}
+              newConversationParentConversationId={props.roomConversationId}
+              newConversationTitleOverride="New thread"
+              onConversationStart={(conversationId) => {
+                const cid = String(conversationId || '').trim()
+                if (!cid) return
+                props.onThreadConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
+              }}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="flex-1 min-h-0 overflow-auto px-4 py-4">
         <div className="w-full max-w-4xl mx-auto">

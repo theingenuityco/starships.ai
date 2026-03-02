@@ -21,9 +21,14 @@ This folder contains documentation for the Starships workflow system, including 
 
 - **Conversations**
   - [Conversations overview](./conversations/README.md)
+  - [Concepts (theory)](./conversations/concepts.md)
+  - [Conversations API + connector actions](./conversations/conversations.md)
+  - [Messages (CRUD + linking)](./conversations/messages.md)
+  - [Streaming + notifications (SSE)](./conversations/streaming-and-notifications.md)
   - [Channels](./conversations/channels.md)
   - [Rooms](./conversations/rooms.md)
   - [Threads](./conversations/threads.md)
+  - [Direct messages (DMs)](./conversations/direct-messages.md)
 
 - **Data**
   - [Starship datasets (tabular)](./data/datasets.md)

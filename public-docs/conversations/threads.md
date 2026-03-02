@@ -16,6 +16,17 @@ Threads are used in two primary places:
 - **Under channels**: channel threads (often linked from a message)
 - **Under rooms**: room threads (forum-style “start a new thread”)
 
+## Channel threads vs room threads (theory)
+
+Both are implemented as child conversations, but they behave differently in the product:
+
+- **Channel thread**
+  - Usually starts “from a message” (a parent message links to the thread).
+  - Thread notification-level endpoints are supported (per-user) because the parent is a channel.
+- **Room thread**
+  - Usually starts “from the room” (room starter composer).
+  - Thread notification-level endpoints are currently **not** supported (those endpoints are channel-thread only).
+
 ## Where this is implemented (source of truth)
 
 - **Child conversation APIs + thread notification level**: `packages/server/src/routes/conversations.ts`
@@ -66,6 +77,8 @@ Returns a compact list of children that currently have pending tool-call approva
 
 Use this when you have a thread id and want to discover which parent message linked to it.
 
+Important: a thread can exist without any linking message. Linking is metadata for “thread from message” UX.
+
 ## Thread notification level (per-user)
 
 Threads reuse conversation notification prefs (`all`, `mentions`, `mute`) but with an important constraint:
@@ -95,4 +108,17 @@ There are currently **no** Starships connector actions seeded specifically for t
 - message linking
 
 Use the HTTP APIs above for thread-specific operations.
+
+## Practical recipes
+
+### Recipe: “start a thread from a room”
+
+- Create a child conversation with `parentConversationId = roomConversationId`.
+- Send the first message in the child conversation.
+
+### Recipe: “start a thread from a channel message”
+
+- Create a child conversation with `parentConversationId = channelConversationId`.
+- Update the parent message to set `linkedConversationId = <threadId>`.
+- Optionally fetch `linked-message` later to show the thread starter message.
 

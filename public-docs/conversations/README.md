@@ -18,10 +18,14 @@ At the API level, these all share a common identifier shape: a **conversation id
 
 ## Documentation map (recommended reading order)
 
-- **1) Conversations API + connector actions**: [Conversations](./conversations.md)
-- **2) Channels (conversation-backed)**: [Channels](./channels.md)
-- **3) Rooms (forum + pins)**: [Rooms](./rooms.md)
-- **4) Threads (child conversations)**: [Threads](./threads.md)
+- **1) Concepts (theory)**: [Conversation concepts](./concepts.md)
+- **2) Conversations API + connector actions**: [Conversations](./conversations.md)
+- **3) Messages (CRUD + linking)**: [Messages](./messages.md)
+- **4) Streaming + notifications (SSE)**: [Streaming + notifications](./streaming-and-notifications.md)
+- **5) Channels (conversation-backed)**: [Channels](./channels.md)
+- **6) Rooms (forum + pins)**: [Rooms](./rooms.md)
+- **7) Threads (child conversations)**: [Threads](./threads.md)
+- **8) Direct messages (DMs)**: [Direct messages](./direct-messages.md)
 
 ## Two ways to interact with conversations
 

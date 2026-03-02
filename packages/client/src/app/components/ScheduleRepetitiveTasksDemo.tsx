@@ -187,12 +187,13 @@ export default function ScheduleRepetitiveTasksDemo() {
 
   return (
     <div className="w-full">
-      <div className="relative z-10 rounded-2xl overflow-hidden border border-white/20 bg-background shadow-md shadow-black/30">
-        <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+      {/* Use bright chat theme inside the calendar card to match the hero demo */}
+      <div className="star-theme-light relative z-10 rounded-2xl overflow-hidden border border-white/20 bg-background shadow-md shadow-black/30">
+        <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex items-center gap-2">
-              <div className="text-sm font-medium leading-none truncate">This month</div>
-              <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/25 text-amber-300 bg-amber-500/10">Demo</div>
+              <div className="text-sm font-medium leading-none truncate text-slate-900">This month</div>
+              <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-700 bg-amber-100">Demo</div>
             </div>
           </div>
         </div>
@@ -204,5 +205,3 @@ export default function ScheduleRepetitiveTasksDemo() {
     </div>
   )
 }
-
-

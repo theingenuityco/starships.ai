@@ -7,7 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol'
 export default function HeroDemoSection(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   return (
-    <section className="relative pb-16 sm:pb-20 px-4">
+    <section className="relative mt-10 sm:mt-12 pb-16 sm:pb-20 px-4">
       {/* Circular glow behind the heading + demo card (let it extend above the section; we'll mask only the bottom) */}
       <div
         className="pointer-events-none absolute left-1/2 top-[-420px] -translate-x-1/2 z-0 w-[1800px] h-[1800px] rounded-full"

@@ -113,14 +113,14 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             </span>
             .
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+          <p className="text-base sm:text-lg text-white/80 mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-white [&_svg]:!w-12 [&_svg]:!h-12 bg-primary hover:bg-primary/90 disabled:opacity-100 disabled:bg-primary disabled:text-white"
+              className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-white [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(180,83,9,1)] active:translate-y-[2px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-white"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
               aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}

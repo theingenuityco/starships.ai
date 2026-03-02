@@ -693,9 +693,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                         onClick={() => setActiveConvoId(id)}
                         className={[
                           'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shadow-sm',
-                          active
-                            ? 'bg-slate-900 text-[#FFF7ED] border-slate-900'
-                            : 'bg-transparent text-slate-700 border-transparent hover:bg-slate-100',
+                          active ? 'bg-slate-900 text-[#FFF7ED] border-slate-900' : 'bg-transparent text-slate-700 border-transparent hover:bg-slate-100',
                         ].join(' ')}
                       >
                         {CONVOS[id].tabName}
@@ -799,7 +797,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               )}
             </div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+            {/* Soft fade at the very bottom of the demo so it blends into the landing background,
+                but keep the chat box edge visible by making the gradient shallower and lighter. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-background/35 to-transparent" aria-hidden />
           </div>
         </div>
       </div>

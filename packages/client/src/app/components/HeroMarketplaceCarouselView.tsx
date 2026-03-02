@@ -97,7 +97,9 @@ export function HeroMarketplaceCarouselView({ agentTemplates, agentTemplatesLoad
 
     notify()
     carouselApi.on('select', notify)
-    return () => carouselApi.off('select', notify)
+    return () => {
+      carouselApi.off('select', notify)
+    }
   }, [carouselApi, featuredAgents.templates, onSelectionChange])
 
   useEffect(() => {

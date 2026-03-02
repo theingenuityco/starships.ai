@@ -783,7 +783,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
 
     const q = String(query.q ?? '').trim();
     const hasQ = q.length > 0;
-    const includeArchived = query.includeArchived ?? true;
+    const includeArchived = query.includeArchived ?? false;
     const limitPerKind = typeof query.limitPerKind === 'number' ? query.limitPerKind : null;
 
     const escapeLike = (input: string): string => {
@@ -797,7 +797,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const requestedKindsList =
       rawKinds == null ? null : Array.isArray(rawKinds) ? rawKinds.flatMap((v) => String(v).split(',')) : String(rawKinds).split(',');
 
-    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools' | null => {
+    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools' | null | 'INVALID' => {
       const k = String(input || '')
         .trim()
         .toLowerCase();
@@ -808,7 +808,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       if (k === 'taskboards' || k === 'task-boards' || k === 'boards' || k === 'board' || k === 'tasks') return 'taskBoards';
       if (k === 'agents' || k === 'agent') return 'agents';
       if (k === 'tools' || k === 'tool') return 'tools';
-      return 'INVALID' as unknown as null;
+      return 'INVALID';
     };
 
     const allKinds: Array<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'> = ['views', 'datasets', 'taskBoards', 'agents', 'tools'];
@@ -823,7 +823,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
           for (const k of allKinds) next.add(k);
           break;
         }
-        if (nk === ('INVALID' as unknown as null)) {
+        if (nk === 'INVALID') {
           sendError(res, 'VALIDATION_ERROR', `Invalid kind: ${String(kRaw)}`, 400, {
             allowed: allKinds,
             provided: requestedKindsList,

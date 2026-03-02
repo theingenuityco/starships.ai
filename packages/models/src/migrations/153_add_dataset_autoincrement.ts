@@ -18,9 +18,6 @@ export async function up(client: Client): Promise<void> {
 
         PRIMARY KEY (dataset_id, column_name)
       );
-
-      CREATE INDEX IF NOT EXISTS idx_starship_dataset_autoincrement_dataset_id
-        ON starship_dataset_autoincrement(dataset_id);
     `);
 
     await client.query('COMMIT');

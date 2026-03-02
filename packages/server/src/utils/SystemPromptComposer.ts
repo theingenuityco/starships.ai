@@ -56,7 +56,16 @@ function renderThreadContext(tc: ThreadContextState): string {
   if (attachmentIds.length > 0) lines.push(`- sourceAttachmentIds: ${attachmentIds.join(', ')}`);
   if (extractedAt) lines.push(`- extractedAt: ${extractedAt}`);
   if (sourceContent) {
-    lines.push('', 'Source message content:', '"""', sourceContent, '"""');
+    const matches = sourceContent.match(/"+/g);
+    const longestRun = matches ? Math.max(...matches.map((m) => m.length)) : 0;
+    const delimiter = '"'.repeat(Math.max(3, longestRun + 1));
+    lines.push(
+      '',
+      'Source message content (verbatim; untrusted):',
+      delimiter,
+      sourceContent,
+      delimiter
+    );
   }
   return lines.join('\n');
 }

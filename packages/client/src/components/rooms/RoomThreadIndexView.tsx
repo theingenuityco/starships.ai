@@ -7,7 +7,6 @@ import { ConversationMessageInput } from '@/components/conversation/Conversation
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
@@ -64,13 +63,8 @@ export function RoomThreadIndexView(props: {
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
-  const [pickViewId, setPickViewId] = useState<string>('')
-  const [pickDatasetId, setPickDatasetId] = useState<string>('')
-  const [pickBoardId, setPickBoardId] = useState<string>('')
-  const [pickAgentId, setPickAgentId] = useState<string>('')
-  const [pickToolId, setPickToolId] = useState<string>('')
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'agents'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'agents' | 'tools'>('suggestions')
 
   const starterBadgeClass = (active: boolean) =>
     cn(
@@ -191,65 +185,6 @@ export function RoomThreadIndexView(props: {
         }
       />
 
-      {pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 ? (
-        <div className="border-b border-border/60 bg-card/40 px-4 py-2">
-          <div className="w-full max-w-4xl mx-auto flex flex-wrap gap-2 items-center">
-            {pinnedAgents.map(p => {
-              const name = props.agentLabelById?.get(String(p.agentId)) || `Agent ${String(p.agentId).slice(0, 8)}`
-              const agentSlug = props.agentSlugById?.get(String(p.agentId)) || ''
-              const peerKey = agentSlug ? agentSlug : `a:${String(p.agentId)}`
-              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
-              return (
-                <Button key={`agent:${p.agentId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
-                  <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
-                  {name}
-                </Button>
-              )
-            })}
-            {pinnedViews.map(p => {
-              const name = props.viewLabelById?.get(String(p.viewId)) || `View ${String(p.viewId).slice(0, 8)}`
-              return (
-                <Button key={`view:${p.viewId}`} type="button" size="sm" variant="outline" onClick={() => props.onOpenPinnedView?.(String(p.viewId))}>
-                  <Icon name="layout" className="h-4 w-4 mr-1.5" />
-                  {name}
-                </Button>
-              )
-            })}
-            {pinnedDatasets.map(p => {
-              const name = props.datasetLabelById?.get(String(p.datasetId)) || `Dataset ${String(p.datasetId).slice(0, 8)}`
-              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(String(p.datasetId))}` : null
-              return (
-                <Button key={`dataset:${p.datasetId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
-                  <Icon name="database" className="h-4 w-4 mr-1.5" />
-                  {name}
-                </Button>
-              )
-            })}
-            {pinnedBoards.map(p => {
-              const name = props.taskBoardLabelById?.get(String(p.boardId)) || `Board ${String(p.boardId).slice(0, 8)}`
-              const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
-              return (
-                <Button key={`board:${p.boardId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
-                  <Icon name="list" className="h-4 w-4 mr-1.5" />
-                  {name}
-                </Button>
-              )
-            })}
-            {pinnedTools.map(p => {
-              const name = props.toolLabelById?.get(String(p.toolId)) || `Tool ${String(p.toolId).slice(0, 8)}`
-              const toolSlug = props.toolSlugById?.get(String(p.toolId)) || ''
-              const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
-              return (
-                <Button key={`tool:${p.toolId}`} type="button" size="sm" variant="outline" disabled={!href} onClick={() => href && router.push(href)}>
-                  <Icon name="workflow" className="h-4 w-4 mr-1.5" />
-                  {name}
-                </Button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
       {/* Room starter (conversation-starter style) */}
       <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
         <div className="w-full max-w-4xl mx-auto h-full flex">
@@ -313,12 +248,30 @@ export function RoomThreadIndexView(props: {
               </button>
               <button
                 type="button"
+                onClick={() => setStarterTab('tasks')}
+                className={starterBadgeClass(starterTab === 'tasks')}
+                role="tab"
+                aria-selected={starterTab === 'tasks'}
+              >
+                Tasks
+              </button>
+              <button
+                type="button"
                 onClick={() => setStarterTab('agents')}
                 className={starterBadgeClass(starterTab === 'agents')}
                 role="tab"
                 aria-selected={starterTab === 'agents'}
               >
                 Agents
+              </button>
+              <button
+                type="button"
+                onClick={() => setStarterTab('tools')}
+                className={starterBadgeClass(starterTab === 'tools')}
+                role="tab"
+                aria-selected={starterTab === 'tools'}
+              >
+                Tools
               </button>
             </div>
 
@@ -449,6 +402,36 @@ export function RoomThreadIndexView(props: {
                 )
               ) : null}
 
+              {starterTab === 'tasks' ? (
+                pinnedBoards.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedBoards.map(p => {
+                      const id = String(p.boardId)
+                      const name = props.taskBoardLabelById?.get(id) || `Board ${id.slice(0, 8)}`
+                      return (
+                        <Button key={`starter:board:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedBoard()}>
+                          <Icon name="list" className="h-4 w-4 mr-1.5" />
+                          {name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    No pinned task boards in this room.
+                    {props.onOpenResourcesPane ? (
+                      <>
+                        {' '}
+                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
+                          Manage resources
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+
               {starterTab === 'agents' ? (
                 pinnedAgents.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
@@ -466,6 +449,36 @@ export function RoomThreadIndexView(props: {
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
                     No pinned agents in this room.
+                    {props.onOpenResourcesPane ? (
+                      <>
+                        {' '}
+                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
+                          Manage resources
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+
+              {starterTab === 'tools' ? (
+                pinnedTools.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedTools.map(p => {
+                      const id = String(p.toolId)
+                      const name = props.toolLabelById?.get(id) || `Tool ${id.slice(0, 8)}`
+                      return (
+                        <Button key={`starter:tool:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedTool(id)}>
+                          <Icon name="workflow" className="h-4 w-4 mr-1.5" />
+                          {name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    No pinned tools in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}

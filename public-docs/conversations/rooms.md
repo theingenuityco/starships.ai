@@ -198,7 +198,22 @@ To avoid fetching “all starship resources” just to render room pins, you can
 - `GET /api/v1/rooms/:roomId/pins/agents`
 - `GET /api/v1/rooms/:roomId/pins/tools`
 
-Each returns an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).
+Combined response shape:
+
+```json
+{ "views": [], "datasets": [], "taskBoards": [], "agents": [], "tools": [] }
+```
+
+Individual kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).
+
+#### Filters & search (combined endpoint)
+
+`GET /api/v1/rooms/:roomId/pins/resources` supports query params:
+
+- `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `datasets`, `taskBoards` (`task-boards`), `agents`, `tools`, `all`.
+- `q`: optional case-insensitive search across `name` / `slug` / `description` (where applicable)
+- `includeArchived`: optional boolean (default `true`). When `false`, excludes archived datasets/task boards.
+- `limitPerKind`: optional number (0–200). Caps results per kind after filtering.
 
 ### Pin / unpin (owner/admin only, MVP policy)
 

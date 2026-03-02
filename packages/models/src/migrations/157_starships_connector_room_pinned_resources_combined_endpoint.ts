@@ -42,12 +42,26 @@ export async function up(client: DbClient): Promise<void> {
           required: ['roomId'],
           properties: {
             roomId: { type: 'string', description: 'Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)' },
+            q: { type: 'string', description: 'Optional case-insensitive search across name/slug/description' },
+            kinds: {
+              description: 'Optional kind filter (comma-separated or array)',
+              anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+            },
+            includeArchived: { type: 'boolean', description: 'When false, excludes archived datasets/task boards (default true)' },
+            limitPerKind: { type: 'number', description: 'Optional cap per kind (0-200) applied after filtering' },
           },
           additionalProperties: false,
         },
         mapping: {
           path: {
             roomId: '{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? "") }}',
+          },
+          query: {
+            q: '{{ String(args.q ?? "") }}',
+            kinds:
+              '{{ args.kinds == null ? "" : (Array.isArray(args.kinds) ? args.kinds.map((x) => String(x)).join(",") : String(args.kinds)) }}',
+            includeArchived: '{{ args.includeArchived == null ? "" : String(args.includeArchived) }}',
+            limitPerKind: '{{ args.limitPerKind == null ? "" : String(args.limitPerKind) }}',
           },
         },
         requestStyle: 'query',

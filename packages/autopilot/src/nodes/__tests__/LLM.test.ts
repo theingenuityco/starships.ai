@@ -21,6 +21,10 @@ function isRoleContentMessage(value: unknown): value is { role: string; content:
   return isRecord(value) && typeof value.role === 'string' && 'content' in value;
 }
 
+function isTextContentPart(value: unknown): value is { type: 'text'; text: string } {
+  return isRecord(value) && value.type === 'text' && typeof value.text === 'string';
+}
+
 function isToolRoleStringContentMessage(value: unknown): value is { role: 'tool'; content: string } {
   return isRoleContentMessage(value) && value.role === 'tool' && typeof value.content === 'string';
 }
@@ -172,20 +176,20 @@ describe('LLM Node Handler', () => {
       const llm = new LLM(params, { hostRuntime });
       await llm.execute();
 
-      const req = llmMock.mock.calls[0]?.[0] as unknown;
+      const req = llmMock.mock.calls[0]?.[0] as LlmHostRequest;
       expect(req).toBeTruthy();
-      const msgList = (req as any).messages as unknown[];
+      const msgList = Array.isArray(req.messages) ? (req.messages as unknown[]) : [];
       const systemCount = Array.isArray(msgList) ? msgList.filter((m) => isRoleContentMessage(m) && m.role === 'system').length : 0;
       expect(systemCount).toBe(1);
 
-      const sys = Array.isArray(msgList) ? msgList.find((m) => isRoleContentMessage(m) && m.role === 'system') : null;
-      const sysContent = sys ? (sys as any).content : '';
+      const sys = msgList.find((m): m is { role: 'system'; content: unknown } => isRoleContentMessage(m) && m.role === 'system') ?? null;
+      const sysContent = sys?.content ?? '';
       const sysText =
         typeof sysContent === 'string'
           ? String(sysContent)
           : Array.isArray(sysContent)
             ? sysContent
-                .map((p: any) => (p && p.type === 'text' && typeof p.text === 'string' ? p.text : ''))
+                .map((p) => (isTextContentPart(p) ? p.text : ''))
                 .filter(Boolean)
                 .join('\n')
             : '';

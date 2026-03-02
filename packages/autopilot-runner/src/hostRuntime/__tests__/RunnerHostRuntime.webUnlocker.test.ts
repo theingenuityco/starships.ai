@@ -105,7 +105,7 @@ describe('RunnerHostRuntime Web Unlocker', () => {
   });
 
   it('routes through Bright Data when useWebUnlocker=true', async () => {
-    const fetchMock = jest.fn(async (_url: string, _init: RequestInit) =>
+    const fetchMock = jest.fn(async () =>
       makeResponse({
         status: 200,
         statusText: 'OK',

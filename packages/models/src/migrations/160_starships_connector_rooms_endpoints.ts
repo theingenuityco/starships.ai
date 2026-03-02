@@ -48,7 +48,7 @@ const ACTION_NAMES = [
 ] as const;
 
 /**
- * Migration 155: Add Starships connector actions for rooms endpoints:
+ * Migration 160: Add Starships connector actions for rooms endpoints:
  * - Room CRUD
  * - Notification level
  * - Private membership add/remove

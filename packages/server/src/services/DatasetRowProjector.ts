@@ -1,15 +1,24 @@
 import type { StarshipDatasetColumn, StarshipDatasetModel } from '@starships/protocol';
 import { getConnection, StarshipDatasetRepository } from '@starships/models';
+import { coerceBoolean as toBool, isPlainObject, toIsoDateOnly, toIsoInstant } from '@/utils/value-coercion';
 
 type RefValue =
   | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
   | { kind: 'task_card'; cardId: string; label?: string; url?: string };
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+function coerceJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (isPlainObject(value)) return value as Record<string, unknown>;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return null;
+    try {
+      const parsed = JSON.parse(s) as unknown;
+      return isPlainObject(parsed) ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function isRefValue(value: unknown): value is RefValue {
@@ -142,6 +151,8 @@ function parse(expr: string): Ast {
   const tokens = tokenize(expr);
   if (tokens.length > 10_000) throw new Error('Expression too complex');
   let pos = 0;
+  let depth = 0;
+  const MAX_PARSE_DEPTH = 300;
   const peek = () => tokens[pos];
   const take = () => tokens[pos++];
   const expect = (t: Token['t']) => {
@@ -151,56 +162,62 @@ function parse(expr: string): Ast {
   };
 
   function parsePrimary(): Ast {
-    const tok = peek();
-    if (!tok) throw new Error('Unexpected end');
-    if (tok.t === 'number') {
-      take();
-      return { k: 'num', v: tok.v };
-    }
-    if (tok.t === 'string') {
-      take();
-      return { k: 'str', v: tok.v };
-    }
-    if (tok.t === 'ident') {
-      take();
-      const ident = tok.v;
-      const next = peek();
-      if (next && next.t === 'lparen') {
-        take(); // (
-        const args: Ast[] = [];
-        if (peek() && peek()!.t !== 'rparen') {
-          while (true) {
-            args.push(parseExpr());
-            if (peek() && peek()!.t === 'comma') {
-              take();
-              continue;
-            }
-            break;
-          }
-        }
-        expect('rparen');
-        return { k: 'call', fn: ident, args };
+    depth += 1;
+    if (depth > MAX_PARSE_DEPTH) throw new Error('Expression too deeply nested');
+    try {
+      const tok = peek();
+      if (!tok) throw new Error('Unexpected end');
+      if (tok.t === 'number') {
+        take();
+        return { k: 'num', v: tok.v };
       }
-      if (ident === 'true') return { k: 'bool', v: true };
-      if (ident === 'false') return { k: 'bool', v: false };
-      if (ident === 'null') return { k: 'null' };
-      return { k: 'var', n: ident };
+      if (tok.t === 'string') {
+        take();
+        return { k: 'str', v: tok.v };
+      }
+      if (tok.t === 'ident') {
+        take();
+        const ident = tok.v;
+        const next = peek();
+        if (next && next.t === 'lparen') {
+          take(); // (
+          const args: Ast[] = [];
+          if (peek() && peek()!.t !== 'rparen') {
+            while (true) {
+              args.push(parseExpr());
+              if (peek() && peek()!.t === 'comma') {
+                take();
+                continue;
+              }
+              break;
+            }
+          }
+          expect('rparen');
+          return { k: 'call', fn: ident, args };
+        }
+        if (ident === 'true') return { k: 'bool', v: true };
+        if (ident === 'false') return { k: 'bool', v: false };
+        if (ident === 'null') return { k: 'null' };
+        return { k: 'var', n: ident };
+      }
+      if (tok.t === 'lparen') {
+        take();
+        const inner = parseExpr();
+        expect('rparen');
+        return inner;
+      }
+      if (tok.t === 'op' && tok.v === '-') {
+        take();
+        return { k: 'neg', e: parsePrimary() };
+      }
+      if (tok.t === 'op' && tok.v === '!') {
+        take();
+        return { k: 'not', e: parsePrimary() };
+      }
+      throw new Error('Unexpected token');
+    } finally {
+      depth -= 1;
     }
-    if (tok.t === 'lparen') {
-      take();
-      const inner = parseExpr();
-      expect('rparen');
-      return inner;
-    }
-    if (tok.t === 'op' && tok.v === '-') {
-      take();
-      return { k: 'neg', e: parsePrimary() };
-    }
-    if (tok.t === 'op' && tok.v === '!') {
-      take();
-      return { k: 'not', e: parsePrimary() };
-    }
-    throw new Error('Unexpected token');
   }
 
   function parseMulDiv(): Ast {
@@ -302,36 +319,6 @@ function toTruthy(v: unknown): boolean {
   return true;
 }
 
-function toBool(v: unknown): boolean | null {
-  if (typeof v === 'boolean') return v;
-  if (typeof v === 'number') {
-    if (v === 1) return true;
-    if (v === 0) return false;
-    return null;
-  }
-  if (typeof v === 'string') {
-    const s = v.trim().toLowerCase();
-    if (!s) return null;
-    if (s === 'true' || s === '1' || s === 'yes' || s === 'y') return true;
-    if (s === 'false' || s === '0' || s === 'no' || s === 'n') return false;
-  }
-  return null;
-}
-
-function toIsoDateOnly(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  const d = new Date(String(v));
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
-}
-
-function toIsoInstant(v: unknown): string | null {
-  if (v === null || v === undefined) return null;
-  const d = new Date(String(v));
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
-}
-
 type FormulaResultType = NonNullable<StarshipDatasetColumn['formula']>['resultType'];
 
 function coerceFormulaResultType(value: unknown, resultType: FormulaResultType | undefined): unknown {
@@ -353,6 +340,10 @@ class LookupCache {
   private datasetIdByIdOrSlug = new Map<string, { id: string; primaryKey: string | null } | null>();
   private rowCache = new Map<string, Record<string, unknown> | null>(); // key = `${datasetId}:${rowKey}`
   private taskCache = new Map<string, Record<string, unknown> | null>(); // key = cardId
+  private pendingDatasetRowKeysByDatasetId = new Map<string, Set<string>>();
+
+  private static readonly UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  private static readonly NANOID_RE = /^[a-z0-9_-]{6,64}$/i;
 
   constructor(starshipId: string) {
     this.starshipId = starshipId;
@@ -366,7 +357,8 @@ class LookupCache {
 
     // Slugs often match our nanoid-shaped ID regex, so attempt ID first,
     // then fall back to slug lookup when not found.
-    let ds = /^[a-z0-9_-]{10,30}$/i.test(key) ? await this.datasetRepo.findById(key) : null;
+    const looksLikeId = LookupCache.UUID_RE.test(key) || LookupCache.NANOID_RE.test(key);
+    let ds = looksLikeId ? await this.datasetRepo.findById(key) : null;
     if (!ds) ds = await this.datasetRepo.findBySlug(key, this.starshipId);
     if (!ds || String(ds.starshipId) !== String(this.starshipId)) {
       this.datasetIdByIdOrSlug.set(key, null);
@@ -375,6 +367,51 @@ class LookupCache {
     const val = { id: ds.id, primaryKey: (ds.primaryKey ?? null) as string | null };
     this.datasetIdByIdOrSlug.set(key, val);
     return val;
+  }
+
+  async queueDatasetRowPrefetch(datasetIdOrSlug: string, rowKey: string): Promise<void> {
+    const resolved = await this.resolveDatasetId(datasetIdOrSlug);
+    if (!resolved) return;
+    if (!resolved.primaryKey || !String(resolved.primaryKey).trim()) return;
+    const rk = String(rowKey || '').trim();
+    if (!rk) return;
+    const set = this.pendingDatasetRowKeysByDatasetId.get(resolved.id) ?? new Set<string>();
+    set.add(rk);
+    this.pendingDatasetRowKeysByDatasetId.set(resolved.id, set);
+  }
+
+  async flushQueuedDatasetRowPrefetch(): Promise<void> {
+    if (this.pendingDatasetRowKeysByDatasetId.size === 0) return;
+    const conn = getConnection();
+    const entries = Array.from(this.pendingDatasetRowKeysByDatasetId.entries());
+    this.pendingDatasetRowKeysByDatasetId.clear();
+
+    for (const [dsId, keySet] of entries) {
+      const keys = Array.from(keySet).filter(Boolean);
+      if (keys.length === 0) continue;
+      const rows = await conn.query<{ row_key: string; data: unknown }>(
+        `
+          SELECT row_key, data_json AS data
+          FROM starship_dataset_rows
+          WHERE dataset_id = $1 AND row_key = ANY($2::text[])
+        `,
+        [dsId, keys]
+      );
+
+      for (const r of rows) {
+        const rk = String(r.row_key || '').trim();
+        if (!rk) continue;
+        const cacheKey = `${dsId}:${rk}`;
+        if (this.rowCache.has(cacheKey)) continue;
+        this.rowCache.set(cacheKey, coerceJsonRecord(r.data));
+      }
+
+      // Cache misses as null so subsequent lookups don't re-query.
+      for (const rk of keys) {
+        const cacheKey = `${dsId}:${rk}`;
+        if (!this.rowCache.has(cacheKey)) this.rowCache.set(cacheKey, null);
+      }
+    }
   }
 
   async lookupDatasetField(datasetIdOrSlug: string, rowKey: string, fieldName: string): Promise<unknown> {
@@ -392,7 +429,7 @@ class LookupCache {
         `SELECT data_json AS data FROM starship_dataset_rows WHERE dataset_id = $1 AND row_key = $2 LIMIT 1`,
         [dsId, rk]
       );
-      this.rowCache.set(cacheKey, isPlainObject(r?.data) ? (r?.data as Record<string, unknown>) : null);
+      this.rowCache.set(cacheKey, coerceJsonRecord(r?.data));
     }
     const rec = this.rowCache.get(cacheKey);
     if (!rec) return null;
@@ -424,369 +461,384 @@ class LookupCache {
   }
 }
 
-async function evalAst(ast: Ast, ctx: Record<string, unknown>, lookup: LookupCache): Promise<unknown> {
-  if (ast.k === 'num') return ast.v;
-  if (ast.k === 'str') return ast.v;
-  if (ast.k === 'bool') return ast.v;
-  if (ast.k === 'null') return null;
-  if (ast.k === 'var') return ctx[ast.n];
-  if (ast.k === 'neg') {
-    const v = await evalAst(ast.e, ctx, lookup);
-    const n = toNumberish(v);
-    return n === null ? null : -n;
-  }
-  if (ast.k === 'not') {
-    const v = await evalAst(ast.e, ctx, lookup);
-    return !toTruthy(v);
-  }
-  if (ast.k === 'bin') {
-    if (ast.op === '&&') {
-      const l = await evalAst(ast.l, ctx, lookup);
-      if (!toTruthy(l)) return false;
-      const r = await evalAst(ast.r, ctx, lookup);
-      return toTruthy(r);
-    }
-    if (ast.op === '||') {
-      const l = await evalAst(ast.l, ctx, lookup);
-      if (toTruthy(l)) return true;
-      const r = await evalAst(ast.r, ctx, lookup);
-      return toTruthy(r);
-    }
+async function evalAst(
+  ast: Ast,
+  ctx: Record<string, unknown>,
+  lookup: LookupCache,
+  opts?: { allowDbLookups?: boolean }
+): Promise<unknown> {
+  const allowDbLookups = opts?.allowDbLookups !== false;
 
-    const l = await evalAst(ast.l, ctx, lookup);
-    const r = await evalAst(ast.r, ctx, lookup);
-
-    if (ast.op === '==' || ast.op === '!=') {
-      const ln = toNumberish(l);
-      const rn = toNumberish(r);
-      const eq =
-        ln !== null && rn !== null
-          ? ln === rn
-          : String(l ?? '').trim().toLowerCase() === String(r ?? '').trim().toLowerCase();
-      return ast.op === '==' ? eq : !eq;
+  const e = async (node: Ast): Promise<unknown> => {
+    if (node.k === 'num') return node.v;
+    if (node.k === 'str') return node.v;
+    if (node.k === 'bool') return node.v;
+    if (node.k === 'null') return null;
+    if (node.k === 'var') return ctx[node.n];
+    if (node.k === 'neg') {
+      const v = await e(node.e);
+      const n = toNumberish(v);
+      return n === null ? null : -n;
     }
-
-    if (ast.op === '<' || ast.op === '<=' || ast.op === '>' || ast.op === '>=') {
-      const ln = toNumberish(l);
-      const rn = toNumberish(r);
-      if (ln !== null && rn !== null) {
-        if (ast.op === '<') return ln < rn;
-        if (ast.op === '<=') return ln <= rn;
-        if (ast.op === '>') return ln > rn;
-        if (ast.op === '>=') return ln >= rn;
-      }
-      const ls = String(l ?? '');
-      const rs = String(r ?? '');
-      if (ast.op === '<') return ls < rs;
-      if (ast.op === '<=') return ls <= rs;
-      if (ast.op === '>') return ls > rs;
-      if (ast.op === '>=') return ls >= rs;
-    }
-
-    const ln = toNumberish(l);
-    const rn = toNumberish(r);
-    if (ln === null || rn === null) return null;
-    if (ast.op === '+') return ln + rn;
-    if (ast.op === '-') return ln - rn;
-    if (ast.op === '*') return ln * rn;
-    if (ast.op === '/') return rn === 0 ? null : ln / rn;
-    if (ast.op === '%') return rn === 0 ? null : ln % rn;
-    return null;
-  }
-  if (ast.k === 'call') {
-    const fn = String(ast.fn || '').trim();
-    if (fn === 'coalesce') {
-      for (const a of ast.args) {
-        const v = await evalAst(a, ctx, lookup);
-        if (!isBlankValue(v)) return v;
-      }
-      return null;
-    }
-    if (fn === 'isNull') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      return v === null || v === undefined;
-    }
-    if (fn === 'isBlank') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      return isBlankValue(v);
-    }
-    if (fn === 'if') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const cond = await evalAst(a0, ctx, lookup);
-      if (toTruthy(cond)) return await evalAst(a1, ctx, lookup);
-      const a2 = ast.args[2];
-      return a2 ? await evalAst(a2, ctx, lookup) : null;
-    }
-    if (fn === 'not') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
+    if (node.k === 'not') {
+      const v = await e(node.e);
       return !toTruthy(v);
     }
-    if (fn === 'and') {
-      for (const a of ast.args) {
-        const v = await evalAst(a, ctx, lookup);
-        if (!toTruthy(v)) return false;
+    if (node.k === 'bin') {
+      if (node.op === '&&') {
+        const l = await e(node.l);
+        if (!toTruthy(l)) return false;
+        const r = await e(node.r);
+        return toTruthy(r);
       }
-      return true;
-    }
-    if (fn === 'or') {
-      for (const a of ast.args) {
-        const v = await evalAst(a, ctx, lookup);
-        if (toTruthy(v)) return true;
+      if (node.op === '||') {
+        const l = await e(node.l);
+        if (toTruthy(l)) return true;
+        const r = await e(node.r);
+        return toTruthy(r);
       }
-      return false;
-    }
-    if (fn === 'toNumber') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      return toNumberish(v);
-    }
-    if (fn === 'toString') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      return v === null || v === undefined ? null : String(v);
-    }
-    if (fn === 'toBoolean') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      return toBool(v);
-    }
-    if (fn === 'abs') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      return x === null ? null : Math.abs(x);
-    }
-    if (fn === 'ceil') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      return x === null ? null : Math.ceil(x);
-    }
-    if (fn === 'floor') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      return x === null ? null : Math.floor(x);
-    }
-    if (fn === 'round') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      const a1 = ast.args[1];
-      const digits = a1 ? toNumberish(await evalAst(a1, ctx, lookup)) ?? 0 : 0;
-      if (x === null) return null;
-      const d = Math.max(0, Math.min(20, Math.floor(digits)));
-      const p = Math.pow(10, d);
-      return Math.round(x * p) / p;
-    }
-    if (fn === 'sqrt') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      return x === null || x < 0 ? null : Math.sqrt(x);
-    }
-    if (fn === 'pow') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const a = toNumberish(await evalAst(a0, ctx, lookup));
-      const b = toNumberish(await evalAst(a1, ctx, lookup));
-      if (a === null || b === null) return null;
-      const v = Math.pow(a, b);
-      return Number.isFinite(v) ? v : null;
-    }
-    if (fn === 'min') {
-      const nums: number[] = [];
-      for (const a of ast.args) {
-        const n = toNumberish(await evalAst(a, ctx, lookup));
-        if (n === null) continue;
-        nums.push(n);
+
+      const l = await e(node.l);
+      const r = await e(node.r);
+
+      if (node.op === '==' || node.op === '!=') {
+        const ln = toNumberish(l);
+        const rn = toNumberish(r);
+        const eq =
+          ln !== null && rn !== null
+            ? ln === rn
+            : String(l ?? '').trim().toLowerCase() === String(r ?? '').trim().toLowerCase();
+        return node.op === '==' ? eq : !eq;
       }
-      return nums.length > 0 ? Math.min(...nums) : null;
-    }
-    if (fn === 'max') {
-      const nums: number[] = [];
-      for (const a of ast.args) {
-        const n = toNumberish(await evalAst(a, ctx, lookup));
-        if (n === null) continue;
-        nums.push(n);
+
+      if (node.op === '<' || node.op === '<=' || node.op === '>' || node.op === '>=') {
+        const ln = toNumberish(l);
+        const rn = toNumberish(r);
+        if (ln !== null && rn !== null) {
+          if (node.op === '<') return ln < rn;
+          if (node.op === '<=') return ln <= rn;
+          if (node.op === '>') return ln > rn;
+          if (node.op === '>=') return ln >= rn;
+        }
+        const ls = String(l ?? '');
+        const rs = String(r ?? '');
+        if (node.op === '<') return ls < rs;
+        if (node.op === '<=') return ls <= rs;
+        if (node.op === '>') return ls > rs;
+        if (node.op === '>=') return ls >= rs;
       }
-      return nums.length > 0 ? Math.max(...nums) : null;
+
+      const ln = toNumberish(l);
+      const rn = toNumberish(r);
+      if (ln === null || rn === null) return null;
+      if (node.op === '+') return ln + rn;
+      if (node.op === '-') return ln - rn;
+      if (node.op === '*') return ln * rn;
+      if (node.op === '/') return rn === 0 ? null : ln / rn;
+      if (node.op === '%') return rn === 0 ? null : ln % rn;
+      return null;
     }
-    if (fn === 'clamp') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      const a2 = ast.args[2];
-      if (!a0 || !a1 || !a2) return null;
-      const x = toNumberish(await evalAst(a0, ctx, lookup));
-      const lo = toNumberish(await evalAst(a1, ctx, lookup));
-      const hi = toNumberish(await evalAst(a2, ctx, lookup));
-      if (x === null || lo === null || hi === null) return null;
-      return Math.min(hi, Math.max(lo, x));
-    }
-    if (fn === 'sum') {
-      let acc = 0;
-      let any = false;
-      for (const a of ast.args) {
-        const n = toNumberish(await evalAst(a, ctx, lookup));
-        if (n === null) continue;
-        any = true;
-        acc += n;
+    if (node.k === 'call') {
+      const fn = String(node.fn || '').trim();
+      if (fn === 'coalesce') {
+        for (const a of node.args) {
+          const v = await e(a);
+          if (!isBlankValue(v)) return v;
+        }
+        return null;
       }
-      return any ? acc : null;
-    }
-    if (fn === 'avg') {
-      let acc = 0;
-      let cnt = 0;
-      for (const a of ast.args) {
-        const n = toNumberish(await evalAst(a, ctx, lookup));
-        if (n === null) continue;
-        acc += n;
-        cnt += 1;
+      if (fn === 'isNull') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return v === null || v === undefined;
       }
-      return cnt > 0 ? acc / cnt : null;
-    }
-    if (fn === 'length') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      return String(v).length;
-    }
-    if (fn === 'lower') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      return String(v).toLowerCase();
-    }
-    if (fn === 'upper') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      return String(v).toUpperCase();
-    }
-    if (fn === 'trim') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      return String(v).trim();
-    }
-    if (fn === 'concat') {
-      const parts: string[] = [];
-      for (const a of ast.args) {
-        const v = await evalAst(a, ctx, lookup);
-        if (v === null || v === undefined) continue;
-        parts.push(String(v));
+      if (fn === 'isBlank') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return isBlankValue(v);
       }
-      return parts.join('');
+      if (fn === 'if') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const cond = await e(a0);
+        if (toTruthy(cond)) return await e(a1);
+        const a2 = node.args[2];
+        return a2 ? await e(a2) : null;
+      }
+      if (fn === 'not') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return !toTruthy(v);
+      }
+      if (fn === 'and') {
+        for (const a of node.args) {
+          const v = await e(a);
+          if (!toTruthy(v)) return false;
+        }
+        return true;
+      }
+      if (fn === 'or') {
+        for (const a of node.args) {
+          const v = await e(a);
+          if (toTruthy(v)) return true;
+        }
+        return false;
+      }
+      if (fn === 'toNumber') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return toNumberish(v);
+      }
+      if (fn === 'toString') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return v === null || v === undefined ? null : String(v);
+      }
+      if (fn === 'toBoolean') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        return toBool(v);
+      }
+      if (fn === 'abs') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const x = toNumberish(await e(a0));
+        return x === null ? null : Math.abs(x);
+      }
+      if (fn === 'ceil') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const x = toNumberish(await e(a0));
+        return x === null ? null : Math.ceil(x);
+      }
+      if (fn === 'floor') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const x = toNumberish(await e(a0));
+        return x === null ? null : Math.floor(x);
+      }
+      if (fn === 'round') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const x = toNumberish(await e(a0));
+        const a1 = node.args[1];
+        const digits = a1 ? toNumberish(await e(a1)) ?? 0 : 0;
+        if (x === null) return null;
+        const d = Math.max(0, Math.min(20, Math.floor(digits)));
+        const p = Math.pow(10, d);
+        return Math.round(x * p) / p;
+      }
+      if (fn === 'sqrt') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const x = toNumberish(await e(a0));
+        return x === null || x < 0 ? null : Math.sqrt(x);
+      }
+      if (fn === 'pow') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const a = toNumberish(await e(a0));
+        const b = toNumberish(await e(a1));
+        if (a === null || b === null) return null;
+        const v = Math.pow(a, b);
+        return Number.isFinite(v) ? v : null;
+      }
+      if (fn === 'min') {
+        const nums: number[] = [];
+        for (const a of node.args) {
+          const n = toNumberish(await e(a));
+          if (n === null) continue;
+          nums.push(n);
+        }
+        return nums.length > 0 ? Math.min(...nums) : null;
+      }
+      if (fn === 'max') {
+        const nums: number[] = [];
+        for (const a of node.args) {
+          const n = toNumberish(await e(a));
+          if (n === null) continue;
+          nums.push(n);
+        }
+        return nums.length > 0 ? Math.max(...nums) : null;
+      }
+      if (fn === 'clamp') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        const a2 = node.args[2];
+        if (!a0 || !a1 || !a2) return null;
+        const x = toNumberish(await e(a0));
+        const lo = toNumberish(await e(a1));
+        const hi = toNumberish(await e(a2));
+        if (x === null || lo === null || hi === null) return null;
+        return Math.min(hi, Math.max(lo, x));
+      }
+      if (fn === 'sum') {
+        let acc = 0;
+        let any = false;
+        for (const a of node.args) {
+          const n = toNumberish(await e(a));
+          if (n === null) continue;
+          any = true;
+          acc += n;
+        }
+        return any ? acc : null;
+      }
+      if (fn === 'avg') {
+        let acc = 0;
+        let cnt = 0;
+        for (const a of node.args) {
+          const n = toNumberish(await e(a));
+          if (n === null) continue;
+          acc += n;
+          cnt += 1;
+        }
+        return cnt > 0 ? acc / cnt : null;
+      }
+      if (fn === 'length') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        return String(v).length;
+      }
+      if (fn === 'lower') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        return String(v).toLowerCase();
+      }
+      if (fn === 'upper') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        return String(v).toUpperCase();
+      }
+      if (fn === 'trim') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        return String(v).trim();
+      }
+      if (fn === 'concat') {
+        const parts: string[] = [];
+        for (const a of node.args) {
+          const v = await e(a);
+          if (v === null || v === undefined) continue;
+          parts.push(String(v));
+        }
+        return parts.join('');
+      }
+      if (fn === 'substring') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        const s = String(v);
+        const start = toNumberish(await e(a1)) ?? 0;
+        const a2 = node.args[2];
+        const len = a2 ? toNumberish(await e(a2)) : null;
+        const st = Math.max(0, Math.floor(start));
+        if (len === null) return s.slice(st);
+        return s.slice(st, st + Math.max(0, Math.floor(len)));
+      }
+      if (fn === 'replace') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        const a2 = node.args[2];
+        if (!a0 || !a1 || !a2) return null;
+        const v = await e(a0);
+        if (v === null || v === undefined) return null;
+        const s = String(v);
+        const from = String((await e(a1)) ?? '');
+        const to = String((await e(a2)) ?? '');
+        if (!from) return s;
+        return s.split(from).join(to);
+      }
+      if (fn === 'startsWith') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const s = await e(a0);
+        const prefix = await e(a1);
+        if (s === null || s === undefined) return null;
+        return String(s).startsWith(String(prefix ?? ''));
+      }
+      if (fn === 'endsWith') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const s = await e(a0);
+        const suffix = await e(a1);
+        if (s === null || s === undefined) return null;
+        return String(s).endsWith(String(suffix ?? ''));
+      }
+      if (fn === 'includes') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const s = await e(a0);
+        const part = await e(a1);
+        if (s === null || s === undefined) return null;
+        return String(s).includes(String(part ?? ''));
+      }
+      if (fn === 'now') return Date.now();
+      if (fn === 'toMs') {
+        const a0 = node.args[0];
+        if (!a0) return null;
+        const v = await e(a0);
+        const d = new Date(String(v ?? ''));
+        return Number.isNaN(d.getTime()) ? null : d.getTime();
+      }
+      if (fn === 'diffDays') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const a = new Date(String((await e(a0)) ?? ''));
+        const b = new Date(String((await e(a1)) ?? ''));
+        if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+        const ms = b.getTime() - a.getTime();
+        return ms / (1000 * 60 * 60 * 24);
+      }
+      if (fn === 'lookupDataset') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        const a2 = node.args[2];
+        if (!a0 || !a1 || !a2) return null;
+        const ds = String((await e(a0)) ?? '');
+        const key = String((await e(a1)) ?? '');
+        const field = String((await e(a2)) ?? '');
+        if (!allowDbLookups) {
+          await lookup.queueDatasetRowPrefetch(ds, key);
+          return null;
+        }
+        return await lookup.lookupDatasetField(ds, key, field);
+      }
+      if (fn === 'lookupTask') {
+        const a0 = node.args[0];
+        const a1 = node.args[1];
+        if (!a0 || !a1) return null;
+        const cardId = String((await e(a0)) ?? '');
+        const field = String((await e(a1)) ?? '');
+        return await lookup.lookupTaskField(cardId, field);
+      }
+      throw new Error(`Unknown function: ${fn}`);
     }
-    if (fn === 'substring') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      const s = String(v);
-      const start = toNumberish(await evalAst(a1, ctx, lookup)) ?? 0;
-      const a2 = ast.args[2];
-      const len = a2 ? toNumberish(await evalAst(a2, ctx, lookup)) : null;
-      const st = Math.max(0, Math.floor(start));
-      if (len === null) return s.slice(st);
-      return s.slice(st, st + Math.max(0, Math.floor(len)));
-    }
-    if (fn === 'replace') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      const a2 = ast.args[2];
-      if (!a0 || !a1 || !a2) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      if (v === null || v === undefined) return null;
-      const s = String(v);
-      const from = String(await evalAst(a1, ctx, lookup) ?? '');
-      const to = String(await evalAst(a2, ctx, lookup) ?? '');
-      if (!from) return s;
-      return s.split(from).join(to);
-    }
-    if (fn === 'startsWith') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const s = await evalAst(a0, ctx, lookup);
-      const prefix = await evalAst(a1, ctx, lookup);
-      if (s === null || s === undefined) return null;
-      return String(s).startsWith(String(prefix ?? ''));
-    }
-    if (fn === 'endsWith') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const s = await evalAst(a0, ctx, lookup);
-      const suffix = await evalAst(a1, ctx, lookup);
-      if (s === null || s === undefined) return null;
-      return String(s).endsWith(String(suffix ?? ''));
-    }
-    if (fn === 'includes') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const s = await evalAst(a0, ctx, lookup);
-      const part = await evalAst(a1, ctx, lookup);
-      if (s === null || s === undefined) return null;
-      return String(s).includes(String(part ?? ''));
-    }
-    if (fn === 'now') return Date.now();
-    if (fn === 'toMs') {
-      const a0 = ast.args[0];
-      if (!a0) return null;
-      const v = await evalAst(a0, ctx, lookup);
-      const d = new Date(String(v ?? ''));
-      return Number.isNaN(d.getTime()) ? null : d.getTime();
-    }
-    if (fn === 'diffDays') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const a = new Date(String(await evalAst(a0, ctx, lookup) ?? ''));
-      const b = new Date(String(await evalAst(a1, ctx, lookup) ?? ''));
-      if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
-      const ms = b.getTime() - a.getTime();
-      return ms / (1000 * 60 * 60 * 24);
-    }
-    if (fn === 'lookupDataset') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      const a2 = ast.args[2];
-      if (!a0 || !a1 || !a2) return null;
-      const ds = String(await evalAst(a0, ctx, lookup) ?? '');
-      const key = String(await evalAst(a1, ctx, lookup) ?? '');
-      const field = String(await evalAst(a2, ctx, lookup) ?? '');
-      return await lookup.lookupDatasetField(ds, key, field);
-    }
-    if (fn === 'lookupTask') {
-      const a0 = ast.args[0];
-      const a1 = ast.args[1];
-      if (!a0 || !a1) return null;
-      const cardId = String(await evalAst(a0, ctx, lookup) ?? '');
-      const field = String(await evalAst(a1, ctx, lookup) ?? '');
-      return await lookup.lookupTaskField(cardId, field);
-    }
-    throw new Error(`Unknown function: ${fn}`);
-  }
-  return null;
+    return null;
+  };
+
+  return await e(ast);
 }
 
 export class DatasetRowProjector {
@@ -799,6 +851,23 @@ export class DatasetRowProjector {
     const expandRefs = Boolean(args.expandRefs);
     const cols = (args.dataset.columns ?? []) as StarshipDatasetColumn[];
     const lookup = new LookupCache(args.starshipId);
+
+    const formulaSpecs: Array<{
+      name: string;
+      resultType: FormulaResultType | undefined;
+      ast: Ast | null;
+    }> = [];
+    for (const c of cols) {
+      if (c?.type !== 'formula') continue;
+      const name = String(c.name || '').trim();
+      const expr = String(c.formula?.expr || '').trim();
+      if (!name || !expr) continue;
+      try {
+        formulaSpecs.push({ name, resultType: c.formula?.resultType, ast: parse(expr) });
+      } catch {
+        formulaSpecs.push({ name, resultType: c.formula?.resultType, ast: null });
+      }
+    }
 
     // Collect refs for optional hydration.
     const datasetRowRefs: Array<{ datasetIdOrSlug: string; key: string; labelColumn?: string }> = [];
@@ -876,7 +945,7 @@ export class DatasetRowProjector {
           for (const r of rows) {
             const rk = String(r.row_key || '').trim();
             if (!rk) continue;
-            const data = isPlainObject(r.data) ? (r.data as Record<string, unknown>) : {};
+            const data = coerceJsonRecord(r.data) ?? {};
             const labelField = String(g.labelColumn || '').trim();
             const label =
               labelField && data[labelField] !== undefined && data[labelField] !== null ? String(data[labelField]) : rk;
@@ -910,24 +979,39 @@ export class DatasetRowProjector {
         }
       }
 
-      // Evaluate formulas in column order, adding results into the row.
-      const ctx: Record<string, unknown> = row;
-      for (const c of cols) {
-        if (c?.type !== 'formula') continue;
-        const name = String(c.name || '').trim();
-        const expr = String(c.formula?.expr || '').trim();
-        if (!name || !expr) continue;
-        try {
-          const ast = parse(expr);
-          const v = await evalAst(ast, ctx, lookup);
-          const coerced = coerceFormulaResultType(v, c.formula?.resultType);
-          ctx[name] = coerced === undefined ? null : coerced;
-        } catch {
-          ctx[name] = null;
+      out.push(row);
+    }
+
+    if (formulaSpecs.length > 0) {
+      // Pass 1: queue dataset rows referenced by lookupDataset(...) without issuing per-row DB queries.
+      for (const ctx of out) {
+        for (const f of formulaSpecs) {
+          if (!f.ast) continue;
+          try {
+            await evalAst(f.ast, ctx, lookup, { allowDbLookups: false });
+          } catch {
+            // best-effort prefetch only
+          }
         }
       }
+      await lookup.flushQueuedDatasetRowPrefetch();
 
-      out.push(ctx);
+      // Pass 2: compute formulas (now mostly served from cache).
+      for (const ctx of out) {
+        for (const f of formulaSpecs) {
+          try {
+            if (!f.ast) {
+              ctx[f.name] = null;
+              continue;
+            }
+            const v = await evalAst(f.ast, ctx, lookup, { allowDbLookups: true });
+            const coerced = coerceFormulaResultType(v, f.resultType);
+            ctx[f.name] = coerced === undefined ? null : coerced;
+          } catch {
+            ctx[f.name] = null;
+          }
+        }
+      }
     }
 
     return out;

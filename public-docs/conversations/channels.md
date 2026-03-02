@@ -1,0 +1,135 @@
+---
+title: Channels (Conversation-Backed)
+slug: conversations/channels
+category: conversations
+---
+
+## What are channels?
+
+Channels are **conversation-backed rooms (Slack/Discord-like)** within a starship.
+
+- **Channel ID**: the backing **`conversationId`** (references `conversations.id`)
+- **Timeline**: channels are primarily used as chat timelines (messages live directly in the channel conversation)
+- **Optional attached view**: channels can have an attached view via `attachedViewId`
+
+## Where this is implemented (source of truth)
+
+- **Protocol types**: `packages/protocol/dist/domains/channel.d.ts`
+- **HTTP API**: `packages/server/src/routes/channels.ts`
+- **Private membership enforcement**: `packages/server/src/utils/conversation-membership.ts` (`enforcePrivateChannelMembership`)
+- **Starships connector actions**:
+  - `packages/models/src/migrations/127_starships_connector_channel_endpoints.ts` (`list-channels`, `create-channel`, `get-channel`, `update-channel`, `delete-channel`, `add-channel-member`, `remove-channel-member`)
+  - `packages/models/src/migrations/126_starships_connector_views_crud_and_view_widget_attachment.ts` (`attach-view-to-channel`)
+
+## Two ways to access channels
+
+- **HTTP API** (documented below)
+- **Starships connector actions** via `connector_action` (recommended for agents)
+
+## HTTP API (server)
+
+All endpoints below are under `/api/v1` and require auth (`jwtAuthMiddleware`).
+
+### List channels for a starship (visibility-filtered)
+
+`GET /api/v1/starships/:starshipId/channels`
+
+Visibility rules:
+
+- Public channels are visible to all starship members.
+- Private channels are visible only to members/participants (owner/admin can see all).
+
+Response:
+
+```json
+{ "channels": [/* ChannelModel[] */] }
+```
+
+### Create a channel
+
+`POST /api/v1/starships/:starshipId/channels`
+
+Body:
+
+```json
+{
+  "slug": "general",
+  "name": "General",
+  "isPrivate": false,
+  "topic": "Optional topic"
+}
+```
+
+Notes:
+
+- Creating a channel creates a backing conversation first with `title = name`.
+- If private, the creator is added as `admin` in both `conversation_members` and `conversation_participants`.
+
+### Get a channel by id
+
+`GET /api/v1/channels/:channelId`
+
+- `channelId` is the backing conversation id.
+- Enforces private-channel membership if `isPrivate` is true.
+
+### Update a channel (owner/admin only, MVP policy)
+
+`PATCH /api/v1/channels/:channelId`
+
+Body supports:
+
+- `name`
+- `isPrivate`
+- `topic`
+- `attachedViewId` (nullable; must belong to same starship)
+
+Notes:
+
+- Best-effort keeps `conversation.title` in sync with `channel.name`.
+- If channel becomes private, the updater is added as an admin member/participant (best-effort).
+
+### Delete a channel (owner/admin only, MVP policy)
+
+`DELETE /api/v1/channels/:channelId`
+
+Notes:
+
+- Implemented by deleting the backing conversation (CASCADE deletes the `channels` row).
+- The server blocks deleting the starship’s default channel.
+
+### Channel notification level (per-user)
+
+Channels use conversation notification prefs (`all`, `mentions`, `mute`).
+
+- `GET /api/v1/channels/:channelId/notification-level`
+- `PUT /api/v1/channels/:channelId/notification-level` body: `{ "level": "mute" }`
+
+### Private channel membership (owner/admin only, MVP policy)
+
+- `POST /api/v1/channels/:channelId/members` body: `{ "userId": "...", "role": "member" }`
+- `DELETE /api/v1/channels/:channelId/members/:userId`
+
+Notes:
+
+- Only valid for private channels.
+- Adds/removes membership in `conversation_members` and keeps `conversation_participants` in sync best-effort.
+
+## Starships connector actions (channels)
+
+When using `connector_action` with `connector: "starships"`, the following channel-related actions exist:
+
+- `list-channels`
+- `create-channel`
+- `get-channel`
+- `update-channel`
+- `delete-channel`
+- `add-channel-member`
+- `remove-channel-member`
+
+### Attaching views to channels
+
+Channel view attachment is implemented by patching the channel and setting `attachedViewId`:
+
+- Connector action: `attach-view-to-channel` (uses `PATCH /channels/{channelId}` under the hood)
+- HTTP API: `PATCH /api/v1/channels/:channelId` with `attachedViewId`
+

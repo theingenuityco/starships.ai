@@ -177,8 +177,7 @@ const ARIA_TIMELINE: Step[] = [
 const SAGA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content:
-      'Write a post about "AI staff: what it is and how teams use it." Draft with SEO and save as draft.',
+    content: 'Write a post about "AI staff: what it is and how teams use it." Draft with SEO and save as draft.',
   },
   {
     role: 'assistant',
@@ -222,8 +221,7 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    content:
-      "✅ Done.\n\n 'AI Staff: What It Is' – 1,235 words (~6 min), saved as draft.\n\nAdd an FAQ, or different examples?",
+    content: "✅ Done.\n\n 'AI Staff: What It Is' – 1,235 words (~6 min), saved as draft.\n\nAdd an FAQ, or different examples?",
   },
 ]
 
@@ -274,8 +272,7 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Clara',
-    content:
-      '✅ Done.\n\n 63 unread, 14 need a reply, 30 archived, 3 drafts ready.\n\nWant me to auto-label newsletters from now on?',
+    content: '✅ Done.\n\n 63 unread, 14 need a reply, 30 archived, 3 drafts ready.\n\nWant me to auto-label newsletters from now on?',
   },
 ]
 
@@ -681,12 +678,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    <AgentAvatar
-                      seed={cfg.agentSeed}
-                      imageUrl={agentAvatarUrlOverride}
-                      size={40}
-                      instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`}
-                    />
+                    <AgentAvatar seed={cfg.agentSeed} imageUrl={agentAvatarUrlOverride} size={40} instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`} />
                   </div>
                   <div className={cn('font-medium leading-none truncate', 'text-sm')}>{cfg.label}</div>
                 </div>
@@ -699,8 +691,10 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                         type="button"
                         onClick={() => setActiveConvoId(id)}
                         className={[
-                          'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                          active ? 'bg-primary text-primary-foreground border-primary/40' : 'bg-background/40 text-foreground/80 border-border/50 hover:bg-background/60',
+                          'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors shadow-sm',
+                          active
+                            ? 'bg-white text-slate-900 border-white/80'
+                            : 'bg-white/10 text-white/85 border-white/25 hover:bg-white/16',
                         ].join(' ')}
                       >
                         {CONVOS[id].tabName}
@@ -747,11 +741,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                   <div className="w-full max-w-4xl mx-auto">
                     <div className="flex justify-end">
                       <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-                        <div
-                          className="flex flex-1 flex-col gap-2 items-end w-full"
-                          onMouseEnter={() => setIsDemoChooserHovered(true)}
-                          onMouseLeave={() => setIsDemoChooserHovered(false)}
-                        >
+                        <div className="flex flex-1 flex-col gap-2 items-end w-full" onMouseEnter={() => setIsDemoChooserHovered(true)} onMouseLeave={() => setIsDemoChooserHovered(false)}>
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('iris')}

@@ -20,7 +20,7 @@ import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows, useStarshipDatasets, useUpdateDataset } from '@/hooks/useDatasets'
+import { useDataset, useDatasetRows, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
 import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
 
 const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
@@ -53,9 +53,23 @@ function normalizeEnumOptions(text: string): string[] {
   return Array.from(new Set(parts))
 }
 
-function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; format?: any }> {
+function toDataTableColumns(cols: unknown): Array<{
+  key: string
+  label: string
+  format?: any
+  dataType?: any
+  enumOptions?: string[]
+  referenceTarget?: any
+}> {
   const arr = Array.isArray(cols) ? cols : []
-  const out: Array<{ key: string; label: string; format?: any }> = []
+  const out: Array<{
+    key: string
+    label: string
+    format?: any
+    dataType?: any
+    enumOptions?: string[]
+    referenceTarget?: any
+  }> = []
   for (const raw of arr) {
     if (!raw || typeof raw !== 'object') continue
     const r = raw as Record<string, any>
@@ -73,7 +87,16 @@ function toDataTableColumns(cols: unknown): Array<{ key: string; label: string; 
             : type === 'boolean'
               ? 'text'
               : 'text')
-    out.push({ key, label: key, format })
+    const enumOptions = Array.isArray(r.enum?.options) ? (r.enum.options as string[]) : undefined
+    const referenceTarget = r.reference?.target ? r.reference.target : undefined
+    out.push({
+      key,
+      label: key,
+      format,
+      dataType: type || undefined,
+      enumOptions,
+      referenceTarget,
+    })
   }
   return out
 }
@@ -90,6 +113,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
   const updateDataset = useUpdateDataset(starshipId, datasetId)
   const { data: datasets = [] } = useStarshipDatasets(starshipId, Boolean(starshipId))
+  const upsertRows = useUpsertDatasetRows(starshipId, datasetId)
 
   const [limit, setLimit] = useState(50)
   const [offset, setOffset] = useState(0)
@@ -161,6 +185,8 @@ export default function DatasetViewerPage(): React.JSX.Element {
     const d = rowsPage?.data ?? []
     return Array.isArray(d) ? (d as Array<Record<string, any>>) : []
   }, [rowsPage?.data])
+
+  const primaryKey = typeof dataset?.primaryKey === 'string' ? dataset.primaryKey.trim() : ''
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
@@ -243,6 +269,12 @@ export default function DatasetViewerPage(): React.JSX.Element {
                 </div>
               </div>
 
+              {!primaryKey && (
+                <div className="text-xs text-muted-foreground">
+                  Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
+                </div>
+              )}
+
               <DataTable
                 title={dataset.name}
                 description={dataset.slug}
@@ -250,6 +282,21 @@ export default function DatasetViewerPage(): React.JSX.Element {
                 data={data as any}
                 pageSize={0}
                 striped={true}
+                excelLike={true}
+                editable={Boolean(primaryKey)}
+                primaryKey={primaryKey || null}
+                onCommitRows={async ({ rows }) => {
+                  if (!primaryKey) {
+                    throw new Error('Dataset primaryKey is required to edit rows')
+                  }
+                  const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
+                  if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
+                    const first = (resp as any).errors[0]
+                    const msg = first?.message ? String(first.message) : 'Row validation failed'
+                    const col = first?.column ? String(first.column) : ''
+                    throw new Error(col ? `${col}: ${msg}` : msg)
+                  }
+                }}
                 className={rowsLoading ? 'opacity-70 pointer-events-none' : undefined}
               />
             </>

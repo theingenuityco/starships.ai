@@ -36,7 +36,32 @@ Stable terms used below:
 - **HTTP API** (documented below)
 - **Starships connector actions** via `connector_action` (recommended when available)
 
-Note: unlike channels/views/datasets, **rooms currently do not have Starships connector actions** seeded in the internal `starships` connector template. Room CRUD and pins are **HTTP-only** today.
+Rooms now have Starships connector actions seeded in the internal `starships` connector template (Room CRUD, notification level, membership, pins, and reordering).
+
+### Starships connector actions (rooms)
+
+When using `connector_action` with `connector: "starships"`, the following room-related actions exist:
+
+- `list-rooms`
+- `create-room`
+- `get-room`
+- `update-room`
+- `delete-room`
+- `get-room-notification-level`
+- `update-room-notification-level`
+- `add-room-member`
+- `remove-room-member`
+- `get-room-pins`
+- `pin-room-agent` / `unpin-room-agent`
+- `pin-room-tool` / `unpin-room-tool`
+- `pin-room-view` / `unpin-room-view`
+- `pin-room-dataset` / `unpin-room-dataset`
+- `pin-room-task-board` / `unpin-room-task-board`
+- `reorder-room-pins-views`
+- `reorder-room-pins-datasets`
+- `reorder-room-pins-task-boards`
+- `reorder-room-pins-agents`
+- `reorder-room-pins-tools`
 
 ## Room vs channel (theory)
 

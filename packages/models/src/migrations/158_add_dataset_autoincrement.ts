@@ -1,7 +1,7 @@
 import type { Client } from 'pg';
 
 /**
- * Migration 153: Add dataset autoincrement state table
+ * Migration 158: Add dataset autoincrement state table
  *
  * Stores per-(dataset_id, column_name) counters so autoincrement values can be
  * allocated atomically, even under concurrent writes.

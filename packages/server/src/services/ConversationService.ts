@@ -549,6 +549,32 @@ export class ConversationService {
   }
 
   /**
+   * Aggressively clear ALL per-conversation in-memory state once a turn is definitively over.
+   * This prevents unbounded growth in singleton Maps/Sets across many conversations.
+   */
+  private cleanupConversation(conversationId: string): void {
+    this.finalizeTurnState(conversationId);
+
+    // Tool call name cache (per conversation)
+    this.lastToolCallNameByConversation.delete(conversationId);
+
+    // Streaming assistant message id (per conversation)
+    this.streamingAssistantMessageId.delete(conversationId);
+
+    // Pending delta buffers + timers
+    const pc = this.pendingContentDelta.get(conversationId);
+    if (pc?.timer) clearTimeout(pc.timer);
+    this.pendingContentDelta.delete(conversationId);
+
+    const pr = this.pendingReasoningDelta.get(conversationId);
+    if (pr?.timer) clearTimeout(pr.timer);
+    this.pendingReasoningDelta.delete(conversationId);
+
+    // Resume sequencing metadata
+    this.resumeTurnSeqOffset.delete(conversationId);
+  }
+
+  /**
    * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
@@ -2468,7 +2494,7 @@ export class ConversationService {
           // best-effort
         }
 
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         return;
       }
       // starship already resolved above
@@ -4822,7 +4848,7 @@ export class ConversationService {
         }
 
         // Final cleanup now that the workflow turn has fully completed
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         break;
       }
 
@@ -4900,7 +4926,7 @@ export class ConversationService {
         }
 
         // Final cleanup after a failed workflow
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         break;
       }
 

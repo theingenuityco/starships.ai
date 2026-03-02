@@ -108,7 +108,7 @@ function datasetColumnJsonSchema(): Record<string, unknown> {
 }
 
 /**
- * Migration 154: Update Starships connector dataset actions to match current endpoints:
+ * Migration 159: Update Starships connector dataset actions to match current endpoints:
  * - dataset routes accept datasetIdOrSlug
  * - rows list supports expand=refs
  * - add update-dataset action (PATCH) for columns/primaryKey/archived updates

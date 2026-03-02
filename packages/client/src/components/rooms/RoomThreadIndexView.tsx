@@ -4,11 +4,16 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
+import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useChildConversationsPaged } from '@/hooks/useConversations'
+import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 export function RoomThreadIndexView(props: {
   starshipId: string
@@ -58,12 +63,26 @@ export function RoomThreadIndexView(props: {
   const router = useRouter()
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
+  const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const [pickViewId, setPickViewId] = useState<string>('')
   const [pickDatasetId, setPickDatasetId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
   const [pickAgentId, setPickAgentId] = useState<string>('')
   const [pickToolId, setPickToolId] = useState<string>('')
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'agents'>('suggestions')
+
+  const starterBadgeClass = (active: boolean) =>
+    cn(
+      badgeVariants({ variant: active ? 'connected' : 'outline' }),
+      'rounded-full px-3 py-1 text-xs font-medium tracking-tight select-none',
+      active
+        ? 'border border-primary/25 bg-primary/10 text-primary shadow-sm hover:bg-primary/15'
+        : 'border border-border/60 bg-background/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+      'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+    )
+
+  const history = useChildConversationsPaged(props.roomConversationId ?? null, { enabled: starterTab === 'history', limit: 25 })
 
   const label = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -130,6 +149,17 @@ export function RoomThreadIndexView(props: {
     const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
     if (!href) return
     router.push(href)
+  }
+
+  const openThreadConversation = (threadConversationId: string) => {
+    const cid = String(threadConversationId || '').trim()
+    if (!cid) return
+    if (!effectiveStarshipSlug) return
+    const roomSlug = String(props.roomSlug || '').trim()
+    const base = roomSlug
+      ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}`
+      : `/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms`
+    router.push(`${base}/thread/${encodeURIComponent(cid)}`)
   }
 
   return (
@@ -223,13 +253,13 @@ export function RoomThreadIndexView(props: {
       {/* Room starter (conversation-starter style) */}
       <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
         <div className="w-full max-w-4xl mx-auto h-full flex">
-          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col justify-center flex-1">
+          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
               <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
-              <p className="text-sm text-muted-foreground mt-2">Your first message creates a new thread in this room.</p>
             </div>
 
             <ConversationMessageInput
+              ref={starterInputRef}
               selectedAgent={starterSelectedAgent}
               onAgentChange={setStarterSelectedAgent}
               starshipId={props.starshipId}
@@ -243,6 +273,212 @@ export function RoomThreadIndexView(props: {
                 props.onThreadConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
               }}
             />
+
+            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
+              <button
+                type="button"
+                onClick={() => setStarterTab('suggestions')}
+                className={starterBadgeClass(starterTab === 'suggestions')}
+                role="tab"
+                aria-selected={starterTab === 'suggestions'}
+              >
+                Suggestions
+              </button>
+              <button
+                type="button"
+                onClick={() => setStarterTab('history')}
+                className={starterBadgeClass(starterTab === 'history')}
+                role="tab"
+                aria-selected={starterTab === 'history'}
+              >
+                History
+              </button>
+              <button
+                type="button"
+                onClick={() => setStarterTab('datasets')}
+                className={starterBadgeClass(starterTab === 'datasets')}
+                role="tab"
+                aria-selected={starterTab === 'datasets'}
+              >
+                Datasets
+              </button>
+              <button
+                type="button"
+                onClick={() => setStarterTab('views')}
+                className={starterBadgeClass(starterTab === 'views')}
+                role="tab"
+                aria-selected={starterTab === 'views'}
+              >
+                Views
+              </button>
+              <button
+                type="button"
+                onClick={() => setStarterTab('agents')}
+                className={starterBadgeClass(starterTab === 'agents')}
+                role="tab"
+                aria-selected={starterTab === 'agents'}
+              >
+                Agents
+              </button>
+            </div>
+
+            <div className="mt-4">
+              {starterTab === 'suggestions' ? (
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {[
+                    'Suggest 5 thread ideas for this room.',
+                    'Summarize the key topics we should discuss here.',
+                    'Draft a concise thread title and first message.',
+                    'What are the most important datasets/views to start with?',
+                  ].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)}
+                      className={starterBadgeClass(false)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {starterTab === 'history' ? (
+                <div className="mx-auto w-full max-w-2xl">
+                  {history.isLoading ? <div className="text-xs text-muted-foreground text-center">Loading…</div> : null}
+
+                  {!history.isLoading ? (
+                    history.conversations.length > 0 ? (
+                      <div className="space-y-1">
+                        {history.conversations
+                          .slice()
+                          .sort((a: any, b: any) => {
+                            const at = Date.parse(String(a?.updatedAt || a?.createdAt || '')) || 0
+                            const bt = Date.parse(String(b?.updatedAt || b?.createdAt || '')) || 0
+                            return bt - at
+                          })
+                          .slice(0, 6)
+                          .map((c: any) => {
+                            const id = String(c?.id || '').trim()
+                            if (!id) return null
+                            const titleRaw = String(c?.title || '').trim()
+                            const title = titleRaw || 'Untitled thread'
+                            const when = c?.updatedAt || c?.createdAt
+                            const whenText = when ? formatDistanceToNow(new Date(when), { addSuffix: false }) : ''
+                            return (
+                              <button
+                                key={`thread:${id}`}
+                                type="button"
+                                onClick={() => openThreadConversation(id)}
+                                className={cn(
+                                  'group w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors',
+                                  'hover:bg-muted/50',
+                                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                                )}
+                              >
+                                <span className="min-w-0 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{title}</span>
+                                {whenText ? <span className="text-[10px] text-muted-foreground flex-shrink-0">{whenText}</span> : null}
+                              </button>
+                            )
+                          })}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground text-center">No threads yet.</div>
+                    )
+                  ) : null}
+                </div>
+              ) : null}
+
+              {starterTab === 'datasets' ? (
+                pinnedDatasets.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedDatasets.map(p => {
+                      const id = String(p.datasetId)
+                      const name = props.datasetLabelById?.get(id) || `Dataset ${id.slice(0, 8)}`
+                      return (
+                        <Button key={`starter:dataset:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedDataset(id)}>
+                          <Icon name="database" className="h-4 w-4 mr-1.5" />
+                          {name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    No pinned datasets in this room.
+                    {props.onOpenResourcesPane ? (
+                      <>
+                        {' '}
+                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
+                          Manage resources
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+
+              {starterTab === 'views' ? (
+                pinnedViews.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedViews.map(p => {
+                      const id = String(p.viewId)
+                      const name = props.viewLabelById?.get(id) || `View ${id.slice(0, 8)}`
+                      return (
+                        <Button key={`starter:view:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedView(id)}>
+                          <Icon name="layout" className="h-4 w-4 mr-1.5" />
+                          {name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    No pinned views in this room.
+                    {props.onOpenResourcesPane ? (
+                      <>
+                        {' '}
+                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
+                          Manage resources
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+
+              {starterTab === 'agents' ? (
+                pinnedAgents.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedAgents.map(p => {
+                      const id = String(p.agentId)
+                      const name = props.agentLabelById?.get(id) || `Agent ${id.slice(0, 8)}`
+                      return (
+                        <Button key={`starter:agent:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedAgent(id)}>
+                          <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
+                          {name}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">
+                    No pinned agents in this room.
+                    {props.onOpenResourcesPane ? (
+                      <>
+                        {' '}
+                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
+                          Manage resources
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+            </div>
           </div>
         </div>
       </div>

@@ -56,6 +56,53 @@ async function resolveRoomAccessArgs(args: { roomConversationId: string }): Prom
   return { room, conversationStarshipId: conversationStarshipId || null };
 }
 
+async function requireRoomReadAccess(args: {
+  roomId: string;
+  req: Request;
+  res: Response;
+}): Promise<{ authUserId: string; room: RoomModel; conversationStarshipId: string } | null> {
+  const roomId = String(args.roomId || '').trim();
+  if (!roomId) {
+    sendError(args.res, 'VALIDATION_ERROR', 'Missing roomId', 400);
+    return null;
+  }
+
+  const authUserId = args.req.user?.id as string | undefined;
+  if (!authUserId) {
+    sendError(args.res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return null;
+  }
+
+  const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: roomId });
+  if (!room) {
+    sendError(args.res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId });
+    return null;
+  }
+  if (!conversationStarshipId) {
+    sendError(args.res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: roomId });
+    return null;
+  }
+  if (String(room.starshipId) !== String(conversationStarshipId)) {
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId });
+    return null;
+  }
+
+  if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, args.res))) return null;
+  if (
+    !(await enforcePrivateRoomMembership({
+      conversationId: roomId,
+      conversationStarshipId,
+      userId: authUserId,
+      room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
+      req: args.req,
+      res: args.res,
+    }))
+  )
+    return null;
+
+  return { authUserId, room, conversationStarshipId };
+}
+
 /**
  * GET /starships/:starshipId/rooms
  *
@@ -686,37 +733,8 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
 
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
-    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!conversationStarshipId) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
-      return;
-    }
-    if (String(room.starshipId) !== String(conversationStarshipId)) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
-      return;
-    }
-
-    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
-    if (
-      !(await enforcePrivateRoomMembership({
-        conversationId: params.roomId,
-        conversationStarshipId,
-        userId: authUserId,
-        req,
-        res,
-      }))
-    )
-      return;
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
 
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
@@ -725,16 +743,532 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const toolsRepo = new RoomToolsRepository();
 
     const [views, datasets, taskBoards, agents, tools] = await Promise.all([
-      viewsRepo.list(room.conversationId),
-      datasetsRepo.list(room.conversationId),
-      boardsRepo.list(room.conversationId),
-      agentsRepo.list(room.conversationId),
-      toolsRepo.list(room.conversationId),
+      viewsRepo.list(access.room.conversationId),
+      datasetsRepo.list(access.room.conversationId),
+      boardsRepo.list(access.room.conversationId),
+      agentsRepo.list(access.room.conversationId),
+      toolsRepo.list(access.room.conversationId),
     ]);
 
     sendSuccess(res, { views, datasets, taskBoards, agents, tools }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Pinned resource "view" endpoints (return resolved resource objects in pin order)
+// ---------------------------------------------------------------------------
+
+router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const viewsRepo = new RoomViewsRepository();
+    const datasetsRepo = new RoomDatasetsRepository();
+    const boardsRepo = new RoomTaskBoardsRepository();
+    const agentsRepo = new RoomAgentsRepository();
+    const toolsRepo = new RoomToolsRepository();
+
+    const [viewPins, datasetPins, boardPins, agentPins, toolPins] = await Promise.all([
+      viewsRepo.list(access.room.conversationId),
+      datasetsRepo.list(access.room.conversationId),
+      boardsRepo.list(access.room.conversationId),
+      agentsRepo.list(access.room.conversationId),
+      toolsRepo.list(access.room.conversationId),
+    ]);
+
+    const conn = getConnection();
+
+    const viewIds = viewPins.map((p) => String(p.viewId)).filter(Boolean);
+    const datasetIds = datasetPins.map((p) => String(p.datasetId)).filter(Boolean);
+    const boardIds = boardPins.map((p) => String(p.boardId)).filter(Boolean);
+    const agentIds = agentPins.map((p) => String(p.agentId)).filter(Boolean);
+    const toolIds = toolPins.map((p) => String(p.toolId)).filter(Boolean);
+
+    const [viewsRows, datasetRows, boardRows, agentRows, toolRows] = await Promise.all([
+      viewIds.length
+        ? conn.query<{
+            id: string;
+            name: string;
+            slug: string;
+            description: string;
+            created_at: string;
+            updated_at: string;
+          }>(
+            `SELECT id, name, slug, description, created_at, updated_at
+               FROM views
+              WHERE id = ANY($1::text[])
+                AND starship_id = $2`,
+            [viewIds, access.conversationStarshipId]
+          )
+        : Promise.resolve([]),
+      datasetIds.length
+        ? conn.query<{
+            id: string;
+            name: string;
+            slug: string;
+            description: string;
+            archived: boolean;
+            created_at: string;
+            updated_at: string;
+          }>(
+            `SELECT id, name, slug, description, archived, created_at, updated_at
+               FROM starship_datasets
+              WHERE id = ANY($1::text[])
+                AND starship_id = $2`,
+            [datasetIds, access.conversationStarshipId]
+          )
+        : Promise.resolve([]),
+      boardIds.length
+        ? conn.query<{
+            id: string;
+            name: string;
+            slug: string;
+            description: string;
+            archived: boolean;
+            pos: number;
+            created_at: string;
+            updated_at: string;
+          }>(
+            `SELECT id, name, slug, description, archived, pos, created_at, updated_at
+               FROM task_boards
+              WHERE id = ANY($1::text[])
+                AND starship_id = $2`,
+            [boardIds, access.conversationStarshipId]
+          )
+        : Promise.resolve([]),
+      agentIds.length
+        ? conn.query<{
+            id: string;
+            name: string;
+            slug: string;
+            description: string | null;
+            created_at: string;
+            updated_at: string;
+          }>(
+            `SELECT id, name, slug, description, created_at, updated_at
+               FROM agents
+              WHERE id = ANY($1::text[])
+                AND starship_id = $2`,
+            [agentIds, access.conversationStarshipId]
+          )
+        : Promise.resolve([]),
+      toolIds.length
+        ? conn.query<{
+            id: string;
+            name: string;
+            slug: string;
+            description: string;
+            created_at: string;
+            updated_at: string;
+          }>(
+            `SELECT id, name, slug, description, created_at, updated_at
+               FROM tools
+              WHERE id = ANY($1::text[])
+                AND starship_id = $2`,
+            [toolIds, access.conversationStarshipId]
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const viewsById = new Map(viewsRows.map((r) => [String(r.id), r]));
+    const datasetsById = new Map(datasetRows.map((r) => [String(r.id), r]));
+    const boardsById = new Map(boardRows.map((r) => [String(r.id), r]));
+    const agentsById = new Map(agentRows.map((r) => [String(r.id), r]));
+    const toolsById = new Map(toolRows.map((r) => [String(r.id), r]));
+
+    const views = viewPins
+      .map((pin) => {
+        const r = viewsById.get(String(pin.viewId));
+        if (!r) return null;
+        return {
+          pin,
+          view: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const datasets = datasetPins
+      .map((pin) => {
+        const r = datasetsById.get(String(pin.datasetId));
+        if (!r) return null;
+        return {
+          pin,
+          dataset: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            archived: Boolean(r.archived),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const taskBoards = boardPins
+      .map((pin) => {
+        const r = boardsById.get(String(pin.boardId));
+        if (!r) return null;
+        return {
+          pin,
+          taskBoard: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            archived: Boolean(r.archived),
+            pos: Number(r.pos ?? 0),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const agents = agentPins
+      .map((pin) => {
+        const r = agentsById.get(String(pin.agentId));
+        if (!r) return null;
+        return {
+          pin,
+          agent: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: r.description ?? null,
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const tools = toolPins
+      .map((pin) => {
+        const r = toolsById.get(String(pin.toolId));
+        if (!r) return null;
+        return {
+          pin,
+          tool: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { views, datasets, taskBoards, agents, tools }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned resources');
+  }
+});
+
+router.get('/rooms/:roomId/pins/views', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const viewsRepo = new RoomViewsRepository();
+    const pins = await viewsRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.viewId)).filter(Boolean);
+
+    if (ids.length === 0) {
+      sendSuccess(res, { items: [] }, 200);
+      return;
+    }
+
+    const conn = getConnection();
+    const rows = await conn.query<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `SELECT id, name, slug, description, created_at, updated_at
+         FROM views
+        WHERE id = ANY($1::text[])
+          AND starship_id = $2`,
+      [ids, access.conversationStarshipId]
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const items = pins
+      .map((pin) => {
+        const r = byId.get(String(pin.viewId));
+        if (!r) return null;
+        return {
+          pin,
+          view: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { items }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned views');
+  }
+});
+
+router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const datasetsRepo = new RoomDatasetsRepository();
+    const pins = await datasetsRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.datasetId)).filter(Boolean);
+
+    if (ids.length === 0) {
+      sendSuccess(res, { items: [] }, 200);
+      return;
+    }
+
+    const conn = getConnection();
+    const rows = await conn.query<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      archived: boolean;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `SELECT id, name, slug, description, archived, created_at, updated_at
+         FROM starship_datasets
+        WHERE id = ANY($1::text[])
+          AND starship_id = $2`,
+      [ids, access.conversationStarshipId]
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const items = pins
+      .map((pin) => {
+        const r = byId.get(String(pin.datasetId));
+        if (!r) return null;
+        return {
+          pin,
+          dataset: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            archived: Boolean(r.archived),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { items }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned datasets');
+  }
+});
+
+router.get('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const boardsRepo = new RoomTaskBoardsRepository();
+    const pins = await boardsRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.boardId)).filter(Boolean);
+
+    if (ids.length === 0) {
+      sendSuccess(res, { items: [] }, 200);
+      return;
+    }
+
+    const conn = getConnection();
+    const rows = await conn.query<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      archived: boolean;
+      pos: number;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `SELECT id, name, slug, description, archived, pos, created_at, updated_at
+         FROM task_boards
+        WHERE id = ANY($1::text[])
+          AND starship_id = $2`,
+      [ids, access.conversationStarshipId]
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const items = pins
+      .map((pin) => {
+        const r = byId.get(String(pin.boardId));
+        if (!r) return null;
+        return {
+          pin,
+          taskBoard: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            archived: Boolean(r.archived),
+            pos: Number(r.pos ?? 0),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { items }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned task boards');
+  }
+});
+
+router.get('/rooms/:roomId/pins/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const agentsRepo = new RoomAgentsRepository();
+    const pins = await agentsRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.agentId)).filter(Boolean);
+
+    if (ids.length === 0) {
+      sendSuccess(res, { items: [] }, 200);
+      return;
+    }
+
+    const conn = getConnection();
+    const rows = await conn.query<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `SELECT id, name, slug, description, created_at, updated_at
+         FROM agents
+        WHERE id = ANY($1::text[])
+          AND starship_id = $2`,
+      [ids, access.conversationStarshipId]
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const items = pins
+      .map((pin) => {
+        const r = byId.get(String(pin.agentId));
+        if (!r) return null;
+        return {
+          pin,
+          agent: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: r.description ?? null,
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { items }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned agents');
+  }
+});
+
+router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const toolsRepo = new RoomToolsRepository();
+    const pins = await toolsRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.toolId)).filter(Boolean);
+
+    if (ids.length === 0) {
+      sendSuccess(res, { items: [] }, 200);
+      return;
+    }
+
+    const conn = getConnection();
+    const rows = await conn.query<{
+      id: string;
+      name: string;
+      slug: string;
+      description: string;
+      created_at: string;
+      updated_at: string;
+    }>(
+      `SELECT id, name, slug, description, created_at, updated_at
+         FROM tools
+        WHERE id = ANY($1::text[])
+          AND starship_id = $2`,
+      [ids, access.conversationStarshipId]
+    );
+    const byId = new Map(rows.map((r) => [String(r.id), r]));
+    const items = pins
+      .map((pin) => {
+        const r = byId.get(String(pin.toolId));
+        if (!r) return null;
+        return {
+          pin,
+          tool: {
+            id: String(r.id),
+            name: String(r.name),
+            slug: String(r.slug),
+            description: String(r.description ?? ''),
+            createdAt: String(r.created_at),
+            updatedAt: String(r.updated_at),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    sendSuccess(res, { items }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing pinned tools');
   }
 });
 

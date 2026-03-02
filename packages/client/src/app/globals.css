@@ -398,8 +398,8 @@
   }
 
   .dark {
-    /* Enhanced Dark Theme - Pure Black Foundation */
-    --background: 0 0% 0%; /* Pure black base */
+    /* Enhanced Dark Theme - Deep Cosmic Navy Foundation (less "black void") */
+    --background: 222 47% 6%; /* Deep navy base inspired by GitHub home */
     --foreground: 0 0% 95%;
     --card: 0 0% 6%;
     --card-foreground: 0 0% 95%;
@@ -703,8 +703,8 @@
 
 /* Star Dark Theme - Matches regular dark theme - Always dark regardless of global theme */
 .star-theme-dark {
-  /* Use same values as .dark class for consistency */
-  --background: 0 0% 0% !important; /* Pure black base - matches .dark */
+  /* Use same values as .dark class for consistency, but avoid pure black "void" */
+  --background: 239 83% 14% !important; /* Approx. #060742 – bright cosmic navy */
   --foreground: 0 0% 95% !important;
   --card: 0 0% 6% !important;
   --card-foreground: 0 0% 95% !important;

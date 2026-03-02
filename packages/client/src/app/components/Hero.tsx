@@ -92,8 +92,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
-    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
-      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
+    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pt-10 sm:pt-12 pb-10 sm:pb-12">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0">
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
             Team chat,
@@ -114,7 +114,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             .
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
-            Chat with your team, delegate work to agents, and ship faster across your tools.
+            Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />

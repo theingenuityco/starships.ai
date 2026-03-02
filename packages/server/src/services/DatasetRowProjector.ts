@@ -364,7 +364,10 @@ class LookupCache {
     if (!key) return null;
     if (this.datasetIdByIdOrSlug.has(key)) return this.datasetIdByIdOrSlug.get(key) ?? null;
 
-    const ds = /^[a-z0-9_-]{10,30}$/i.test(key) ? await this.datasetRepo.findById(key) : await this.datasetRepo.findBySlug(key, this.starshipId);
+    // Slugs often match our nanoid-shaped ID regex, so attempt ID first,
+    // then fall back to slug lookup when not found.
+    let ds = /^[a-z0-9_-]{10,30}$/i.test(key) ? await this.datasetRepo.findById(key) : null;
+    if (!ds) ds = await this.datasetRepo.findBySlug(key, this.starshipId);
     if (!ds || String(ds.starshipId) !== String(this.starshipId)) {
       this.datasetIdByIdOrSlug.set(key, null);
       return null;

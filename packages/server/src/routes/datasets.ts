@@ -551,9 +551,13 @@ async function requireDatasetInStarship(args: {
   res: Response;
 }): Promise<{ dataset: StarshipDatasetModel } | null> {
   const { datasetIdOrSlug, starshipId, datasetRepo, res } = args;
-  const dataset = IdSchema.safeParse(datasetIdOrSlug).success
-    ? await datasetRepo.findById(datasetIdOrSlug)
-    : await datasetRepo.findBySlug(datasetIdOrSlug, starshipId);
+  const key = String(datasetIdOrSlug || '').trim();
+  let dataset: StarshipDatasetModel | null = null;
+
+  // Slugs often satisfy IdSchema (both allow lowercase + hyphens), so we must
+  // fall back to slug lookup when an ID-shaped value isn't found by ID.
+  if (IdSchema.safeParse(key).success) dataset = await datasetRepo.findById(key);
+  if (!dataset) dataset = await datasetRepo.findBySlug(key, starshipId);
   if (!dataset) {
     sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug });
     return null;

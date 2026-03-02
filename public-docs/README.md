@@ -16,8 +16,28 @@ This folder contains documentation for the Starships workflow system, including 
 - **Views**
   - [Views](./views/README.md)
 
+- **Tasks**
+  - [Task boards (kanban)](./tasks/README.md)
+
+- **Conversations**
+  - [Conversations overview](./conversations/README.md)
+  - [Concepts (theory)](./conversations/concepts.md)
+  - [Conversations API + connector actions](./conversations/conversations.md)
+  - [Messages (CRUD + linking)](./conversations/messages.md)
+  - [Streaming + notifications (SSE)](./conversations/streaming-and-notifications.md)
+  - [Channels](./conversations/channels.md)
+  - [Rooms](./conversations/rooms.md)
+  - [Threads](./conversations/threads.md)
+  - [Direct messages (DMs)](./conversations/direct-messages.md)
+
 - **Data**
   - [Starship datasets (tabular)](./data/datasets.md)
+    - [Schema & columns](./data/datasets/schema.md)
+    - [Rows, coercion, and upserts](./data/datasets/rows.md)
+    - [HTTP API](./data/datasets/api.md)
+    - [Connector actions & agent tools](./data/datasets/connector-actions.md)
+    - [UI + Views integration](./data/datasets/ui-and-views.md)
+    - [Troubleshooting](./data/datasets/troubleshooting.md)
 
 Audience and access modes
 
@@ -70,6 +90,7 @@ Blueprint examples live under [Blueprints reference](./blueprints/README.md#exam
 
 Notes:
 
+- Slugs prefer a doc's frontmatter `slug:` when present; otherwise they fall back to the file path (without extension).
 - Template expressions use `{{ ... }}` and are resolved by the Engine prior to handler execution (full-only mode). Inline fields are executed post-handler; see Engine.
 - Execution input/output items are arrays of `ExecutionItem` internally; examples show plain JSON for clarity.
 

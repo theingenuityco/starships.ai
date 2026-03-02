@@ -5,6 +5,8 @@ const publishMock = jest.fn().mockResolvedValue({ streamId: '1-0' });
 const updateMessageMock = jest.fn();
 const getMessageMock = jest.fn();
 const getConversationByIdMock = jest.fn();
+const mergeStateMock = jest.fn().mockResolvedValue(null);
+const findConversationByIdMock = jest.fn();
 
 jest.mock('@/middleware/jwt-auth', () => {
   return {
@@ -43,6 +45,10 @@ jest.mock('@starships/models', () => {
     DirectMessageRepository: jest.fn(),
     MessageReactionRepository: jest.fn(),
     NotificationRepository: jest.fn(),
+    ConversationRepository: jest.fn().mockImplementation(() => ({
+      findById: findConversationByIdMock,
+      mergeState: mergeStateMock,
+    })),
     ConversationParticipantRepository: jest.fn().mockImplementation(() => ({
       addUserParticipant: jest.fn().mockResolvedValue(null),
       addAgentParticipant: jest.fn().mockResolvedValue(null),
@@ -81,6 +87,8 @@ describe('PUT /messages/:messageId streaming', () => {
     updateMessageMock.mockReset();
     getMessageMock.mockReset();
     getConversationByIdMock.mockReset();
+    mergeStateMock.mockClear();
+    findConversationByIdMock.mockReset();
   });
 
   it('broadcasts a message.append update when a message is linked to a thread', async () => {
@@ -97,7 +105,9 @@ describe('PUT /messages/:messageId streaming', () => {
       conversationId: parentConversationId,
       starshipId: 'starship-1',
       userId: 'user-a',
+      userName: 'User A',
       linkedConversationId: childConversationId,
+      attachmentIds: ['att_1234567'],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -115,6 +125,12 @@ describe('PUT /messages/:messageId streaming', () => {
     getConversationByIdMock.mockResolvedValue({
       id: parentConversationId,
       starshipId: 'starship-1',
+    });
+    findConversationByIdMock.mockResolvedValue({
+      id: childConversationId,
+      starshipId: 'starship-1',
+      parentConversationId: parentConversationId,
+      state: {},
     });
 
     const app = express();
@@ -142,6 +158,21 @@ describe('PUT /messages/:messageId streaming', () => {
           }),
         },
       });
+
+      expect(mergeStateMock).toHaveBeenCalledTimes(1);
+      expect(mergeStateMock).toHaveBeenCalledWith(
+        childConversationId,
+        expect.objectContaining({
+          threadContext: expect.objectContaining({
+            sourceConversationId: parentConversationId,
+            sourceMessageId: messageId,
+            sourceRole: 'user',
+            sourceUserName: 'User A',
+            sourceAttachmentIds: ['att_1234567'],
+            sourceContent: 'hello',
+          }),
+        })
+      );
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

@@ -25,10 +25,54 @@ const DocsQuerySchema = z
 
 type DocRecord = {
   relativePath: string;
+  slug: string;
+  slugAliases: string[];
   title: string;
   content: string;
-  contentLower: string;
+  searchContent: string;
+  searchContentLower: string;
 };
+
+type Frontmatter = {
+  title?: string;
+  slug?: string;
+  [key: string]: string | undefined;
+};
+
+function parseFrontmatter(raw: string): { frontmatter: Frontmatter; body: string } {
+  // Minimal YAML frontmatter parser:
+  // - supports a `---` block at the file start
+  // - supports `key: value` single-line fields
+  if (!raw.startsWith('---')) return { frontmatter: {}, body: raw };
+
+  const m = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
+  if (!m) return { frontmatter: {}, body: raw };
+
+  const fmRaw = m[1] ?? '';
+  const frontmatter: Frontmatter = {};
+  for (const line of fmRaw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('#')) continue;
+    const kv = trimmed.match(/^([A-Za-z0-9_/-]+)\s*:\s*(.*)$/);
+    if (!kv) continue;
+    const key = kv[1];
+    let value = (kv[2] ?? '').trim();
+    value = value.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1').trim();
+    frontmatter[key] = value;
+  }
+
+  const body = raw.slice(m[0].length);
+  return { frontmatter, body };
+}
+
+function normalizeDocSlug(input: string): string | null {
+  const raw = String(input ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/^[./]+/, '').replace(/\\/g, '/').replace(/\.(md|mdx)$/i, '');
+  if (!normalized || normalized.includes('..')) return null;
+  return normalized;
+}
 
 function resolveDocsRootDir(): string {
   // 1) Explicit env override
@@ -84,17 +128,42 @@ async function buildDocsIndex(rootDir: string): Promise<DocRecord[]> {
   }
 
   const records: DocRecord[] = [];
+  const usedPrimarySlugs = new Set<string>();
   for await (const relPath of walk(rootDir, rootDir)) {
     const absPath = path.join(rootDir, relPath);
     const content = await fs.promises.readFile(absPath, 'utf-8');
-    const lines = content.split(/\r?\n/);
-    const firstHeading = lines.find((l) => /^#{1,6}\s+/.test(l)) || '';
-    const extractedTitle = firstHeading.replace(/^#{1,6}\s+/, '').trim() || path.basename(relPath).replace(/\.(md|mdx)$/i, '');
+
+    const { frontmatter, body } = parseFrontmatter(content);
+
+    const bodyLines = body.split(/\r?\n/);
+    const firstHeading = bodyLines.find((l) => /^#{1,6}\s+/.test(l)) || '';
+    const extractedTitle =
+      (frontmatter.title && String(frontmatter.title).trim()) ||
+      firstHeading.replace(/^#{1,6}\s+/, '').trim() ||
+      path.basename(relPath).replace(/\.(md|mdx)$/i, '');
+
+    const pathSlug = toSlug(relPath);
+    const fmSlug = frontmatter.slug ? normalizeDocSlug(frontmatter.slug) : null;
+    const slugCandidates = Array.from(new Set([fmSlug, pathSlug].filter(Boolean))) as string[];
+
+    let primarySlug = fmSlug ?? pathSlug;
+    if (usedPrimarySlugs.has(primarySlug)) {
+      primarySlug = pathSlug;
+    }
+    if (usedPrimarySlugs.has(primarySlug)) {
+      primarySlug = `${pathSlug}-${records.length + 1}`;
+    }
+    usedPrimarySlugs.add(primarySlug);
+
     const record: DocRecord = {
       relativePath: relPath.split(path.sep).join('/'),
+      slug: primarySlug,
+      slugAliases: slugCandidates.filter((s) => s !== primarySlug),
       title: extractedTitle,
       content,
-      contentLower: content.toLowerCase(),
+      // Prefer body-only for search/excerpts so frontmatter doesn't dominate results.
+      searchContent: body,
+      searchContentLower: body.toLowerCase(),
     };
     records.push(record);
   }
@@ -187,7 +256,7 @@ function searchDocs(records: DocRecord[], query: string, limit: number): DocSear
     const titleLower = rec.title.toLowerCase();
 
     // Phrase match bonus (exact substring of full query)
-    const phraseIdx = rec.contentLower.indexOf(qLower);
+    const phraseIdx = rec.searchContentLower.indexOf(qLower);
     if (phraseIdx >= 0) {
       score += 20;
       excerptIdx = phraseIdx;
@@ -205,27 +274,27 @@ function searchDocs(records: DocRecord[], query: string, limit: number): DocSear
       // Content token hits (cap per token to avoid overly long docs dominating)
       for (const t of tokens) {
         if (!t) continue;
-        const occurrences = countOccurrences(rec.contentLower, t);
+        const occurrences = countOccurrences(rec.searchContentLower, t);
         if (occurrences > 0 && excerptIdx === -1) {
           // First token hit - use for excerpt if phrase not found
-          excerptIdx = rec.contentLower.indexOf(t);
+          excerptIdx = rec.searchContentLower.indexOf(t);
         }
         score += Math.min(15, occurrences); // per-token cap
       }
     } else {
       // Fallback to simple phrase scoring when tokenization yields nothing meaningful
       if (titleLower.includes(qLower)) score += 10;
-      score += Math.min(50, countOccurrences(rec.contentLower, qLower));
+      score += Math.min(50, countOccurrences(rec.searchContentLower, qLower));
       if (excerptIdx === -1 && score > 0) {
-        excerptIdx = rec.contentLower.indexOf(qLower);
+        excerptIdx = rec.searchContentLower.indexOf(qLower);
       }
     }
 
     if (score === 0) continue;
     results.push({
-      slug: toSlug(rec.relativePath),
+      slug: rec.slug,
       title: rec.title,
-      excerpt: excerptIdx >= 0 ? buildExcerptAtIndex(rec.content, excerptIdx) : buildExcerpt(rec.content, qLower),
+      excerpt: excerptIdx >= 0 ? buildExcerptAtIndex(rec.searchContent, excerptIdx) : buildExcerpt(rec.searchContent, qLower),
       score,
     });
   }
@@ -248,7 +317,7 @@ router.get('/docs', async (req: Request, res: Response): Promise<void> => {
 
     if (!query) {
       // No query: return a lightweight listing
-      const listing = index.slice(0, limit).map((r) => ({ slug: toSlug(r.relativePath), title: r.title }));
+      const listing = index.slice(0, limit).map((r) => ({ slug: r.slug, title: r.title }));
       sendSuccess(res, {
         query,
         count: index.length,
@@ -295,7 +364,7 @@ router.get(/^\/docs\/(.+)$/, async (req: Request, res: Response): Promise<void> 
     }
 
     const index = await getDocsIndex();
-    const rec = index.find((r) => toSlug(r.relativePath) === normalizedSlug);
+    const rec = index.find((r) => r.slug === normalizedSlug || r.slugAliases.includes(normalizedSlug));
     if (!rec) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Doc not found', 404, { slug: normalizedSlug });
       return;

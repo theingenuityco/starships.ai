@@ -865,7 +865,9 @@ export function ConversationMessageList({
   const SCROLL_THRESHOLD_PX = 120
 
   // Create display messages with optimized rendering and group tool calls with their results
-  const displayMessages = useMemo(() => {
+    const displayMessages = useMemo(() => {
+    // Legacy compatibility: older threads persisted a hidden system_instruction message containing
+    // `[THREAD_CONTEXT_SEED]`. New threads store thread context in `conversation.state.threadContext`.
     const isHiddenThreadContextSeed = (m: any): boolean => {
       if (!m) return false
       // Hide only our special "seed" system messages; keep other system messages visible.

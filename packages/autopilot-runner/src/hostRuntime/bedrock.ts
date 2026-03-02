@@ -442,21 +442,6 @@ export async function invokeBedrock(
           if (delta.reasoningContent) {
             const rc = delta.reasoningContent;
             let nextText = '';
-            let eventHasSignature = false;
-            try {
-              if (rc && typeof rc === 'object') {
-                const rco = rc as Record<string, unknown>;
-                const reasoningText = rco.reasoningText;
-                if (reasoningText && typeof reasoningText === 'object') {
-                  const rt = reasoningText as Record<string, unknown>;
-                  eventHasSignature = typeof rt.signature === 'string' && rt.signature.trim().length > 0;
-                } else {
-                  eventHasSignature = typeof rco.signature === 'string' && rco.signature.trim().length > 0;
-                }
-              }
-            } catch {
-              eventHasSignature = false;
-            }
 
             try {
               if (typeof rc === 'string') {

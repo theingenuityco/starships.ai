@@ -30,8 +30,12 @@ export default function PricingTeaser() {
               <p className="text-sm text-muted-foreground">Start free, then scale up when you’re ready.</p>
             </div>
             <div className="flex gap-3">
-              <Button size="lg" variant="outline" className="h-12 px-10 text-base" onClick={handleClick}>
-                {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Launch your starship now'}
+              <Button
+                size="lg"
+                className="relative h-14 px-8 text-base sm:text-lg leading-none overflow-hidden rounded-full whitespace-nowrap text-center text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_6px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_4px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[2px] transition"
+                onClick={handleClick}
+              >
+                {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get Started for free'}
               </Button>
             </div>
           </Card>

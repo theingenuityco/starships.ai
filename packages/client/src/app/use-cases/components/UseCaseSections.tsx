@@ -77,7 +77,11 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                           <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">Explore more capabilities</h3>
 
                           <div className="mt-6">
-                            <Button asChild size="sm" className="h-10 rounded-full px-6 bg-white text-slate-900 hover:bg-white/90 shadow-sm font-medium">
+                            <Button
+                              asChild
+                              size="sm"
+                              className="relative inline-flex items-center justify-center h-10 px-6 rounded-full text-sm font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[1px] transition"
+                            >
                               <Link href={useCase.primaryTemplateSlug ? `/explore/agents/${useCase.primaryTemplateSlug}` : '/explore/agents'}>
                                 Get Started
                                 <Icon name="chevron-right" className="h-3.5 w-3.5" />
@@ -113,7 +117,11 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                 Watch a quick walkthrough of Piper in action—from writing your first prompt to getting qualified leads. No setup required.
               </p>
               <div className="mt-6">
-                <Button asChild size="lg" className="h-11 rounded-full text-white gap-2">
+                <Button
+                  asChild
+                  size="lg"
+                  className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:shadow-[0_2px_0_0_rgba(180,83,9,1)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(180,83,9,1)] active:translate-y-[1px] transition gap-2"
+                >
                   <Link href="/login">
                     Sign up free
                     <Icon name="chevron-right" className="h-4 w-4" />
@@ -203,7 +211,13 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {useCase.nextLinks.map(l => (
-                    <Button key={l.href} asChild size="lg" variant="outline" className="h-11 px-6 rounded-full bg-white text-slate-900 hover:bg-white/90 border-white/30">
+                    <Button
+                      key={l.href}
+                      asChild
+                      size="lg"
+                      variant="outline"
+                      className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[1px] transition border-0"
+                    >
                       <Link href={l.href}>
                         {l.label}
                         <Icon name="chevron-right" className="h-4 w-4" />

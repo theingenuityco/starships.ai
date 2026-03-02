@@ -148,7 +148,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   <span className="-mt-0.5 text-xs sm:text-sm font-normal text-white/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
                 </span>
               ) : (
-                'Get started for free'
+                'Get Started for free'
               )}
             </Button>
           </div>

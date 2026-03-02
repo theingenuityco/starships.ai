@@ -100,7 +100,7 @@ export function PublicHeader(): React.JSX.Element {
           </span>
         </button>
 
-        <nav className="hidden sm:flex items-center gap-3 md:gap-6 text-sm leading-none">
+        <nav className="hidden sm:flex items-center gap-4 md:gap-7 text-[15px] md:text-base leading-none">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -164,7 +164,7 @@ export function PublicHeader(): React.JSX.Element {
             <Link
               href="/login"
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-              className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:shadow-[0_2px_0_0_rgba(180,83,9,1)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(180,83,9,1)] active:translate-y-[1px] transition"
             >
               Get Started
             </Link>
@@ -250,7 +250,7 @@ export function PublicHeader(): React.JSX.Element {
                     track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                     setMobileMenuOpen(false)
                   }}
-                  className="block px-3 py-2 rounded-md text-sm font-medium text-center bg-primary text-white hover:bg-primary/90"
+                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:shadow-[0_2px_0_0_rgba(180,83,9,1)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(180,83,9,1)] active:translate-y-[1px] transition"
                 >
                   Get Started
                 </Link>

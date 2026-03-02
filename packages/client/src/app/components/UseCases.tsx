@@ -10,13 +10,13 @@ export default function UseCases() {
     <section className="relative py-14 px-4 bg-background">
       <div className="relative max-w-7xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Create agents, add tools, and collaborate in one workspace.</p>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Deploy agents, add tools, and collaborate in one workspace.</p>
 
         {/* Deploy your agent */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Deploy agents</h3>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">1. Deploy agents</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Deploy agentic teams of specialists to get the job done.</p>
             </div>
 
@@ -32,7 +32,7 @@ export default function UseCases() {
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Connect your apps</h3>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">2. Connect your apps</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Integrate with apps you already use.</p>
             </div>
 
@@ -44,12 +44,14 @@ export default function UseCases() {
           </div>
         </div>
 
-        {/* Delegate like never before */}
+        {/* Delegate like never before (temporarily hidden)
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="text-left mb-4 md:mb-5">
+            <div className="text-left mb-4 md:mb-2">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegate like never before</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Aria spins up specialist chats and brings back the result.</p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Aria spins up specialist chats and brings back the result.
+              </p>
             </div>
             <div className="w-full">
               <div className="py-8 sm:py-10">
@@ -60,6 +62,7 @@ export default function UseCases() {
             </div>
           </div>
         </div>
+        */}
 
         {/* Build agents for your custom workflows — commented out for now */}
         {/* <div className="mt-14 md:mt-16">
@@ -83,7 +86,7 @@ export default function UseCases() {
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Schedule repetitive tasks</h3>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">3. Schedule repetitive tasks</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Schedule agents. Review and approve.</p>
             </div>
 

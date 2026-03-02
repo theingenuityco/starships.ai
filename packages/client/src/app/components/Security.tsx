@@ -44,7 +44,7 @@ export default function Security() {
           </ul>
           <div className="mt-10 text-center">
             <a href="/docs" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              Learn more about security
+              Learn more
               <Icon name="external-link" className="w-3.5 h-3.5" />
             </a>
           </div>

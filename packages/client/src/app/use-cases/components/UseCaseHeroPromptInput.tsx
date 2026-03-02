@@ -113,7 +113,11 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
                 )}
               />
             </div>
-            <Button type="submit" size="icon" className="absolute bottom-3 right-3 h-10 w-10 rounded-full text-white [&_svg]:text-white">
+            <Button
+              type="submit"
+              size="icon"
+              className="absolute bottom-3 right-3 h-10 w-10 rounded-full text-white bg-gradient-to-b from-amber-300 to-amber-500 shadow-md hover:shadow-lg transition-colors transition-shadow [&_svg]:text-white"
+            >
               <Icon name="arrow-up" className="h-4 w-4" />
             </Button>
           </div>

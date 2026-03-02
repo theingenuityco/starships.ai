@@ -768,6 +768,76 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
+    const query = validateData(
+      z.object({
+        q: z.string().optional(),
+        kinds: z.union([z.string(), z.array(z.string())]).optional(),
+        includeArchived: z.coerce.boolean().optional(),
+        limitPerKind: z.coerce.number().int().min(0).max(200).optional(),
+      }),
+      req.query,
+      res,
+      'pinned resources query'
+    );
+    if (!query) return;
+
+    const q = String(query.q ?? '').trim();
+    const hasQ = q.length > 0;
+    const includeArchived = query.includeArchived ?? true;
+    const limitPerKind = typeof query.limitPerKind === 'number' ? query.limitPerKind : null;
+
+    const escapeLike = (input: string): string => {
+      // Escape LIKE wildcards so user search is treated literally.
+      // We use `... ILIKE $n ESCAPE '\'` in SQL.
+      return input.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    };
+    const qLike = hasQ ? `%${escapeLike(q)}%` : null;
+
+    const rawKinds = query.kinds;
+    const requestedKindsList =
+      rawKinds == null ? null : Array.isArray(rawKinds) ? rawKinds.flatMap((v) => String(v).split(',')) : String(rawKinds).split(',');
+
+    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools' | null => {
+      const k = String(input || '')
+        .trim()
+        .toLowerCase();
+      if (!k) return null;
+      if (k === 'all' || k === '*') return null;
+      if (k === 'views' || k === 'view') return 'views';
+      if (k === 'datasets' || k === 'dataset') return 'datasets';
+      if (k === 'taskboards' || k === 'task-boards' || k === 'boards' || k === 'board' || k === 'tasks') return 'taskBoards';
+      if (k === 'agents' || k === 'agent') return 'agents';
+      if (k === 'tools' || k === 'tool') return 'tools';
+      return 'INVALID' as unknown as null;
+    };
+
+    const allKinds: Array<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'> = ['views', 'datasets', 'taskBoards', 'agents', 'tools'];
+    const kindSet = new Set<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'>(allKinds);
+    if (requestedKindsList && requestedKindsList.length > 0) {
+      const next = new Set<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'>();
+      for (const kRaw of requestedKindsList) {
+        const nk = normalizeKind(kRaw);
+        if (nk === null) {
+          // 'all' or empty => treat as default (all)
+          next.clear();
+          for (const k of allKinds) next.add(k);
+          break;
+        }
+        if (nk === ('INVALID' as unknown as null)) {
+          sendError(res, 'VALIDATION_ERROR', `Invalid kind: ${String(kRaw)}`, 400, {
+            allowed: allKinds,
+            provided: requestedKindsList,
+          });
+          return;
+        }
+        next.add(nk);
+      }
+      if (next.size > 0) {
+        kindSet.clear();
+        for (const k of next) kindSet.add(k);
+      }
+    }
+
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
@@ -775,11 +845,11 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const toolsRepo = new RoomToolsRepository();
 
     const [viewPins, datasetPins, boardPins, agentPins, toolPins] = await Promise.all([
-      viewsRepo.list(access.room.conversationId),
-      datasetsRepo.list(access.room.conversationId),
-      boardsRepo.list(access.room.conversationId),
-      agentsRepo.list(access.room.conversationId),
-      toolsRepo.list(access.room.conversationId),
+      kindSet.has('views') ? viewsRepo.list(access.room.conversationId) : Promise.resolve([]),
+      kindSet.has('datasets') ? datasetsRepo.list(access.room.conversationId) : Promise.resolve([]),
+      kindSet.has('taskBoards') ? boardsRepo.list(access.room.conversationId) : Promise.resolve([]),
+      kindSet.has('agents') ? agentsRepo.list(access.room.conversationId) : Promise.resolve([]),
+      kindSet.has('tools') ? toolsRepo.list(access.room.conversationId) : Promise.resolve([]),
     ]);
 
     const conn = getConnection();
@@ -803,8 +873,17 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             `SELECT id, name, slug, description, created_at, updated_at
                FROM views
               WHERE id = ANY($1::text[])
-                AND starship_id = $2`,
-            [viewIds, access.conversationStarshipId]
+                AND starship_id = $2
+                ${
+                  hasQ
+                    ? `AND (
+                         name ILIKE $3 ESCAPE '\\'
+                      OR slug ILIKE $3 ESCAPE '\\'
+                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
+                    )`
+                    : ''
+                }`,
+            hasQ ? [viewIds, access.conversationStarshipId, qLike] : [viewIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
       datasetIds.length
@@ -820,8 +899,18 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             `SELECT id, name, slug, description, archived, created_at, updated_at
                FROM starship_datasets
               WHERE id = ANY($1::text[])
-                AND starship_id = $2`,
-            [datasetIds, access.conversationStarshipId]
+                AND starship_id = $2
+                ${includeArchived ? '' : `AND archived = FALSE`}
+                ${
+                  hasQ
+                    ? `AND (
+                         name ILIKE $3 ESCAPE '\\'
+                      OR slug ILIKE $3 ESCAPE '\\'
+                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
+                    )`
+                    : ''
+                }`,
+            hasQ ? [datasetIds, access.conversationStarshipId, qLike] : [datasetIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
       boardIds.length
@@ -838,8 +927,18 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             `SELECT id, name, slug, description, archived, pos, created_at, updated_at
                FROM task_boards
               WHERE id = ANY($1::text[])
-                AND starship_id = $2`,
-            [boardIds, access.conversationStarshipId]
+                AND starship_id = $2
+                ${includeArchived ? '' : `AND archived = FALSE`}
+                ${
+                  hasQ
+                    ? `AND (
+                         name ILIKE $3 ESCAPE '\\'
+                      OR slug ILIKE $3 ESCAPE '\\'
+                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
+                    )`
+                    : ''
+                }`,
+            hasQ ? [boardIds, access.conversationStarshipId, qLike] : [boardIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
       agentIds.length
@@ -854,8 +953,17 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             `SELECT id, name, slug, description, created_at, updated_at
                FROM agents
               WHERE id = ANY($1::text[])
-                AND starship_id = $2`,
-            [agentIds, access.conversationStarshipId]
+                AND starship_id = $2
+                ${
+                  hasQ
+                    ? `AND (
+                         name ILIKE $3 ESCAPE '\\'
+                      OR slug ILIKE $3 ESCAPE '\\'
+                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
+                    )`
+                    : ''
+                }`,
+            hasQ ? [agentIds, access.conversationStarshipId, qLike] : [agentIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
       toolIds.length
@@ -870,8 +978,17 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             `SELECT id, name, slug, description, created_at, updated_at
                FROM tools
               WHERE id = ANY($1::text[])
-                AND starship_id = $2`,
-            [toolIds, access.conversationStarshipId]
+                AND starship_id = $2
+                ${
+                  hasQ
+                    ? `AND (
+                         name ILIKE $3 ESCAPE '\\'
+                      OR slug ILIKE $3 ESCAPE '\\'
+                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
+                    )`
+                    : ''
+                }`,
+            hasQ ? [toolIds, access.conversationStarshipId, qLike] : [toolIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
     ]);
@@ -882,7 +999,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const agentsById = new Map(agentRows.map((r) => [String(r.id), r]));
     const toolsById = new Map(toolRows.map((r) => [String(r.id), r]));
 
-    const views = viewPins
+    let views = viewPins
       .map((pin) => {
         const r = viewsById.get(String(pin.viewId));
         if (!r) return null;
@@ -900,7 +1017,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       })
       .filter(Boolean);
 
-    const datasets = datasetPins
+    let datasets = datasetPins
       .map((pin) => {
         const r = datasetsById.get(String(pin.datasetId));
         if (!r) return null;
@@ -919,7 +1036,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       })
       .filter(Boolean);
 
-    const taskBoards = boardPins
+    let taskBoards = boardPins
       .map((pin) => {
         const r = boardsById.get(String(pin.boardId));
         if (!r) return null;
@@ -939,7 +1056,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       })
       .filter(Boolean);
 
-    const agents = agentPins
+    let agents = agentPins
       .map((pin) => {
         const r = agentsById.get(String(pin.agentId));
         if (!r) return null;
@@ -957,7 +1074,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       })
       .filter(Boolean);
 
-    const tools = toolPins
+    let tools = toolPins
       .map((pin) => {
         const r = toolsById.get(String(pin.toolId));
         if (!r) return null;
@@ -974,6 +1091,22 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
         };
       })
       .filter(Boolean);
+
+    if (limitPerKind != null) {
+      if (limitPerKind === 0) {
+        views = [];
+        datasets = [];
+        taskBoards = [];
+        agents = [];
+        tools = [];
+      } else {
+        views = views.slice(0, limitPerKind);
+        datasets = datasets.slice(0, limitPerKind);
+        taskBoards = taskBoards.slice(0, limitPerKind);
+        agents = agents.slice(0, limitPerKind);
+        tools = tools.slice(0, limitPerKind);
+      }
+    }
 
     sendSuccess(res, { views, datasets, taskBoards, agents, tools }, 200);
   } catch (error) {

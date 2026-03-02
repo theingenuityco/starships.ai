@@ -12,27 +12,45 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useCreateDataset, useStarshipDatasets } from '@/hooks/useDatasets'
-import type { StarshipDatasetColumn } from '@starships/protocol'
+import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
 
-function parseColumnsText(text: string): StarshipDatasetColumn[] {
-  const lines = String(text || '')
-    .split('\n')
-    .map(l => l.trim())
+const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
+  { value: 'string', label: 'String' },
+  { value: 'number', label: 'Number' },
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'date', label: 'Date' },
+  { value: 'datetime', label: 'Datetime' },
+  { value: 'enum', label: 'Enum (select)' },
+  { value: 'reference', label: 'Reference' },
+  { value: 'formula', label: 'Formula' },
+  { value: 'json', label: 'JSON' },
+]
+
+const COLUMN_FORMATS: Array<{ value: StarshipDatasetColumnFormat; label: string }> = [
+  { value: 'text', label: 'Text' },
+  { value: 'number', label: 'Number' },
+  { value: 'currency', label: 'Currency' },
+  { value: 'date', label: 'Date' },
+  { value: 'datetime', label: 'Datetime' },
+  { value: 'percentage', label: 'Percentage' },
+]
+
+function normalizeEnumOptions(text: string): string[] {
+  const raw = String(text || '')
+  const parts = raw
+    .split(/\r?\n|,/g)
+    .map((s) => s.trim())
     .filter(Boolean)
-
-  const cols: StarshipDatasetColumn[] = []
-  for (const line of lines) {
-    const name = String(line || '').trim()
-    if (!name) continue
-    cols.push({ name })
-  }
-  return cols
+  return Array.from(new Set(parts))
 }
 
 export default function TablesIndexPage(): React.JSX.Element {
@@ -56,16 +74,52 @@ export default function TablesIndexPage(): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [primaryKey, setPrimaryKey] = useState('')
-  const [columnsText, setColumnsText] = useState('id\nname\n')
+  const [primaryKey, setPrimaryKey] = useState<string>('')
+  const [createTab, setCreateTab] = useState<'guided' | 'json'>('guided')
+  const [columnsDraft, setColumnsDraft] = useState<StarshipDatasetColumn[]>([
+    { name: 'id', type: 'string' },
+    { name: 'name', type: 'string' },
+  ])
+  const [columnsJsonText, setColumnsJsonText] = useState('')
+
+  function resetCreateModal() {
+    setName('')
+    setDescription('')
+    setPrimaryKey('')
+    setCreateTab('guided')
+    const initial: StarshipDatasetColumn[] = [
+      { name: 'id', type: 'string' },
+      { name: 'name', type: 'string' },
+    ]
+    setColumnsDraft(initial)
+    setColumnsJsonText(JSON.stringify(initial, null, 2))
+  }
 
   async function onCreate() {
     if (!canCreate) return
-    const cols = parseColumnsText(columnsText)
+    let cols: StarshipDatasetColumn[] = []
+    if (createTab === 'json') {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(columnsJsonText)
+      } catch (e) {
+        toast.error('Invalid columns JSON', { description: getSafeErrorMessage(e) })
+        return
+      }
+      if (!Array.isArray(parsed)) {
+        toast.error('Columns JSON must be an array')
+        return
+      }
+      cols = parsed.filter((c) => c && typeof c === 'object') as StarshipDatasetColumn[]
+    } else {
+      cols = (Array.isArray(columnsDraft) ? columnsDraft : []).filter((c) => String(c?.name || '').trim().length > 0)
+    }
+
     if (cols.length === 0) {
       toast.error('Please provide at least one column')
       return
     }
+
     try {
       const created = await createDataset.mutateAsync({
         name: name.trim() || 'New dataset',
@@ -74,9 +128,7 @@ export default function TablesIndexPage(): React.JSX.Element {
         primaryKey: primaryKey.trim() ? primaryKey.trim() : null,
       })
       setOpen(false)
-      setName('')
-      setDescription('')
-      setPrimaryKey('')
+      resetCreateModal()
       router.push(`/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(created.id)}`)
     } catch (e) {
       toast.error('Failed to create dataset', { description: getSafeErrorMessage(e) })
@@ -180,7 +232,15 @@ export default function TablesIndexPage(): React.JSX.Element {
         </div>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next)
+          if (next) {
+            resetCreateModal()
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>Create dataset</DialogTitle>
@@ -200,20 +260,289 @@ export default function TablesIndexPage(): React.JSX.Element {
 
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground">Primary key (optional)</div>
-              <Input value={primaryKey} onChange={e => setPrimaryKey(e.target.value)} placeholder="id (must match a column key)" />
+              <Input value={primaryKey} onChange={e => setPrimaryKey(e.target.value)} placeholder="id (must match a column name)" />
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">Columns (one per line)</div>
-              <Textarea
-                value={columnsText}
-                onChange={e => setColumnsText(e.target.value)}
-                placeholder="email\nstatus"
-                rows={8}
-              />
-              <div className="text-[11px] text-muted-foreground">
-                Format: <code className="font-mono">name</code> (one per line). Names should be alphanumeric/underscore.
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Schema</div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const next = [...(Array.isArray(columnsDraft) ? columnsDraft : []), { name: '', type: 'string' as const }]
+                    setColumnsDraft(next)
+                    if (createTab === 'guided') setColumnsJsonText(JSON.stringify(next, null, 2))
+                  }}
+                >
+                  <Icon name="plus" className="h-4 w-4 mr-1.5" />
+                  Add column
+                </Button>
               </div>
+
+              <Tabs value={createTab} onValueChange={(v) => setCreateTab(v === 'json' ? 'json' : 'guided')}>
+                <TabsList>
+                  <TabsTrigger value="guided">Guided</TabsTrigger>
+                  <TabsTrigger value="json">JSON</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="guided" className="space-y-3">
+                  {columnsDraft.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No columns yet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {columnsDraft.map((col, idx) => {
+                        const nameVal = String(col?.name || '')
+                        const typeVal = (col?.type ?? 'string') as StarshipDatasetColumnType
+                        const formatVal = col?.format as StarshipDatasetColumnFormat | undefined
+                        const constraints = (col?.constraints ?? {}) as any
+                        const isPk = primaryKey.trim() && primaryKey.trim() === nameVal.trim()
+
+                        const setCol = (patch: Partial<StarshipDatasetColumn>) => {
+                          const next = columnsDraft.map((c, i) => (i === idx ? { ...(c as any), ...patch } : c))
+                          setColumnsDraft(next)
+                          setColumnsJsonText(JSON.stringify(next, null, 2))
+                        }
+
+                        return (
+                          <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                                <div className="space-y-1">
+                                  <div className="text-[11px] text-muted-foreground">Name</div>
+                                  <Input
+                                    value={nameVal}
+                                    onChange={(e) => setCol({ name: e.target.value })}
+                                    placeholder="e.g. status"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-[11px] text-muted-foreground">Type</div>
+                                  <Select value={typeVal} onValueChange={(v) => setCol({ type: v as any })}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {COLUMN_TYPES.map((t) => (
+                                        <SelectItem key={t.value} value={t.value}>
+                                          {t.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="text-[11px] text-muted-foreground">Format (optional)</div>
+                                  <Select
+                                    value={formatVal ?? ''}
+                                    onValueChange={(v) => setCol({ format: (v ? (v as any) : undefined) as any })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="(none)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="">(none)</SelectItem>
+                                      {COLUMN_FORMATS.map((f) => (
+                                        <SelectItem key={f.value} value={f.value}>
+                                          {f.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const next = columnsDraft.filter((_, i) => i !== idx)
+                                  setColumnsDraft(next)
+                                  setColumnsJsonText(JSON.stringify(next, null, 2))
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="text-[11px] text-muted-foreground">Description (optional)</div>
+                              <Input
+                                value={String(col?.description ?? '')}
+                                onChange={(e) => setCol({ description: e.target.value })}
+                                placeholder="What does this column represent?"
+                              />
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-4">
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={Boolean(constraints.required)}
+                                  onCheckedChange={(v) => setCol({ constraints: { ...constraints, required: Boolean(v) } })}
+                                />
+                                Required
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={Boolean(constraints.nullable)}
+                                  onCheckedChange={(v) => setCol({ constraints: { ...constraints, nullable: Boolean(v) } })}
+                                />
+                                Nullable
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <Checkbox
+                                  checked={Boolean(constraints.unique)}
+                                  disabled={!isPk}
+                                  onCheckedChange={(v) => setCol({ constraints: { ...constraints, unique: Boolean(v) } })}
+                                />
+                                Unique {isPk ? '' : '(primaryKey only)'}
+                              </label>
+                            </div>
+
+                            {typeVal === 'enum' && (
+                              <div className="space-y-2">
+                                <div className="text-[11px] text-muted-foreground">Enum options (comma or newline separated)</div>
+                                <Textarea
+                                  value={Array.isArray((col as any)?.enum?.options) ? (col as any).enum.options.join('\n') : ''}
+                                  onChange={(e) =>
+                                    setCol({ enum: { options: normalizeEnumOptions(e.target.value) } } as any)
+                                  }
+                                  rows={3}
+                                />
+                              </div>
+                            )}
+
+                            {typeVal === 'reference' && (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] text-muted-foreground">Target kind</div>
+                                    <Select
+                                      value={String((col as any)?.reference?.target?.kind || '') || 'dataset_row'}
+                                      onValueChange={(v) => {
+                                        if (v === 'task_card') {
+                                          setCol({ reference: { target: { kind: 'task_card' } } } as any)
+                                        } else {
+                                          setCol({ reference: { target: { kind: 'dataset_row', datasetIdOrSlug: '' } } } as any)
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select target" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="dataset_row">Dataset row</SelectItem>
+                                        <SelectItem value="task_card">Task card</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] text-muted-foreground">Label column (optional)</div>
+                                    <Input
+                                      value={String((col as any)?.reference?.labelColumn || '')}
+                                      onChange={(e) =>
+                                        setCol({
+                                          reference: {
+                                            ...(col as any).reference,
+                                            labelColumn: e.target.value,
+                                          },
+                                        } as any)
+                                      }
+                                      placeholder="e.g. name"
+                                    />
+                                  </div>
+                                </div>
+
+                                {String((col as any)?.reference?.target?.kind || '') === 'dataset_row' && (
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] text-muted-foreground">Target dataset</div>
+                                    <Select
+                                      value={String((col as any)?.reference?.target?.datasetIdOrSlug || '')}
+                                      onValueChange={(v) =>
+                                        setCol({ reference: { ...(col as any).reference, target: { kind: 'dataset_row', datasetIdOrSlug: v } } } as any)
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select dataset" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {(sorted ?? []).map((d) => (
+                                          <SelectItem key={d.id} value={d.slug}>
+                                            {d.name} ({d.slug})
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      Uses the target dataset’s primaryKey (row_key) to resolve labels.
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {typeVal === 'formula' && (
+                              <div className="space-y-2">
+                                <div className="text-[11px] text-muted-foreground">Expression</div>
+                                <Textarea
+                                  value={String((col as any)?.formula?.expr || '')}
+                                  onChange={(e) => setCol({ formula: { ...(col as any).formula, expr: e.target.value } } as any)}
+                                  rows={3}
+                                  placeholder='e.g. round(price * qty, 2)'
+                                />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] text-muted-foreground">Result type (optional)</div>
+                                    <Select
+                                      value={String((col as any)?.formula?.resultType || '')}
+                                      onValueChange={(v) =>
+                                        setCol({ formula: { ...(col as any).formula, resultType: v || undefined } } as any)
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="(infer)" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="">(infer)</SelectItem>
+                                        {['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum'].map((t) => (
+                                          <SelectItem key={t} value={t}>
+                                            {t}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="text-[11px] text-muted-foreground">Notes</div>
+                                    <div className="text-[11px] text-muted-foreground">
+                                      Formulas are computed on read; writes ignore this field.
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="json" className="space-y-2">
+                  <Textarea
+                    value={columnsJsonText}
+                    onChange={(e) => setColumnsJsonText(e.target.value)}
+                    className="min-h-[320px] font-mono text-xs"
+                    placeholder='[{"name":"id","type":"string"}]'
+                  />
+                  <div className="text-[11px] text-muted-foreground">
+                    You can paste the full column config including constraints/enum/reference/formula blocks.
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
 

@@ -4,6 +4,8 @@ slug: tasks
 category: tasks
 ---
 
+# Task Boards (Kanban)
+
 ## Overview
 
 Task boards are **starship-scoped** kanban boards intended for both humans and agents to track work.
@@ -21,11 +23,21 @@ Key actions (Starships connector):
 - `list-task-boards`
 - `create-task-board`
 - `get-task-board`
+- `update-task-board`
+- `archive-task-board`
+- `create-task-column`
+- `update-task-column`
+- `delete-task-column`
 - `list-task-cards`
 - `create-task-card`
 - `update-task-card`
 - `move-task-card`
 - `archive-task-card`
+
+### Notes on board IDs vs slugs
+
+- Most board actions accept **`boardSlug` (preferred)** or `boardId` (legacy).
+- Slugs are unique per starship.
 
 ### Example: create a card, then move it
 
@@ -49,6 +61,7 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
       "parameters": {
         "connector": "starships",
         "action": "list-task-boards",
+        "failOnNon2xx": true,
         "args": { "starshipId": "{{ state.starshipId }}" }
       }
     },
@@ -60,7 +73,11 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
       "parameters": {
         "connector": "starships",
         "action": "get-task-board",
-        "args": { "boardId": "{{ lastOutputOf('boards').boards[0].id }}" }
+        "failOnNon2xx": true,
+        "args": {
+          "starshipId": "{{ state.starshipId }}",
+          "boardSlug": "{{ lastOutputOf('boards').body.data.boards[0].slug }}"
+        }
       }
     },
     {
@@ -71,9 +88,11 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
       "parameters": {
         "connector": "starships",
         "action": "create-task-card",
+        "failOnNon2xx": true,
         "args": {
-          "boardId": "{{ lastOutputOf('boards').boards[0].id }}",
-          "columnId": "{{ lastOutputOf('getBoard').columns[0].id }}",
+          "starshipId": "{{ state.starshipId }}",
+          "boardSlug": "{{ lastOutputOf('boards').body.data.boards[0].slug }}",
+          "columnName": "{{ lastOutputOf('getBoard').body.data.columns[0].title }}",
           "title": "Investigate issue #123"
         }
       }
@@ -86,9 +105,10 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
       "parameters": {
         "connector": "starships",
         "action": "move-task-card",
+        "failOnNon2xx": true,
         "args": {
-          "cardId": "{{ lastOutputOf('createCard').id }}",
-          "toColumnId": "{{ lastOutputOf('getBoard').columns[1].id }}"
+          "cardId": "{{ lastOutputOf('createCard').body.data.id }}",
+          "toColumnName": "{{ lastOutputOf('getBoard').body.data.columns[1].title }}"
         }
       }
     },
@@ -97,7 +117,7 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
       "type": "end",
       "name": "End",
       "description": "End",
-      "parameters": { "output": "{{ lastOutputOf('moveCard') }}" }
+      "parameters": { "output": "{{ lastOutputOf('moveCard').body.data }}" }
     }
   ],
   "edges": [
@@ -113,6 +133,8 @@ This example assumes the agent runtime provides `state.starshipId` (or `runtimeE
 
 Notes:
 
-- `get-task-board` returns `board` + `columns`.
+- `get-task-board` returns `{ board, columns }` in `body.data`.
+- `create-task-card` requires `columnName` (the column title, unique per board).
 - `move-task-card` accepts `toPos` optionally for precise ordering. If omitted, the server places the card at the end of the destination column.
+- `create-task-card` and `update-task-card` support `assignee: { type: "user"|"agent", slug } | null` (users use `u:<userId>` or `<@u:userId>`; agents use the agent slug).
 

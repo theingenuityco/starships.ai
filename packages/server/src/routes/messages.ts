@@ -8,11 +8,13 @@ import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from 
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import type { MessageModel } from '@starships/protocol';
 import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
 import {
   ChannelRepository,
+  ConversationRepository,
   ConversationParticipantRepository,
   DirectMessageRepository,
   MessageReactionRepository,
@@ -65,6 +67,28 @@ const checkAuth = (req: Request, res: Response): boolean => {
   }
   return true;
 };
+
+function coerceStringId(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+type PersistedMessage = MessageModel & {
+  // NOTE: protocol MessageModel does not currently include these persisted FK fields,
+  // but server messages do contain them (camelCase).
+  conversationId?: string;
+  starshipId?: string;
+  // Back-compat: some mocks/legacy payloads may use snake_case.
+  conversation_id?: string;
+  starship_id?: string;
+};
+
+function getMessageConversationId(message: PersistedMessage): string {
+  return coerceStringId(message.conversationId) || coerceStringId(message.conversation_id);
+}
+
+function getMessageStarshipId(message: PersistedMessage): string {
+  return coerceStringId(message.starshipId) || coerceStringId(message.starship_id);
+}
 
 /**
  * POST /messages - Create a message (no agent processing)
@@ -198,18 +222,8 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    const conversationId =
-      typeof (message as any)?.conversationId === 'string'
-        ? String((message as any).conversationId).trim()
-        : typeof (message as any)?.conversation_id === 'string'
-          ? String((message as any).conversation_id).trim()
-          : '';
-    const starshipId =
-      typeof (message as any)?.starshipId === 'string'
-        ? String((message as any).starshipId).trim()
-        : typeof (message as any)?.starship_id === 'string'
-          ? String((message as any).starship_id).trim()
-          : '';
+    const conversationId = getMessageConversationId(message as PersistedMessage);
+    const starshipId = getMessageStarshipId(message as PersistedMessage);
 
     if (!conversationId || !starshipId) {
       sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
@@ -241,20 +255,20 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
 
     const wantsContentUpdate = typeof (bodyValidation as any)?.content === 'string';
     if (wantsContentUpdate) {
-      const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';
-      const authorUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId) : '';
+      const role = coerceStringId((message as PersistedMessage).role);
+      const authorUserId = coerceStringId((message as PersistedMessage).userId);
       if (!authUserId || role !== 'user' || !authorUserId || authorUserId !== authUserId) {
         sendError(res, 'ACCESS_DENIED', 'You can only edit your own messages', 403, { resource: 'message', id: messageId });
         return;
       }
-      if (String((message as any)?.content || '') === DELETED_MESSAGE_MARKER) {
+      if (String((message as PersistedMessage).content || '') === DELETED_MESSAGE_MARKER) {
         sendError(res, 'RESOURCE_CONFLICT', 'Deleted messages cannot be edited', 409, { resource: 'message', id: messageId });
         return;
       }
     }
 
     // Delegate to service layer
-    const updatedMessage = await messageService.updateMessage(messageId, bodyValidation);
+    const updatedMessage = (await messageService.updateMessage(messageId, bodyValidation)) as PersistedMessage | null;
 
     if (!updatedMessage) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
@@ -276,9 +290,9 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         const participantRepo = new ConversationParticipantRepository();
 
         // 1) Add the message author (author of linked message).
-        const role = typeof (updatedMessage as any)?.role === 'string' ? String((updatedMessage as any).role) : '';
+        const role = coerceStringId(updatedMessage.role);
         if (role === 'user') {
-          const authorUserId = typeof (updatedMessage as any)?.userId === 'string' ? String((updatedMessage as any).userId) : '';
+          const authorUserId = coerceStringId(updatedMessage.userId);
           if (authorUserId) {
             await participantRepo.addUserParticipant({
               conversationId: linkedConversationId,
@@ -288,7 +302,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
             });
           }
         } else if (role === 'assistant') {
-          const authorAgentId = typeof (updatedMessage as any)?.agentId === 'string' ? String((updatedMessage as any).agentId) : '';
+          const authorAgentId = coerceStringId(updatedMessage.agentId);
           if (authorAgentId) {
             await participantRepo.addAgentParticipant({
               conversationId: linkedConversationId,
@@ -307,6 +321,42 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
             createdBy: authUserId,
           });
         }
+
+        // 3) Persist thread context into the child conversation state so agents can see the linked message
+        // without requiring hidden `role:"system"` seed messages in history.
+        try {
+          const convRepo = new ConversationRepository();
+          const child = await convRepo.findById(linkedConversationId).catch(() => null);
+          if (child) {
+            const parentConversationId = getMessageConversationId(updatedMessage);
+            const content = String(updatedMessage.content || '').trim().slice(0, 20_000);
+            const sourceUserName = coerceStringId(updatedMessage.userName);
+            const sourceAgentName = coerceStringId(updatedMessage.agentName);
+            const createdAt = coerceStringId(updatedMessage.createdAt);
+            const attachmentIds = (Array.isArray(updatedMessage.attachmentIds) ? updatedMessage.attachmentIds : [])
+              .map((x) => String(x).trim())
+              .filter(Boolean)
+              .slice(0, 50);
+
+            await convRepo
+              .mergeState(linkedConversationId, {
+                threadContext: {
+                  sourceConversationId: parentConversationId || undefined,
+                  sourceMessageId: messageId,
+                  sourceRole: role || undefined,
+                  sourceUserName: sourceUserName || undefined,
+                  sourceAgentName: sourceAgentName || undefined,
+                  sourceCreatedAt: createdAt || undefined,
+                  sourceAttachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+                  sourceContent: content || undefined,
+                  extractedAt: new Date().toISOString(),
+                },
+              })
+              .catch(() => null);
+          }
+        } catch {
+          /* best-effort: threadContext is helpful but not required */
+        }
       } catch {
         /* best-effort: do not fail linking if participant insertion fails */
       }
@@ -319,15 +369,10 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     // We reuse `message.append` intentionally: the client treats same-id `message.append` as an update,
     // which avoids needing a new stream event type.
     try {
-      const conversationId =
-        typeof (updatedMessage as any)?.conversationId === 'string'
-          ? String((updatedMessage as any).conversationId).trim()
-          : typeof (updatedMessage as any)?.conversation_id === 'string'
-            ? String((updatedMessage as any).conversation_id).trim()
-            : '';
+      const conversationId = getMessageConversationId(updatedMessage);
       if (conversationId) {
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: updatedMessage as any } });
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: updatedMessage } });
       }
     } catch {
       /* best-effort: persistence succeeded even if streaming publish fails */

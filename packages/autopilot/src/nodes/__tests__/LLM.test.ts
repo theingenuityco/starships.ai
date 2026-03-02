@@ -21,6 +21,10 @@ function isRoleContentMessage(value: unknown): value is { role: string; content:
   return isRecord(value) && typeof value.role === 'string' && 'content' in value;
 }
 
+function isTextContentPart(value: unknown): value is { type: 'text'; text: string } {
+  return isRecord(value) && value.type === 'text' && typeof value.text === 'string';
+}
+
 function isToolRoleStringContentMessage(value: unknown): value is { role: 'tool'; content: string } {
   return isRoleContentMessage(value) && value.role === 'tool' && typeof value.content === 'string';
 }
@@ -139,6 +143,59 @@ describe('LLM Node Handler', () => {
           type: 'content_complete',
         })
       );
+    });
+
+    it('should merge multiple system messages into one provider system message', async () => {
+      const params: LlmParams = {
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          { role: 'system', content: 'SYS_A' },
+          { role: 'system', content: 'SYS_B' },
+          { role: 'user', content: 'Hello!' },
+        ],
+      };
+
+      const mockStream = createMockStream([
+        {
+          id: 'test-merge-sys',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'OK' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 'test-merge-sys',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
+
+      const llm = new LLM(params, { hostRuntime });
+      await llm.execute();
+
+      const req = llmMock.mock.calls[0]?.[0] as LlmHostRequest;
+      expect(req).toBeTruthy();
+      const msgList = Array.isArray(req.messages) ? (req.messages as unknown[]) : [];
+      const systemCount = Array.isArray(msgList) ? msgList.filter((m) => isRoleContentMessage(m) && m.role === 'system').length : 0;
+      expect(systemCount).toBe(1);
+
+      const sys = msgList.find((m): m is { role: 'system'; content: unknown } => isRoleContentMessage(m) && m.role === 'system') ?? null;
+      const sysContent = sys?.content ?? '';
+      const sysText =
+        typeof sysContent === 'string'
+          ? String(sysContent)
+          : Array.isArray(sysContent)
+            ? sysContent
+                .map((p) => (isTextContentPart(p) ? p.text : ''))
+                .filter(Boolean)
+                .join('\n')
+            : '';
+      // Both system blocks should be present in the merged prompt
+      expect(sysText).toContain('SYS_A');
+      expect(sysText).toContain('SYS_B');
     });
 
     it('should handle custom LLM parameters', async () => {

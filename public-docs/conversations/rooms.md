@@ -187,6 +187,19 @@ Response:
 { "views": [], "datasets": [], "taskBoards": [], "agents": [], "tools": [] }
 ```
 
+### View pinned resources (resolved objects)
+
+To avoid fetching “all starship resources” just to render room pins, you can fetch the resolved pinned resources (in pin order):
+
+- `GET /api/v1/rooms/:roomId/pins/resources` (combined; returns all kinds in one response)
+- `GET /api/v1/rooms/:roomId/pins/views`
+- `GET /api/v1/rooms/:roomId/pins/datasets`
+- `GET /api/v1/rooms/:roomId/pins/task-boards`
+- `GET /api/v1/rooms/:roomId/pins/agents`
+- `GET /api/v1/rooms/:roomId/pins/tools`
+
+Each returns an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).
+
 ### Pin / unpin (owner/admin only, MVP policy)
 
 - Agents:

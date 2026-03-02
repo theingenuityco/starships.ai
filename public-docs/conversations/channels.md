@@ -12,6 +12,14 @@ Channels are **conversation-backed rooms (Slack/Discord-like)** within a starshi
 - **Timeline**: channels are primarily used as chat timelines (messages live directly in the channel conversation)
 - **Optional attached view**: channels can have an attached view via `attachedViewId`
 
+## Channel vs room (theory)
+
+- **Channel**: optimized for a single scrolling chat timeline.
+- **Room**: optimized for starting many threads and pinning resources (forum-style).
+
+If you want “one place where messages happen”, use a channel.
+If you want “a place to start many independent threads”, use a room.
+
 ## Where this is implemented (source of truth)
 
 - **Protocol types**: `packages/protocol/dist/domains/channel.d.ts`
@@ -126,10 +134,86 @@ When using `connector_action` with `connector: "starships"`, the following chann
 - `add-channel-member`
 - `remove-channel-member`
 
+### Action → endpoint mapping (Starships connector)
+
+These are defined in `packages/models/src/migrations/127_starships_connector_channel_endpoints.ts`:
+
+- `list-channels` → `GET /starships/{starshipId}/channels`
+- `create-channel` → `POST /starships/{starshipId}/channels`
+- `get-channel` → `GET /channels/{channelId}`
+- `update-channel` → `PATCH /channels/{channelId}`
+- `delete-channel` → `DELETE /channels/{channelId}`
+- `add-channel-member` → `POST /channels/{channelId}/members`
+- `remove-channel-member` → `DELETE /channels/{channelId}/members/{userId}`
+
 ### Attaching views to channels
 
 Channel view attachment is implemented by patching the channel and setting `attachedViewId`:
 
 - Connector action: `attach-view-to-channel` (uses `PATCH /channels/{channelId}` under the hood)
 - HTTP API: `PATCH /api/v1/channels/:channelId` with `attachedViewId`
+
+## Examples (Blueprint / DSL)
+
+### Example: list channels
+
+```json
+{
+  "nodes": [
+    { "ref": "start", "type": "start", "name": "Start", "description": "", "parameters": {} },
+    {
+      "ref": "list",
+      "type": "connector_action",
+      "name": "List channels",
+      "description": "",
+      "parameters": {
+        "connector": "starships",
+        "action": "list-channels",
+        "failOnNon2xx": true,
+        "args": { "starshipId": "{{ env('STARSHIP_ID') }}" }
+      }
+    },
+    { "ref": "endNode", "type": "end", "name": "End", "description": "", "parameters": { "output": "{{ lastOutputOf('list').body.data }}" } }
+  ],
+  "edges": [
+    { "ref": "e1", "from": "start", "to": "list" },
+    { "ref": "e2", "from": "list", "to": "endNode" }
+  ],
+  "metadata": {}
+}
+```
+
+### Example: create a channel
+
+```json
+{
+  "nodes": [
+    { "ref": "start", "type": "start", "name": "Start", "description": "", "parameters": {} },
+    {
+      "ref": "create",
+      "type": "connector_action",
+      "name": "Create channel",
+      "description": "",
+      "parameters": {
+        "connector": "starships",
+        "action": "create-channel",
+        "failOnNon2xx": true,
+        "args": {
+          "starshipId": "{{ env('STARSHIP_ID') }}",
+          "slug": "general",
+          "name": "General",
+          "isPrivate": false,
+          "topic": "Optional topic"
+        }
+      }
+    },
+    { "ref": "endNode", "type": "end", "name": "End", "description": "", "parameters": { "output": "{{ lastOutputOf('create').body.data }}" } }
+  ],
+  "edges": [
+    { "ref": "e1", "from": "start", "to": "create" },
+    { "ref": "e2", "from": "create", "to": "endNode" }
+  ],
+  "metadata": {}
+}
+```
 

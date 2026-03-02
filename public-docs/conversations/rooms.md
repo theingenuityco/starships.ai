@@ -38,6 +38,39 @@ Stable terms used below:
 
 Note: unlike channels/views/datasets, **rooms currently do not have Starships connector actions** seeded in the internal `starships` connector template. Room CRUD and pins are **HTTP-only** today.
 
+## Room vs channel (theory)
+
+- **Room**: a forum-style index for starting many threads and pinning resources.
+- **Channel**: a single chat timeline that may optionally have message-linked threads.
+
+Rooms are best when you want:
+
+- many independent threads (each is its own child conversation)
+- a curated “Resources” panel (pins)
+
+Channels are best when you want:
+
+- one continuous timeline (messages live directly in the channel conversation)
+
+## Pins (theory)
+
+Pins are **per-kind ordered lists** attached to a room.
+Each pin kind has its own ordered list (so “views position 0” and “datasets position 0” are different lists).
+
+Pin kinds:
+
+- `view`
+- `dataset`
+- `task_board`
+- `agent`
+- `tool`
+
+## Tips for agents
+
+- **Rooms are HTTP-only today**: without a seeded connector action (or a custom tool wrapping these routes), an agent cannot call the rooms APIs via `connector_action`.
+- **Prefer pinning to teach context**: pins are the intended way to make “room context” discoverable (dashboards, datasets, task boards, etc.).
+- **Thread notification level**: thread notification-level endpoints are currently channel-thread only; do not rely on them for room threads.
+
 ## Privacy & access control
 
 Rooms can be **public** or **private** (`isPrivate: boolean`).
@@ -146,6 +179,18 @@ Response:
 - Task boards:
   - `POST /api/v1/rooms/:roomId/pins/task-boards` body: `{ "boardId": "...", "position"?: 0 }`
   - `DELETE /api/v1/rooms/:roomId/pins/task-boards/:boardId`
+
+Validation / invariants:
+
+- The pinned resource must exist.
+- The pinned resource must belong to the **same starship** as the room.
+- Pin mutations are owner/admin-only today (MVP policy).
+
+Ordering semantics:
+
+- `position` is 0-based **within the pin kind**.
+- If `position` is omitted, the pin is appended.
+- The server maintains a stable order by shifting positions under concurrency.
 
 ### Reorder pins (owner/admin only, MVP policy)
 

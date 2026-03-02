@@ -101,6 +101,28 @@ function isEmptyValue(value: unknown): boolean {
   return false;
 }
 
+const MAX_SCHEMA_REGEX_LENGTH = 256;
+const MAX_SCHEMA_REGEX_TEST_INPUT_LENGTH = 10_000;
+
+function isProbablyUnsafeRegex(pattern: string): boolean {
+  const p = String(pattern ?? '');
+  if (!p.trim()) return true;
+  if (p.length > MAX_SCHEMA_REGEX_LENGTH) return true;
+
+  // Disallow advanced constructs that are easy to make catastrophically slow.
+  // This is an admin-configured field, but we still guard the server thread.
+  if (p.includes('(?')) return true; // lookarounds, named groups, etc
+  if (/\\\d/.test(p)) return true; // backreferences
+
+  // Heuristic: reject "nested quantifier" shapes like (a+)+, (.*)+, (.+){2,}, etc.
+  if (/\((?:[^()\\]|\\.)*?[+*{](?:[^()\\]|\\.)*?\)\s*(?:[+*?]|\{\s*\d+)/.test(p)) return true;
+
+  // Another common pitfall: adjacent quantifiers (often accidental).
+  if (/[+*?}]\s*(?:[+*?]|\{\s*\d+)/.test(p)) return true;
+
+  return false;
+}
+
 function wantsAutoincrement(col: StarshipDatasetColumn): boolean {
   return Boolean((col as any)?.constraints?.autoincrement);
 }
@@ -223,8 +245,13 @@ function coerceValidateRow(args: {
       const pattern = (constraints as any).pattern;
       if (typeof pattern === 'string' && pattern.trim()) {
         try {
+          if (isProbablyUnsafeRegex(pattern)) {
+            issues.push({ index, column: name, code: 'PATTERN_INVALID', message: 'Unsafe pattern' });
+            continue;
+          }
           const re = new RegExp(pattern);
-          if (!re.test(String(out[name]))) {
+          const testValue = String(out[name]).slice(0, MAX_SCHEMA_REGEX_TEST_INPUT_LENGTH);
+          if (!re.test(testValue)) {
             issues.push({ index, column: name, code: 'PATTERN', message: 'Does not match required pattern' });
           }
         } catch {

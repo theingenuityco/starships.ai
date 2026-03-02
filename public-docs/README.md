@@ -20,7 +20,10 @@ This folder contains documentation for the Starships workflow system, including 
   - [Task boards (kanban)](./tasks/README.md)
 
 - **Conversations**
-  - [Rooms (forum-style threads + pins)](./rooms.md)
+  - [Conversations overview](./conversations/README.md)
+  - [Channels](./conversations/channels.md)
+  - [Rooms](./conversations/rooms.md)
+  - [Threads](./conversations/threads.md)
 
 - **Data**
   - [Starship datasets (tabular)](./data/datasets.md)

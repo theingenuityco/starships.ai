@@ -21,7 +21,9 @@ export function LeadGenerationHero(props: { useCase: UseCaseModel; typewriterPro
     <section className="min-h-[95vh] flex flex-col justify-center">
       <div className="max-w-3xl mx-auto w-full text-center px-4">
         <h1 className="flex justify-center">
-          <span className="text-5xl sm:text-7xl font-semibold tracking-tight leading-[1.05] whitespace-nowrap">Lead generation made <span className="text-primary">simple</span>.</span>
+          <span className="text-5xl sm:text-7xl font-semibold tracking-tight leading-[1.05] whitespace-nowrap">
+            Lead generation made <span className="text-primary">simple</span>.
+          </span>
         </h1>
         <p className="mt-6 text-base sm:text-lg text-muted-foreground text-balance">{useCase.heroSubtitle}</p>
 

@@ -113,8 +113,11 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                 Watch a quick walkthrough of Piper in action—from writing your first prompt to getting qualified leads. No setup required.
               </p>
               <div className="mt-6">
-                <Button asChild size="lg" className="h-11 rounded-full text-white">
-                  <Link href="/login">Sign up free</Link>
+                <Button asChild size="lg" className="h-11 rounded-full text-white gap-2">
+                  <Link href="/login">
+                    Sign up free
+                    <Icon name="chevron-right" className="h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
             </div>

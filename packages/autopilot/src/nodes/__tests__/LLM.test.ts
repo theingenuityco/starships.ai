@@ -141,6 +141,59 @@ describe('LLM Node Handler', () => {
       );
     });
 
+    it('should merge multiple system messages into one provider system message', async () => {
+      const params: LlmParams = {
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          { role: 'system', content: 'SYS_A' },
+          { role: 'system', content: 'SYS_B' },
+          { role: 'user', content: 'Hello!' },
+        ],
+      };
+
+      const mockStream = createMockStream([
+        {
+          id: 'test-merge-sys',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'OK' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 'test-merge-sys',
+          model: 'anthropic/claude-3.5-sonnet',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
+
+      const llm = new LLM(params, { hostRuntime });
+      await llm.execute();
+
+      const req = llmMock.mock.calls[0]?.[0] as unknown;
+      expect(req).toBeTruthy();
+      const msgList = (req as any).messages as unknown[];
+      const systemCount = Array.isArray(msgList) ? msgList.filter((m) => isRoleContentMessage(m) && m.role === 'system').length : 0;
+      expect(systemCount).toBe(1);
+
+      const sys = Array.isArray(msgList) ? msgList.find((m) => isRoleContentMessage(m) && m.role === 'system') : null;
+      const sysContent = sys ? (sys as any).content : '';
+      const sysText =
+        typeof sysContent === 'string'
+          ? String(sysContent)
+          : Array.isArray(sysContent)
+            ? sysContent
+                .map((p: any) => (p && p.type === 'text' && typeof p.text === 'string' ? p.text : ''))
+                .filter(Boolean)
+                .join('\n')
+            : '';
+      // Both system blocks should be present in the merged prompt
+      expect(sysText).toContain('SYS_A');
+      expect(sysText).toContain('SYS_B');
+    });
+
     it('should handle custom LLM parameters', async () => {
       const params: LlmParams = {
         model: 'openai/gpt-4-turbo',

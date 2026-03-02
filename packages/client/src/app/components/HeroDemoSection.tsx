@@ -8,13 +8,20 @@ export default function HeroDemoSection(props: { initialAgentTemplates?: AgentTe
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   return (
     <section className="relative pb-16 sm:pb-20 px-4">
-      {/* Circular glow behind the heading + demo card */}
+      {/* Circular glow behind the heading + demo card (let it extend above the section; we'll mask only the bottom) */}
       <div
-        className="pointer-events-none absolute left-1/2 top-[-480px] -translate-x-1/2 z-0 w-[1800px] h-[1800px] rounded-full"
+        className="pointer-events-none absolute left-1/2 top-[-420px] -translate-x-1/2 z-0 w-[1800px] h-[1800px] rounded-full"
         style={{
-          // Larger, soft purple circular glow that comfortably wraps the whole section
-          background: 'radial-gradient(circle at center, rgba(168,85,247,0.7) 0%, rgba(147,112,255,0.5) 32%, transparent 80%)',
+          background: 'radial-gradient(circle at center, rgba(168,85,247,0.7) 0%, rgba(147,112,255,0.5) 32%, transparent 78%)',
           filter: 'blur(14px)',
+        }}
+        aria-hidden
+      />
+      {/* Mask the bottom so the glow is only visible above/around the demo, not below it */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 z-10"
+        style={{
+          background: 'linear-gradient(to bottom, transparent 0%, hsl(var(--background)) 70%, hsl(var(--background)) 100%)',
         }}
         aria-hidden
       />

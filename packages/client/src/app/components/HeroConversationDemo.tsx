@@ -666,7 +666,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       <div className="absolute inset-0 -z-10 rounded-2xl video-glow opacity-80 pointer-events-none" aria-hidden />
       <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-90 pointer-events-none" aria-hidden />
 
-      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
+      {/* Use light chat theme locally so the demo matches bright in-app conversations */}
+      <div className="star-theme-light relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
         <div
           className="relative w-full"
           style={{
@@ -674,13 +675,13 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
           }}
         >
           <div className="h-[640px] sm:h-[620px] md:h-[680px] flex flex-col">
-            <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+            <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-[#FFE4C4] flex items-center justify-center">
                     <AgentAvatar seed={cfg.agentSeed} imageUrl={agentAvatarUrlOverride} size={40} instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`} />
                   </div>
-                  <div className={cn('font-medium leading-none truncate', 'text-sm')}>{cfg.label}</div>
+                  <div className={cn('font-medium leading-none truncate', 'text-sm text-slate-900')}>{cfg.label}</div>
                 </div>
                 <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
                   {(Object.keys(CONVOS) as ConvoId[]).map(id => {
@@ -691,10 +692,10 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                         type="button"
                         onClick={() => setActiveConvoId(id)}
                         className={[
-                          'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors shadow-sm',
+                          'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shadow-sm',
                           active
-                            ? 'bg-white text-slate-900 border-white/80'
-                            : 'bg-white/10 text-white/85 border-white/25 hover:bg-white/16',
+                            ? 'bg-slate-900 text-[#FFF7ED] border-slate-900'
+                            : 'bg-transparent text-slate-700 border-transparent hover:bg-slate-100',
                         ].join(' ')}
                       >
                         {CONVOS[id].tabName}

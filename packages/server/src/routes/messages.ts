@@ -329,7 +329,9 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
           const child = await convRepo.findById(linkedConversationId).catch(() => null);
           if (child) {
             const parentConversationId = getMessageConversationId(updatedMessage);
-            const content = String(updatedMessage.content || '').trim().slice(0, 20_000);
+            const content = String(updatedMessage.content || '')
+              .trim()
+              .slice(0, 20_000);
             const sourceUserName = coerceStringId(updatedMessage.userName);
             const sourceAgentName = coerceStringId(updatedMessage.agentName);
             const createdAt = coerceStringId(updatedMessage.createdAt);

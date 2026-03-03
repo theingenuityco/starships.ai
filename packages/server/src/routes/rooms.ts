@@ -12,6 +12,8 @@ import {
   AgentRepository,
   ConversationNotificationPrefRepository,
   ConversationParticipantRepository,
+  ConversationRepository,
+  NotificationRepository,
   RoomDatasetsRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
@@ -24,8 +26,15 @@ import {
   ViewRepository,
   getConnection,
 } from '@starships/models';
-import type { RoomModel } from '@starships/protocol';
+import type { MessageModel, RoomModel } from '@starships/protocol';
 import { StarshipService } from '@/services/StarshipService';
+import { NotificationStreamBus } from '@/services/NotificationStreamBus';
+import { MessageService } from '@/services/MessageService';
+import { WalletService } from '@/services/WalletService';
+import { BillingService } from '@/services/BillingService';
+import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
+import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import crypto from 'crypto';
 
 const router: Router = Router();
 
@@ -250,6 +259,10 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
 
     const conn = getConnection();
     let threadConversationId = '';
+    let approvalMessageId = '';
+    let requestedByUserId: string | null = null;
+    let invitedUserIds: string[] = [];
+    let invitedAgentIds: string[] = [];
     await conn.query('BEGIN');
     try {
       const approval = await conn.queryOne<{
@@ -278,11 +291,21 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
         return;
       }
       threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
+      approvalMessageId = approval.message_id ? String(approval.message_id) : '';
+      requestedByUserId = approval.requested_by_user_id ? String(approval.requested_by_user_id) : null;
 
       const targets = await conn.query<{ target_type: 'user' | 'agent'; target_id: string }>(
         `SELECT target_type, target_id FROM room_invite_approval_targets WHERE approval_id = $1`,
         [params.approvalId]
       );
+      invitedUserIds = targets
+        .filter((t) => t.target_type === 'user')
+        .map((t) => String(t.target_id || '').trim())
+        .filter(Boolean);
+      invitedAgentIds = targets
+        .filter((t) => t.target_type === 'agent')
+        .map((t) => String(t.target_id || '').trim())
+        .filter(Boolean);
 
       // "Invited by" should reflect the requester (message author) even if someone else approves.
       const createdBy = approval.requested_by_user_id ? String(approval.requested_by_user_id) : access.authUserId;
@@ -326,6 +349,134 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
     } catch {
       // best-effort only
     }
+
+    // After approval:
+    // - If users were added, notify them (inbox + SSE).
+    // - If an agent was added, trigger the agent turn for the original message.
+    void (async () => {
+      try {
+        const sid = String(access.room.starshipId || '').trim();
+        const conversationId = String(threadConversationId || '').trim();
+        const messageId = String(approvalMessageId || '').trim();
+        if (!sid || !conversationId || !messageId) return;
+
+        // 1) Notify invited users
+        if (invitedUserIds.length > 0) {
+          const notifRepo = new NotificationRepository();
+          const bus = NotificationStreamBus.getInstance();
+          for (const uid of invitedUserIds) {
+            // Don't notify the approver about their own action.
+            if (uid && uid === access.authUserId) continue;
+            const created = await notifRepo
+              .createOrIgnoreByUserTypeMessage({
+                starshipId: sid,
+                userId: uid,
+                type: 'channel',
+                conversationId,
+                messageId,
+              })
+              .catch(() => ({ created: false as const }));
+            if (!created.created || !created.notification) continue;
+            try {
+              await bus.publish(sid, uid, { type: 'notification.append', data: { notification: created.notification } });
+              const unread = await notifRepo.getUnreadCounts({ starshipId: sid, userId: uid });
+              await bus.publish(sid, uid, { type: 'notification.state', data: { unread } });
+            } catch {
+              // best-effort only
+            }
+          }
+        }
+
+        // 2) Trigger agent once the agent is now a room participant
+        const agentId = invitedAgentIds.length > 0 ? invitedAgentIds[0] : '';
+        if (!agentId) return;
+
+        const agentRepo = new AgentRepository();
+        const agent = await agentRepo.findById(agentId).catch(() => null);
+        if (!agent) return;
+        if (String(agent.starshipId) !== String(sid)) return;
+
+        const messageService = new MessageService();
+        const msg = (await messageService.getMessage(messageId).catch(() => null)) as MessageModel | null;
+        if (!msg) return;
+        if (String(msg.role || '') !== 'user') return;
+
+        const content = String(msg.content || '');
+        const attachmentIds = Array.isArray(msg.attachmentIds) ? msg.attachmentIds : undefined;
+
+        const conversationService = new ConversationService();
+        const willTrigger = await conversationService.willTriggerAgentExecution({ conversationId, content, agentId }).catch(() => false);
+        if (!willTrigger) return;
+
+        // Billing + concurrency guard (mirrors POST /conversations/:id/messages behavior at a high level).
+        const starship = await conversationService.getConversationStarship(conversationId).catch(() => null);
+        if (!starship) return;
+
+        const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
+        const walletService = new WalletService();
+        const wallet = await walletService.getByStarshipId(starship.id).catch(() => null);
+        if (!wallet) return;
+        const currentCredits = Number(wallet.balance) || 0;
+        if (currentCredits < requiredCredits) return;
+
+        const leaseService = new StarshipTurnLeaseService();
+        let turnLeaseId: string | undefined;
+        try {
+          turnLeaseId = await leaseService.acquire({
+            starshipId: starship.id,
+            conversationId,
+            maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
+          });
+        } catch {
+          return;
+        }
+
+        const conversationRepo = new ConversationRepository();
+        const turnGuardId = crypto.randomUUID();
+        const turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId).catch(() => false);
+        if (!turnGuardAcquired) {
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          return;
+        }
+
+        try {
+          const billingService = new BillingService();
+          await billingService.debitForUserMessage({
+            walletId: wallet.id,
+            starshipId: starship.id,
+            conversationId,
+            messageId,
+          });
+        } catch {
+          await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          return;
+        }
+
+        try {
+          await conversationService.addConversationMessage(
+            {
+              conversationId,
+              role: 'user',
+              content,
+              messageType: msg.messageType || 'user_input',
+              agentId,
+              ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : null),
+            },
+            requestedByUserId ? { authContext: { userId: requestedByUserId } } : undefined,
+            { preCreatedUserMessage: msg, turnLeaseId, turnGuardId }
+          );
+        } catch {
+          // Best-effort: if it fails post-debit, we don't retry automatically.
+          // Turn guard state cleanup is handled by ConversationService on completion; but if it fails early,
+          // attempt to release lease and clear turnActive.
+          await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+        }
+      } catch {
+        // best-effort only
+      }
+    })();
 
     sendSuccess(res, { status: 'approved' }, 200);
   } catch (error) {

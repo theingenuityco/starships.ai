@@ -629,6 +629,48 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Resolve the effective permission for an agent/tool slug within a room conversation.
+   *
+   * Precedence:
+   * - agent_tools.permission (agent override) if an agent_tools row exists
+   * - else room_tools.permission (room override) if a room_tools row exists for this room conversation
+   * - else starship_tools.permission (starship default) if a starship_tools row exists
+   * - else null (no access)
+   */
+  async getEffectiveToolPermissionBySlugInRoom(
+    agentId: string,
+    starshipId: string,
+    toolSlug: string,
+    roomConversationId: string
+  ): Promise<'allow' | 'ask' | 'deny' | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ permission: 'allow' | 'ask' | 'deny' | null }>(
+          `
+          SELECT COALESCE(at.permission, rt.permission, st.permission) as permission
+          FROM tools t
+          LEFT JOIN agent_tools at
+            ON at.tool_id = t.id AND at.agent_id = $1
+          LEFT JOIN room_tools rt
+            ON rt.tool_id = t.id AND rt.room_conversation_id = $4
+          LEFT JOIN starship_tools st
+            ON st.tool_id = t.id AND st.starship_id = $2
+          WHERE t.starship_id = $2 AND t.slug = $3
+          LIMIT 1
+          `,
+          [agentId, starshipId, toolSlug, roomConversationId]
+        );
+        const p = row?.permission ?? null;
+        return p === 'allow' || p === 'ask' || p === 'deny' ? p : null;
+      },
+      'getEffectiveToolPermissionBySlugInRoom',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
    * Get the effective tool set for an agent at runtime.
    *
    * A tool is included if:
@@ -660,6 +702,46 @@ export class AgentRepository extends BaseRepository {
         return fromDatabaseArray(ToolEntity, rows);
       },
       'getEffectiveAgentTools',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get the effective tool set for an agent at runtime inside a room (or room thread).
+   *
+   * A tool is included if:
+   * - it is explicitly assigned to the agent (agent_tools row exists), OR
+   * - it is pinned/assigned to the room (room_tools row exists for the room conversation), OR
+   * - it is enabled at the starship level (starship_tools row exists),
+   * AND the effective permission is not 'deny'.
+   *
+   * Precedence: agent_tools.permission overrides room_tools.permission overrides starship_tools.permission.
+   */
+  async getEffectiveAgentToolsForRoomConversation(agentId: string, starshipId: string, roomConversationId: string): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<Record<string, unknown>>(
+          `
+          SELECT DISTINCT t.*
+          FROM tools t
+          LEFT JOIN agent_tools at
+            ON at.tool_id = t.id AND at.agent_id = $1
+          LEFT JOIN room_tools rt
+            ON rt.tool_id = t.id AND rt.room_conversation_id = $3
+          LEFT JOIN starship_tools st
+            ON st.tool_id = t.id AND st.starship_id = $2
+          WHERE t.starship_id = $2
+            AND COALESCE(at.permission, rt.permission, st.permission) IS NOT NULL
+            AND COALESCE(at.permission, rt.permission, st.permission) <> 'deny'
+          ORDER BY t.created_at DESC
+          `,
+          [agentId, starshipId, roomConversationId]
+        );
+        return fromDatabaseArray(ToolEntity, rows);
+      },
+      'getEffectiveAgentToolsForRoomConversation',
       'Agent',
       agentId
     );

@@ -5,6 +5,8 @@
  * A room's identifier is its backing `conversationId` (references `conversations.id`).
  */
 
+import type { AgentToolPermission } from './agent';
+
 export interface Room {
   slug: string;
   name: string;
@@ -48,6 +50,8 @@ export interface RoomPinnedTaskBoard extends RoomPinBase {
 export interface RoomPinnedTool extends RoomPinBase {
   kind: 'tool';
   toolId: string;
+  /** Optional room-scoped override permission for this tool. */
+  permission?: AgentToolPermission;
 }
 
 export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard | RoomPinnedTool;

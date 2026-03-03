@@ -1166,6 +1166,7 @@ router.post(
         permission = fresh;
         setCachedPermission(permCacheKey, fresh);
       }
+
       if (!permission) {
         sendError(res, 'FORBIDDEN', 'Tool is not available to agent', 200, { agentId, toolSlug, toolCallId });
         return;

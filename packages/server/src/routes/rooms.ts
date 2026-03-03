@@ -258,6 +258,8 @@ router.post(
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
+    // Policy: for public rooms, any room participant may approve/deny invite requests.
+    // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
     if (access.room.isPrivate) {
       if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
     }
@@ -510,6 +512,8 @@ router.post(
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
+    // Policy: for public rooms, any room participant may approve/deny invite requests.
+    // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
     if (access.room.isPrivate) {
       if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
     }
@@ -730,7 +734,7 @@ router.post('/rooms/:roomId/leave', jwtAuthMiddleware, rateLimiters.apiAuthentic
  * Returns user + agent participant ids for the room conversation.
  * Requires the caller to be a room participant.
  */
-router.get('/rooms/:roomId/participants', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/participants', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -756,7 +760,7 @@ router.get('/rooms/:roomId/participants', jwtAuthMiddleware, async (req: Request
  * Adds an agent participant to the room (agent allowlist).
  * MVP policy: starship owner/instance-admin only.
  */
-router.post('/rooms/:roomId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/agents', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -807,7 +811,11 @@ router.post('/rooms/:roomId/agents', jwtAuthMiddleware, async (req: Request, res
  * Removes an agent participant from the room (agent allowlist).
  * MVP policy: starship owner/instance-admin only.
  */
-router.delete('/rooms/:roomId/agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete(
+  '/rooms/:roomId/agents/:agentId',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema, agentId: IdSchema }), req.params, res, 'room agent remove');
     if (!params) return;
@@ -988,7 +996,7 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
  *
  * Returns a conversation-backed room by its conversation id.
  */
-router.get('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1134,6 +1142,8 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
     }
 
     // If the room is now private, ensure the updater is a member/participant (idempotent).
+    // NOTE: By policy we do not revoke existing participants when a room flips from public → private
+    // (Slack-like behavior); access is locked to the current member set going forward.
     if (nextIsPrivate === true) {
       const participantRepo = new ConversationParticipantRepository();
       try {

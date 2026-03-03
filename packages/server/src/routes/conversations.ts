@@ -43,7 +43,7 @@ import {
 } from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
 import { createRoomInviteApprovalForMessage } from '@/utils/room-invite-approvals';
-import { parseMentionTokens } from '@/utils/mentions';
+import { analyzeRoomMentionsAndAgentAllowlist } from '@/utils/room-mentions';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
   ToolModel,
@@ -195,71 +195,6 @@ async function verifyResourceAccess200(args: {
   }
 
   return true;
-}
-
-async function enforceRoomMentionAndAgentAllowlist(args: {
-  conversationId: string;
-  conversationStarshipId: string;
-  userId: string;
-  content: string;
-  requestedAgentId?: string | null;
-  req: Request;
-  res: Response;
-}): Promise<
-  | {
-      ctx: { roomConversationId: string };
-      allowUsers: Set<string>;
-      allowAgents: Set<string>;
-      missingUserIds: string[];
-      missingAgentIds: string[];
-      sanitizedContentForExecution: string;
-      sanitizedAgentIdForExecution: string | null;
-    }
-  | null
-> {
-  const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
-  if (!ctx) return null;
-
-  const participantRepo = new ConversationParticipantRepository();
-  const [userIds, agentIds] = await Promise.all([
-    participantRepo.listUserIdsByConversation(ctx.roomConversationId).catch(() => []),
-    participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []),
-  ]);
-  const allowUsers = new Set((userIds || []).map((x) => String(x || '').trim()).filter(Boolean));
-  const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
-
-  const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
-  const missingUserIds = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
-  const missingAgentIdsFromMentions = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
-
-  // If the client explicitly chose an execution agent that isn't allowed in the room,
-  // do NOT trigger agent execution; instead require invite approval.
-  const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
-  const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
-  const missingAgentIds = Array.from(
-    new Set([...(missingAgentIdsFromMentions || []), ...(requestedAgentDisallowed ? [requestedAgentId] : [])].filter(Boolean))
-  );
-
-  // Sanitize agent mentions for execution/routing: disallowed agent mention tokens should not trigger workflows
-  // or auto-link agents in the thread, but the original message content is still persisted as typed.
-  const disallowedAgentIdSet = new Set(missingAgentIdsFromMentions.map((x) => String(x || '').trim()).filter(Boolean));
-  const sanitizedContentForExecution =
-    disallowedAgentIdSet.size === 0
-      ? String(args.content || '')
-      : String(args.content || '').replace(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, (full, id) => {
-          const v = String(id || '').trim();
-          return disallowedAgentIdSet.has(v) ? '' : full;
-        });
-
-  return {
-    ctx: { roomConversationId: ctx.roomConversationId },
-    allowUsers,
-    allowAgents,
-    missingUserIds,
-    missingAgentIds,
-    sanitizedContentForExecution,
-    sanitizedAgentIdForExecution: requestedAgentDisallowed ? null : requestedAgentId || null,
-  };
 }
 
 const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -1878,19 +1813,15 @@ router.post(
       // Also ensure disallowed agents do not trigger execution (they become invite approvals instead).
       const roomInvite =
         !isInternal && authUserId
-          ? await enforceRoomMentionAndAgentAllowlist({
+          ? await analyzeRoomMentionsAndAgentAllowlist({
               conversationId,
-              conversationStarshipId: conversation.starshipId,
-              userId: authUserId,
               content,
               requestedAgentId: agentId ?? null,
-              req,
-              res,
             })
           : null;
 
-      const contentForExecution = roomInvite ? roomInvite.sanitizedContentForExecution : content;
-      const agentIdForExecution = roomInvite ? roomInvite.sanitizedAgentIdForExecution : agentId ?? null;
+      const contentForMessage = roomInvite ? roomInvite.sanitizedContentForMessage : content;
+      const agentIdForExecution = roomInvite ? roomInvite.sanitizedAgentIdForMessage : agentId ?? null;
 
       // Authorization: if agentId is provided (and allowed), verify user owns it and it belongs to the conversation's starship.
       // Do this BEFORE persisting/debiting so we don't charge for an invalid request.
@@ -1923,7 +1854,7 @@ router.post(
       const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
       const willTriggerAgent = await conversationService.willTriggerAgentExecution({
         conversationId,
-        content: contentForExecution,
+        content: contentForMessage,
         agentId: agentIdForExecution,
       });
 
@@ -2022,7 +1953,7 @@ router.post(
       const userMessage = await messageService.createMessage({
         conversationId,
         role: 'user',
-        content,
+        content: contentForMessage,
         messageType: 'user_input',
         ...(authorUserId && { userId: authorUserId }),
         ...(authorName && { userName: authorName }),
@@ -2099,7 +2030,7 @@ router.post(
           await conversationService.addConversationMessage(
             {
               conversationId,
-              content: contentForExecution,
+              content: contentForMessage,
               role: 'user',
               messageType: 'user_input',
               ...(agentIdForExecution && { agentId: agentIdForExecution }),
@@ -2156,7 +2087,7 @@ router.post(
         .addConversationMessage(
           {
             conversationId,
-            content: contentForExecution,
+            content: contentForMessage,
             role: 'user',
             messageType: 'user_input',
             ...(agentIdForExecution && { agentId: agentIdForExecution }),

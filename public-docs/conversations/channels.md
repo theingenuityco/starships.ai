@@ -71,7 +71,7 @@ Body:
 Notes:
 
 - Creating a channel creates a backing conversation first with `title = name`.
-- If private, the creator is added as `admin` in both `conversation_members` and `conversation_participants`.
+- If private, the creator is added as `admin` in `conversation_participants`.
 
 ### Get a channel by id
 
@@ -120,7 +120,7 @@ Channels use conversation notification prefs (`all`, `mentions`, `mute`).
 Notes:
 
 - Only valid for private channels.
-- Adds/removes membership in `conversation_members` and keeps `conversation_participants` in sync best-effort.
+- Adds/removes membership in `conversation_participants`.
 
 ## Starships connector actions (channels)
 

@@ -7,7 +7,7 @@ import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ChannelRepository, ConversationMemberRepository, ConversationNotificationPrefRepository, ConversationParticipantRepository, ViewRepository, getConnection } from '@starships/models';
+import { ChannelRepository, ConversationNotificationPrefRepository, ConversationParticipantRepository, ViewRepository, getConnection } from '@starships/models';
 import type { ChannelModel } from '@starships/protocol';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
@@ -80,13 +80,6 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
           OR $2::boolean = true
           OR EXISTS (
             SELECT 1
-            FROM conversation_members cm
-            WHERE cm.conversation_id = c.conversation_id
-              AND cm.user_id = $3
-            LIMIT 1
-          )
-          OR EXISTS (
-            SELECT 1
             FROM conversation_participants cp
             WHERE cp.conversation_id = c.conversation_id
               AND cp.user_id = $3
@@ -155,7 +148,6 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
 
     const conversationService = new ConversationService();
     const channelRepo = new ChannelRepository();
-    const memberRepo = new ConversationMemberRepository();
     const participantRepo = new ConversationParticipantRepository();
 
     // Create backing conversation first (reuses existing conversation page + message routes).
@@ -177,12 +169,6 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
 
       // Private channels: add creator as a member (idempotent).
       if (channel.isPrivate) {
-        await memberRepo.createOrIgnoreMember({
-          conversationId: channel.conversationId,
-          userId: authUserId,
-          role: 'admin',
-          createdBy: authUserId,
-        });
         await participantRepo.addUserParticipant({
           conversationId: channel.conversationId,
           userId: authUserId,
@@ -399,18 +385,7 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
 
     // If the channel is now private, ensure the updater is a member (idempotent).
     if (nextIsPrivate === true) {
-      const memberRepo = new ConversationMemberRepository();
       const participantRepo = new ConversationParticipantRepository();
-      try {
-        await memberRepo.createOrIgnoreMember({
-          conversationId: channel.conversationId,
-          userId: authUserId,
-          role: 'admin',
-          createdBy: authUserId,
-        });
-      } catch {
-        /* ignore */
-      }
       try {
         await participantRepo.addUserParticipant({
           conversationId: channel.conversationId,
@@ -655,15 +630,8 @@ router.post('/channels/:channelId/members', jwtAuthMiddleware, async (req: Reque
     // MVP: owner-only (owner/admin/instance-admin). Tighten later if desired.
     if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
     const participantRepo = new ConversationParticipantRepository();
-    const result = await memberRepo.createOrIgnoreMember({
-      conversationId: channel.conversationId,
-      userId: body.userId,
-      role: body.role ?? 'member',
-      createdBy: authUserId,
-    });
-    await participantRepo.addUserParticipant({
+    const result = await participantRepo.addUserParticipant({
       conversationId: channel.conversationId,
       userId: body.userId,
       role: body.role ?? 'member',
@@ -706,15 +674,12 @@ router.delete('/channels/:channelId/members/:userId', jwtAuthMiddleware, async (
 
     if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
-    const removed = await memberRepo.removeMember(channel.conversationId, params.userId);
-    // Best-effort: keep participants in sync; ignore failures.
-    try {
-      const conn = getConnection();
-      await conn.query(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [channel.conversationId, params.userId]);
-    } catch {
-      /* ignore */
-    }
+    const conn = getConnection();
+    const result = await conn.queryWithResult(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [
+      channel.conversationId,
+      params.userId,
+    ]);
+    const removed = (result.rowCount ?? 0) > 0;
     sendSuccess(res, { removed }, 200);
   } catch (error) {
     handleError(error, res, 'removing channel member');

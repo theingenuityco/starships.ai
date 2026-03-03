@@ -8,11 +8,8 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import {
-  AgentRepository,
-  ConversationMemberRepository,
   ConversationNotificationPrefRepository,
   ConversationParticipantRepository,
-  RoomAgentsRepository,
   RoomDatasetsRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
@@ -154,13 +151,6 @@ router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reques
           OR $2::boolean = true
           OR EXISTS (
             SELECT 1
-            FROM conversation_members cm
-            WHERE cm.conversation_id = r.conversation_id
-              AND cm.user_id = $3
-            LIMIT 1
-          )
-          OR EXISTS (
-            SELECT 1
             FROM conversation_participants cp
             WHERE cp.conversation_id = r.conversation_id
               AND cp.user_id = $3
@@ -227,7 +217,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
 
     const conversationService = new ConversationService();
     const roomRepo = new RoomRepository();
-    const memberRepo = new ConversationMemberRepository();
     const participantRepo = new ConversationParticipantRepository();
 
     const conversation = await conversationService.createConversation({
@@ -247,12 +236,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
       });
 
       if (room.isPrivate) {
-        await memberRepo.createOrIgnoreMember({
-          conversationId: room.conversationId,
-          userId: authUserId,
-          role: 'admin',
-          createdBy: authUserId,
-        });
         await participantRepo.addUserParticipant({
           conversationId: room.conversationId,
           userId: authUserId,
@@ -431,18 +414,7 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
 
     // If the room is now private, ensure the updater is a member/participant (idempotent).
     if (nextIsPrivate === true) {
-      const memberRepo = new ConversationMemberRepository();
       const participantRepo = new ConversationParticipantRepository();
-      try {
-        await memberRepo.createOrIgnoreMember({
-          conversationId: room.conversationId,
-          userId: authUserId,
-          role: 'admin',
-          createdBy: authUserId,
-        });
-      } catch {
-        /* ignore */
-      }
       try {
         await participantRepo.addUserParticipant({
           conversationId: room.conversationId,
@@ -658,15 +630,8 @@ router.post('/rooms/:roomId/members', jwtAuthMiddleware, async (req: Request, re
 
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
     const participantRepo = new ConversationParticipantRepository();
-    const result = await memberRepo.createOrIgnoreMember({
-      conversationId: room.conversationId,
-      userId: body.userId,
-      role: body.role ?? 'member',
-      createdBy: authUserId,
-    });
-    await participantRepo.addUserParticipant({
+    const result = await participantRepo.addUserParticipant({
       conversationId: room.conversationId,
       userId: body.userId,
       role: body.role ?? 'member',
@@ -709,15 +674,12 @@ router.delete('/rooms/:roomId/members/:userId', jwtAuthMiddleware, async (req: R
 
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
-    const removed = await memberRepo.removeMember(room.conversationId, params.userId);
-    // Best-effort: keep participants in sync; ignore failures.
-    try {
-      const conn = getConnection();
-      await conn.query(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [room.conversationId, params.userId]);
-    } catch {
-      /* ignore */
-    }
+    const conn = getConnection();
+    const result = await conn.queryWithResult(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [
+      room.conversationId,
+      params.userId,
+    ]);
+    const removed = (result.rowCount ?? 0) > 0;
     sendSuccess(res, { removed }, 200);
   } catch (error) {
     handleError(error, res, 'removing room member');
@@ -739,18 +701,16 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
-    const agentsRepo = new RoomAgentsRepository();
     const toolsRepo = new RoomToolsRepository();
 
-    const [views, datasets, taskBoards, agents, tools] = await Promise.all([
+    const [views, datasets, taskBoards, tools] = await Promise.all([
       viewsRepo.list(access.room.conversationId),
       datasetsRepo.list(access.room.conversationId),
       boardsRepo.list(access.room.conversationId),
-      agentsRepo.list(access.room.conversationId),
       toolsRepo.list(access.room.conversationId),
     ]);
 
-    sendSuccess(res, { views, datasets, taskBoards, agents, tools }, 200);
+    sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
   }
@@ -797,7 +757,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const requestedKindsList =
       rawKinds == null ? null : Array.isArray(rawKinds) ? rawKinds.flatMap((v) => String(v).split(',')) : String(rawKinds).split(',');
 
-    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools' | null | 'INVALID' => {
+    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'tools' | null | 'INVALID' => {
       const k = String(input || '')
         .trim()
         .toLowerCase();
@@ -806,15 +766,14 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       if (k === 'views' || k === 'view') return 'views';
       if (k === 'datasets' || k === 'dataset') return 'datasets';
       if (k === 'taskboards' || k === 'task-boards' || k === 'boards' || k === 'board' || k === 'tasks') return 'taskBoards';
-      if (k === 'agents' || k === 'agent') return 'agents';
       if (k === 'tools' || k === 'tool') return 'tools';
       return 'INVALID';
     };
 
-    const allKinds: Array<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'> = ['views', 'datasets', 'taskBoards', 'agents', 'tools'];
-    const kindSet = new Set<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'>(allKinds);
+    const allKinds: Array<'views' | 'datasets' | 'taskBoards' | 'tools'> = ['views', 'datasets', 'taskBoards', 'tools'];
+    const kindSet = new Set<'views' | 'datasets' | 'taskBoards' | 'tools'>(allKinds);
     if (requestedKindsList && requestedKindsList.length > 0) {
-      const next = new Set<'views' | 'datasets' | 'taskBoards' | 'agents' | 'tools'>();
+      const next = new Set<'views' | 'datasets' | 'taskBoards' | 'tools'>();
       for (const kRaw of requestedKindsList) {
         const nk = normalizeKind(kRaw);
         if (nk === null) {
@@ -841,14 +800,12 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
-    const agentsRepo = new RoomAgentsRepository();
     const toolsRepo = new RoomToolsRepository();
 
-    const [viewPins, datasetPins, boardPins, agentPins, toolPins] = await Promise.all([
+    const [viewPins, datasetPins, boardPins, toolPins] = await Promise.all([
       kindSet.has('views') ? viewsRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('datasets') ? datasetsRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('taskBoards') ? boardsRepo.list(access.room.conversationId) : Promise.resolve([]),
-      kindSet.has('agents') ? agentsRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('tools') ? toolsRepo.list(access.room.conversationId) : Promise.resolve([]),
     ]);
 
@@ -857,10 +814,9 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const viewIds = viewPins.map((p) => String(p.viewId)).filter(Boolean);
     const datasetIds = datasetPins.map((p) => String(p.datasetId)).filter(Boolean);
     const boardIds = boardPins.map((p) => String(p.boardId)).filter(Boolean);
-    const agentIds = agentPins.map((p) => String(p.agentId)).filter(Boolean);
     const toolIds = toolPins.map((p) => String(p.toolId)).filter(Boolean);
 
-    const [viewsRows, datasetRows, boardRows, agentRows, toolRows] = await Promise.all([
+    const [viewsRows, datasetRows, boardRows, toolRows] = await Promise.all([
       viewIds.length
         ? conn.query<{
             id: string;
@@ -941,31 +897,6 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
             hasQ ? [boardIds, access.conversationStarshipId, qLike] : [boardIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
-      agentIds.length
-        ? conn.query<{
-            id: string;
-            name: string;
-            slug: string;
-            description: string | null;
-            created_at: string;
-            updated_at: string;
-          }>(
-            `SELECT id, name, slug, description, created_at, updated_at
-               FROM agents
-              WHERE id = ANY($1::text[])
-                AND starship_id = $2
-                ${
-                  hasQ
-                    ? `AND (
-                         name ILIKE $3 ESCAPE '\\'
-                      OR slug ILIKE $3 ESCAPE '\\'
-                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
-                    )`
-                    : ''
-                }`,
-            hasQ ? [agentIds, access.conversationStarshipId, qLike] : [agentIds, access.conversationStarshipId]
-          )
-        : Promise.resolve([]),
       toolIds.length
         ? conn.query<{
             id: string;
@@ -996,7 +927,6 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     const viewsById = new Map(viewsRows.map((r) => [String(r.id), r]));
     const datasetsById = new Map(datasetRows.map((r) => [String(r.id), r]));
     const boardsById = new Map(boardRows.map((r) => [String(r.id), r]));
-    const agentsById = new Map(agentRows.map((r) => [String(r.id), r]));
     const toolsById = new Map(toolRows.map((r) => [String(r.id), r]));
 
     let views = viewPins
@@ -1056,24 +986,6 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       })
       .filter(Boolean);
 
-    let agents = agentPins
-      .map((pin) => {
-        const r = agentsById.get(String(pin.agentId));
-        if (!r) return null;
-        return {
-          pin,
-          agent: {
-            id: String(r.id),
-            name: String(r.name),
-            slug: String(r.slug),
-            description: r.description ?? null,
-            createdAt: String(r.created_at),
-            updatedAt: String(r.updated_at),
-          },
-        };
-      })
-      .filter(Boolean);
-
     let tools = toolPins
       .map((pin) => {
         const r = toolsById.get(String(pin.toolId));
@@ -1097,18 +1009,16 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
         views = [];
         datasets = [];
         taskBoards = [];
-        agents = [];
         tools = [];
       } else {
         views = views.slice(0, limitPerKind);
         datasets = datasets.slice(0, limitPerKind);
         taskBoards = taskBoards.slice(0, limitPerKind);
-        agents = agents.slice(0, limitPerKind);
         tools = tools.slice(0, limitPerKind);
       }
     }
 
-    sendSuccess(res, { views, datasets, taskBoards, agents, tools }, 200);
+    sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
   } catch (error) {
     handleError(error, res, 'listing pinned resources');
   }
@@ -1291,63 +1201,6 @@ router.get('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Req
   }
 });
 
-router.get('/rooms/:roomId/pins/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
-
-    const agentsRepo = new RoomAgentsRepository();
-    const pins = await agentsRepo.list(access.room.conversationId);
-    const ids = pins.map((p) => String(p.agentId)).filter(Boolean);
-
-    if (ids.length === 0) {
-      sendSuccess(res, { items: [] }, 200);
-      return;
-    }
-
-    const conn = getConnection();
-    const rows = await conn.query<{
-      id: string;
-      name: string;
-      slug: string;
-      description: string | null;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `SELECT id, name, slug, description, created_at, updated_at
-         FROM agents
-        WHERE id = ANY($1::text[])
-          AND starship_id = $2`,
-      [ids, access.conversationStarshipId]
-    );
-    const byId = new Map(rows.map((r) => [String(r.id), r]));
-    const items = pins
-      .map((pin) => {
-        const r = byId.get(String(pin.agentId));
-        if (!r) return null;
-        return {
-          pin,
-          agent: {
-            id: String(r.id),
-            name: String(r.name),
-            slug: String(r.slug),
-            description: r.description ?? null,
-            createdAt: String(r.created_at),
-            updatedAt: String(r.updated_at),
-          },
-        };
-      })
-      .filter(Boolean);
-
-    sendSuccess(res, { items }, 200);
-  } catch (error) {
-    handleError(error, res, 'listing pinned agents');
-  }
-});
-
 router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
@@ -1402,79 +1255,6 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
     sendSuccess(res, { items }, 200);
   } catch (error) {
     handleError(error, res, 'listing pinned tools');
-  }
-});
-
-router.post('/rooms/:roomId/pins/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const body = validateData(z.object({ agentId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin agent');
-    if (!body) return;
-
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const agentRepo = new AgentRepository();
-    const agent = await agentRepo.findById(body.agentId);
-    if (!agent) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
-      return;
-    }
-    if (String(agent.starshipId) !== String(room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Pinned agent must belong to the same starship as the room', 400, {
-        agentId: body.agentId,
-        roomStarshipId: room.starshipId,
-        agentStarshipId: agent.starshipId,
-      });
-      return;
-    }
-
-    const pinnedRepo = new RoomAgentsRepository();
-    const pin = await pinnedRepo.upsert({
-      roomConversationId: room.conversationId,
-      agentId: body.agentId,
-      position: body.position ?? null,
-      createdBy: authUserId,
-    });
-    sendSuccess(res, { pin }, 200);
-  } catch (error) {
-    handleError(error, res, 'pinning agent');
-  }
-});
-
-router.delete('/rooms/:roomId/pins/agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema, agentId: IdSchema }), req.params, res, 'pin parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const pinnedRepo = new RoomAgentsRepository();
-    const removed = await pinnedRepo.remove(room.conversationId, params.agentId);
-    sendSuccess(res, { removed }, 200);
-  } catch (error) {
-    handleError(error, res, 'unpinning agent');
   }
 });
 
@@ -1989,80 +1769,6 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     sendSuccess(res, { taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'reordering pinned task boards');
-  }
-});
-
-router.post('/rooms/:roomId/pins/agents/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const body = validateData(z.object({ agentIds: z.array(IdSchema) }), req.body, res, 'reorder pinned agents');
-    if (!body) return;
-
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const pinnedRepo = new RoomAgentsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const existingIds = existing.map((p: { agentId: string }) => String(p.agentId));
-    const nextIds = body.agentIds.map((x) => String(x));
-
-    const uniq = new Set(nextIds);
-    if (uniq.size !== nextIds.length) {
-      sendError(res, 'VALIDATION_ERROR', 'Duplicate agentIds in reorder list', 400);
-      return;
-    }
-    if (existingIds.length !== nextIds.length || existingIds.some((id: string) => !uniq.has(id))) {
-      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned agents', 400, {
-        pinnedCount: existingIds.length,
-        providedCount: nextIds.length,
-      });
-      return;
-    }
-
-    const conn = getConnection();
-    const caseTemp = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${-(idx + 1)}`).join(' ');
-    const caseFinal = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${idx}`).join(' ');
-    const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
-    const args = [room.conversationId, ...nextIds];
-
-    await conn.query('BEGIN');
-    try {
-      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_agents:${room.conversationId}`]);
-      await conn.query(
-        `UPDATE room_agents
-            SET position = CASE agent_id ${caseTemp} ELSE position END
-          WHERE room_conversation_id = $1
-            AND agent_id IN (${inList})`,
-        args
-      );
-      await conn.query(
-        `UPDATE room_agents
-            SET position = CASE agent_id ${caseFinal} ELSE position END
-          WHERE room_conversation_id = $1
-            AND agent_id IN (${inList})`,
-        args
-      );
-      await conn.query('COMMIT');
-    } catch (e) {
-      await conn.query('ROLLBACK');
-      throw e;
-    }
-
-    const agents = await pinnedRepo.list(room.conversationId);
-    sendSuccess(res, { agents }, 200);
-  } catch (error) {
-    handleError(error, res, 'reordering pinned agents');
   }
 });
 

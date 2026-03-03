@@ -292,10 +292,13 @@ erDiagram
         timestamp created_at
     }
 
-    conversation_agents {
-        string conversation_id PK FK
-        string agent_id PK FK
-        timestamp linked_at
+    conversation_participants {
+        string conversation_id FK
+        string user_id FK
+        string agent_id FK
+        string role "member|admin"
+        timestamp created_at
+        string created_by FK
     }
 
     %% ------------------------------------------------------------------------
@@ -524,8 +527,9 @@ erDiagram
     tools ||--o{ agent_tools : "used_by"
     conversations ||--o{ messages : "contains"
     conversations ||--o{ usage : "tracks_usage"
-    conversations ||--o{ conversation_agents : "involves"
-    agents ||--o{ conversation_agents : "participates_in"
+    conversations ||--o{ conversation_participants : "has_participants"
+    users ||--o{ conversation_participants : "participates_in"
+    agents ||--o{ conversation_participants : "participates_in"
     conversations ||--o{ tool_call_approvals : "approvals"
 
     attachments }o--|| messages : "message"
@@ -632,7 +636,7 @@ graph TD
 - **JSONB Storage**: Complex objects (agent state, tool blueprints, metadata) stored as JSONB for flexibility
 - **Removed Tables**: `workflows`, `blueprints`, `executions`, `nodes`, and `edges` tables removed - data stored as JSONB within agent/tool blueprints
 - **Encrypted Secrets**: Per-starship encrypted secrets live in `connector_secrets` (renamed from `environments`)
-- **Conversation Agents**: Many-to-many relationship between conversations and agents via junction table
+- **Conversation Participants**: Participation (users + agents) is stored in `conversation_participants`
 - **Credits/Billing**: Credits are tracked via `wallets` + `wallet_ledger`; legacy USD-era history remains in `ledger_entries`
 
 ### Technical Implementation Notes
@@ -642,7 +646,7 @@ graph TD
 - **Tool Configuration**: Tools support flexible configuration via JSONB blueprint field
 - **Usage Tracking**: Comprehensive token usage tracking for analytics
 - **Full-text Search**: GIN indexes on concatenated text fields for efficient search across all major entities
-- **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_agents`
+- **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_participants`
 
 ### Migration Changes (v2.1.0)
 

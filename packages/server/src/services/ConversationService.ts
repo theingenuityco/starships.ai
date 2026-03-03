@@ -1221,10 +1221,11 @@ export class ConversationService {
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
       const agentRows = await conn.query<Record<string, unknown>>(
-        `SELECT ca.conversation_id, a.*
-         FROM conversation_agents ca
-         INNER JOIN agents a ON a.id = ca.agent_id
-         WHERE ca.conversation_id = ANY($1::text[])
+        `SELECT cp.conversation_id, a.*
+         FROM conversation_participants cp
+         INNER JOIN agents a ON a.id = cp.agent_id
+         WHERE cp.agent_id IS NOT NULL
+           AND cp.conversation_id = ANY($1::text[])
          ORDER BY a.name`,
         [conversationIds]
       );

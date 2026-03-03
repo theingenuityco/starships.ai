@@ -20,7 +20,6 @@ import {
   AgentRepository,
   ChannelRepository,
   ConversationRepository,
-  ConversationMemberRepository,
   ConversationParticipantRepository,
   ConversationNotificationPrefRepository,
   DirectMessageRepository,
@@ -2446,9 +2445,10 @@ router.get(
             COUNT(tca.id)::int AS pending_count,
             (
               SELECT a.name
-              FROM conversation_agents ca
-              INNER JOIN agents a ON a.id = ca.agent_id
-              WHERE ca.conversation_id = c.id
+              FROM conversation_participants cp2
+              INNER JOIN agents a ON a.id = cp2.agent_id
+              WHERE cp2.conversation_id = c.id
+                AND cp2.agent_id IS NOT NULL
               ORDER BY a.name
               LIMIT 1
             ) AS agent_name
@@ -2472,9 +2472,10 @@ router.get(
             COUNT(tca.id)::int AS pending_count,
             (
               SELECT a.name
-              FROM conversation_agents ca
-              INNER JOIN agents a ON a.id = ca.agent_id
-              WHERE ca.conversation_id = c.id
+              FROM conversation_participants cp2
+              INNER JOIN agents a ON a.id = cp2.agent_id
+              WHERE cp2.conversation_id = c.id
+                AND cp2.agent_id IS NOT NULL
               ORDER BY a.name
               LIMIT 1
             ) AS agent_name
@@ -2685,10 +2686,8 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         })
         .catch(() => null);
 
-      const memberRepo = new ConversationMemberRepository();
-      await memberRepo
-        .createOrIgnoreMember({ conversationId: conversation.id, userId: authUserId, role: 'admin', createdBy: authUserId })
-        .catch(() => null);
+      const participantRepo = new ConversationParticipantRepository();
+      await participantRepo.addUserParticipant({ conversationId: conversation.id, userId: authUserId, role: null, createdBy: authUserId }).catch(() => null);
 
       sendSuccess(res, conversation, 201);
       return;

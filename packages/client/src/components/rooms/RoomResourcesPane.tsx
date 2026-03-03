@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import type { RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -17,20 +17,16 @@ export function RoomResourcesPane(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
-  pinnedAgents?: RoomPinnedAgent[] | null
   pinnedTools?: RoomPinnedTool[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
-  agentLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
-  agentSlugById?: Map<string, string> | null
   toolSlugById?: Map<string, string> | null
   canManagePins?: boolean | null
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
-  availableAgents?: Array<{ id: string; name: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
@@ -38,8 +34,6 @@ export function RoomResourcesPane(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
-  onPinAgent?: (agentId: string) => void
-  onUnpinAgent?: (agentId: string) => void
   onPinTool?: (toolId: string) => void
   onUnpinTool?: (toolId: string) => void
   onOpenPinnedView?: (viewId: string) => void
@@ -52,15 +46,13 @@ export function RoomResourcesPane(props: {
   const [pickViewId, setPickViewId] = useState<string>('')
   const [pickDatasetId, setPickDatasetId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
-  const [pickAgentId, setPickAgentId] = useState<string>('')
   const [pickToolId, setPickToolId] = useState<string>('')
 
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedAgents = (props.pinnedAgents || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const totalSaved = pinnedAgents.length + pinnedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length
+  const totalSaved = pinnedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length
 
   const roomLabel = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -68,17 +60,6 @@ export function RoomResourcesPane(props: {
     const slug = String(props.roomSlug || '').trim()
     return slug || 'Room'
   }, [props.roomName, props.roomSlug])
-
-  const openPinnedAgent = (agentId: string) => {
-    const id = String(agentId || '').trim()
-    if (!id) return
-    const agentSlug = props.agentSlugById?.get(id) || ''
-    const peerKey = agentSlug ? agentSlug : `a:${id}`
-    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
-    if (!href) return
-    props.onClose()
-    router.push(href)
-  }
 
   const openPinnedView = (viewId: string) => {
     const id = String(viewId || '').trim()
@@ -178,54 +159,6 @@ export function RoomResourcesPane(props: {
       {/* Body */}
       <div className="flex-1 min-h-0 overflow-auto px-0 sm:px-4 md:px-6 py-4 space-y-6">
         <div className="space-y-3">
-          <div className="text-xs font-medium text-muted-foreground">Agents</div>
-          {props.canManagePins ? (
-            <div className="flex items-center gap-2">
-              <Select value={pickAgentId} onValueChange={setPickAgentId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Add an agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(props.availableAgents || []).map(a => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                onClick={() => {
-                  const id = pickAgentId.trim()
-                  if (!id) return
-                  props.onPinAgent?.(id)
-                  setPickAgentId('')
-                }}
-                disabled={!pickAgentId.trim()}
-              >
-                Add
-              </Button>
-            </div>
-          ) : null}
-          {pinnedAgents.length === 0 ? (
-            <div className="text-sm text-muted-foreground">None</div>
-          ) : (
-            <div className="space-y-1">
-              {pinnedAgents.map(p => (
-                <div key={`pa:${p.agentId}`} className="flex items-center justify-between gap-2">
-                  <Row icon="sparkles" label={props.agentLabelById?.get(String(p.agentId)) || String(p.agentId)} onClick={() => openPinnedAgent(String(p.agentId))} />
-                  {props.canManagePins ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinAgent?.(String(p.agentId))}>
-                      Remove
-                    </Button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-border/60 pt-6 space-y-3">
           <div className="text-xs font-medium text-muted-foreground">Tools</div>
           {props.canManagePins ? (
             <div className="flex items-center gap-2">

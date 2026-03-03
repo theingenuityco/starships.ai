@@ -17,6 +17,8 @@ export function ThreadPane(props: {
   starshipId: string
   starshipSlug?: string
   conversationId: string | null
+  /** Optional: when this thread lives inside a room, pass the room conversation id. */
+  roomConversationId?: string | null
   pinnedFirstMessage?: MessageModel | null
   /** When set (and conversationId is null), this pane acts as a draft thread. */
   draftParentConversationId?: string | null
@@ -37,13 +39,24 @@ export function ThreadPane(props: {
   rightSlot?: ReactNode
   /** When true, omit the default close button (ignored if `rightSlot` is provided). */
   hideCloseButton?: boolean
+  /**
+   * Controls the maximum width of the inner message column.
+   * - 'constrained': center a readable column (matches channel/DM conversations)
+   * - 'full': allow messages to expand to the full available width
+   */
+  contentWidth?: 'constrained' | 'full'
   /** Optional extra classes for the outer container (header+body+composer live inside). */
   className?: string
+  /** Optional allowlists to scope @mention and agent selection (e.g. rooms). */
+  allowedMentionUserIds?: string[] | null
+  allowedMentionAgentIds?: string[] | null
+  allowedAgentIds?: string[] | null
 }) {
   const {
     starshipId,
     starshipSlug,
     conversationId,
+    roomConversationId,
     pinnedFirstMessage,
     draftParentConversationId,
     draftTitle,
@@ -57,7 +70,11 @@ export function ThreadPane(props: {
     titleRightSlot,
     rightSlot,
     hideCloseButton,
+    contentWidth = 'full',
     className,
+    allowedMentionUserIds,
+    allowedMentionAgentIds,
+    allowedAgentIds,
   } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
   const inputContainerRef = useRef<HTMLDivElement>(null)
@@ -276,19 +293,21 @@ export function ThreadPane(props: {
           <ConversationMessageList
             conversationId={effectiveConversationId}
             starshipId={starshipId}
+            roomConversationId={roomConversationId ?? null}
             bottomPaddingPx={inputHeight + 12}
             pinnedFirstMessage={pinnedFirstMessage ?? null}
-            contentWidth="full"
+            contentWidth={contentWidth}
           />
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}
         <div ref={inputContainerRef} className="px-0 sm:px-4 md:px-6 pt-1.5 pb-[env(safe-area-inset-bottom)] sm:pb-3">
-          <div className="w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative" data-message-input>
+          <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto pointer-events-auto opacity-100 relative" data-message-input>
             <ConversationMessageInput
               selectedAgent={selectedAgent}
               starshipId={starshipId}
               conversationId={effectiveConversationId}
+              roomConversationId={roomConversationId ?? null}
               onConversationStart={cid => {
                 onThreadCreated?.(cid)
               }}
@@ -312,6 +331,9 @@ export function ThreadPane(props: {
               minimal={true}
               onAgentChange={onAgentChange}
               starshipSlug={starshipSlug}
+              allowedMentionUserIds={allowedMentionUserIds ?? undefined}
+              allowedMentionAgentIds={allowedMentionAgentIds ?? undefined}
+              allowedAgentIds={allowedAgentIds ?? undefined}
             />
           </div>
         </div>

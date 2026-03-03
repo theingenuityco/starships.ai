@@ -1221,10 +1221,11 @@ export class ConversationService {
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
       const agentRows = await conn.query<Record<string, unknown>>(
-        `SELECT ca.conversation_id, a.*
-         FROM conversation_agents ca
-         INNER JOIN agents a ON a.id = ca.agent_id
-         WHERE ca.conversation_id = ANY($1::text[])
+        `SELECT cp.conversation_id, a.*
+         FROM conversation_participants cp
+         INNER JOIN agents a ON a.id = cp.agent_id
+         WHERE cp.agent_id IS NOT NULL
+           AND cp.conversation_id = ANY($1::text[])
          ORDER BY a.name`,
         [conversationIds]
       );
@@ -2866,6 +2867,7 @@ export class ConversationService {
         conversation?.state &&
         typeof conversation.state === 'object' &&
         (conversation.state as { turnActive?: boolean }).turnActive === true;
+
       if (turnActive) {
         ConversationService.activeCancellations.delete(conversationId);
         throw new ConflictError('A turn is already in progress for this conversation. Please wait for it to complete.');
@@ -2983,6 +2985,21 @@ export class ConversationService {
         userIds: mentionIds.userIds,
         agentIds: mentionIds.agentIds,
       });
+      // When resuming after tool approval, conversation state often has pending tool calls.
+      // For provider-safety we sometimes inject synthetic TOOL_RESULT_MISSING tool messages into history,
+      // but those placeholders must NOT block persistence of the real tool result that will be appended next.
+      const pendingToolCallIds = (() => {
+        const st = conversation?.state && typeof conversation.state === 'object' ? (conversation.state as Record<string, unknown>) : null;
+        const raw = st && Array.isArray(st['pendingToolCalls']) ? (st['pendingToolCalls'] as unknown[]) : [];
+        const out = new Set<string>();
+        for (const item of raw) {
+          if (!item || typeof item !== 'object') continue;
+          const rec = item as Record<string, unknown>;
+          const id = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+          if (id) out.add(id);
+        }
+        return out;
+      })();
       // Exclude persisted system messages from LLM history. System instructions must come only from
       // the canonical system prompt for provider-stable semantics.
       const llmMessagesCore: LlmMessage[] = await Promise.all(
@@ -3022,7 +3039,18 @@ export class ConversationService {
       );
       const llmMessagesCoreNormalized = this.normalizeToolCallHistory(llmMessagesCore);
       // History folding notice is carried inside the canonical system prompt.
-      const llmMessages: LlmMessage[] = llmMessagesCoreNormalized;
+      const llmMessages: LlmMessage[] =
+        pendingToolCallIds.size > 0
+          ? llmMessagesCoreNormalized.filter((m) => {
+              if (!m || typeof m !== 'object') return true;
+              if (m.role !== 'tool') return true;
+              const rec = m as unknown as Record<string, unknown>;
+              const id = typeof rec['toolCallId'] === 'string' ? String(rec['toolCallId']).trim() : '';
+              // Strip any placeholder tool messages for currently pending tool calls.
+              // The real tool result will be appended by the agent execution and must be seen as "new" for persistence.
+              return !id || !pendingToolCallIds.has(id);
+            })
+          : llmMessagesCoreNormalized;
 
       const env = getEnvConfig();
 

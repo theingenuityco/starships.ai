@@ -19,9 +19,9 @@ export interface RoomModel extends Room {
   updatedAt: string;
 }
 
-export type RoomPinnedResourceKind = 'view' | 'dataset' | 'task_board' | 'agent' | 'tool';
+export type RoomPinnedResourceKind = 'view' | 'dataset' | 'task_board' | 'tool';
 
-export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'dataset', 'task_board', 'agent', 'tool'] as const;
+export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'dataset', 'task_board', 'tool'] as const;
 
 export interface RoomPinBase {
   roomConversationId: string;
@@ -45,15 +45,10 @@ export interface RoomPinnedTaskBoard extends RoomPinBase {
   boardId: string;
 }
 
-export interface RoomPinnedAgent extends RoomPinBase {
-  kind: 'agent';
-  agentId: string;
-}
-
 export interface RoomPinnedTool extends RoomPinBase {
   kind: 'tool';
   toolId: string;
 }
 
-export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard | RoomPinnedAgent | RoomPinnedTool;
+export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard | RoomPinnedTool;
 

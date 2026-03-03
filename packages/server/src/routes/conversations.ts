@@ -24,12 +24,10 @@ import {
   ConversationNotificationPrefRepository,
   DirectMessageRepository,
   getConnection,
-  MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
   ToolRepository,
   TurnRepository,
-  WidgetRepository,
 } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
@@ -37,8 +35,14 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
+import {
+  enforceDirectMessageMembership,
+  enforcePrivateChannelMembership,
+  enforceRoomParticipantMembershipForConversation,
+  resolveRoomConversationContext,
+} from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
+import { parseMentionTokens } from '@/utils/mentions';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
   ToolModel,
@@ -190,6 +194,46 @@ async function verifyResourceAccess200(args: {
   }
 
   return true;
+}
+
+async function enforceRoomMentionAndAgentAllowlist(args: {
+  conversationId: string;
+  conversationStarshipId: string;
+  userId: string;
+  content: string;
+  requestedAgentId?: string | null;
+  req: Request;
+  res: Response;
+}): Promise<boolean> {
+  const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
+  if (!ctx) return true;
+
+  const participantRepo = new ConversationParticipantRepository();
+  const [userIds, agentIds] = await Promise.all([
+    participantRepo.listUserIdsByConversation(ctx.roomConversationId).catch(() => []),
+    participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []),
+  ]);
+  const allowUsers = new Set((userIds || []).map((x) => String(x || '').trim()).filter(Boolean));
+  const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
+
+  const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
+
+  const invalidUsers = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
+  const invalidAgents = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
+
+  const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
+  const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
+
+  if (invalidUsers.length === 0 && invalidAgents.length === 0 && !requestedAgentDisallowed) return true;
+
+  sendError(args.res, 'VALIDATION_ERROR', 'You can only mention room participants', 400, {
+    conversationId: args.conversationId,
+    roomConversationId: ctx.roomConversationId,
+    invalidUserIds: invalidUsers,
+    invalidAgentIds: invalidAgents,
+    ...(requestedAgentDisallowed ? { disallowedAgentId: requestedAgentId } : {}),
+  });
+  return false;
 }
 
 const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -505,6 +549,17 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       return;
     }
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: convAuth.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
       return;
     }
 
@@ -1039,6 +1094,17 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: exists.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
 
     await conversationService.stopConversation(conversationId);
     sendSuccess(res, { status: 'stopped', conversationId }, 200);
@@ -1121,6 +1187,18 @@ router.post(
         return;
       }
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+          statusCode: 200,
+        }))
+      ) {
         return;
       }
 
@@ -1323,7 +1401,6 @@ router.post(
 
       const bus = ConversationStreamBus.getInstance();
       const uiActions = new UIActionService(bus);
-      const messageRepo = new MessageRepository();
 
       const result = await executeToolBlueprint({
         blueprint: tool.blueprint,
@@ -1420,6 +1497,16 @@ router.post(
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1506,6 +1593,16 @@ router.get(
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
       const approvals = await approvalsRepo.findPendingByConversation(conversationId);
@@ -1593,6 +1690,17 @@ router.post(
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
       if (
         !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
           conversationId,
           conversationStarshipId: conversation.starshipId,
           userId: authUserId,
@@ -1722,6 +1830,17 @@ router.post(
         if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
           return;
         }
+        if (
+          !(await enforceRoomParticipantMembershipForConversation({
+            conversationId,
+            conversationStarshipId: conversation.starshipId,
+            userId: authUserId,
+            req,
+            res,
+          }))
+        ) {
+          return;
+        }
       }
 
       // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
@@ -1745,6 +1864,21 @@ router.post(
           sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
           return;
         }
+      }
+
+      // Room mention policy: only allow mentioning users/agents who are room participants.
+      // Also enforce that an explicit `agentId` execution target is allowlisted for the room.
+      if (!isInternal && authUserId) {
+        const ok = await enforceRoomMentionAndAgentAllowlist({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          content,
+          requestedAgentId: agentId ?? null,
+          req,
+          res,
+        });
+        if (!ok) return;
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -2042,6 +2176,17 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
 
     sendSuccess(res, conversation, 200);
   } catch (error) {
@@ -2221,6 +2366,16 @@ router.get('/conversations/:conversationId/agents', jwtAuthMiddleware, async (re
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     const agents = await conversationService.getConversationAgents(conversationId);
     sendSuccess(res, { conversationId, agents }, 200);
@@ -2270,6 +2425,16 @@ router.get('/conversations/:conversationId/linked-message', jwtAuthMiddleware, a
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     const messageService = new MessageService();
     const message = await messageService.getLinkingMessage({ conversationId, linkedConversationId });
@@ -2317,6 +2482,17 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
       return;
     }
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
       return;
     }
 
@@ -2421,6 +2597,17 @@ router.get(
         return;
       }
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
         return;
       }
 
@@ -2655,6 +2842,68 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
     }
 
     const conversationService = new ConversationService();
+
+    // Thread creation guard:
+    // If creating a child conversation under a parent, enforce access/membership on the parent.
+    // This prevents users from creating room threads without explicitly joining the room first.
+    if (!isInternal && parentConversationId && authUserId) {
+      const parent = await conversationService.getConversationById(parentConversationId);
+      if (!parent) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Parent conversation not found', 404, {
+          resource: 'conversation',
+          id: parentConversationId,
+        });
+        return;
+      }
+      if (String(parent.starshipId) !== String(bodyValidation.starshipId)) {
+        sendError(res, 'VALIDATION_ERROR', 'parentConversationId does not belong to starshipId', 400, {
+          parentConversationId,
+          parentStarshipId: parent.starshipId,
+          starshipId: bodyValidation.starshipId,
+        });
+        return;
+      }
+      if (!(await verifyResourceAccess(parent.starshipId, authUserId, 'conversation', parentConversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId: parentConversationId,
+          conversationStarshipId: parent.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId: parentConversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId: parentConversationId,
+          conversationStarshipId: parent.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+
+      // If the parent is a room, restrict the thread's agent (if any) to the room's agent allowlist.
+      if (effectiveAgentId) {
+        const ctx = await resolveRoomConversationContext({ conversationId: parentConversationId });
+        if (ctx?.isRoom) {
+          const participantRepo = new ConversationParticipantRepository();
+          const allowedAgentIds = await participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []);
+          const allow = new Set((allowedAgentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
+          if (!allow.has(String(effectiveAgentId))) {
+            sendError(res, 'VALIDATION_ERROR', 'Agent is not allowed in this room', 400, {
+              roomConversationId: ctx.roomConversationId,
+              agentId: effectiveAgentId,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     // For external callers creating top-level agent chats, create/reuse a DM instead of a raw conversation.
     if (!isInternal && !parentConversationId && effectiveAgentId && authUserId) {
       const dmRepo = new DirectMessageRepository();
@@ -2754,6 +3003,31 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
 
     // Update status using appropriate method
     switch (status) {
@@ -2804,6 +3078,31 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       return;
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
       return;
     }
 

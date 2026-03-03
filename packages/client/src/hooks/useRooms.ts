@@ -14,6 +14,8 @@ export const ROOM_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...ROOM_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (roomConversationId: string) => [...ROOM_QUERY_KEYS.all, 'detail', roomConversationId] as const,
   pins: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'pins'] as const,
+  participation: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participation'] as const,
+  participants: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participants'] as const,
 } as const
 
 export function useStarshipRooms(starshipId: string, enabled: boolean = true) {
@@ -47,6 +49,83 @@ export function useRoomPins(roomConversationId: string, enabled: boolean = true)
     },
     enabled: !!roomConversationId && enabled,
     staleTime: 10_000,
+  })
+}
+
+export function useRoomParticipation(roomConversationId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ROOM_QUERY_KEYS.participation(roomConversationId),
+    queryFn: async (): Promise<{ isParticipant: boolean; isPrivate: boolean; canJoin: boolean }> => {
+      const response: FetchResponse<ApiResponse<{ isParticipant: boolean; isPrivate: boolean; canJoin: boolean }>> = await api.get(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/participation`
+      )
+      return {
+        isParticipant: Boolean(response.data.data?.isParticipant),
+        isPrivate: Boolean(response.data.data?.isPrivate),
+        canJoin: Boolean(response.data.data?.canJoin),
+      }
+    },
+    enabled: !!roomConversationId && enabled,
+    staleTime: 5_000,
+  })
+}
+
+export function useJoinRoom(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response: FetchResponse<ApiResponse<{ joined: boolean; created: boolean }>> = await api.post(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/join`,
+        {}
+      )
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participation(roomConversationId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomConversationId) })
+    },
+    onError: (error: any) => {
+      toast.error('Failed to join room', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useLeaveRoom(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response: FetchResponse<ApiResponse<{ left: boolean; removed: boolean }>> = await api.post(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/leave`,
+        {}
+      )
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participation(roomConversationId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomConversationId) })
+    },
+    onError: (error: any) => {
+      toast.error('Failed to leave room', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useRoomParticipants(roomConversationId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ROOM_QUERY_KEYS.participants(roomConversationId),
+    queryFn: async (): Promise<{ userIds: string[]; agentIds: string[] }> => {
+      const response: FetchResponse<ApiResponse<{ userIds: string[]; agentIds: string[] }>> = await api.get(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/participants`
+      )
+      return {
+        userIds: (response.data.data?.userIds || []).map((x: any) => String(x)).filter(Boolean),
+        agentIds: (response.data.data?.agentIds || []).map((x: any) => String(x)).filter(Boolean),
+      }
+    },
+    enabled: !!roomConversationId && enabled,
+    staleTime: 5_000,
   })
 }
 

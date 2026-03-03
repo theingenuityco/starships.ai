@@ -99,6 +99,12 @@ interface ConversationMessageInputProps {
   budgetTokens?: number
   onAgentChange?: (agent: AgentModel | null) => void
   starshipSlug?: string
+  /** Optional allowlists to scope @mention suggestions (users). */
+  allowedMentionUserIds?: string[] | null
+  /** Optional allowlists to scope @mention suggestions (agents). */
+  allowedMentionAgentIds?: string[] | null
+  /** Optional allowlists to scope execution agent selection. */
+  allowedAgentIds?: string[] | null
 }
 
 export interface ConversationMessageInputRef {
@@ -132,6 +138,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       budgetTokens,
       onAgentChange,
       starshipSlug,
+      allowedMentionUserIds,
+      allowedMentionAgentIds,
+      allowedAgentIds,
     },
     ref
   ) => {
@@ -338,27 +347,87 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const list = (membersData as any)?.members
       return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
     }, [membersData])
+
+    const allowedMentionUserIdSet = useMemo(() => {
+      const raw = Array.isArray(allowedMentionUserIds) ? allowedMentionUserIds : null
+      if (!raw || raw.length === 0) return null
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedMentionUserIds])
+
+    const allowedMentionAgentIdSet = useMemo(() => {
+      const raw = Array.isArray(allowedMentionAgentIds) ? allowedMentionAgentIds : null
+      if (!raw || raw.length === 0) return null
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedMentionAgentIds])
+
+    const allowedAgentIdSet = useMemo(() => {
+      const raw = Array.isArray(allowedAgentIds) ? allowedAgentIds : null
+      if (!raw || raw.length === 0) return null
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedAgentIds])
+
+    const starshipAgentsForMention = useMemo(() => {
+      const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
+      const allow = allowedMentionAgentIdSet
+      if (!allow) return list
+      return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
+    }, [allowedMentionAgentIdSet, starshipAgents])
+
+    const starshipAgentsForExecution = useMemo(() => {
+      const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
+      const allow = allowedAgentIdSet
+      if (!allow) return list
+      return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
+    }, [allowedAgentIdSet, starshipAgents])
+
+    const memberUsersForMention: StarshipMemberListItem[] = useMemo(() => {
+      const list = Array.isArray(memberUsers) ? memberUsers : []
+      const allow = allowedMentionUserIdSet
+      if (!allow) return list
+      return list.filter(u => {
+        const uid = String((u as any)?.userId || '').trim()
+        return uid && allow.has(uid)
+      })
+    }, [allowedMentionUserIdSet, memberUsers])
+
+    // If the current selection becomes disallowed (e.g. room allowlist changes), clear it.
+    useEffect(() => {
+      const allow = allowedAgentIdSet
+      const id = String((selectedAgent as any)?.id || '').trim()
+      if (!allow || !id) return
+      if (!allow.has(id)) {
+        onAgentChange?.(null)
+      }
+    }, [allowedAgentIdSet, onAgentChange, selectedAgent])
     const mentionAvatarAttachmentIds = useMemo(() => {
-      return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
+      return (Array.isArray(starshipAgentsForMention) ? (starshipAgentsForMention as AgentModel[]) : [])
         .map(a => (a as any)?.avatarAttachmentId as string | undefined)
         .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    }, [starshipAgents])
+    }, [starshipAgentsForMention])
     const { data: mentionAvatarAttachments = [] } = useMessageAttachments(mentionAvatarAttachmentIds, starshipId)
     const mentionAvatarUrlById = useMemo(() => new Map(mentionAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [mentionAvatarAttachments])
 
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
     const membersRef = useRef<StarshipMemberListItem[]>([])
+    const allowedMentionUserIdSetRef = useRef<Set<string> | null>(null)
+    const allowedMentionAgentIdSetRef = useRef<Set<string> | null>(null)
     useEffect(() => {
-      const latest = Array.isArray(memberUsers) ? memberUsers : []
+      allowedMentionUserIdSetRef.current = allowedMentionUserIdSet
+    }, [allowedMentionUserIdSet])
+    useEffect(() => {
+      allowedMentionAgentIdSetRef.current = allowedMentionAgentIdSet
+    }, [allowedMentionAgentIdSet])
+    useEffect(() => {
+      const latest = Array.isArray(memberUsersForMention) ? memberUsersForMention : []
       if (latest.length > 0) membersRef.current = latest
-    }, [memberUsers])
+    }, [memberUsersForMention])
     useEffect(() => {
-      const latest = (starshipAgents as AgentModel[]) || []
+      const latest = (starshipAgentsForExecution as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
         agentsRef.current = latest
       }
-    }, [starshipAgents])
+    }, [starshipAgentsForExecution])
 
     // Stream state must come from the (single) ship-layout provider; no fallbacks.
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, hasSnapshot, messages: streamMessages, hasMoreBefore: streamHasMoreBefore } = useConversationStreamContext()
@@ -765,7 +834,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const resolveAgentById = (id: string): AgentModel | null => {
         const aid = String(id || '').trim()
         if (!aid) return null
-        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+          a => String(a?.id || '').trim() === aid
+        ) ?? null
         if (fromStarship) return fromStarship
         const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
         return fromConv ?? null
@@ -805,7 +876,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
         if (!dmLockedAgent) {
           const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
-          if (tokenMatch && starshipAgents.length > 0) {
+          if (tokenMatch && starshipAgentsForExecution.length > 0) {
             const id = String(tokenMatch[1] || '').trim()
             const matched = id ? resolveAgentById(id) : null
             if (matched) {
@@ -814,10 +885,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           } else {
             // Back-compat: plain-text leading @handle
             const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-            if (mentionMatch && starshipAgents.length > 0) {
+            if (mentionMatch && starshipAgentsForExecution.length > 0) {
               const handle = mentionMatch[1]
               const lower = handle.toLowerCase()
-              const matched = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
+              const matched =
+                (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+                  a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower
+                ) ?? null
               if (matched) {
                 effectiveAgent = matched
                 // Do NOT strip the leading mention; keep it in the message content
@@ -1175,7 +1249,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       sendMessageFn,
       starshipId,
       onAgentChange,
-      starshipAgents,
+      starshipAgentsForExecution,
       uploadFile,
       queryClient,
       applyPendingWebBrowsing,
@@ -1345,7 +1419,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // DMs: lock UI hints to the DM target agent when applicable.
       if (resolvedDmTarget?.dmType === 'user_agent') {
         const id = resolvedDmTarget.agentId
-        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+          a => String(a?.id || '').trim() === id
+        ) ?? null
         if (fromStarship) return fromStarship
         const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
         return fromConv ?? null
@@ -1358,7 +1434,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
+    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgentsForExecution])
 
     const getPlaceholder = () => {
       const label = agentLabelForUI(contextAgentForUI)
@@ -1527,6 +1603,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const dmKind = dmAllowed?.kind ?? null
         const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
         const restrictToSingleDmPeer = Boolean(dmKind && dmId)
+        const mentionAllowAgents = allowedMentionAgentIdSetRef.current
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
 
@@ -1585,6 +1662,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
           const id = String((a as any)?.id || '').trim()
           if (!id) continue
+          if (mentionAllowAgents && !mentionAllowAgents.has(id)) continue
           const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
           const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
           if (!matchesQuery(haystacks)) continue

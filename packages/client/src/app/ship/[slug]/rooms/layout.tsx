@@ -6,6 +6,7 @@ import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import Icon from '@/components/primitives/Icon'
+import { Button } from '@/components/ui/button'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
 import {
@@ -13,7 +14,10 @@ import {
   usePinRoomTaskBoard,
   usePinRoomTool,
   usePinRoomView,
+  useJoinRoom,
   useRoomPins,
+  useRoomParticipants,
+  useRoomParticipation,
   useStarshipRooms,
   useStarshipTaskBoards,
   useUnpinRoomDataset,
@@ -351,7 +355,12 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   // If slug is present but doesn't match a room, show a not-found UI (hard cutover; no redirects).
   const isInvalidRoomSlug = Boolean(routeParams.roomSlug && !roomsLoading && !activeRoom)
 
-  const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId))
+  const roomParticipation = useRoomParticipation(activeConversationId || '', Boolean(activeConversationId))
+  const isRoomParticipant = Boolean(roomParticipation.data?.isParticipant)
+  const joinRoom = useJoinRoom(activeConversationId || '')
+  const roomParticipants = useRoomParticipants(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
+
+  const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: datasets = [] } = useStarshipDatasets(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -514,6 +523,40 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return null
   }
 
+  // Avoid flashing room UI before we know whether the user is joined.
+  if (activeConversationId && roomParticipation.isLoading) {
+    return null
+  }
+
+  if (activeConversationId && !isRoomParticipant) {
+    const label = String(activeRoom?.name ?? activeRoom?.slug ?? 'Room').trim() || 'Room'
+    const topic = typeof (activeRoom as any)?.topic === 'string' ? String((activeRoom as any).topic).trim() : ''
+    const canJoin = Boolean(roomParticipation.data?.canJoin)
+    return (
+      <div className="h-screen w-full flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center space-y-3">
+          <div className="text-lg font-semibold">
+            Join <span className="font-mono">#{label}</span>
+          </div>
+          <div className="text-sm text-muted-foreground">{topic || 'You must join this room to view threads and resources.'}</div>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button type="button" className="text-sm underline underline-offset-2" onClick={() => router.push(`/ship/${routeParams.slug}/rooms`)}>
+              Back to rooms
+            </button>
+            <Button
+              type="button"
+              onClick={() => joinRoom.mutate()}
+              disabled={!canJoin || joinRoom.isPending || !activeConversationId}
+              title={!canJoin ? 'This room cannot be joined' : undefined}
+            >
+              {joinRoom.isPending ? 'Joining…' : 'Join room'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       ref={rootRef}
@@ -534,6 +577,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onAgentChange={setThreadAgent}
             onThreadCreated={handleThreadCreated}
             onClose={handleCloseThread}
+            allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+            allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
             contentWidth="constrained"
             titlePrefix={
               <button
@@ -565,6 +611,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             roomName={activeRoom?.name ?? null}
             roomIsPrivate={Boolean(activeRoom?.isPrivate)}
             starshipSlug={routeParams.slug}
+            allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+            allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
             pinnedViews={pinsData?.views ?? null}
             pinnedDatasets={pinsData?.datasets ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}

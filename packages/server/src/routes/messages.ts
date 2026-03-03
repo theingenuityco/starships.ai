@@ -4,7 +4,13 @@ import { ConversationService } from '@/services/ConversationService';
 import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
+import {
+  enforceDirectMessageMembership,
+  enforcePrivateChannelMembership,
+  enforceRoomParticipantMembershipForConversation,
+  resolveRoomConversationContext,
+} from '@/utils/conversation-membership';
+import { parseMentionTokens } from '@/utils/mentions';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -90,6 +96,44 @@ function getMessageStarshipId(message: PersistedMessage): string {
   return coerceStringId(message.starshipId) || coerceStringId(message.starship_id);
 }
 
+async function enforceRoomMentionAndAgentAllowlist(args: {
+  conversationId: string;
+  conversationStarshipId: string;
+  userId: string;
+  content: string;
+  requestedAgentId?: string | null;
+  req: Request;
+  res: Response;
+}): Promise<boolean> {
+  const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
+  if (!ctx) return true;
+
+  const participantRepo = new ConversationParticipantRepository();
+  const [userIds, agentIds] = await Promise.all([
+    participantRepo.listUserIdsByConversation(ctx.roomConversationId).catch(() => []),
+    participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []),
+  ]);
+  const allowUsers = new Set((userIds || []).map((x) => String(x || '').trim()).filter(Boolean));
+  const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
+
+  const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
+  const invalidUsers = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
+  const invalidAgents = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
+
+  const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
+  const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
+
+  if (invalidUsers.length === 0 && invalidAgents.length === 0 && !requestedAgentDisallowed) return true;
+  sendError(args.res, 'VALIDATION_ERROR', 'You can only mention room participants', 400, {
+    conversationId: args.conversationId,
+    roomConversationId: ctx.roomConversationId,
+    invalidUserIds: invalidUsers,
+    invalidAgentIds: invalidAgents,
+    ...(requestedAgentDisallowed ? { disallowedAgentId: requestedAgentId } : {}),
+  });
+  return false;
+}
+
 /**
  * POST /messages - Create a message (no agent processing)
  *
@@ -145,6 +189,27 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const okMentions = await enforceRoomMentionAndAgentAllowlist({
+      conversationId,
+      conversationStarshipId: conversation.starshipId,
+      userId: authUserId,
+      content: String((bodyValidation as any)?.content || ''),
+      requestedAgentId: typeof (bodyValidation as any)?.agentId === 'string' ? String((bodyValidation as any).agentId) : null,
+      req,
+      res,
+    });
+    if (!okMentions) return;
 
     const messageService = new MessageService();
     const created = await messageService.createMessage({
@@ -185,6 +250,48 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       });
       return;
     }
+
+    const authUserId = req.user?.id as string | undefined;
+    const conversationId = getMessageConversationId(message as PersistedMessage);
+    const starshipId = getMessageStarshipId(message as PersistedMessage);
+    if (!conversationId || !starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
+      return;
+    }
+
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     sendSuccess(res, message, 200);
   } catch (error) {
@@ -230,6 +337,8 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
+    let conversationStarshipIdForAccess: string | null = null;
+
     // Authorization: verify user has access to the starship + conversation membership.
     if (authUserId) {
       if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
@@ -239,6 +348,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
         return;
       }
+      conversationStarshipIdForAccess = String(conversation.starshipId);
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
       if (
         !(await enforcePrivateChannelMembership({
@@ -251,6 +361,16 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
     }
 
     const wantsContentUpdate = typeof (bodyValidation as any)?.content === 'string';
@@ -265,6 +385,18 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         sendError(res, 'RESOURCE_CONFLICT', 'Deleted messages cannot be edited', 409, { resource: 'message', id: messageId });
         return;
       }
+
+      // Room mention policy: prevent editing a message to mention non-room participants.
+      const okMentions = await enforceRoomMentionAndAgentAllowlist({
+        conversationId,
+        conversationStarshipId: conversationStarshipIdForAccess ?? starshipId,
+        userId: authUserId,
+        content: String((bodyValidation as any)?.content || ''),
+        requestedAgentId: null,
+        req,
+        res,
+      });
+      if (!okMentions) return;
     }
 
     // Delegate to service layer
@@ -454,6 +586,16 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     const reactionRepo = new MessageReactionRepository();
     const toggled = await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
@@ -581,6 +723,16 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
     }
 
     const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';

@@ -52,11 +52,14 @@ import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentP
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
   starshipId: string
   conversationId?: string | null
+  /** Optional: when composing inside a room thread, pass the room conversation id for invite-on-mention. */
+  roomConversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   /**
    * Optional: draft direct message target.
@@ -119,6 +122,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       selectedAgent,
       starshipId,
       conversationId,
+      roomConversationId,
       onConversationStart,
       draftDirectMessageTarget,
       newConversationParentConversationId,
@@ -366,29 +370,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
     }, [allowedAgentIds])
 
-    const starshipAgentsForMention = useMemo(() => {
-      const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
-      const allow = allowedMentionAgentIdSet
-      if (!allow) return list
-      return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
-    }, [allowedMentionAgentIdSet, starshipAgents])
-
     const starshipAgentsForExecution = useMemo(() => {
       const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
       const allow = allowedAgentIdSet
       if (!allow) return list
       return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
     }, [allowedAgentIdSet, starshipAgents])
-
-    const memberUsersForMention: StarshipMemberListItem[] = useMemo(() => {
-      const list = Array.isArray(memberUsers) ? memberUsers : []
-      const allow = allowedMentionUserIdSet
-      if (!allow) return list
-      return list.filter(u => {
-        const uid = String((u as any)?.userId || '').trim()
-        return uid && allow.has(uid)
-      })
-    }, [allowedMentionUserIdSet, memberUsers])
 
     // If the current selection becomes disallowed (e.g. room allowlist changes), clear it.
     useEffect(() => {
@@ -400,10 +387,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
     }, [allowedAgentIdSet, onAgentChange, selectedAgent])
     const mentionAvatarAttachmentIds = useMemo(() => {
-      return (Array.isArray(starshipAgentsForMention) ? (starshipAgentsForMention as AgentModel[]) : [])
+      return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
         .map(a => (a as any)?.avatarAttachmentId as string | undefined)
         .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    }, [starshipAgentsForMention])
+    }, [starshipAgents])
     const { data: mentionAvatarAttachments = [] } = useMessageAttachments(mentionAvatarAttachmentIds, starshipId)
     const mentionAvatarUrlById = useMemo(() => new Map(mentionAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [mentionAvatarAttachments])
 
@@ -419,15 +406,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       allowedMentionAgentIdSetRef.current = allowedMentionAgentIdSet
     }, [allowedMentionAgentIdSet])
     useEffect(() => {
-      const latest = Array.isArray(memberUsersForMention) ? memberUsersForMention : []
+      const latest = Array.isArray(memberUsers) ? memberUsers : []
       if (latest.length > 0) membersRef.current = latest
-    }, [memberUsersForMention])
+    }, [memberUsers])
     useEffect(() => {
-      const latest = (starshipAgentsForExecution as AgentModel[]) || []
+      const latest = (starshipAgents as AgentModel[]) || []
       if (Array.isArray(latest) && latest.length > 0) {
         agentsRef.current = latest
       }
-    }, [starshipAgentsForExecution])
+    }, [starshipAgents])
 
     // Stream state must come from the (single) ship-layout provider; no fallbacks.
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, hasSnapshot, messages: streamMessages, hasMoreBefore: streamHasMoreBefore } = useConversationStreamContext()
@@ -1490,8 +1477,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       active,
       onHover,
     }: {
-      items: Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }>
-      command: (item: { id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }) => void
+      items: Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem; inRoom?: boolean }>
+      command: (item: { id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem; inRoom?: boolean }) => void
       anchorRect: DOMRect | null
       active: number
       onHover: (i: number) => void
@@ -1524,6 +1511,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         : 0
       const left = rect ? Math.min(Math.max(8, rect.left), vw - menuWidth - 8) : 0
       const style: React.CSSProperties | undefined = anchorRect ? { position: 'fixed', left, top, zIndex: 9999, width: menuWidth, willChange: 'transform' } : undefined
+      const hasRoomSegregation = (Array.isArray(items) ? items : []).some(i => (i as any)?.inRoom === false)
+      const firstNotInRoomIdx = hasRoomSegregation ? (Array.isArray(items) ? items : []).findIndex(i => (i as any)?.inRoom === false) : -1
       return (
         <div
           style={style}
@@ -1532,6 +1521,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           aria-label="Mention suggestions"
         >
           {(Array.isArray(items) ? items : []).map((item, idx: number) => {
+            const showNotInRoomHeader = hasRoomSegregation && firstNotInRoomIdx >= 0 && idx === firstNotInRoomIdx
+            const showInRoomHeader = hasRoomSegregation && idx === 0
             const kind = (item as any)?.kind === 'user' ? 'user' : 'agent'
             const agent = kind === 'agent' ? ((item as any).agent as AgentModel | undefined) : undefined
             const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
@@ -1540,51 +1531,69 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const userIdForPresence = kind === 'user' ? String((user as any)?.userId || (item as any)?.id || '').trim() : ''
             const online = kind === 'user' ? isUserOnline(userIdForPresence) : true
             const fallback = (label || '?').trim().slice(0, 1).toUpperCase()
+            const inRoom = (item as any)?.inRoom !== false
             return (
-              <button
-                key={key}
-                id={`mention-option-${key}`}
-                ref={idx === active ? activeItemRef : null}
-                type="button"
-                tabIndex={-1}
-                role="option"
-                aria-selected={idx === active}
-                className={cn(
-                  // Match navbar item styling: muted by default, foreground on hover/active.
-                  'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
-                  idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-                )}
-                onMouseEnter={() => onHover(idx)}
-                onMouseDown={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  command(item)
-                }}
-                onPointerDown={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onClick={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  command(item)
-                }}
-              >
-                <div className="relative">
-                  <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
-                    {kind === 'user' ? (
-                      <>
-                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
-                        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
-                      </>
-                    ) : (
-                      <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={20} rounded />
-                    )}
-                  </Avatar>
-                  <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
-                </div>
-                <span className="min-w-0 truncate font-medium">{label}</span>
-              </button>
+              <div key={key}>
+                {showInRoomHeader ? (
+                  <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">In this room</div>
+                ) : null}
+                {showNotInRoomHeader ? (
+                  <div className="px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">Not in this room</div>
+                ) : null}
+                <button
+                  id={`mention-option-${key}`}
+                  ref={idx === active ? activeItemRef : null}
+                  type="button"
+                  tabIndex={-1}
+                  role="option"
+                  aria-selected={idx === active}
+                  className={cn(
+                    // Match navbar item styling: muted by default, foreground on hover/active.
+                    'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
+                    idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                  )}
+                  onMouseEnter={() => onHover(idx)}
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    command(item)
+                  }}
+                  onPointerDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    command(item)
+                  }}
+                >
+                  <div className="relative">
+                    <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
+                      {kind === 'user' ? (
+                        <>
+                          {user?.avatar ? (
+                            <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" />
+                          ) : null}
+                          <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+                        </>
+                      ) : (
+                        <AgentAvatar
+                          seed={label || 'Mention'}
+                          imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
+                          size={20}
+                          rounded
+                        />
+                      )}
+                    </Avatar>
+                    <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
+                  </div>
+                  <span className="min-w-0 truncate font-medium flex-1">{label}</span>
+                  {!inRoom ? (
+                    <span className="ml-2 text-[11px] font-medium text-muted-foreground border border-border/40 rounded px-1.5 py-0.5">Add</span>
+                  ) : null}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -1603,9 +1612,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const dmKind = dmAllowed?.kind ?? null
         const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
         const restrictToSingleDmPeer = Boolean(dmKind && dmId)
+        const mentionAllowUsers = allowedMentionUserIdSetRef.current
         const mentionAllowAgents = allowedMentionAgentIdSetRef.current
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
+        const hasRoomSegregation = Boolean(roomConversationId && (mentionAllowUsers || mentionAllowAgents))
 
         const matchesQuery = (haystacks: string[]) => {
           if (!q) return true
@@ -1625,8 +1636,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           kind: 'agent' | 'user'
           agent?: AgentModel
           user?: StarshipMemberListItem
+          inRoom?: boolean
           _kindRank: number
           _matchRank: number
+          _roomRank: number
         }> = []
 
         // Humans first
@@ -1644,13 +1657,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const label = String(u.displayName || u.email || 'User').trim() || 'User'
           const haystacks = [label.toLowerCase(), String(u.email || '').toLowerCase()]
           if (!matchesQuery(haystacks)) continue
+          const inRoom = hasRoomSegregation && mentionAllowUsers ? mentionAllowUsers.has(uid) : true
           items.push({
             id: uid,
             label,
             kind: 'user',
             user: u,
+            inRoom,
             _kindRank: 0,
             _matchRank: matchRank(haystacks),
+            _roomRank: inRoom ? 0 : 1,
           })
         }
 
@@ -1662,21 +1678,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
           const id = String((a as any)?.id || '').trim()
           if (!id) continue
-          if (mentionAllowAgents && !mentionAllowAgents.has(id)) continue
           const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
           const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
           if (!matchesQuery(haystacks)) continue
+          const inRoom = hasRoomSegregation && mentionAllowAgents ? mentionAllowAgents.has(id) : true
           items.push({
             id,
             label,
             kind: 'agent',
             agent: a as any,
+            inRoom,
             _kindRank: 1,
             _matchRank: matchRank(haystacks),
+            _roomRank: inRoom ? 0 : 1,
           })
         }
 
         items.sort((a, b) => {
+          if (a._roomRank !== b._roomRank) return a._roomRank - b._roomRank // in-room first
           if (a._kindRank !== b._kindRank) return a._kindRank - b._kindRank // users first
           if (a._matchRank !== b._matchRank) return a._matchRank - b._matchRank // starts-with first
           return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
@@ -1684,9 +1703,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         return items
           .filter(i => Boolean(i.id))
-          .slice(0, 8)
+          .slice(0, 10)
           .map(i => {
-            const { _kindRank: _kr, _matchRank: _mr, ...rest } = i
+            const { _kindRank: _kr, _matchRank: _mr, _roomRank: _rr, ...rest } = i
             return rest
           })
       },
@@ -1828,6 +1847,55 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 },
                 command: (item: any) => {
                   const realItem = (props.items as any[]).find(i => i.id === item?.id && i.kind === item?.kind) || item
+                  const inRoom = realItem?.inRoom !== false
+
+                  // Slack-like: if target isn't in the room yet, prompt to add them first.
+                  if (!inRoom && roomConversationId) {
+                    const kind = realItem?.kind === 'user' ? 'user' : 'agent'
+                    const id = String(realItem?.id || '').trim()
+                    const label = String(realItem?.label || '').trim() || (kind === 'user' ? 'User' : 'Agent')
+                    if (!id) return
+
+                    // Close the menu immediately to avoid duplicate actions while we confirm/execute.
+                    try {
+                      props.exit?.()
+                    } catch {}
+
+                    void (async () => {
+                      const ok = typeof window !== 'undefined' ? window.confirm(`${label} isn’t in this room yet. Add them to the room?`) : false
+                      if (!ok) return
+                      try {
+                        if (kind === 'user') {
+                          await api.post(`/api/v1/rooms/${encodeURIComponent(String(roomConversationId))}/members`, { userId: id, role: 'member' })
+                        } else {
+                          await api.post(`/api/v1/rooms/${encodeURIComponent(String(roomConversationId))}/agents`, { agentId: id })
+                        }
+
+                        // Best-effort cache refresh so subsequent UI reflects membership.
+                        try {
+                          await queryClient.invalidateQueries({ queryKey: ['rooms', 'detail', String(roomConversationId), 'participants'] as const })
+                        } catch {}
+
+                        // Now insert the mention token.
+                        props.command({ ...realItem, inRoom: true })
+                        try {
+                          cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                        } catch {}
+
+                        // Update selected agent (agents only) after allowlisting.
+                        try {
+                          if (kind === 'agent') {
+                            const selected = (agentsRef.current || []).find(a => a.id === id) || null
+                            if (selected && onAgentChange) onAgentChange(selected)
+                          }
+                        } catch {}
+                      } catch (e) {
+                        toast.error('Failed to add to room', { description: getSafeErrorMessage(e) })
+                      }
+                    })()
+                    return
+                  }
+
                   props.command(realItem)
                   try {
                     cleanupTrailingQueryAfterMention(props.editor, lastQuery)

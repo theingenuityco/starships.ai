@@ -17,15 +17,14 @@ import {
   RoomViewsRepository,
   RoomRepository,
   StarshipDatasetRepository,
+  StarshipMemberRepository,
   TaskBoardRepository,
   ToolRepository,
   ViewRepository,
   getConnection,
 } from '@starships/models';
 import type { RoomModel } from '@starships/protocol';
-import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
-import { enforcePrivateRoomMembership } from '@/utils/conversation-membership';
 
 const router: Router = Router();
 
@@ -294,8 +293,11 @@ router.post('/rooms/:roomId/agents', jwtAuthMiddleware, async (req: Request, res
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
-    // Reuse existing MVP policy: only starship owner/admin can manage room members/agents/pins.
-    if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    // Private rooms: only starship owner/admin can manage the agent allowlist (MVP).
+    // Public rooms: any participant can add allowlisted agents (Slack-like "invite on mention").
+    if (access.room.isPrivate) {
+      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    }
 
     const body = validateData(z.object({ agentId: IdSchema }), req.body, res, 'room agent add');
     if (!body) return;
@@ -342,7 +344,9 @@ router.delete('/rooms/:roomId/agents/:agentId', jwtAuthMiddleware, async (req: R
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
-    if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    if (access.room.isPrivate) {
+      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    }
 
     const conn = getConnection();
     const result = await conn.queryWithResult(
@@ -830,19 +834,17 @@ router.put('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
 /**
  * POST /rooms/:roomId/members
  *
- * Adds a member to a private room.
- * MVP policy: starship owner/instance-admin only.
+ * Adds a member to a room.
+ *
+ * Policy:
+ * - Caller must be a room participant (no bypass).
+ * - Public rooms: any participant can add another starship member.
+ * - Private rooms: starship owner/instance-admin only (MVP).
  */
 router.post('/rooms/:roomId/members', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
-
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
 
     const body = validateData(
       z.object({
@@ -855,25 +857,29 @@ router.post('/rooms/:roomId/members', jwtAuthMiddleware, async (req: Request, re
     );
     if (!body) return;
 
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!room.isPrivate) {
-      sendError(res, 'VALIDATION_ERROR', 'Cannot add members to a public room', 400, { roomId: params.roomId });
-      return;
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    if (access.room.isPrivate) {
+      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
     }
 
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+    const memberRepo = new StarshipMemberRepository();
+    const okMember = await memberRepo.isMember(body.userId, access.room.starshipId).catch(() => false);
+    if (!okMember) {
+      sendError(res, 'VALIDATION_ERROR', 'User is not a member of this starship', 400, {
+        userId: body.userId,
+        starshipId: access.room.starshipId,
+      });
+      return;
+    }
 
     const participantRepo = new ConversationParticipantRepository();
     const result = await participantRepo.addUserParticipant({
-      conversationId: room.conversationId,
+      conversationId: access.room.conversationId,
       userId: body.userId,
-      role: body.role ?? 'member',
-      createdBy: authUserId,
+      role: access.room.isPrivate ? (body.role ?? 'member') : 'member',
+      createdBy: access.authUserId,
     });
 
     sendSuccess(res, { created: result.created }, 200);

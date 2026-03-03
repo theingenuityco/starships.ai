@@ -17,6 +17,8 @@ export function ThreadPane(props: {
   starshipId: string
   starshipSlug?: string
   conversationId: string | null
+  /** Optional: when this thread lives inside a room, pass the room conversation id. */
+  roomConversationId?: string | null
   pinnedFirstMessage?: MessageModel | null
   /** When set (and conversationId is null), this pane acts as a draft thread. */
   draftParentConversationId?: string | null
@@ -54,6 +56,7 @@ export function ThreadPane(props: {
     starshipId,
     starshipSlug,
     conversationId,
+    roomConversationId,
     pinnedFirstMessage,
     draftParentConversationId,
     draftTitle,
@@ -303,6 +306,7 @@ export function ThreadPane(props: {
               selectedAgent={selectedAgent}
               starshipId={starshipId}
               conversationId={effectiveConversationId}
+              roomConversationId={roomConversationId ?? null}
               onConversationStart={cid => {
                 onThreadCreated?.(cid)
               }}

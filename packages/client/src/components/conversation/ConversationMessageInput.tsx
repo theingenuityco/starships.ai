@@ -352,28 +352,31 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
     }, [membersData])
 
+    // Allowlist semantics:
+    // - undefined => unrestricted (non-room contexts)
+    // - [] => restrict to none (e.g. room has no allowlisted agents)
     const allowedMentionUserIdSet = useMemo(() => {
-      const raw = Array.isArray(allowedMentionUserIds) ? allowedMentionUserIds : null
-      if (!raw || raw.length === 0) return null
+      if (allowedMentionUserIds === undefined) return null
+      const raw = Array.isArray(allowedMentionUserIds) ? allowedMentionUserIds : []
       return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
     }, [allowedMentionUserIds])
 
     const allowedMentionAgentIdSet = useMemo(() => {
-      const raw = Array.isArray(allowedMentionAgentIds) ? allowedMentionAgentIds : null
-      if (!raw || raw.length === 0) return null
+      if (allowedMentionAgentIds === undefined) return null
+      const raw = Array.isArray(allowedMentionAgentIds) ? allowedMentionAgentIds : []
       return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
     }, [allowedMentionAgentIds])
 
     const allowedAgentIdSet = useMemo(() => {
-      const raw = Array.isArray(allowedAgentIds) ? allowedAgentIds : null
-      if (!raw || raw.length === 0) return null
+      if (allowedAgentIds === undefined) return null
+      const raw = Array.isArray(allowedAgentIds) ? allowedAgentIds : []
       return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
     }, [allowedAgentIds])
 
     const starshipAgentsForExecution = useMemo(() => {
       const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
       const allow = allowedAgentIdSet
-      if (!allow) return list
+      if (allow === null) return list
       return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
     }, [allowedAgentIdSet, starshipAgents])
 
@@ -381,7 +384,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     useEffect(() => {
       const allow = allowedAgentIdSet
       const id = String((selectedAgent as any)?.id || '').trim()
-      if (!allow || !id) return
+      if (allow === null || !id) return
       if (!allow.has(id)) {
         onAgentChange?.(null)
       }
@@ -1562,11 +1565,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     e.preventDefault()
                     e.stopPropagation()
                   }}
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    command(item)
-                  }}
                 >
                   <div className="relative">
                     <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
@@ -1802,24 +1800,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const choice = items[active]
             if (choice) {
               try {
-                lastProps.command(choice)
-                try {
-                  cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
-                } catch {}
-                // Update selected agent (mirror mouse selection)
-                try {
-                  const kind = (choice as any)?.kind
-                  const id = (choice as any)?.id
-                  const label = (choice as any)?.label
-                  if (kind === 'agent') {
-                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                    if (!agent && label) {
-                      const lower = String(label).toLowerCase()
-                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                const cmd = (component as any)?.props?.command
+                if (typeof cmd === 'function') {
+                  cmd(choice)
+                } else {
+                  // Fallback: legacy behavior (no invite-on-mention)
+                  lastProps.command(choice)
+                  try {
+                    cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
+                  } catch {}
+                  try {
+                    const kind = (choice as any)?.kind
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    if (kind === 'agent') {
+                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                      if (!agent && label) {
+                        const lower = String(label).toLowerCase()
+                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      }
+                      if (agent) onAgentChange?.(agent)
                     }
-                    if (agent) onAgentChange?.(agent)
-                  }
-                } catch {}
+                  } catch {}
+                }
               } catch {}
             }
             return
@@ -1999,24 +2002,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               const choice = items[active]
               if (choice) {
                 try {
-                  props.command(choice)
-                  try {
-                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
-                  } catch {}
-                  // Update selected agent state (mirror mouse path)
-                  try {
-                    const kind = (choice as any)?.kind
-                    const id = (choice as any)?.id
-                    const label = (choice as any)?.label
-                    if (kind === 'agent') {
-                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                      if (!agent && label) {
-                        const lower = String(label).toLowerCase()
-                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                  const cmd = (component as any)?.props?.command
+                  if (typeof cmd === 'function') {
+                    cmd(choice)
+                  } else {
+                    // Fallback: legacy behavior (no invite-on-mention)
+                    props.command(choice)
+                    try {
+                      cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                    } catch {}
+                    try {
+                      const kind = (choice as any)?.kind
+                      const id = (choice as any)?.id
+                      const label = (choice as any)?.label
+                      if (kind === 'agent') {
+                        let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                        if (!agent && label) {
+                          const lower = String(label).toLowerCase()
+                          agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                        }
+                        if (agent) onAgentChange?.(agent)
                       }
-                      if (agent) onAgentChange?.(agent)
-                    }
-                  } catch {}
+                    } catch {}
+                  }
                 } catch (err) {
                   try {
                     const label = (choice as any)?.label || ''

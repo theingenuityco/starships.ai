@@ -42,6 +42,7 @@ import {
   resolveRoomConversationContext,
 } from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
+import { nanoid } from 'nanoid';
 import { parseMentionTokens } from '@/utils/mentions';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
@@ -204,9 +205,20 @@ async function enforceRoomMentionAndAgentAllowlist(args: {
   requestedAgentId?: string | null;
   req: Request;
   res: Response;
-}): Promise<boolean> {
+}): Promise<
+  | {
+      ctx: { roomConversationId: string };
+      allowUsers: Set<string>;
+      allowAgents: Set<string>;
+      missingUserIds: string[];
+      missingAgentIds: string[];
+      sanitizedContentForExecution: string;
+      sanitizedAgentIdForExecution: string | null;
+    }
+  | null
+> {
   const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
-  if (!ctx) return true;
+  if (!ctx) return null;
 
   const participantRepo = new ConversationParticipantRepository();
   const [userIds, agentIds] = await Promise.all([
@@ -217,23 +229,37 @@ async function enforceRoomMentionAndAgentAllowlist(args: {
   const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
 
   const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
+  const missingUserIds = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
+  const missingAgentIdsFromMentions = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
 
-  const invalidUsers = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
-  const invalidAgents = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
-
+  // If the client explicitly chose an execution agent that isn't allowed in the room,
+  // do NOT trigger agent execution; instead require invite approval.
   const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
   const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
+  const missingAgentIds = Array.from(
+    new Set([...(missingAgentIdsFromMentions || []), ...(requestedAgentDisallowed ? [requestedAgentId] : [])].filter(Boolean))
+  );
 
-  if (invalidUsers.length === 0 && invalidAgents.length === 0 && !requestedAgentDisallowed) return true;
+  // Sanitize agent mentions for execution/routing: disallowed agent mention tokens should not trigger workflows
+  // or auto-link agents in the thread, but the original message content is still persisted as typed.
+  const disallowedAgentIdSet = new Set(missingAgentIdsFromMentions.map((x) => String(x || '').trim()).filter(Boolean));
+  const sanitizedContentForExecution =
+    disallowedAgentIdSet.size === 0
+      ? String(args.content || '')
+      : String(args.content || '').replace(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi, (full, id) => {
+          const v = String(id || '').trim();
+          return disallowedAgentIdSet.has(v) ? '' : full;
+        });
 
-  sendError(args.res, 'VALIDATION_ERROR', 'You can only mention room participants', 400, {
-    conversationId: args.conversationId,
-    roomConversationId: ctx.roomConversationId,
-    invalidUserIds: invalidUsers,
-    invalidAgentIds: invalidAgents,
-    ...(requestedAgentDisallowed ? { disallowedAgentId: requestedAgentId } : {}),
-  });
-  return false;
+  return {
+    ctx: { roomConversationId: ctx.roomConversationId },
+    allowUsers,
+    allowAgents,
+    missingUserIds,
+    missingAgentIds,
+    sanitizedContentForExecution,
+    sanitizedAgentIdForExecution: requestedAgentDisallowed ? null : requestedAgentId || null,
+  };
 }
 
 const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -1843,42 +1869,45 @@ router.post(
         }
       }
 
-      // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
-      // Do this BEFORE persisting/debiting so we don't charge for an invalid request.
-      if (agentId && !isInternal) {
-        const agentService = new AgentService();
-        const agent = await agentService.getAgent(agentId);
+      // NOTE:
+      // Agent execution validation is deferred until after room invite analysis so that
+      // a disallowed agent selection in a room can be handled via invite approval
+      // (instead of rejecting the message).
 
+      // Room mention policy: only allow mentioning users/agents who are room participants.
+      // Also ensure disallowed agents do not trigger execution (they become invite approvals instead).
+      const roomInvite =
+        !isInternal && authUserId
+          ? await enforceRoomMentionAndAgentAllowlist({
+              conversationId,
+              conversationStarshipId: conversation.starshipId,
+              userId: authUserId,
+              content,
+              requestedAgentId: agentId ?? null,
+              req,
+              res,
+            })
+          : null;
+
+      const contentForExecution = roomInvite ? roomInvite.sanitizedContentForExecution : content;
+      const agentIdForExecution = roomInvite ? roomInvite.sanitizedAgentIdForExecution : agentId ?? null;
+
+      // Authorization: if agentId is provided (and allowed), verify user owns it and it belongs to the conversation's starship.
+      // Do this BEFORE persisting/debiting so we don't charge for an invalid request.
+      if (agentIdForExecution && !isInternal) {
+        const agentService = new AgentService();
+        const agent = await agentService.getAgent(agentIdForExecution);
         if (!agent) {
           sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404);
           return;
         }
-
-        // Verify user owns the agent's starship
-        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agentId, res))) {
+        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agentIdForExecution, res))) {
           return;
         }
-
-        // Verify agent belongs to the same starship as the conversation
         if (agent.starshipId !== conversation.starshipId) {
           sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
           return;
         }
-      }
-
-      // Room mention policy: only allow mentioning users/agents who are room participants.
-      // Also enforce that an explicit `agentId` execution target is allowlisted for the room.
-      if (!isInternal && authUserId) {
-        const ok = await enforceRoomMentionAndAgentAllowlist({
-          conversationId,
-          conversationStarshipId: conversation.starshipId,
-          userId: authUserId,
-          content,
-          requestedAgentId: agentId ?? null,
-          req,
-          res,
-        });
-        if (!ok) return;
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -1892,7 +1921,11 @@ router.post(
       }
 
       const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
-      const willTriggerAgent = await conversationService.willTriggerAgentExecution({ conversationId, content, agentId });
+      const willTriggerAgent = await conversationService.willTriggerAgentExecution({
+        conversationId,
+        content: contentForExecution,
+        agentId: agentIdForExecution,
+      });
 
       let wallet: { id: string; balance: string } | null = null;
       if (willTriggerAgent) {
@@ -1994,9 +2027,73 @@ router.post(
         ...(authorUserId && { userId: authorUserId }),
         ...(authorName && { userName: authorName }),
         ...(authorAvatar && { userAvatar: authorAvatar }),
-        ...(agentId && { agentId }),
+        ...(agentIdForExecution && { agentId: agentIdForExecution }),
         ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
+
+      // Persist invite approvals (Slack-like) for missing room participants (best-effort).
+      if (roomInvite && (roomInvite.missingUserIds.length > 0 || roomInvite.missingAgentIds.length > 0) && authorUserId) {
+        try {
+          const conn = getConnection();
+          const newApprovalId = nanoid();
+          const approvalRow = await conn.queryOne<{ id: string }>(
+            `
+            INSERT INTO room_invite_approvals (
+              id,
+              starship_id,
+              room_conversation_id,
+              conversation_id,
+              message_id,
+              requested_by_user_id,
+              status,
+              updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())
+            ON CONFLICT (message_id)
+            DO UPDATE SET
+              updated_at = NOW(),
+              status = CASE WHEN room_invite_approvals.status = 'pending' THEN 'pending' ELSE room_invite_approvals.status END
+            RETURNING id
+          `,
+            [newApprovalId, conversation.starshipId, roomInvite.ctx.roomConversationId, conversationId, userMessage.id, authorUserId]
+          );
+          const approvalId = approvalRow?.id ? String(approvalRow.id) : '';
+
+          if (approvalId) {
+            const targets: Array<{ type: 'user' | 'agent'; id: string }> = [
+              ...roomInvite.missingUserIds.map((id) => ({ type: 'user' as const, id: String(id || '').trim() })),
+              ...roomInvite.missingAgentIds.map((id) => ({ type: 'agent' as const, id: String(id || '').trim() })),
+            ].filter((t) => t.id);
+
+            if (targets.length > 0) {
+              const params: string[] = [];
+              const tuples: string[] = [];
+              for (let i = 0; i < targets.length; i++) {
+                const t = targets[i];
+                params.push(approvalId, t.type, t.id);
+                const base = i * 3;
+                tuples.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
+              }
+              await conn.query(
+                `INSERT INTO room_invite_approval_targets (approval_id, target_type, target_id)
+                 VALUES ${tuples.join(',')}
+                 ON CONFLICT (approval_id, target_type, target_id) DO NOTHING`,
+                params
+              );
+            }
+
+            // Prompt clients to hydrate inline approvals (and persist across refresh via the pending endpoint).
+            await new UIActionService().publishAction(conversationId, 'room_invite_approval_required', {
+              approvalId,
+              roomConversationId: roomInvite.ctx.roomConversationId,
+              conversationId,
+              messageId: userMessage.id,
+            });
+          }
+        } catch {
+          // best-effort only
+        }
+      }
 
       if (willTriggerAgent) {
         const billingService = new BillingService();
@@ -2047,10 +2144,10 @@ router.post(
           await conversationService.addConversationMessage(
             {
               conversationId,
-              content,
+              content: contentForExecution,
               role: 'user',
               messageType: 'user_input',
-              ...(agentId && { agentId }),
+              ...(agentIdForExecution && { agentId: agentIdForExecution }),
               ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
               ...(modalities && modalities.length > 0 && { modalities }),
               ...(imageConfig && { imageConfig }),
@@ -2104,10 +2201,10 @@ router.post(
         .addConversationMessage(
           {
             conversationId,
-            content,
+            content: contentForExecution,
             role: 'user',
             messageType: 'user_input',
-            ...(agentId && { agentId }),
+            ...(agentIdForExecution && { agentId: agentIdForExecution }),
             ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
             ...(modalities && modalities.length > 0 && { modalities }),
             ...(imageConfig && { imageConfig }),

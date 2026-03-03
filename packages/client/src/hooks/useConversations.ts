@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
+import { ROOM_QUERY_KEYS } from '@/hooks/useRooms'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 import { addPendingAppendCallback, getLastAssistantMessageId, isAnimationComplete, removePendingAppendCallback } from './useMessageAnimationState'
 import { useAuth } from '@/hooks/useAuth'
@@ -2059,6 +2060,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         case 'tool_approval_resolved': {
           const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
           if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(cid) })
+          break
+        }
+        case 'room_invite_approval_required':
+        case 'room_invite_approval_resolved': {
+          const roomId = typeof payload?.roomConversationId === 'string' ? String(payload.roomConversationId) : ''
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (roomId && cid) queryClient.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.inviteApprovalsPending(roomId, cid) })
+          if (roomId) queryClient.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomId) })
           break
         }
         case 'conversation_title_updated': {

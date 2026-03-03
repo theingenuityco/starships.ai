@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { ConversationService } from '@/services/ConversationService';
+import { UIActionService } from '@/services/UIActionService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
@@ -37,6 +38,7 @@ const RoomSlugSchema = z
   .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
+const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
 
 async function resolveRoomAccessArgs(args: { roomConversationId: string }): Promise<{
   room: RoomModel | null;
@@ -102,6 +104,293 @@ async function requireRoomReadAccess(args: {
 
   return { authUserId, room, conversationStarshipId };
 }
+
+// ============================================================================
+// Invite approvals API (Slack-like "add on mention")
+// ============================================================================
+
+/**
+ * GET /rooms/:roomId/invite-approvals/pending
+ *
+ * Returns pending invite approvals for a room, optionally filtered by the current thread conversation id.
+ * Used to persist inline approvals across refresh.
+ */
+router.get('/rooms/:roomId/invite-approvals/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const query = req.query as Record<string, unknown>;
+    const conversationIdFilter = typeof query.conversationId === 'string' ? query.conversationId.trim() : '';
+
+    const conn = getConnection();
+    const approvals = await conn.query<{
+      id: string;
+      message_id: string;
+      conversation_id: string;
+      room_conversation_id: string;
+      requested_by_user_id: string | null;
+      created_at: string;
+      requested_by_display_name: string | null;
+      requested_by_email: string | null;
+    }>(
+      `
+      SELECT
+        ria.id,
+        ria.message_id,
+        ria.conversation_id,
+        ria.room_conversation_id,
+        ria.requested_by_user_id,
+        ria.created_at,
+        u.display_name AS requested_by_display_name,
+        u.email AS requested_by_email
+      FROM room_invite_approvals ria
+      LEFT JOIN users u ON u.id = ria.requested_by_user_id
+      WHERE ria.room_conversation_id = $1
+        AND ria.status = 'pending'
+        AND ($2::text = '' OR ria.conversation_id = $2::text)
+      ORDER BY ria.created_at ASC
+      `,
+      [access.room.conversationId, conversationIdFilter]
+    );
+
+    const approvalIds = approvals.map((a) => String(a.id)).filter(Boolean);
+    const targets =
+      approvalIds.length === 0
+        ? []
+        : await conn.query<{
+            approval_id: string;
+            target_type: 'user' | 'agent';
+            target_id: string;
+            user_display_name: string | null;
+            user_email: string | null;
+            agent_name: string | null;
+            agent_slug: string | null;
+          }>(
+            `
+            SELECT
+              t.approval_id,
+              t.target_type,
+              t.target_id,
+              u.display_name AS user_display_name,
+              u.email AS user_email,
+              a.name AS agent_name,
+              a.slug AS agent_slug
+            FROM room_invite_approval_targets t
+            LEFT JOIN users u ON t.target_type = 'user' AND u.id = t.target_id
+            LEFT JOIN agents a ON t.target_type = 'agent' AND a.id = t.target_id
+            WHERE t.approval_id = ANY($1)
+            ORDER BY t.created_at ASC
+            `,
+            [approvalIds]
+          );
+
+    const byApprovalId: Record<string, { users: Array<{ id: string; label: string }>; agents: Array<{ id: string; label: string }> }> = {};
+    for (const id of approvalIds) byApprovalId[id] = { users: [], agents: [] };
+    for (const t of targets) {
+      const aid = String(t.approval_id || '').trim();
+      if (!aid || !byApprovalId[aid]) continue;
+      const type = t.target_type === 'user' ? 'user' : 'agent';
+      const id = String(t.target_id || '').trim();
+      if (!id) continue;
+      if (type === 'user') {
+        const label = String(t.user_display_name || t.user_email || id).trim();
+        byApprovalId[aid].users.push({ id, label: label || id });
+      } else {
+        const label = String(t.agent_name || t.agent_slug || id).trim();
+        byApprovalId[aid].agents.push({ id, label: label || id });
+      }
+    }
+
+    const payload = approvals.map((a) => {
+      const id = String(a.id);
+      const targets = byApprovalId[id] ?? { users: [], agents: [] };
+      const requestedBy =
+        a.requested_by_display_name || a.requested_by_email
+          ? String(a.requested_by_display_name || a.requested_by_email)
+          : a.requested_by_user_id
+            ? String(a.requested_by_user_id)
+            : '';
+      return {
+        id,
+        roomConversationId: String(a.room_conversation_id),
+        conversationId: String(a.conversation_id),
+        messageId: String(a.message_id),
+        createdAt: String(a.created_at),
+        requestedByUserId: a.requested_by_user_id ? String(a.requested_by_user_id) : null,
+        requestedByLabel: requestedBy || null,
+        users: targets.users,
+        agents: targets.agents,
+      };
+    });
+
+    sendSuccess(res, { approvals: payload }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching room invite approvals');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/invite-approvals/:approvalId/approve
+ */
+router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    if (access.room.isPrivate) {
+      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    }
+
+    const conn = getConnection();
+    let threadConversationId = '';
+    await conn.query('BEGIN');
+    try {
+      const approval = await conn.queryOne<{
+        id: string;
+        status: string;
+        requested_by_user_id: string | null;
+        conversation_id: string;
+        message_id: string;
+      }>(
+        `
+        SELECT id, status, requested_by_user_id, conversation_id, message_id
+        FROM room_invite_approvals
+        WHERE id = $1 AND room_conversation_id = $2
+        FOR UPDATE
+        `,
+        [params.approvalId, access.room.conversationId]
+      );
+      if (!approval) {
+        await conn.query('ROLLBACK');
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
+        return;
+      }
+      if (String(approval.status) !== 'pending') {
+        await conn.query('ROLLBACK');
+        sendSuccess(res, { status: String(approval.status) }, 200);
+        return;
+      }
+      threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
+
+      const targets = await conn.query<{ target_type: 'user' | 'agent'; target_id: string }>(
+        `SELECT target_type, target_id FROM room_invite_approval_targets WHERE approval_id = $1`,
+        [params.approvalId]
+      );
+
+      // "Invited by" should reflect the requester (message author) even if someone else approves.
+      const createdBy = approval.requested_by_user_id ? String(approval.requested_by_user_id) : access.authUserId;
+      const participantRepo = new ConversationParticipantRepository();
+      for (const t of targets) {
+        const type = t.target_type === 'user' ? 'user' : 'agent';
+        const id = String(t.target_id || '').trim();
+        if (!id) continue;
+        if (type === 'user') {
+          await participantRepo.addUserParticipant({ conversationId: access.room.conversationId, userId: id, role: 'member', createdBy }).catch(() => null);
+        } else {
+          await participantRepo.addAgentParticipant({ conversationId: access.room.conversationId, agentId: id, createdBy }).catch(() => null);
+        }
+      }
+
+      await conn.query(
+        `
+        UPDATE room_invite_approvals
+           SET status = 'approved',
+               resolved_at = NOW(),
+               resolved_by_user_id = $2,
+               updated_at = NOW()
+         WHERE id = $1
+        `,
+        [params.approvalId, access.authUserId]
+      );
+
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
+
+    try {
+      const ui = new UIActionService();
+      await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
+        approvalId: params.approvalId,
+        roomConversationId: access.room.conversationId,
+        conversationId: threadConversationId || null,
+      });
+    } catch {
+      // best-effort only
+    }
+
+    sendSuccess(res, { status: 'approved' }, 200);
+  } catch (error) {
+    handleError(error, res, 'approving room invite');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/invite-approvals/:approvalId/deny
+ */
+router.post('/rooms/:roomId/invite-approvals/:approvalId/deny', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    if (access.room.isPrivate) {
+      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+    }
+
+    const conn = getConnection();
+    const approval = await conn.queryOne<{ id: string; status: string; conversation_id: string; message_id: string }>(
+      `SELECT id, status, conversation_id, message_id FROM room_invite_approvals WHERE id = $1 AND room_conversation_id = $2`,
+      [params.approvalId, access.room.conversationId]
+    );
+    if (!approval) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
+      return;
+    }
+    if (String(approval.status) !== 'pending') {
+      sendSuccess(res, { status: String(approval.status) }, 200);
+      return;
+    }
+
+    await conn.query(
+      `
+      UPDATE room_invite_approvals
+         SET status = 'denied',
+             resolved_at = NOW(),
+             resolved_by_user_id = $2,
+             updated_at = NOW()
+       WHERE id = $1
+      `,
+      [params.approvalId, access.authUserId]
+    );
+
+    try {
+      const ui = new UIActionService();
+      const threadConversationId = approval?.conversation_id ? String(approval.conversation_id) : '';
+      await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
+        approvalId: params.approvalId,
+        roomConversationId: access.room.conversationId,
+        conversationId: threadConversationId || null,
+      });
+    } catch {
+      // best-effort only
+    }
+
+    sendSuccess(res, { status: 'denied' }, 200);
+  } catch (error) {
+    handleError(error, res, 'denying room invite');
+  }
+});
 
 /**
  * GET /rooms/:roomId/participation
@@ -308,11 +597,11 @@ router.post('/rooms/:roomId/agents', jwtAuthMiddleware, async (req: Request, res
       sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
       return;
     }
-    if (String((agent as any).starshipId) !== String(access.room.starshipId)) {
+    if (String(agent.starshipId) !== String(access.room.starshipId)) {
       sendError(res, 'VALIDATION_ERROR', 'Agent must belong to the same starship as the room', 400, {
         agentId: body.agentId,
         roomStarshipId: access.room.starshipId,
-        agentStarshipId: (agent as any).starshipId,
+        agentStarshipId: agent.starshipId,
       });
       return;
     }

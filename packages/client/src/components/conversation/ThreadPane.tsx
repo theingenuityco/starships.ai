@@ -293,6 +293,7 @@ export function ThreadPane(props: {
           <ConversationMessageList
             conversationId={effectiveConversationId}
             starshipId={starshipId}
+            roomConversationId={roomConversationId ?? null}
             bottomPaddingPx={inputHeight + 12}
             pinnedFirstMessage={pinnedFirstMessage ?? null}
             contentWidth={contentWidth}

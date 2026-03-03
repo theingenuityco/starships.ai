@@ -10,6 +10,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, 
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents, useConversationDetail, useDeleteMessage, useStarshipDirectMessages, useUpdateMessage, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
+import { useApproveRoomInviteApproval, useDenyRoomInviteApproval, useRoomInviteApprovalsPending, type PendingRoomInviteApproval } from '@/hooks/useRooms'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
@@ -38,6 +39,7 @@ import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MessageReactions } from './MessageReactions'
+import { RoomInviteApprovalInline } from '@/components/conversation/RoomInviteApprovalInline'
 import { MessageReactionAction } from './MessageReactionAction'
 import { HoverProfilePopover } from './HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
@@ -452,6 +454,8 @@ function LinkedConversationCard({
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  /** When set, enables room invite approvals inline rendering/hydration. */
+  roomConversationId?: string | null
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
   channelName?: string | null
   /**
@@ -544,6 +548,7 @@ interface ConversationMessageListProps {
 export function ConversationMessageList({
   conversationId,
   starshipId,
+  roomConversationId,
   channelName,
   emptyHeroTitleOverride,
   emptyHeroParticipantOverride,
@@ -603,6 +608,25 @@ export function ConversationMessageList({
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
+
+  const cid = typeof conversationId === 'string' ? conversationId.trim() : ''
+  const roomId = typeof roomConversationId === 'string' ? roomConversationId.trim() : ''
+  const { data: pendingInvitesData } = useRoomInviteApprovalsPending(roomId, cid, Boolean(roomId && cid))
+  const pendingInvitesByMessageId = useMemo(() => {
+    const map = new Map<string, PendingRoomInviteApproval[]>()
+    const list = Array.isArray(pendingInvitesData?.approvals) ? pendingInvitesData!.approvals : []
+    for (const a of list) {
+      const mid = typeof a?.messageId === 'string' ? a.messageId : ''
+      if (!mid) continue
+      const arr = map.get(mid) ?? []
+      arr.push(a)
+      map.set(mid, arr)
+    }
+    return map
+  }, [pendingInvitesData])
+  const approveInvite = useApproveRoomInviteApproval(roomId)
+  const denyInvite = useDenyRoomInviteApproval(roomId)
+  const [submittingInviteApprovalId, setSubmittingInviteApprovalId] = useState<string | null>(null)
 
   const { data: conversationDetail } = useConversationDetail(conversationId)
   const resolvedEmptyHeroTitle = useMemo(() => {
@@ -2162,6 +2186,35 @@ export function ConversationMessageList({
                               ]
                           )}
                         />
+                        {roomId && cid && pendingInvitesByMessageId.has(String(message.id)) ? (
+                          <div className="ml-10 sm:ml-12">
+                            {(pendingInvitesByMessageId.get(String(message.id)) || []).map(approval => (
+                              <RoomInviteApprovalInline
+                                key={approval.id}
+                                approval={approval}
+                                isSubmitting={submittingInviteApprovalId === approval.id}
+                                onApprove={async () => {
+                                  if (!roomId || !cid) return
+                                  setSubmittingInviteApprovalId(approval.id)
+                                  try {
+                                    await approveInvite.mutateAsync({ approvalId: approval.id, conversationId: cid })
+                                  } finally {
+                                    setSubmittingInviteApprovalId(null)
+                                  }
+                                }}
+                                onDeny={async () => {
+                                  if (!roomId || !cid) return
+                                  setSubmittingInviteApprovalId(approval.id)
+                                  try {
+                                    await denyInvite.mutateAsync({ approvalId: approval.id, conversationId: cid })
+                                  } finally {
+                                    setSubmittingInviteApprovalId(null)
+                                  }
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </Fragment>
                   )

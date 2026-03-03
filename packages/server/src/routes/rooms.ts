@@ -48,7 +48,9 @@ async function resolveRoomAccessArgs(args: { roomConversationId: string }): Prom
 
   // Resolve starshipId from authoritative conversation row (defense-in-depth).
   const conn = getConnection();
-  const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [args.roomConversationId]);
+  const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [
+    args.roomConversationId,
+  ]);
   const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
   return { room, conversationStarshipId: conversationStarshipId || null };
 }
@@ -1413,7 +1415,12 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    const body = validateData(z.object({ datasetId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin dataset');
+    const body = validateData(
+      z.object({ datasetId: IdSchema, position: z.number().int().min(0).optional() }),
+      req.body,
+      res,
+      'pin dataset'
+    );
     if (!body) return;
 
     const roomRepo = new RoomRepository();
@@ -1486,7 +1493,12 @@ router.post('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Re
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    const body = validateData(z.object({ boardId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin task board');
+    const body = validateData(
+      z.object({ boardId: IdSchema, position: z.number().int().min(0).optional() }),
+      req.body,
+      res,
+      'pin task board'
+    );
     if (!body) return;
 
     const roomRepo = new RoomRepository();
@@ -1847,4 +1859,3 @@ router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: 
 });
 
 export default router;
-

@@ -2688,7 +2688,9 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         .catch(() => null);
 
       const participantRepo = new ConversationParticipantRepository();
-      await participantRepo.addUserParticipant({ conversationId: conversation.id, userId: authUserId, role: null, createdBy: authUserId }).catch(() => null);
+      await participantRepo
+        .addUserParticipant({ conversationId: conversation.id, userId: authUserId, role: null, createdBy: authUserId })
+        .catch(() => null);
 
       sendSuccess(res, conversation, 201);
       return;

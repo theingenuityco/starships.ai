@@ -59,6 +59,7 @@ import {
   hasPlugins,
 } from '@/utils/conversation-state';
 import type { ConversationState, AgentState } from '@starships/protocol';
+import { resolveRoomConversationContext } from '@/utils/conversation-membership';
 
 /**
  * Autopilot child process configuration
@@ -1811,7 +1812,7 @@ export class ConversationService {
    * Get deployed tool instances with their actual blueprints for the agent
    * Uses relationship-based tool resolution for accurate results
    */
-  private async getAgentTools(agentId: string, starshipId: string): Promise<ToolParams[]> {
+  private async getAgentTools(agentId: string, starshipId: string, conversationId: string): Promise<ToolParams[]> {
     try {
       const redactedBlueprint = {
         nodes: [
@@ -1826,7 +1827,10 @@ export class ConversationService {
       // - agent-assigned tools (agent_tools) OR starship-level tools (starship_tools)
       // - with effective permission != 'deny'
       // - precedence: agent_tools.permission overrides starship_tools.permission
-      const deployedTools = await this.agentRepository.getEffectiveAgentTools(agentId, starshipId);
+      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
+      const deployedTools = roomCtx
+        ? await this.agentRepository.getEffectiveAgentToolsForRoomConversation(agentId, starshipId, roomCtx.roomConversationId)
+        : await this.agentRepository.getEffectiveAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
         return [];
@@ -2537,7 +2541,7 @@ export class ConversationService {
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
         // Get deployed tools for this agent (always redacted; server executes tools)
-        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id, data.conversationId);
 
         // Resolve plugins from conversation state only (agent plugins ignored)
         const plugins = this.resolvePlugins(
@@ -3071,7 +3075,7 @@ export class ConversationService {
         conversationState = await this.ensureThreadContextFromLegacySeed({ conversationId, conversationState });
       }
       // Resolve tools for this agent (always redacted; server executes tools)
-      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id, conversationId);
 
       // Guard against NULL/undefined persisted JSONB state
       const baseState =

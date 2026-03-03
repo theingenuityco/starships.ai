@@ -1,15 +1,19 @@
 import { BaseRepository } from './BaseRepository';
 import type { RoomPinnedTool } from '@starships/protocol';
 
+type RoomToolPermission = 'allow' | 'ask' | 'deny';
+
 type DbRow = {
   room_conversation_id: string;
   tool_id: string;
   position: number;
   created_at: string;
   created_by: string | null;
+  permission?: RoomToolPermission | null;
 };
 
 function fromDb(r: DbRow): RoomPinnedTool {
+  const p = r.permission === 'allow' || r.permission === 'ask' || r.permission === 'deny' ? r.permission : undefined;
   return {
     kind: 'tool',
     roomConversationId: String(r.room_conversation_id),
@@ -17,6 +21,7 @@ function fromDb(r: DbRow): RoomPinnedTool {
     position: Number(r.position) || 0,
     createdAt: String(r.created_at),
     createdBy: r.created_by ?? null,
+    ...(p ? { permission: p } : {}),
   };
 }
 
@@ -29,7 +34,7 @@ export class RoomToolsRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, tool_id, position, created_at, created_by
+        `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
            FROM room_tools
           WHERE room_conversation_id = $1
           ORDER BY position ASC, created_at ASC`,
@@ -39,13 +44,21 @@ export class RoomToolsRepository extends BaseRepository {
     }, 'list', 'room_tools', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; toolId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTool> {
+  async upsert(args: {
+    roomConversationId: string;
+    toolId: string;
+    position?: number | null;
+    createdBy?: string | null;
+    permission?: RoomToolPermission | null;
+  }): Promise<RoomPinnedTool> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const roomConversationId = String(args.roomConversationId || '').trim();
       const toolId = String(args.toolId || '').trim();
       const createdBy = args.createdBy ?? null;
       const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
+      const requestedPermission =
+        args.permission === 'allow' || args.permission === 'ask' || args.permission === 'deny' ? args.permission : null;
 
       await conn.query('BEGIN');
       try {
@@ -56,9 +69,9 @@ export class RoomToolsRepository extends BaseRepository {
           [roomConversationId, toolId]
         );
 
-        if (existing && requestedPosition == null) {
+        if (existing && requestedPosition == null && requestedPermission == null) {
           const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, tool_id, position, created_at, created_by
+            `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
                FROM room_tools
               WHERE room_conversation_id = $1 AND tool_id = $2`,
             [roomConversationId, toolId]
@@ -92,10 +105,10 @@ export class RoomToolsRepository extends BaseRepository {
           );
 
           const inserted = await conn.queryOne<DbRow>(
-            `INSERT INTO room_tools (room_conversation_id, tool_id, position, created_by)
-             VALUES ($1, $2, $3, $4)
-             RETURNING room_conversation_id, tool_id, position, created_at, created_by`,
-            [roomConversationId, toolId, desired, createdBy]
+            `INSERT INTO room_tools (room_conversation_id, tool_id, position, created_by, permission)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING room_conversation_id, tool_id, position, created_at, created_by, permission`,
+            [roomConversationId, toolId, desired, createdBy, requestedPermission ?? 'allow']
           );
           if (!inserted) throw new Error('Failed to upsert room tool');
           await conn.query('COMMIT');
@@ -104,6 +117,14 @@ export class RoomToolsRepository extends BaseRepository {
 
         const current = Number(existing.position) || 0;
         const desired = requestedPosition ?? current;
+
+        if (requestedPermission != null) {
+          await conn.query(`UPDATE room_tools SET permission = $3 WHERE room_conversation_id = $1 AND tool_id = $2`, [
+            roomConversationId,
+            toolId,
+            requestedPermission,
+          ]);
+        }
 
         if (desired !== current) {
           const tmpRow = await conn.queryOne<{ tmp: number }>(
@@ -147,7 +168,7 @@ export class RoomToolsRepository extends BaseRepository {
         }
 
         const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, tool_id, position, created_at, created_by
+          `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
              FROM room_tools
             WHERE room_conversation_id = $1 AND tool_id = $2`,
           [roomConversationId, toolId]

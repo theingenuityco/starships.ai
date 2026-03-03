@@ -1992,7 +1992,16 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    const body = validateData(z.object({ toolId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin tool');
+    const body = validateData(
+      z.object({
+        toolId: IdSchema,
+        position: z.number().int().min(0).optional(),
+        permission: z.enum(['allow', 'ask', 'deny']).optional(),
+      }),
+      req.body,
+      res,
+      'pin tool'
+    );
     if (!body) return;
 
     const roomRepo = new RoomRepository();
@@ -2024,6 +2033,7 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       toolId: body.toolId,
       position: body.position ?? null,
       createdBy: authUserId,
+      permission: body.permission ?? null,
     });
     sendSuccess(res, { pin }, 200);
   } catch (error) {

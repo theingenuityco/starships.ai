@@ -1184,7 +1184,9 @@ router.post(
       }
 
       const agentRepo = new AgentRepository();
-      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}`;
+      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
+      const roomConversationId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
       const cachedPerm = getCachedPermission(permCacheKey);
       // NOTE: We keep a small in-memory cache for hot tool-call loops, but permissions can be
       // changed out-of-band by the UI (e.g. "Always allow"). If we blindly trust a cached
@@ -1194,14 +1196,17 @@ router.post(
       // - Cache misses → read from DB and cache.
       // - Cache hits for 'allow' → trust (fast path).
       // - Cache hits for 'ask'/'deny' → re-check DB to pick up recent changes, then update cache.
-      let permission =
-        cachedPerm !== undefined
-          ? cachedPerm
+      const readPermission = async (): Promise<'allow' | 'ask' | 'deny' | null> => {
+        return roomConversationId
+          ? await agentRepo.getEffectiveToolPermissionBySlugInRoom(agentId, conversation.starshipId, toolSlug, roomConversationId)
           : await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+      };
+
+      let permission = cachedPerm !== undefined ? cachedPerm : await readPermission();
       if (cachedPerm === undefined) {
         setCachedPermission(permCacheKey, permission);
       } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
-        const fresh = await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        const fresh = await readPermission();
         permission = fresh;
         setCachedPermission(permCacheKey, fresh);
       }

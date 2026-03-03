@@ -1486,6 +1486,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const messages = clone(acc)
       if (!msgRaw || !msgRaw.id) return messages
       const msg = normalizeMessageTimestamps(msgRaw)
+
       // If a message with the same id already exists, treat this as an update rather than a new message.
       // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
       const existingIdxById = messages.findIndex(m => m.id === msg.id)

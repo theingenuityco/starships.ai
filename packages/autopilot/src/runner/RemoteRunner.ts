@@ -53,10 +53,19 @@ export class RemoteRunner implements Runner {
 
     const promise = (async (): Promise<ExecutionItem[]> => {
       const streamUrl = `${this.baseUrl}/runner.Runner/ExecuteStream`;
+      // Apply a hard network timeout so the caller never hangs indefinitely if the remote runner
+      // stops responding mid-stream.
+      const cfgAny = (config?.runnerConfig || {}) as Record<string, unknown>;
+      const timeoutMsRaw = cfgAny['timeoutMs'] ?? cfgAny['timeout_ms'];
+      const timeoutMs = typeof timeoutMsRaw === 'number' && Number.isFinite(timeoutMsRaw) && timeoutMsRaw > 0 ? Math.round(timeoutMsRaw) : 10 * 60 * 1000;
+      // Add a small buffer to cover startup/transport overhead.
+      const signal = AbortSignal.timeout(Math.max(1000, timeoutMs + 5000));
+
       const streamRes = await fetch(streamUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        signal,
       });
       if (!streamRes.ok || !streamRes.body) {
         throw new Error(`Remote runner stream error: ${streamRes.status} ${streamRes.statusText}`);

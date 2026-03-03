@@ -154,7 +154,11 @@ export function useRoomInviteApprovalsPending(roomConversationId: string, conver
       return { approvals: Array.isArray(response.data.data?.approvals) ? response.data.data!.approvals : [] }
     },
     enabled: !!roomConversationId && !!conversationId && enabled,
-    staleTime: 2_000,
+    // Avoid polling: live updates are driven by SSE ui_actions invalidating this query.
+    // Keep a moderate staleTime for hydration and "missed SSE" recovery without hammering the API.
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }
 

@@ -35,6 +35,7 @@ import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import crypto from 'crypto';
+import { rateLimiters } from '@/middleware/rateLimiter';
 
 const router: Router = Router();
 
@@ -245,7 +246,11 @@ router.get('/rooms/:roomId/invite-approvals/pending', jwtAuthMiddleware, async (
 /**
  * POST /rooms/:roomId/invite-approvals/:approvalId/approve
  */
-router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post(
+  '/rooms/:roomId/invite-approvals/:approvalId/approve',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
     if (!params) return;
@@ -388,14 +393,6 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
         }
 
         // 2) Trigger agent once the agent is now a room participant
-        const agentId = invitedAgentIds.length > 0 ? invitedAgentIds[0] : '';
-        if (!agentId) return;
-
-        const agentRepo = new AgentRepository();
-        const agent = await agentRepo.findById(agentId).catch(() => null);
-        if (!agent) return;
-        if (String(agent.starshipId) !== String(sid)) return;
-
         const messageService = new MessageService();
         const msg = (await messageService.getMessage(messageId).catch(() => null)) as MessageModel | null;
         if (!msg) return;
@@ -405,7 +402,20 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
         const attachmentIds = Array.isArray(msg.attachmentIds) ? msg.attachmentIds : undefined;
 
         const conversationService = new ConversationService();
-        const willTrigger = await conversationService.willTriggerAgentExecution({ conversationId, content, agentId }).catch(() => false);
+        // Prefer mention-driven routing (can include multiple agents); otherwise fall back to a single explicit agentId.
+        const allAgents = await new AgentRepository().findByStarship(sid).catch(() => []);
+        const starshipAgentIdSet = new Set(allAgents.map((a) => String(a?.id || '').trim()).filter(Boolean));
+        const mentionedAgentIds = Array.from(new Set((content.match(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi) || [])
+          .map((t) => String(t).replace(/^<@a:|>$/g, '').trim())
+          .filter((id) => starshipAgentIdSet.has(id))));
+        const hasMentionTargets = mentionedAgentIds.length > 0;
+        const explicitAgentId = hasMentionTargets
+          ? null
+          : invitedAgentIds.find((id) => starshipAgentIdSet.has(String(id || '').trim())) || null;
+
+        const willTrigger = await conversationService
+          .willTriggerAgentExecution({ conversationId, content, agentId: explicitAgentId })
+          .catch(() => false);
         if (!willTrigger) return;
 
         // Billing + concurrency guard (mirrors POST /conversations/:id/messages behavior at a high level).
@@ -460,7 +470,7 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
               role: 'user',
               content,
               messageType: msg.messageType || 'user_input',
-              agentId,
+              ...(explicitAgentId ? { agentId: explicitAgentId } : null),
               ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : null),
             },
             requestedByUserId ? { authContext: { userId: requestedByUserId } } : undefined,
@@ -482,12 +492,17 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/approve', jwtAuthMiddle
   } catch (error) {
     handleError(error, res, 'approving room invite');
   }
-});
+  }
+);
 
 /**
  * POST /rooms/:roomId/invite-approvals/:approvalId/deny
  */
-router.post('/rooms/:roomId/invite-approvals/:approvalId/deny', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post(
+  '/rooms/:roomId/invite-approvals/:approvalId/deny',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
     if (!params) return;
@@ -500,34 +515,49 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/deny', jwtAuthMiddlewar
     }
 
     const conn = getConnection();
-    const approval = await conn.queryOne<{ id: string; status: string; conversation_id: string; message_id: string }>(
-      `SELECT id, status, conversation_id, message_id FROM room_invite_approvals WHERE id = $1 AND room_conversation_id = $2`,
-      [params.approvalId, access.room.conversationId]
-    );
-    if (!approval) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
-      return;
-    }
-    if (String(approval.status) !== 'pending') {
-      sendSuccess(res, { status: String(approval.status) }, 200);
-      return;
-    }
+    let threadConversationId = '';
+    await conn.query('BEGIN');
+    try {
+      const approval = await conn.queryOne<{ id: string; status: string; conversation_id: string; message_id: string }>(
+        `
+        SELECT id, status, conversation_id, message_id
+        FROM room_invite_approvals
+        WHERE id = $1 AND room_conversation_id = $2
+        FOR UPDATE
+        `,
+        [params.approvalId, access.room.conversationId]
+      );
+      if (!approval) {
+        await conn.query('ROLLBACK');
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
+        return;
+      }
+      if (String(approval.status) !== 'pending') {
+        await conn.query('ROLLBACK');
+        sendSuccess(res, { status: String(approval.status) }, 200);
+        return;
+      }
 
-    await conn.query(
-      `
-      UPDATE room_invite_approvals
-         SET status = 'denied',
-             resolved_at = NOW(),
-             resolved_by_user_id = $2,
-             updated_at = NOW()
-       WHERE id = $1
-      `,
-      [params.approvalId, access.authUserId]
-    );
+      threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
+      await conn.query(
+        `
+        UPDATE room_invite_approvals
+           SET status = 'denied',
+               resolved_at = NOW(),
+               resolved_by_user_id = $2,
+               updated_at = NOW()
+         WHERE id = $1
+        `,
+        [params.approvalId, access.authUserId]
+      );
+      await conn.query('COMMIT');
+    } catch (e) {
+      await conn.query('ROLLBACK');
+      throw e;
+    }
 
     try {
       const ui = new UIActionService();
-      const threadConversationId = approval?.conversation_id ? String(approval.conversation_id) : '';
       await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
         approvalId: params.approvalId,
         roomConversationId: access.room.conversationId,
@@ -541,7 +571,8 @@ router.post('/rooms/:roomId/invite-approvals/:approvalId/deny', jwtAuthMiddlewar
   } catch (error) {
     handleError(error, res, 'denying room invite');
   }
-});
+  }
+);
 
 /**
  * GET /rooms/:roomId/participation
@@ -600,7 +631,7 @@ router.get('/rooms/:roomId/participation', jwtAuthMiddleware, async (req: Reques
  *
  * Join a public room by inserting a conversation_participants row.
  */
-router.post('/rooms/:roomId/join', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/join', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -650,7 +681,7 @@ router.post('/rooms/:roomId/join', jwtAuthMiddleware, async (req: Request, res: 
  *
  * Leave a public room by removing the conversation_participants row for the current user.
  */
-router.post('/rooms/:roomId/leave', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/leave', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;

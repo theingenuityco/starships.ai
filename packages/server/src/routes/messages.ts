@@ -27,9 +27,8 @@ import {
   NotificationRepository,
 } from '@starships/models';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
-import { UIActionService } from '@/services/UIActionService';
 import { getConnection } from '@starships/models';
-import { nanoid } from 'nanoid';
+import { createRoomInviteApprovalForMessage } from '@/utils/room-invite-approvals';
 
 const router: Router = Router();
 
@@ -252,65 +251,17 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     if (roomInvite && (roomInvite.missingUserIds.length > 0 || roomInvite.missingAgentIds.length > 0)) {
       try {
         const conn = getConnection();
-        const newApprovalId = nanoid();
-        const approvalRow = await conn.queryOne<{ id: string }>(
-          `
-          INSERT INTO room_invite_approvals (
-            id,
-            starship_id,
-            room_conversation_id,
-            conversation_id,
-            message_id,
-            requested_by_user_id,
-            status,
-            updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())
-          ON CONFLICT (message_id)
-          DO UPDATE SET
-            updated_at = NOW(),
-            status = CASE WHEN room_invite_approvals.status = 'pending' THEN 'pending' ELSE room_invite_approvals.status END
-          RETURNING id
-        `,
-          [
-            newApprovalId,
-            conversation.starshipId,
-            roomInvite.ctx.roomConversationId,
-            conversationId,
-            String((created as unknown as { id?: unknown })?.id ?? ''),
-            authUserId,
-          ]
-        );
-        const approvalId = approvalRow?.id ? String(approvalRow.id) : '';
         const messageId = String((created as unknown as { id?: unknown })?.id ?? '').trim();
-        if (approvalId && messageId) {
-          const targets: Array<{ type: 'user' | 'agent'; id: string }> = [
-            ...roomInvite.missingUserIds.map((id) => ({ type: 'user' as const, id: String(id || '').trim() })),
-            ...roomInvite.missingAgentIds.map((id) => ({ type: 'agent' as const, id: String(id || '').trim() })),
-          ].filter((t) => t.id);
-
-          if (targets.length > 0) {
-            const params: string[] = [];
-            const tuples: string[] = [];
-            for (let i = 0; i < targets.length; i++) {
-              const t = targets[i];
-              params.push(approvalId, t.type, t.id);
-              const base = i * 3;
-              tuples.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
-            }
-            await conn.query(
-              `INSERT INTO room_invite_approval_targets (approval_id, target_type, target_id)
-               VALUES ${tuples.join(',')}
-               ON CONFLICT (approval_id, target_type, target_id) DO NOTHING`,
-              params
-            );
-          }
-
-          await new UIActionService().publishAction(conversationId, 'room_invite_approval_required', {
-            approvalId,
+        if (messageId) {
+          await createRoomInviteApprovalForMessage(conn, {
+            starshipId: conversation.starshipId,
             roomConversationId: roomInvite.ctx.roomConversationId,
             conversationId,
             messageId,
+            requestedByUserId: authUserId,
+            missingUserIds: roomInvite.missingUserIds,
+            missingAgentIds: roomInvite.missingAgentIds,
+            emitUIAction: true,
           });
         }
       } catch {

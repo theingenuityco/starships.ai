@@ -8,7 +8,21 @@ import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import Icon from '@/components/primitives/Icon'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
-import { usePinRoomAgent, usePinRoomDataset, usePinRoomTaskBoard, usePinRoomTool, usePinRoomView, useRoomPins, useStarshipRooms, useStarshipTaskBoards, useUnpinRoomAgent, useUnpinRoomDataset, useUnpinRoomTaskBoard, useUnpinRoomTool, useUnpinRoomView } from '@/hooks/useRooms'
+import {
+  usePinRoomAgent,
+  usePinRoomDataset,
+  usePinRoomTaskBoard,
+  usePinRoomTool,
+  usePinRoomView,
+  useRoomPins,
+  useStarshipRooms,
+  useStarshipTaskBoards,
+  useUnpinRoomAgent,
+  useUnpinRoomDataset,
+  useUnpinRoomTaskBoard,
+  useUnpinRoomTool,
+  useUnpinRoomView,
+} from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { cn } from '@/lib/utils'
@@ -275,9 +289,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const isViewPaneOpen = Boolean(viewKey)
 
   const roomBasePath = useMemo(() => {
-    return routeParams.roomSlug && String(routeParams.roomSlug).trim()
-      ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
-      : `/ship/${routeParams.slug}/rooms`
+    return routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
   }, [routeParams.roomSlug, routeParams.slug])
 
   const setThreadKeyInUrl = useCallback(
@@ -301,9 +313,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       next.delete('thread')
       const qs = next.toString()
       const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim()
-          ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
-          : `/ship/${routeParams.slug}/rooms`
+        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.roomSlug, routeParams.slug, searchParams]
@@ -318,9 +328,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       next.delete('thread')
       const qs = next.toString()
       const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim()
-          ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}`
-          : `/ship/${routeParams.slug}/rooms`
+        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.roomSlug, routeParams.slug, searchParams]
@@ -453,7 +461,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const list = Array.isArray(starshipViews) ? starshipViews : []
     return list
       .map((v: any) => ({ id: String(v?.id || '').trim(), name: String(v?.name || v?.slug || 'View').trim() }))
-      .filter((v) => Boolean(v.id))
+      .filter(v => Boolean(v.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [starshipViews])
 
@@ -461,7 +469,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const list = Array.isArray(datasets) ? datasets : []
     return list
       .map((d: any) => ({ id: String(d?.id || '').trim(), name: String(d?.name || d?.slug || 'Dataset').trim() }))
-      .filter((d) => Boolean(d.id))
+      .filter(d => Boolean(d.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [datasets])
 
@@ -469,7 +477,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const list = Array.isArray(taskBoards) ? taskBoards : []
     return list
       .map((b: any) => ({ id: String(b?.id || '').trim(), name: String(b?.name || b?.slug || 'Board').trim() }))
-      .filter((b) => Boolean(b.id))
+      .filter(b => Boolean(b.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [taskBoards])
 
@@ -477,7 +485,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const list = Array.isArray(agents) ? agents : []
     return list
       .map((a: any) => ({ id: String(a?.id || '').trim(), name: String(a?.name || a?.slug || 'Agent').trim() }))
-      .filter((a) => Boolean(a.id))
+      .filter(a => Boolean(a.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [agents])
 
@@ -485,7 +493,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const list = Array.isArray(tools) ? tools : []
     return list
       .map((t: any) => ({ id: String(t?.id || '').trim(), name: String(t?.name || t?.slug || 'Tool').trim() }))
-      .filter((t) => Boolean(t.id))
+      .filter(t => Boolean(t.id))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [tools])
 
@@ -528,11 +536,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           <div className="text-lg font-semibold">Room not found</div>
           <div className="text-sm text-muted-foreground">This room doesn’t exist (or was migrated from forum channels and is now only accessible via `/rooms`).</div>
           <div className="flex items-center justify-center gap-2 pt-2">
-            <button
-              type="button"
-              className="text-sm underline underline-offset-2"
-              onClick={() => router.replace(`/ship/${routeParams.slug}`)}
-            >
+            <button type="button" className="text-sm underline underline-offset-2" onClick={() => router.replace(`/ship/${routeParams.slug}`)}>
               Go to starship
             </button>
           </div>
@@ -567,6 +571,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onAgentChange={setThreadAgent}
             onThreadCreated={handleThreadCreated}
             onClose={handleCloseThread}
+            contentWidth="constrained"
             titlePrefix={
               <button
                 type="button"
@@ -617,16 +622,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             availableTaskBoards={availableTaskBoards}
             availableAgents={availableAgents}
             availableTools={availableTools}
-            onPinView={(viewId) => pinView.mutate({ viewId })}
-            onUnpinView={(viewId) => unpinView.mutate(viewId)}
-            onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
-            onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
-            onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
-            onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
-            onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
-            onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
-            onPinTool={(toolId) => pinTool.mutate({ toolId })}
-            onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+            onPinView={viewId => pinView.mutate({ viewId })}
+            onUnpinView={viewId => unpinView.mutate(viewId)}
+            onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
+            onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+            onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
+            onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
+            onPinAgent={agentId => pinAgent.mutate({ agentId })}
+            onUnpinAgent={agentId => unpinAgent.mutate(agentId)}
+            onPinTool={toolId => pinTool.mutate({ toolId })}
+            onUnpinTool={toolId => unpinTool.mutate(toolId)}
             onCreateDraftThread={() => {
               setThreadKeyInUrl('draft')
             }}
@@ -698,16 +703,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   availableTaskBoards={availableTaskBoards}
                   availableAgents={availableAgents}
                   availableTools={availableTools}
-                  onPinView={(viewId) => pinView.mutate({ viewId })}
-                  onUnpinView={(viewId) => unpinView.mutate(viewId)}
-                  onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
-                  onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
-                  onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
-                  onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
-                  onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
-                  onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
-                  onPinTool={(toolId) => pinTool.mutate({ toolId })}
-                  onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+                  onPinView={viewId => pinView.mutate({ viewId })}
+                  onUnpinView={viewId => unpinView.mutate(viewId)}
+                  onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
+                  onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+                  onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
+                  onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
+                  onPinAgent={agentId => pinAgent.mutate({ agentId })}
+                  onUnpinAgent={agentId => unpinAgent.mutate(agentId)}
+                  onPinTool={toolId => pinTool.mutate({ toolId })}
+                  onUnpinTool={toolId => unpinTool.mutate(toolId)}
                   onClose={() => setRoomPaneInUrl(null)}
                 />
               ) : null
@@ -720,10 +725,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
       {/* Resources full-screen overlay (mobile) */}
       <aside
-        className={cn(
-          'md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden',
-          isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        )}
+        className={cn('md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden', isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
         style={{
           transition: 'opacity 200ms ease-out',
           willChange: 'opacity',
@@ -757,16 +759,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               availableTaskBoards={availableTaskBoards}
               availableAgents={availableAgents}
               availableTools={availableTools}
-              onPinView={(viewId) => pinView.mutate({ viewId })}
-              onUnpinView={(viewId) => unpinView.mutate(viewId)}
-              onPinDataset={(datasetId) => pinDataset.mutate({ datasetId })}
-              onUnpinDataset={(datasetId) => unpinDataset.mutate(datasetId)}
-              onPinTaskBoard={(boardId) => pinBoard.mutate({ boardId })}
-              onUnpinTaskBoard={(boardId) => unpinBoard.mutate(boardId)}
-              onPinAgent={(agentId) => pinAgent.mutate({ agentId })}
-              onUnpinAgent={(agentId) => unpinAgent.mutate(agentId)}
-              onPinTool={(toolId) => pinTool.mutate({ toolId })}
-              onUnpinTool={(toolId) => unpinTool.mutate(toolId)}
+              onPinView={viewId => pinView.mutate({ viewId })}
+              onUnpinView={viewId => unpinView.mutate(viewId)}
+              onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
+              onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+              onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
+              onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
+              onPinAgent={agentId => pinAgent.mutate({ agentId })}
+              onUnpinAgent={agentId => unpinAgent.mutate(agentId)}
+              onPinTool={toolId => pinTool.mutate({ toolId })}
+              onUnpinTool={toolId => unpinTool.mutate(toolId)}
               onClose={() => setRoomPaneInUrl(null)}
             />
           ) : null
@@ -780,14 +782,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
         <div className="absolute inset-0 z-[30] bg-background/80 backdrop-blur-sm">
           <div className="absolute inset-0" onClick={() => setViewKeyInUrl(null)} />
           <div className="absolute inset-y-0 right-0 w-full md:w-[720px] bg-background border-l border-border/60 shadow-xl">
-            {viewKey ? (
-              <ViewPane
-                starshipId={starshipData.id}
-                viewId={viewKey}
-                onClose={() => setViewKeyInUrl(null)}
-                className="h-full"
-              />
-            ) : null}
+            {viewKey ? <ViewPane starshipId={starshipData.id} viewId={viewKey} onClose={() => setViewKeyInUrl(null)} className="h-full" /> : null}
           </div>
         </div>
       ) : null}
@@ -797,4 +792,3 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     </div>
   )
 }
-

@@ -141,6 +141,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [sending, setSending] = useState(false)
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
     const isStarter = !conversationId
+    const isExpandedStarterLayout = Boolean(isStarter && !minimal)
     // Load channels so we can detect "channel context" for both channel roots AND channel threads.
     // (Channel threads have conversationId != channelConversationId, so we must check parentConversationId.)
     const { data: channelsData } = useStarshipChannels(
@@ -2417,184 +2418,323 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.java,.cpp,.c,.go,.rs,.rb,.php,.swift"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.java,.cpp,.c,.go,.rs,.rb,.php,.swift"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
 
-            {/* Left-side Actions */}
-            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-              {/* Secondary actions (mobile: fade back while typing/focused) */}
+          {isExpandedStarterLayout ? (
+            <div className="px-3 py-2.5">
+              {/* Row 1: Editor gets full width */}
               <div
-                className={cn(
-                  'flex items-center gap-1 transition-opacity duration-200',
-                  // Mobile: don't dim attachment/emoji while the editor is focused (they should still look tappable).
-                  isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
-                  'sm:opacity-100'
-                )}
+                className={cn('w-full min-w-0 relative z-10')}
+                onPaste={handlePaste}
+                style={{
+                  paddingBottom: attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
+                }}
               >
-                {/* Attachment Button */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled || fileUploading}
-                  className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                  aria-label="Attach file"
-                  title="Attach file (images, PDFs)"
+                <div
+                  className={cn('overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent', 'max-h-[300px]')}
+                  style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                  <Icon name="paperclip" className="h-5 w-5" />
-                </button>
+                  <EditorContent editor={tiptap} />
+                </div>
 
-                {/* Emoji Picker */}
-                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={!canEditComposer}
-                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                      aria-label="Insert emoji"
-                      title="Insert emoji"
-                    >
-                      <Icon name="smiley" className="h-5 w-5" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverPrimitive.Portal>
-                    <PopoverPrimitive.Content
-                      asChild
-                      align="start"
-                      side="top"
-                      sideOffset={8}
-                      // NOTE: With `asChild`, these classes land on the picker element.
-                      // Do not include bg/border/shadow resets here or we'll override the theme styling.
-                      className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
-                    >
-                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                    </PopoverPrimitive.Content>
-                  </PopoverPrimitive.Portal>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Optional left-side controls in expanded mode */}
-            {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
-
-            {/* Text Input (TipTap) with attachments */}
-            <div
-              className={cn('flex-1 min-w-0 relative z-10')}
-              onPaste={handlePaste}
-              style={{
-                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
-              }}
-            >
-              <div
-                className={cn(
-                  'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-                  minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
-                )}
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                <EditorContent editor={tiptap} />
-              </div>
-
-              {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
-              {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
-                  <div className="flex flex-wrap gap-2">
-                    {pendingFiles.map(file => (
-                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
-                    ))}
+                {pendingFiles.length > 0 && (
+                  <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
+                    <div className="flex flex-wrap gap-2">
+                      {pendingFiles.map(file => (
+                        <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right-side Action Buttons Container */}
-            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-              {/* Secondary actions (mobile: fade back while typing/focused) */}
-              <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
-                {/* Web Browsing Toggle Button - Available from the start */}
-                <button
-                  onClick={() => {
-                    if (conversationId) {
-                      // Update existing conversation
-                      const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
-                      updateConversationState.mutate({
-                        conversationId,
-                        state: {
-                          plugins: newPlugins,
-                        } as ConversationState,
-                      })
-                    } else {
-                      // Store preference for when conversation is created
-                      setPendingWebBrowsing(!pendingWebBrowsing)
-                    }
-                  }}
-                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
-                  className={cn(
-                    'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
-                    hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    // Mobile: when engaged, hide the toggle to keep the composer feeling focused.
-                    isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
-                  )}
-                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
-                >
-                  {hasWebBrowsing ? (
-                    <>
-                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
-                    </>
-                  ) : (
-                    <Icon name="globe" className="h-5 w-5" />
-                  )}
-                </button>
+                )}
               </div>
 
-              {/* Stop (when streaming) or Send Button */}
-              {shouldShowStop ? (
-                <div className="relative h-8 w-8">
-                  <Button
-                    onClick={() => {
-                      const id = lastConversationIdRef.current
-                      if (!id) return
-                      void stopConversation(id)
-                    }}
-                    variant="outline"
-                    size="icon"
-                    className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
-                    aria-label="Stop response"
-                    title="Stop response"
+              {/* Row 2: Actions toolbar (doesn't steal editor width) */}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'flex items-center gap-1 transition-opacity duration-200',
+                      isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                      'sm:opacity-100'
+                    )}
                   >
-                    <Icon name="stop" weight="fill" className="h-4 w-4" />
-                  </Button>
-                  {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={disabled || fileUploading}
+                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      aria-label="Attach file"
+                      title="Attach file (images, PDFs)"
+                    >
+                      <Icon name="paperclip" className="h-5 w-5" />
+                    </button>
+
+                    <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!canEditComposer}
+                          className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                          aria-label="Insert emoji"
+                          title="Insert emoji"
+                        >
+                          <Icon name="smiley" className="h-5 w-5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverPrimitive.Portal>
+                        <PopoverPrimitive.Content
+                          asChild
+                          align="start"
+                          side="top"
+                          sideOffset={8}
+                          className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                        >
+                          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                        </PopoverPrimitive.Content>
+                      </PopoverPrimitive.Portal>
+                    </Popover>
+                  </div>
+
+                  {children ? <div className="ml-1 flex items-center gap-3">{children}</div> : null}
                 </div>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!canSend}
-                  size="icon"
-                  className={cn(
-                    'h-8 w-8 rounded-full shrink-0 transition-all',
-                    canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+
+                <div className="flex items-center gap-2">
+                  <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
+                    <button
+                      onClick={() => {
+                        if (conversationId) {
+                          const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                          updateConversationState.mutate({
+                            conversationId,
+                            state: {
+                              plugins: newPlugins,
+                            } as ConversationState,
+                          })
+                        } else {
+                          setPendingWebBrowsing(!pendingWebBrowsing)
+                        }
+                      }}
+                      disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                      className={cn(
+                        'group inline-flex items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                        hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                        isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                      )}
+                      aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                      title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                    >
+                      {hasWebBrowsing ? (
+                        <>
+                          <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                            <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                            <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                        </>
+                      ) : (
+                        <Icon name="globe" className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {shouldShowStop ? (
+                    <div className="relative h-8 w-8">
+                      <Button
+                        onClick={() => {
+                          const id = lastConversationIdRef.current
+                          if (!id) return
+                          void stopConversation(id)
+                        }}
+                        variant="outline"
+                        size="icon"
+                        className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                        aria-label="Stop response"
+                        title="Stop response"
+                      >
+                        <Icon name="stop" weight="fill" className="h-4 w-4" />
+                      </Button>
+                      {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!canSend}
+                      size="icon"
+                      className={cn(
+                        'h-8 w-8 rounded-full shrink-0 transition-all',
+                        canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      )}
+                      aria-label="Send"
+                      title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
+                    >
+                      {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                    </Button>
                   )}
-                  aria-label="Send"
-                  title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
-                >
-                  {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-                </Button>
-              )}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
+              {/* Left-side Actions */}
+              <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+                <div
+                  className={cn(
+                    'flex items-center gap-1 transition-opacity duration-200',
+                    isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                    'sm:opacity-100'
+                  )}
+                >
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={disabled || fileUploading}
+                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                    aria-label="Attach file"
+                    title="Attach file (images, PDFs)"
+                  >
+                    <Icon name="paperclip" className="h-5 w-5" />
+                  </button>
+
+                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={!canEditComposer}
+                        className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                        aria-label="Insert emoji"
+                        title="Insert emoji"
+                      >
+                        <Icon name="smiley" className="h-5 w-5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverPrimitive.Portal>
+                      <PopoverPrimitive.Content
+                        asChild
+                        align="start"
+                        side="top"
+                        sideOffset={8}
+                        className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                      >
+                        <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                      </PopoverPrimitive.Content>
+                    </PopoverPrimitive.Portal>
+                  </Popover>
+                </div>
+              </div>
+
+              {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
+
+              <div
+                className={cn('flex-1 min-w-0 relative z-10')}
+                onPaste={handlePaste}
+                style={{
+                  paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
+                }}
+              >
+                <div
+                  className={cn(
+                    'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                    minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
+                  )}
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <EditorContent editor={tiptap} />
+                </div>
+
+                {!minimal && pendingFiles.length > 0 && (
+                  <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
+                    <div className="flex flex-wrap gap-2">
+                      {pendingFiles.map(file => (
+                        <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+                <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
+                  <button
+                    onClick={() => {
+                      if (conversationId) {
+                        const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                        updateConversationState.mutate({
+                          conversationId,
+                          state: {
+                            plugins: newPlugins,
+                          } as ConversationState,
+                        })
+                      } else {
+                        setPendingWebBrowsing(!pendingWebBrowsing)
+                      }
+                    }}
+                    disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                    className={cn(
+                      'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                      hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                      'disabled:opacity-50 disabled:cursor-not-allowed',
+                      isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                    )}
+                    aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                    title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                  >
+                    {hasWebBrowsing ? (
+                      <>
+                        <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                          <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                          <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                      </>
+                    ) : (
+                      <Icon name="globe" className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+
+                {shouldShowStop ? (
+                  <div className="relative h-8 w-8">
+                    <Button
+                      onClick={() => {
+                        const id = lastConversationIdRef.current
+                        if (!id) return
+                        void stopConversation(id)
+                      }}
+                      variant="outline"
+                      size="icon"
+                      className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                      aria-label="Stop response"
+                      title="Stop response"
+                    >
+                      <Icon name="stop" weight="fill" className="h-4 w-4" />
+                    </Button>
+                    {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canSend}
+                    size="icon"
+                    className={cn(
+                      'h-8 w-8 rounded-full shrink-0 transition-all',
+                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                    )}
+                    aria-label="Send"
+                    title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
+                  >
+                    {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Disclaimer: only show when an agent is tagged in the draft */}
           {draftHasAgentMention && (

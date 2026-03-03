@@ -8,9 +8,8 @@ import {
   enforceDirectMessageMembership,
   enforcePrivateChannelMembership,
   enforceRoomParticipantMembershipForConversation,
-  resolveRoomConversationContext,
 } from '@/utils/conversation-membership';
-import { parseMentionTokens } from '@/utils/mentions';
+import { analyzeRoomMentionsAndAgentAllowlist } from '@/utils/room-mentions';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -100,51 +99,6 @@ function getMessageStarshipId(message: PersistedMessage): string {
   return coerceStringId(message.starshipId) || coerceStringId(message.starship_id);
 }
 
-async function enforceRoomMentionAndAgentAllowlist(args: {
-  conversationId: string;
-  conversationStarshipId: string;
-  userId: string;
-  content: string;
-  requestedAgentId?: string | null;
-}): Promise<
-  | {
-      ctx: { roomConversationId: string };
-      missingUserIds: string[];
-      missingAgentIds: string[];
-      sanitizedAgentIdForMessage: string | null;
-    }
-  | null
-> {
-  const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
-  if (!ctx) return null;
-
-  const participantRepo = new ConversationParticipantRepository();
-  const [userIds, agentIds] = await Promise.all([
-    participantRepo.listUserIdsByConversation(ctx.roomConversationId).catch(() => []),
-    participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []),
-  ]);
-  const allowUsers = new Set((userIds || []).map((x) => String(x || '').trim()).filter(Boolean));
-  const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
-
-  const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
-  const missingUserIds = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
-  const missingAgentIdsFromMentions = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
-
-  const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
-  const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
-
-  const missingAgentIds = Array.from(
-    new Set([...(missingAgentIdsFromMentions || []), ...(requestedAgentDisallowed ? [requestedAgentId] : [])].filter(Boolean))
-  );
-
-  return {
-    ctx: { roomConversationId: ctx.roomConversationId },
-    missingUserIds,
-    missingAgentIds,
-    sanitizedAgentIdForMessage: requestedAgentDisallowed ? null : requestedAgentId || null,
-  };
-}
-
 /**
  * POST /messages - Create a message (no agent processing)
  *
@@ -212,10 +166,8 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     )
       return;
 
-    const roomInvite = await enforceRoomMentionAndAgentAllowlist({
+    const roomInvite = await analyzeRoomMentionsAndAgentAllowlist({
       conversationId,
-      conversationStarshipId: conversation.starshipId,
-      userId: authUserId,
       content: String(bodyValidation.content || ''),
       requestedAgentId: typeof bodyValidation.agentId === 'string' ? String(bodyValidation.agentId) : null,
     });
@@ -232,8 +184,10 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
             : bodyValidation.role === 'system'
               ? 'system_notification'
               : 'user_input';
+    const contentForMessage = roomInvite ? roomInvite.sanitizedContentForMessage : String(bodyValidation.content || '');
     const created = await messageService.createMessage({
       ...bodyWithoutAgentId,
+      content: contentForMessage,
       conversationId,
       // Attribute to the caller for auditing (even for system messages).
       userId: authUserId,
@@ -364,6 +318,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     // Validate request body
     const bodyValidation = validateData(UpdateMessageSchema, req.body, res, 'message update data');
     if (!bodyValidation) return;
+    let updatePayload: Record<string, unknown> = bodyValidation as unknown as Record<string, unknown>;
 
     const { messageId } = paramValidation;
     const authUserId = req.user?.id as string | undefined;
@@ -387,8 +342,6 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    let conversationStarshipIdForAccess: string | null = null;
-
     // Authorization: verify user has access to the starship + conversation membership.
     if (authUserId) {
       if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
@@ -398,7 +351,6 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
         return;
       }
-      conversationStarshipIdForAccess = String(conversation.starshipId);
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
       if (
         !(await enforcePrivateChannelMembership({
@@ -423,7 +375,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         return;
     }
 
-    const wantsContentUpdate = typeof (bodyValidation as any)?.content === 'string';
+    const wantsContentUpdate = typeof (updatePayload as any)?.content === 'string';
     if (wantsContentUpdate) {
       const role = coerceStringId((message as PersistedMessage).role);
       const authorUserId = coerceStringId((message as PersistedMessage).userId);
@@ -436,19 +388,20 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         return;
       }
 
-      // Room mention policy: prevent editing a message to mention non-room participants.
-      const okMentions = await enforceRoomMentionAndAgentAllowlist({
+      // Room mention policy: persist a sanitized copy so disallowed agent mention tokens
+      // cannot be stored and later re-surface in history.
+      const analysis = await analyzeRoomMentionsAndAgentAllowlist({
         conversationId,
-        conversationStarshipId: conversationStarshipIdForAccess ?? starshipId,
-        userId: authUserId,
-        content: String((bodyValidation as any)?.content || ''),
+        content: String((updatePayload as any)?.content || ''),
         requestedAgentId: null,
       });
-      void okMentions;
+      if (analysis) {
+        updatePayload = { ...updatePayload, content: analysis.sanitizedContentForMessage };
+      }
     }
 
     // Delegate to service layer
-    const updatedMessage = (await messageService.updateMessage(messageId, bodyValidation)) as PersistedMessage | null;
+    const updatedMessage = (await messageService.updateMessage(messageId, updatePayload)) as PersistedMessage | null;
 
     if (!updatedMessage) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
@@ -463,7 +416,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     // - linked message author (user or agent)
     // - thread starter (the authenticated user who performed the link)
     const linkedConversationId =
-      typeof (bodyValidation as any)?.linkedConversationId === 'string' ? String((bodyValidation as any).linkedConversationId).trim() : '';
+      typeof (updatePayload as any)?.linkedConversationId === 'string' ? String((updatePayload as any).linkedConversationId).trim() : '';
     if (linkedConversationId) {
       try {
         const authUserId = req.user?.id as string | undefined;

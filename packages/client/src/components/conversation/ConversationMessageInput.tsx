@@ -2469,7 +2469,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={disabled || fileUploading}
-                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
                       aria-label="Attach file"
                       title="Attach file (images, PDFs)"
                     >
@@ -2481,7 +2481,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                         <button
                           type="button"
                           disabled={!canEditComposer}
-                          className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                          className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
                           aria-label="Insert emoji"
                           title="Insert emoji"
                         >
@@ -2595,7 +2595,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={disabled || fileUploading}
-                    className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                    className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
                     aria-label="Attach file"
                     title="Attach file (images, PDFs)"
                   >
@@ -2607,7 +2607,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       <button
                         type="button"
                         disabled={!canEditComposer}
-                        className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                        className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
                         aria-label="Insert emoji"
                         title="Insert emoji"
                       >

@@ -73,6 +73,8 @@ jest.mock('@/utils/conversation-membership', () => {
   return {
     enforceDirectMessageMembership: jest.fn().mockResolvedValue(true),
     enforcePrivateChannelMembership: jest.fn().mockResolvedValue(true),
+    enforceRoomParticipantMembershipForConversation: jest.fn().mockResolvedValue(true),
+    resolveRoomConversationContext: jest.fn().mockResolvedValue(null),
   };
 });
 jest.mock('@/services/NotificationStreamBus', () => {

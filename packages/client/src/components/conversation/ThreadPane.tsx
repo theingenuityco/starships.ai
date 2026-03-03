@@ -37,6 +37,12 @@ export function ThreadPane(props: {
   rightSlot?: ReactNode
   /** When true, omit the default close button (ignored if `rightSlot` is provided). */
   hideCloseButton?: boolean
+  /**
+   * Controls the maximum width of the inner message column.
+   * - 'constrained': center a readable column (matches channel/DM conversations)
+   * - 'full': allow messages to expand to the full available width
+   */
+  contentWidth?: 'constrained' | 'full'
   /** Optional extra classes for the outer container (header+body+composer live inside). */
   className?: string
 }) {
@@ -57,6 +63,7 @@ export function ThreadPane(props: {
     titleRightSlot,
     rightSlot,
     hideCloseButton,
+    contentWidth = 'full',
     className,
   } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
@@ -278,7 +285,7 @@ export function ThreadPane(props: {
             starshipId={starshipId}
             bottomPaddingPx={inputHeight + 12}
             pinnedFirstMessage={pinnedFirstMessage ?? null}
-            contentWidth="full"
+            contentWidth={contentWidth}
           />
         </div>
 

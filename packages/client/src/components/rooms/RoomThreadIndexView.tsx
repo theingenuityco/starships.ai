@@ -186,6 +186,7 @@ export function RoomThreadIndexView(props: {
               onAgentChange={setStarterSelectedAgent}
               starshipId={props.starshipId}
               conversationId={null}
+              roomConversationId={props.roomConversationId}
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
               newConversationTitleOverride="New thread"

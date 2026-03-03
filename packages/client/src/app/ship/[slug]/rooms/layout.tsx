@@ -571,6 +571,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             conversationId={threadConversationId}
+            roomConversationId={activeConversationId}
             draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
             draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
             selectedAgent={threadAgent}

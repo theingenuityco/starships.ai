@@ -4,7 +4,12 @@ import { ConversationService } from '@/services/ConversationService';
 import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
+import {
+  enforceDirectMessageMembership,
+  enforcePrivateChannelMembership,
+  enforceRoomParticipantMembershipForConversation,
+} from '@/utils/conversation-membership';
+import { analyzeRoomMentionsAndAgentAllowlist } from '@/utils/room-mentions';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -21,6 +26,8 @@ import {
   NotificationRepository,
 } from '@starships/models';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
+import { getConnection } from '@starships/models';
+import { createRoomInviteApprovalForMessage } from '@/utils/room-invite-approvals';
 
 const router: Router = Router();
 
@@ -53,6 +60,8 @@ const CreateMessageSchema = z.object({
 });
 
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });
+
+type CreateMessageBody = z.infer<typeof CreateMessageSchema>;
 
 const ToggleReactionSchema = z.object({
   emoji: z.string().min(1, 'emoji is required').max(32, 'emoji too long'),
@@ -104,8 +113,9 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     if (!checkAuth(req, res)) return;
 
     // Validate request body
-    const bodyValidation = validateData(CreateMessageSchema, req.body, res, 'create message');
-    if (!bodyValidation) return;
+    const bodyValidationUnknown = validateData(CreateMessageSchema, req.body, res, 'create message');
+    if (!bodyValidationUnknown) return;
+    const bodyValidation = bodyValidationUnknown as CreateMessageBody;
 
     const conversationId = typeof bodyValidation.conversationId === 'string' ? bodyValidation.conversationId : '';
     if (!conversationId) {
@@ -145,14 +155,73 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const roomInvite = await analyzeRoomMentionsAndAgentAllowlist({
+      conversationId,
+      content: String(bodyValidation.content || ''),
+      requestedAgentId: typeof bodyValidation.agentId === 'string' ? String(bodyValidation.agentId) : null,
+    });
 
     const messageService = new MessageService();
+    const { agentId: requestedAgentId, ...bodyWithoutAgentId } = bodyValidation;
+    const messageType =
+      typeof bodyValidation.messageType === 'string'
+        ? bodyValidation.messageType
+        : bodyValidation.role === 'tool'
+          ? 'tool_result'
+          : bodyValidation.role === 'assistant'
+            ? 'agent_response'
+            : bodyValidation.role === 'system'
+              ? 'system_notification'
+              : 'user_input';
+    const contentForMessage = roomInvite ? roomInvite.sanitizedContentForMessage : String(bodyValidation.content || '');
     const created = await messageService.createMessage({
-      ...(bodyValidation as any),
+      ...bodyWithoutAgentId,
+      content: contentForMessage,
       conversationId,
       // Attribute to the caller for auditing (even for system messages).
       userId: authUserId,
+      messageType,
+      ...(roomInvite
+        ? roomInvite.sanitizedAgentIdForMessage
+          ? { agentId: roomInvite.sanitizedAgentIdForMessage }
+          : {}
+        : requestedAgentId
+          ? { agentId: requestedAgentId }
+          : {}),
     });
+
+    // If this is a room/room-thread message and it referenced non-participants, persist a pending approval row (best-effort).
+    if (roomInvite && (roomInvite.missingUserIds.length > 0 || roomInvite.missingAgentIds.length > 0)) {
+      try {
+        const conn = getConnection();
+        const messageId = String((created as unknown as { id?: unknown })?.id ?? '').trim();
+        if (messageId) {
+          await createRoomInviteApprovalForMessage(conn, {
+            starshipId: conversation.starshipId,
+            roomConversationId: roomInvite.ctx.roomConversationId,
+            conversationId,
+            messageId,
+            requestedByUserId: authUserId,
+            missingUserIds: roomInvite.missingUserIds,
+            missingAgentIds: roomInvite.missingAgentIds,
+            emitUIAction: true,
+          });
+        }
+      } catch {
+        // best-effort only
+      }
+    }
 
     sendSuccess(res, created, 201);
   } catch (error) {
@@ -186,6 +255,48 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
+    const authUserId = req.user?.id as string | undefined;
+    const conversationId = getMessageConversationId(message as PersistedMessage);
+    const starshipId = getMessageStarshipId(message as PersistedMessage);
+    if (!conversationId || !starshipId) {
+      sendError(res, 'VALIDATION_ERROR', 'Message is missing conversationId/starshipId', 400, { messageId });
+      return;
+    }
+
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!(await verifyResourceAccess(starshipId, authUserId, 'message', messageId, res))) return;
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
     sendSuccess(res, message, 200);
   } catch (error) {
     handleError(error, res, 'fetching message');
@@ -207,6 +318,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     // Validate request body
     const bodyValidation = validateData(UpdateMessageSchema, req.body, res, 'message update data');
     if (!bodyValidation) return;
+    let updatePayload: Record<string, unknown> = bodyValidation as unknown as Record<string, unknown>;
 
     const { messageId } = paramValidation;
     const authUserId = req.user?.id as string | undefined;
@@ -251,9 +363,19 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
     }
 
-    const wantsContentUpdate = typeof (bodyValidation as any)?.content === 'string';
+    const wantsContentUpdate = typeof (updatePayload as any)?.content === 'string';
     if (wantsContentUpdate) {
       const role = coerceStringId((message as PersistedMessage).role);
       const authorUserId = coerceStringId((message as PersistedMessage).userId);
@@ -265,10 +387,21 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         sendError(res, 'RESOURCE_CONFLICT', 'Deleted messages cannot be edited', 409, { resource: 'message', id: messageId });
         return;
       }
+
+      // Room mention policy: persist a sanitized copy so disallowed agent mention tokens
+      // cannot be stored and later re-surface in history.
+      const analysis = await analyzeRoomMentionsAndAgentAllowlist({
+        conversationId,
+        content: String((updatePayload as any)?.content || ''),
+        requestedAgentId: null,
+      });
+      if (analysis) {
+        updatePayload = { ...updatePayload, content: analysis.sanitizedContentForMessage };
+      }
     }
 
     // Delegate to service layer
-    const updatedMessage = (await messageService.updateMessage(messageId, bodyValidation)) as PersistedMessage | null;
+    const updatedMessage = (await messageService.updateMessage(messageId, updatePayload)) as PersistedMessage | null;
 
     if (!updatedMessage) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Message not found', 404, {
@@ -283,7 +416,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     // - linked message author (user or agent)
     // - thread starter (the authenticated user who performed the link)
     const linkedConversationId =
-      typeof (bodyValidation as any)?.linkedConversationId === 'string' ? String((bodyValidation as any).linkedConversationId).trim() : '';
+      typeof (updatePayload as any)?.linkedConversationId === 'string' ? String((updatePayload as any).linkedConversationId).trim() : '';
     if (linkedConversationId) {
       try {
         const authUserId = req.user?.id as string | undefined;
@@ -329,7 +462,9 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
           const child = await convRepo.findById(linkedConversationId).catch(() => null);
           if (child) {
             const parentConversationId = getMessageConversationId(updatedMessage);
-            const content = String(updatedMessage.content || '').trim().slice(0, 20_000);
+            const content = String(updatedMessage.content || '')
+              .trim()
+              .slice(0, 20_000);
             const sourceUserName = coerceStringId(updatedMessage.userName);
             const sourceAgentName = coerceStringId(updatedMessage.agentName);
             const createdAt = coerceStringId(updatedMessage.createdAt);
@@ -452,6 +587,16 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
     )
       return;
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     const reactionRepo = new MessageReactionRepository();
     const toggled = await reactionRepo.toggleReaction({ messageId, userId: authUserId, emoji });
@@ -579,6 +724,16 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
       )
         return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
     }
 
     const role = typeof (message as any)?.role === 'string' ? String((message as any).role) : '';

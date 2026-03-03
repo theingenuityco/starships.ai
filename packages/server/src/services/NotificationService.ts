@@ -188,10 +188,10 @@ export class NotificationService {
       try {
         const conn = getConnection();
         const rows = await conn.query<{ user_id: string }>(
-          // IMPORTANT:
-          // Private channel membership is enforced via `conversation_members` in route auth.
-          // Do NOT use `conversation_participants` here; it may only reflect recent speakers / partial lists.
-          `SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id IS NOT NULL`,
+          `SELECT user_id
+             FROM conversation_participants
+            WHERE conversation_id = $1
+              AND user_id IS NOT NULL`,
           [parentChannelConversationId]
         );
         const allow = new Set(rows.map((r) => String(r.user_id)).filter(Boolean));

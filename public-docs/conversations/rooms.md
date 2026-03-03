@@ -28,7 +28,6 @@ Stable terms used below:
   - `packages/models/src/repositories/RoomViewsRepository.ts` (`room_views`)
   - `packages/models/src/repositories/RoomDatasetsRepository.ts` (`room_datasets`)
   - `packages/models/src/repositories/RoomTaskBoardsRepository.ts` (`room_task_boards`)
-  - `packages/models/src/repositories/RoomAgentsRepository.ts` (`room_agents`)
   - `packages/models/src/repositories/RoomToolsRepository.ts` (`room_tools`)
 
 ## Two ways to access rooms
@@ -52,7 +51,6 @@ When using `connector_action` with `connector: "starships"`, the following room-
 - `add-room-member`
 - `remove-room-member`
 - `get-room-pins`
-- `pin-room-agent` / `unpin-room-agent`
 - `pin-room-tool` / `unpin-room-tool`
 - `pin-room-view` / `unpin-room-view`
 - `pin-room-dataset` / `unpin-room-dataset`
@@ -60,7 +58,6 @@ When using `connector_action` with `connector: "starships"`, the following room-
 - `reorder-room-pins-views`
 - `reorder-room-pins-datasets`
 - `reorder-room-pins-task-boards`
-- `reorder-room-pins-agents`
 - `reorder-room-pins-tools`
 
 ## Room vs channel (theory)
@@ -87,7 +84,6 @@ Pin kinds:
 - `view`
 - `dataset`
 - `task_board`
-- `agent`
 - `tool`
 
 ## Tips for agents
@@ -105,10 +101,7 @@ Rooms can be **public** or **private** (`isPrivate: boolean`).
   - **instance admin** can always access
   - **starship owner** can always access (only when the room belongs to that starship)
 
-For private rooms, membership is accepted from either:
-
-- `conversation_participants` (preferred), or
-- `conversation_members` (backward/repair compatibility)
+For private rooms, membership is enforced via `conversation_participants`.
 
 ## HTTP API (server)
 
@@ -184,7 +177,7 @@ Pins are stored per-kind and ordered by `position` within that kind.
 Response:
 
 ```json
-{ "views": [], "datasets": [], "taskBoards": [], "agents": [], "tools": [] }
+{ "views": [], "datasets": [], "taskBoards": [], "tools": [] }
 ```
 
 ### View pinned resources (resolved objects)
@@ -195,13 +188,12 @@ To avoid fetching “all starship resources” just to render room pins, you can
 - `GET /api/v1/rooms/:roomId/pins/views`
 - `GET /api/v1/rooms/:roomId/pins/datasets`
 - `GET /api/v1/rooms/:roomId/pins/task-boards`
-- `GET /api/v1/rooms/:roomId/pins/agents`
 - `GET /api/v1/rooms/:roomId/pins/tools`
 
 Combined response shape:
 
 ```json
-{ "views": [], "datasets": [], "taskBoards": [], "agents": [], "tools": [] }
+{ "views": [], "datasets": [], "taskBoards": [], "tools": [] }
 ```
 
 Individual kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).
@@ -210,16 +202,13 @@ Individual kind endpoints return an `items` array of `{ pin, <resource> }` objec
 
 `GET /api/v1/rooms/:roomId/pins/resources` supports query params:
 
-- `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `datasets`, `taskBoards` (`task-boards`), `agents`, `tools`, `all`.
+- `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `datasets`, `taskBoards` (`task-boards`), `tools`, `all`.
 - `q`: optional case-insensitive search across `name` / `slug` / `description` (where applicable)
 - `includeArchived`: optional boolean (default `true`). When `false`, excludes archived datasets/task boards.
 - `limitPerKind`: optional number (0–200). Caps results per kind after filtering.
 
 ### Pin / unpin (owner/admin only, MVP policy)
 
-- Agents:
-  - `POST /api/v1/rooms/:roomId/pins/agents` body: `{ "agentId": "...", "position"?: 0 }`
-  - `DELETE /api/v1/rooms/:roomId/pins/agents/:agentId`
 - Tools:
   - `POST /api/v1/rooms/:roomId/pins/tools` body: `{ "toolId": "...", "position"?: 0 }`
   - `DELETE /api/v1/rooms/:roomId/pins/tools/:toolId`
@@ -252,7 +241,6 @@ Reorder endpoints require providing exactly the currently pinned ids for that ki
 - `POST /api/v1/rooms/:roomId/pins/views/reorder` body: `{ "viewIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/datasets/reorder` body: `{ "datasetIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/task-boards/reorder` body: `{ "boardIds": ["..."] }`
-- `POST /api/v1/rooms/:roomId/pins/agents/reorder` body: `{ "agentIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/tools/reorder` body: `{ "toolIds": ["..."] }`
 
 ## Threads in rooms

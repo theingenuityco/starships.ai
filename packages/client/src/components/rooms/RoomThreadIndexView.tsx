@@ -9,7 +9,7 @@ import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedAgent, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
@@ -21,17 +21,18 @@ export function RoomThreadIndexView(props: {
   roomName?: string | null
   roomIsPrivate?: boolean | null
   starshipSlug?: string | null
+  /** Optional allowlists to scope @mention and agent selection within room threads. */
+  allowedMentionUserIds?: string[] | null
+  allowedMentionAgentIds?: string[] | null
+  allowedAgentIds?: string[] | null
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
-  pinnedAgents?: RoomPinnedAgent[] | null
   pinnedTools?: RoomPinnedTool[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
-  agentLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
-  agentSlugById?: Map<string, string> | null
   toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
   canManagePins?: boolean | null
@@ -39,7 +40,6 @@ export function RoomThreadIndexView(props: {
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
-  availableAgents?: Array<{ id: string; name: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
@@ -47,8 +47,6 @@ export function RoomThreadIndexView(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
-  onPinAgent?: (agentId: string) => void
-  onUnpinAgent?: (agentId: string) => void
   onPinTool?: (toolId: string) => void
   onUnpinTool?: (toolId: string) => void
   /** Open a draft thread (no persistence until first message). */
@@ -64,7 +62,7 @@ export function RoomThreadIndexView(props: {
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'agents' | 'tools'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
 
   const starterBadgeClass = (active: boolean) =>
     cn(
@@ -102,19 +100,8 @@ export function RoomThreadIndexView(props: {
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedAgents = (props.pinnedAgents || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const hasAnyResources = pinnedAgents.length > 0 || pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
-
-  const openPinnedAgent = (agentId: string) => {
-    const id = String(agentId || '').trim()
-    if (!id) return
-    const agentSlug = props.agentSlugById?.get(id) || ''
-    const peerKey = agentSlug ? agentSlug : `a:${id}`
-    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/dm/${encodeURIComponent(peerKey)}` : null
-    if (!href) return
-    router.push(href)
-  }
+  const hasAnyResources = pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
 
   const openPinnedView = (viewId: string) => {
     const id = String(viewId || '').trim()
@@ -188,7 +175,7 @@ export function RoomThreadIndexView(props: {
       {/* Room starter (conversation-starter style) */}
       <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
         <div className="w-full max-w-4xl mx-auto h-full flex">
-          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
+          <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
               <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
             </div>
@@ -199,9 +186,13 @@ export function RoomThreadIndexView(props: {
               onAgentChange={setStarterSelectedAgent}
               starshipId={props.starshipId}
               conversationId={null}
+              roomConversationId={props.roomConversationId}
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
               newConversationTitleOverride="New thread"
+              allowedMentionUserIds={props.allowedMentionUserIds ?? undefined}
+              allowedMentionAgentIds={props.allowedMentionAgentIds ?? undefined}
+              allowedAgentIds={props.allowedAgentIds ?? undefined}
               onConversationStart={conversationId => {
                 const cid = String(conversationId || '').trim()
                 if (!cid) return
@@ -254,15 +245,6 @@ export function RoomThreadIndexView(props: {
                 aria-selected={starterTab === 'tasks'}
               >
                 Tasks
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('agents')}
-                className={starterBadgeClass(starterTab === 'agents')}
-                role="tab"
-                aria-selected={starterTab === 'agents'}
-              >
-                Agents
               </button>
               <button
                 type="button"
@@ -419,36 +401,6 @@ export function RoomThreadIndexView(props: {
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
                     No pinned task boards in this room.
-                    {props.onOpenResourcesPane ? (
-                      <>
-                        {' '}
-                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
-                          Manage resources
-                        </button>
-                        .
-                      </>
-                    ) : null}
-                  </div>
-                )
-              ) : null}
-
-              {starterTab === 'agents' ? (
-                pinnedAgents.length > 0 ? (
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedAgents.map(p => {
-                      const id = String(p.agentId)
-                      const name = props.agentLabelById?.get(id) || `Agent ${id.slice(0, 8)}`
-                      return (
-                        <Button key={`starter:agent:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedAgent(id)}>
-                          <Icon name="sparkles" className="h-4 w-4 mr-1.5" />
-                          {name}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground">
-                    No pinned agents in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}

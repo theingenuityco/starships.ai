@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 
 // Import FetchResponse type (kept local to avoid cross-hook coupling).
-interface FetchResponse<T = any> {
+interface FetchResponse<T = unknown> {
   data: T
 }
 
@@ -16,7 +16,21 @@ export const ROOM_QUERY_KEYS = {
   pins: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'pins'] as const,
   participation: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participation'] as const,
   participants: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participants'] as const,
+  inviteApprovalsPending: (roomConversationId: string, conversationId: string) =>
+    [...ROOM_QUERY_KEYS.detail(roomConversationId), 'invite-approvals', 'pending', conversationId] as const,
 } as const
+
+export type PendingRoomInviteApproval = {
+  id: string
+  roomConversationId: string
+  conversationId: string
+  messageId: string
+  createdAt: string
+  requestedByUserId: string | null
+  requestedByLabel: string | null
+  users: Array<{ id: string; label: string }>
+  agents: Array<{ id: string; label: string }>
+}
 
 export function useStarshipRooms(starshipId: string, enabled: boolean = true) {
   return useQuery({
@@ -85,7 +99,7 @@ export function useJoinRoom(roomConversationId: string) {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomConversationId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to join room', { description: getSafeErrorMessage(error) })
     },
   })
@@ -106,7 +120,7 @@ export function useLeaveRoom(roomConversationId: string) {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomConversationId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to leave room', { description: getSafeErrorMessage(error) })
     },
   })
@@ -120,12 +134,66 @@ export function useRoomParticipants(roomConversationId: string, enabled: boolean
         `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/participants`
       )
       return {
-        userIds: (response.data.data?.userIds || []).map((x: any) => String(x)).filter(Boolean),
-        agentIds: (response.data.data?.agentIds || []).map((x: any) => String(x)).filter(Boolean),
+        userIds: (response.data.data?.userIds || []).map((x: unknown) => String(x)).filter(Boolean),
+        agentIds: (response.data.data?.agentIds || []).map((x: unknown) => String(x)).filter(Boolean),
       }
     },
     enabled: !!roomConversationId && enabled,
     staleTime: 5_000,
+  })
+}
+
+export function useRoomInviteApprovalsPending(roomConversationId: string, conversationId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ROOM_QUERY_KEYS.inviteApprovalsPending(roomConversationId, conversationId),
+    queryFn: async (): Promise<{ approvals: PendingRoomInviteApproval[] }> => {
+      const response: FetchResponse<ApiResponse<{ approvals: PendingRoomInviteApproval[] }>> = await api.get(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/invite-approvals/pending`,
+        { params: { conversationId } }
+      )
+      return { approvals: Array.isArray(response.data.data?.approvals) ? response.data.data!.approvals : [] }
+    },
+    enabled: !!roomConversationId && !!conversationId && enabled,
+    staleTime: 2_000,
+  })
+}
+
+export function useApproveRoomInviteApproval(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { approvalId: string; conversationId: string }) => {
+      const response: FetchResponse<ApiResponse<{ status: string }>> = await api.post(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/invite-approvals/${encodeURIComponent(args.approvalId)}/approve`,
+        {}
+      )
+      return response.data.data
+    },
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.inviteApprovalsPending(roomConversationId, vars.conversationId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to approve invite', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useDenyRoomInviteApproval(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { approvalId: string; conversationId: string }) => {
+      const response: FetchResponse<ApiResponse<{ status: string }>> = await api.post(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/invite-approvals/${encodeURIComponent(args.approvalId)}/deny`,
+        {}
+      )
+      return response.data.data
+    },
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.inviteApprovalsPending(roomConversationId, vars.conversationId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to deny invite', { description: getSafeErrorMessage(error) })
+    },
   })
 }
 
@@ -144,7 +212,7 @@ export function useCreateRoom(starshipId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(starshipId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to create room', { description: getSafeErrorMessage(error) })
     },
   })
@@ -164,7 +232,7 @@ export function useUpdateRoom(starshipId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(starshipId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to update room', { description: getSafeErrorMessage(error) })
     },
   })
@@ -180,7 +248,7 @@ export function useDeleteRoom(starshipId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(starshipId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to delete room', { description: getSafeErrorMessage(error) })
     },
   })
@@ -200,7 +268,7 @@ export function usePinRoomView(roomId: string, starshipId: string) {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(starshipId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to pin view', { description: getSafeErrorMessage(error) })
     },
   })
@@ -218,7 +286,7 @@ export function useUnpinRoomView(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to unpin view', { description: getSafeErrorMessage(error) })
     },
   })
@@ -237,7 +305,7 @@ export function usePinRoomDataset(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to pin dataset', { description: getSafeErrorMessage(error) })
     },
   })
@@ -255,7 +323,7 @@ export function useUnpinRoomDataset(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to unpin dataset', { description: getSafeErrorMessage(error) })
     },
   })
@@ -274,7 +342,7 @@ export function usePinRoomTaskBoard(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to pin task board', { description: getSafeErrorMessage(error) })
     },
   })
@@ -292,7 +360,7 @@ export function useUnpinRoomTaskBoard(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to unpin task board', { description: getSafeErrorMessage(error) })
     },
   })
@@ -311,7 +379,7 @@ export function usePinRoomTool(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to pin tool', { description: getSafeErrorMessage(error) })
     },
   })
@@ -329,7 +397,7 @@ export function useUnpinRoomTool(roomId: string) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error('Failed to unpin tool', { description: getSafeErrorMessage(error) })
     },
   })

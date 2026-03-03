@@ -27,6 +27,9 @@ import {
   NotificationRepository,
 } from '@starships/models';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
+import { UIActionService } from '@/services/UIActionService';
+import { getConnection } from '@starships/models';
+import { nanoid } from 'nanoid';
 
 const router: Router = Router();
 
@@ -59,6 +62,8 @@ const CreateMessageSchema = z.object({
 });
 
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });
+
+type CreateMessageBody = z.infer<typeof CreateMessageSchema>;
 
 const ToggleReactionSchema = z.object({
   emoji: z.string().min(1, 'emoji is required').max(32, 'emoji too long'),
@@ -102,11 +107,17 @@ async function enforceRoomMentionAndAgentAllowlist(args: {
   userId: string;
   content: string;
   requestedAgentId?: string | null;
-  req: Request;
-  res: Response;
-}): Promise<boolean> {
+}): Promise<
+  | {
+      ctx: { roomConversationId: string };
+      missingUserIds: string[];
+      missingAgentIds: string[];
+      sanitizedAgentIdForMessage: string | null;
+    }
+  | null
+> {
   const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
-  if (!ctx) return true;
+  if (!ctx) return null;
 
   const participantRepo = new ConversationParticipantRepository();
   const [userIds, agentIds] = await Promise.all([
@@ -117,21 +128,22 @@ async function enforceRoomMentionAndAgentAllowlist(args: {
   const allowAgents = new Set((agentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
 
   const { userIds: mentionedUserIds, agentIds: mentionedAgentIds } = parseMentionTokens(args.content || '');
-  const invalidUsers = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
-  const invalidAgents = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
+  const missingUserIds = mentionedUserIds.filter((id) => !allowUsers.has(String(id || '').trim()));
+  const missingAgentIdsFromMentions = mentionedAgentIds.filter((id) => !allowAgents.has(String(id || '').trim()));
 
   const requestedAgentId = typeof args.requestedAgentId === 'string' ? args.requestedAgentId.trim() : '';
   const requestedAgentDisallowed = Boolean(requestedAgentId && !allowAgents.has(requestedAgentId));
 
-  if (invalidUsers.length === 0 && invalidAgents.length === 0 && !requestedAgentDisallowed) return true;
-  sendError(args.res, 'VALIDATION_ERROR', 'You can only mention room participants', 400, {
-    conversationId: args.conversationId,
-    roomConversationId: ctx.roomConversationId,
-    invalidUserIds: invalidUsers,
-    invalidAgentIds: invalidAgents,
-    ...(requestedAgentDisallowed ? { disallowedAgentId: requestedAgentId } : {}),
-  });
-  return false;
+  const missingAgentIds = Array.from(
+    new Set([...(missingAgentIdsFromMentions || []), ...(requestedAgentDisallowed ? [requestedAgentId] : [])].filter(Boolean))
+  );
+
+  return {
+    ctx: { roomConversationId: ctx.roomConversationId },
+    missingUserIds,
+    missingAgentIds,
+    sanitizedAgentIdForMessage: requestedAgentDisallowed ? null : requestedAgentId || null,
+  };
 }
 
 /**
@@ -148,8 +160,9 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     if (!checkAuth(req, res)) return;
 
     // Validate request body
-    const bodyValidation = validateData(CreateMessageSchema, req.body, res, 'create message');
-    if (!bodyValidation) return;
+    const bodyValidationUnknown = validateData(CreateMessageSchema, req.body, res, 'create message');
+    if (!bodyValidationUnknown) return;
+    const bodyValidation = bodyValidationUnknown as CreateMessageBody;
 
     const conversationId = typeof bodyValidation.conversationId === 'string' ? bodyValidation.conversationId : '';
     if (!conversationId) {
@@ -200,24 +213,110 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
     )
       return;
 
-    const okMentions = await enforceRoomMentionAndAgentAllowlist({
+    const roomInvite = await enforceRoomMentionAndAgentAllowlist({
       conversationId,
       conversationStarshipId: conversation.starshipId,
       userId: authUserId,
-      content: String((bodyValidation as any)?.content || ''),
-      requestedAgentId: typeof (bodyValidation as any)?.agentId === 'string' ? String((bodyValidation as any).agentId) : null,
-      req,
-      res,
+      content: String(bodyValidation.content || ''),
+      requestedAgentId: typeof bodyValidation.agentId === 'string' ? String(bodyValidation.agentId) : null,
     });
-    if (!okMentions) return;
 
     const messageService = new MessageService();
+    const { agentId: requestedAgentId, ...bodyWithoutAgentId } = bodyValidation;
+    const messageType =
+      typeof bodyValidation.messageType === 'string'
+        ? bodyValidation.messageType
+        : bodyValidation.role === 'tool'
+          ? 'tool_result'
+          : bodyValidation.role === 'assistant'
+            ? 'agent_response'
+            : bodyValidation.role === 'system'
+              ? 'system_notification'
+              : 'user_input';
     const created = await messageService.createMessage({
-      ...(bodyValidation as any),
+      ...bodyWithoutAgentId,
       conversationId,
       // Attribute to the caller for auditing (even for system messages).
       userId: authUserId,
+      messageType,
+      ...(roomInvite
+        ? roomInvite.sanitizedAgentIdForMessage
+          ? { agentId: roomInvite.sanitizedAgentIdForMessage }
+          : {}
+        : requestedAgentId
+          ? { agentId: requestedAgentId }
+          : {}),
     });
+
+    // If this is a room/room-thread message and it referenced non-participants, persist a pending approval row (best-effort).
+    if (roomInvite && (roomInvite.missingUserIds.length > 0 || roomInvite.missingAgentIds.length > 0)) {
+      try {
+        const conn = getConnection();
+        const newApprovalId = nanoid();
+        const approvalRow = await conn.queryOne<{ id: string }>(
+          `
+          INSERT INTO room_invite_approvals (
+            id,
+            starship_id,
+            room_conversation_id,
+            conversation_id,
+            message_id,
+            requested_by_user_id,
+            status,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())
+          ON CONFLICT (message_id)
+          DO UPDATE SET
+            updated_at = NOW(),
+            status = CASE WHEN room_invite_approvals.status = 'pending' THEN 'pending' ELSE room_invite_approvals.status END
+          RETURNING id
+        `,
+          [
+            newApprovalId,
+            conversation.starshipId,
+            roomInvite.ctx.roomConversationId,
+            conversationId,
+            String((created as unknown as { id?: unknown })?.id ?? ''),
+            authUserId,
+          ]
+        );
+        const approvalId = approvalRow?.id ? String(approvalRow.id) : '';
+        const messageId = String((created as unknown as { id?: unknown })?.id ?? '').trim();
+        if (approvalId && messageId) {
+          const targets: Array<{ type: 'user' | 'agent'; id: string }> = [
+            ...roomInvite.missingUserIds.map((id) => ({ type: 'user' as const, id: String(id || '').trim() })),
+            ...roomInvite.missingAgentIds.map((id) => ({ type: 'agent' as const, id: String(id || '').trim() })),
+          ].filter((t) => t.id);
+
+          if (targets.length > 0) {
+            const params: string[] = [];
+            const tuples: string[] = [];
+            for (let i = 0; i < targets.length; i++) {
+              const t = targets[i];
+              params.push(approvalId, t.type, t.id);
+              const base = i * 3;
+              tuples.push(`($${base + 1}, $${base + 2}, $${base + 3})`);
+            }
+            await conn.query(
+              `INSERT INTO room_invite_approval_targets (approval_id, target_type, target_id)
+               VALUES ${tuples.join(',')}
+               ON CONFLICT (approval_id, target_type, target_id) DO NOTHING`,
+              params
+            );
+          }
+
+          await new UIActionService().publishAction(conversationId, 'room_invite_approval_required', {
+            approvalId,
+            roomConversationId: roomInvite.ctx.roomConversationId,
+            conversationId,
+            messageId,
+          });
+        }
+      } catch {
+        // best-effort only
+      }
+    }
 
     sendSuccess(res, created, 201);
   } catch (error) {
@@ -393,10 +492,8 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
         userId: authUserId,
         content: String((bodyValidation as any)?.content || ''),
         requestedAgentId: null,
-        req,
-        res,
       });
-      if (!okMentions) return;
+      void okMentions;
     }
 
     // Delegate to service layer

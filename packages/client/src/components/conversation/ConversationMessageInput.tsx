@@ -53,7 +53,6 @@ import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { getSafeErrorMessage } from '@/lib/error-utils'
-import { RoomInviteApprovalCallout } from '@/components/conversation/RoomInviteApprovalCallout'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -154,13 +153,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
-    const [pendingRoomInviteApproval, setPendingRoomInviteApproval] = useState<{
-      roomConversationId: string
-      users: Array<{ id: string; label: string }>
-      agents: Array<{ id: string; label: string }>
-    } | null>(null)
-    const [submittingRoomInviteApproval, setSubmittingRoomInviteApproval] = useState(false)
-    const bypassRoomInviteApprovalOnceRef = useRef(false)
     const isStarter = !conversationId
     const isExpandedStarterLayout = Boolean(isStarter && !minimal)
     // Load channels so we can detect "channel context" for both channel roots AND channel threads.
@@ -772,60 +764,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Allow sending with ONLY file attachments (no text required).
       if ((!messageToSend && !hasPendingAttachments) || sending || disabled || isStreamingEffective || streamingRef.current) return
 
-      // Room invite approval (Slack-like):
-      // If composing inside a room, allow mentioning non-members, but require approval at send-time
-      // to add them to the room before we actually send.
-      const roomId = typeof roomConversationId === 'string' ? roomConversationId.trim() : ''
-      if (roomId && !bypassRoomInviteApprovalOnceRef.current) {
-        const allowUsers = allowedMentionUserIdSetRef.current
-        const allowAgents = allowedMentionAgentIdSetRef.current
-        // Only run in contexts where we have a known allowlist (rooms); undefined => unrestricted contexts.
-        if (allowUsers !== null && allowAgents !== null) {
-          let t = String(messageToSend || '')
-          if (t.length > 20_000) t = t.slice(0, 20_000)
-          const u = new Set<string>()
-          const a = new Set<string>()
-          const userRe = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi
-          const agentRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi
-          let m: RegExpExecArray | null
-          while ((m = userRe.exec(t))) {
-            const id = String(m[1] || '').trim()
-            if (id) u.add(id)
-          }
-          while ((m = agentRe.exec(t))) {
-            const id = String(m[1] || '').trim()
-            if (id) a.add(id)
-          }
-          const mentionedUserIds = Array.from(u)
-          const mentionedAgentIds = Array.from(a)
-          const missingUserIds = mentionedUserIds.filter(id => !allowUsers.has(id))
-          const missingAgentIds = mentionedAgentIds.filter(id => !allowAgents.has(id))
-
-          if (missingUserIds.length > 0 || missingAgentIds.length > 0) {
-            const userLabelById = new Map(
-              (Array.isArray(memberUsers) ? memberUsers : []).map(u => [
-                String((u as any)?.userId || '').trim(),
-                String((u as any)?.displayName || (u as any)?.email || 'User').trim() || 'User',
-              ] as const)
-            )
-            const agentLabelById = new Map(
-              (Array.isArray(starshipAgents) ? (starshipAgents as any[]) : []).map(a => [
-                String((a as any)?.id || '').trim(),
-                String(formatAgentDisplayName(a as any) || (a as any)?.name || (a as any)?.slug || 'Agent').trim() || 'Agent',
-              ] as const)
-            )
-            setPendingRoomInviteApproval({
-              roomConversationId: roomId,
-              users: missingUserIds.map(id => ({ id, label: userLabelById.get(id) || id })),
-              agents: missingAgentIds.map(id => ({ id, label: agentLabelById.get(id) || id })),
-            })
-            return
-          }
-        }
-      }
-      // Reset bypass once we pass the check (one-shot).
-      bypassRoomInviteApprovalOnceRef.current = false
-
       // CRITICAL: Set ref FIRST (synchronous, blocks subsequent calls immediately)
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
@@ -886,9 +824,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const resolveAgentById = (id: string): AgentModel | null => {
         const aid = String(id || '').trim()
         if (!aid) return null
-        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+          a => String(a?.id || '').trim() === aid
+        ) ?? null
         if (fromStarship) return fromStarship
-        const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        if (fromConvRaw && allowedAgentIdSet && !allowedAgentIdSet.has(String(fromConvRaw.id || '').trim())) return null
+        const fromConv = fromConvRaw
         return fromConv ?? null
       }
 
@@ -2488,53 +2430,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             )
           })}
 
-        {/* Room invite approval callout (Slack-like, triggered on submit) */}
-        {pendingRoomInviteApproval && (
-          <RoomInviteApprovalCallout
-            users={pendingRoomInviteApproval.users}
-            agents={pendingRoomInviteApproval.agents}
-            isSubmitting={submittingRoomInviteApproval}
-            onDeny={() => {
-              setPendingRoomInviteApproval(null)
-              try {
-                tiptap?.commands.focus()
-              } catch {}
-            }}
-            onAllowOnceAndSend={() => {
-              void (async () => {
-                if (!pendingRoomInviteApproval) return
-                setSubmittingRoomInviteApproval(true)
-                try {
-                  const rid = String(pendingRoomInviteApproval.roomConversationId || '').trim()
-                  if (!rid) return
-                  await Promise.all([
-                    ...pendingRoomInviteApproval.users.map(u =>
-                      api.post(`/api/v1/rooms/${encodeURIComponent(rid)}/members`, { userId: u.id, role: 'member' }).catch(e => {
-                        throw e
-                      })
-                    ),
-                    ...pendingRoomInviteApproval.agents.map(a =>
-                      api.post(`/api/v1/rooms/${encodeURIComponent(rid)}/agents`, { agentId: a.id }).catch(e => {
-                        throw e
-                      })
-                    ),
-                  ])
-                  try {
-                    await queryClient.invalidateQueries({ queryKey: ['rooms', 'detail', rid, 'participants'] as const })
-                  } catch {}
-                  setPendingRoomInviteApproval(null)
-                  bypassRoomInviteApprovalOnceRef.current = true
-                  // Retry submit now that the room membership is updated.
-                  submitRef.current?.()
-                } catch (e) {
-                  toast.error('Failed to add to room', { description: getSafeErrorMessage(e) })
-                } finally {
-                  setSubmittingRoomInviteApproval(false)
-                }
-              })()
-            }}
-          />
-        )}
         {/* Low credits warning banner */}
         {showLowBalanceWarning && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-50/80 to-orange-50/60 dark:from-yellow-950/20 dark:to-orange-950/10 border border-yellow-200/50 dark:border-yellow-800/30 backdrop-blur-sm shadow-sm">

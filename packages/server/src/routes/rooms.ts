@@ -8,6 +8,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+  AgentRepository,
   ConversationNotificationPrefRepository,
   ConversationParticipantRepository,
   RoomDatasetsRepository,
@@ -87,27 +88,280 @@ async function requireRoomReadAccess(args: {
   }
 
   if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, args.res))) return null;
-  if (
-    !(await enforcePrivateRoomMembership({
-      conversationId: roomId,
-      conversationStarshipId,
-      userId: authUserId,
-      room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
-      req: args.req,
-      res: args.res,
-    }))
-  )
+  // Rooms require explicit participation for read/write (public + private).
+  // No owner/admin bypass by policy.
+  const participantRepo = new ConversationParticipantRepository();
+  const ok = await participantRepo.isUserParticipant(authUserId, roomId).catch(() => false);
+  if (!ok) {
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+      resource: 'room',
+      roomId,
+      reason: 'room_membership_required',
+    });
     return null;
+  }
 
   return { authUserId, room, conversationStarshipId };
 }
+
+/**
+ * GET /rooms/:roomId/participation
+ *
+ * Returns whether the current user is a participant of the room conversation.
+ * This endpoint is used to drive the explicit "Join room" UI flow.
+ *
+ * NOTE:
+ * - For public rooms, non-participants may call this.
+ * - For private rooms, access is still restricted by the room visibility rules (caller must already be a participant).
+ */
+router.get('/rooms/:roomId/participation', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
+      return;
+    }
+    if (String(room.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+
+    const participantRepo = new ConversationParticipantRepository();
+    const isParticipant = await participantRepo.isUserParticipant(authUserId, params.roomId).catch(() => false);
+
+    // For private rooms, do not reveal participation status to non-members.
+    if (room.isPrivate && !isParticipant) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+      return;
+    }
+
+    sendSuccess(res, { isParticipant, isPrivate: Boolean(room.isPrivate), canJoin: !room.isPrivate }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching room participation');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/join
+ *
+ * Join a public room by inserting a conversation_participants row.
+ */
+router.post('/rooms/:roomId/join', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
+      return;
+    }
+    if (String(room.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+      return;
+    }
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+
+    if (room.isPrivate) {
+      sendError(res, 'ACCESS_DENIED', 'Cannot join a private room', 403, { roomId: params.roomId });
+      return;
+    }
+
+    const participantRepo = new ConversationParticipantRepository();
+    const result = await participantRepo.addUserParticipant({
+      conversationId: params.roomId,
+      userId: authUserId,
+      role: 'member',
+      createdBy: authUserId,
+    });
+
+    sendSuccess(res, { joined: true, created: result.created }, 200);
+  } catch (error) {
+    handleError(error, res, 'joining room');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/leave
+ *
+ * Leave a public room by removing the conversation_participants row for the current user.
+ */
+router.post('/rooms/:roomId/leave', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
+      return;
+    }
+    if (String(room.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+      return;
+    }
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+
+    if (room.isPrivate) {
+      sendError(res, 'ACCESS_DENIED', 'Cannot leave a private room', 403, { roomId: params.roomId });
+      return;
+    }
+
+    const conn = getConnection();
+    const result = await conn.queryWithResult(
+      `DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`,
+      [params.roomId, authUserId]
+    );
+    const removed = (result.rowCount ?? 0) > 0;
+    sendSuccess(res, { left: true, removed }, 200);
+  } catch (error) {
+    handleError(error, res, 'leaving room');
+  }
+});
+
+/**
+ * GET /rooms/:roomId/participants
+ *
+ * Returns user + agent participant ids for the room conversation.
+ * Requires the caller to be a room participant.
+ */
+router.get('/rooms/:roomId/participants', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const participantRepo = new ConversationParticipantRepository();
+    const [userIds, agentIds] = await Promise.all([
+      participantRepo.listUserIdsByConversation(access.room.conversationId).catch(() => []),
+      participantRepo.listAgentIdsByConversation(access.room.conversationId).catch(() => []),
+    ]);
+
+    sendSuccess(res, { userIds, agentIds }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing room participants');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/agents
+ *
+ * Adds an agent participant to the room (agent allowlist).
+ * MVP policy: starship owner/instance-admin only.
+ */
+router.post('/rooms/:roomId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    // Reuse existing MVP policy: only starship owner/admin can manage room members/agents/pins.
+    if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+
+    const body = validateData(z.object({ agentId: IdSchema }), req.body, res, 'room agent add');
+    if (!body) return;
+
+    const agentRepo = new AgentRepository();
+    const agent = await agentRepo.findById(body.agentId);
+    if (!agent) {
+      sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
+      return;
+    }
+    if (String((agent as any).starshipId) !== String(access.room.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Agent must belong to the same starship as the room', 400, {
+        agentId: body.agentId,
+        roomStarshipId: access.room.starshipId,
+        agentStarshipId: (agent as any).starshipId,
+      });
+      return;
+    }
+
+    const participantRepo = new ConversationParticipantRepository();
+    const result = await participantRepo.addAgentParticipant({
+      conversationId: access.room.conversationId,
+      agentId: body.agentId,
+      createdBy: access.authUserId,
+    });
+
+    sendSuccess(res, { created: result.created }, 200);
+  } catch (error) {
+    handleError(error, res, 'adding room agent');
+  }
+});
+
+/**
+ * DELETE /rooms/:roomId/agents/:agentId
+ *
+ * Removes an agent participant from the room (agent allowlist).
+ * MVP policy: starship owner/instance-admin only.
+ */
+router.delete('/rooms/:roomId/agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema, agentId: IdSchema }), req.params, res, 'room agent remove');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+
+    const conn = getConnection();
+    const result = await conn.queryWithResult(
+      `DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2`,
+      [access.room.conversationId, params.agentId]
+    );
+    const removed = (result.rowCount ?? 0) > 0;
+    sendSuccess(res, { removed }, 200);
+  } catch (error) {
+    handleError(error, res, 'removing room agent');
+  }
+});
 
 /**
  * GET /starships/:starshipId/rooms
  *
  * Lists rooms for a starship:
  * - public rooms are visible to all starship members
- * - private rooms are visible only to room members (owner/instance-admin can see all)
+ * - private rooms are visible only to room members (no bypass)
  */
 router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -121,11 +375,6 @@ router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reques
     }
 
     if (!(await verifyStarshipAccess(params.starshipId, authUserId, res))) return;
-
-    const starshipService = new StarshipService();
-    const starship = await starshipService.getStarship(params.starshipId);
-    const isOwner = !!starship && starship.ownerId === authUserId;
-    const isAdmin = isInstanceAdmin(req.user);
 
     const conn = getConnection();
     const rows = await conn.query<{
@@ -150,18 +399,17 @@ router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reques
       WHERE r.starship_id = $1
         AND (
           r.is_private = false
-          OR $2::boolean = true
           OR EXISTS (
             SELECT 1
             FROM conversation_participants cp
             WHERE cp.conversation_id = r.conversation_id
-              AND cp.user_id = $3
+              AND cp.user_id = $2
             LIMIT 1
           )
         )
       ORDER BY conv.updated_at DESC, conv.created_at DESC
       `,
-      [params.starshipId, Boolean(isOwner || isAdmin), authUserId]
+      [params.starshipId, authUserId]
     );
 
     const rooms: RoomModel[] = rows.map((r) => ({
@@ -237,14 +485,14 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
         topic: body.topic ?? null,
       });
 
-      if (room.isPrivate) {
-        await participantRepo.addUserParticipant({
-          conversationId: room.conversationId,
-          userId: authUserId,
-          role: 'admin',
-          createdBy: authUserId,
-        });
-      }
+      // Rooms require explicit participation even when public.
+      // Make the creator an initial admin participant so they can access the room immediately.
+      await participantRepo.addUserParticipant({
+        conversationId: room.conversationId,
+        userId: authUserId,
+        role: 'admin',
+        createdBy: authUserId,
+      });
 
       sendSuccess(res, { room, conversationId: conversation.id }, 201);
     } catch (e) {
@@ -298,17 +546,13 @@ router.get('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Respon
     }
 
     if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
-    if (
-      !(await enforcePrivateRoomMembership({
-        conversationId: params.roomId,
-        conversationStarshipId,
-        userId: authUserId,
-        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
-        req,
-        res,
-      }))
-    )
+    // Rooms require explicit participation (public + private). No bypass.
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(authUserId, params.roomId).catch(() => false);
+    if (!ok) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { resource: 'room', roomId: params.roomId });
       return;
+    }
 
     sendSuccess(res, { room }, 200);
   } catch (error) {
@@ -515,17 +759,13 @@ router.get('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
     }
 
     if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
-    if (
-      !(await enforcePrivateRoomMembership({
-        conversationId: params.roomId,
-        conversationStarshipId,
-        userId: authUserId,
-        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
-        req,
-        res,
-      }))
-    )
+    // Rooms require explicit participation (public + private). No bypass.
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(authUserId, params.roomId).catch(() => false);
+    if (!ok) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { resource: 'room', roomId: params.roomId });
       return;
+    }
 
     const prefRepo = new ConversationNotificationPrefRepository();
     const pref = await prefRepo.get(params.roomId, authUserId);
@@ -571,17 +811,13 @@ router.put('/rooms/:roomId/notification-level', jwtAuthMiddleware, async (req: R
     }
 
     if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
-    if (
-      !(await enforcePrivateRoomMembership({
-        conversationId: params.roomId,
-        conversationStarshipId,
-        userId: authUserId,
-        room: { starshipId: room.starshipId, isPrivate: room.isPrivate },
-        req,
-        res,
-      }))
-    )
+    // Rooms require explicit participation (public + private). No bypass.
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(authUserId, params.roomId).catch(() => false);
+    if (!ok) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { resource: 'room', roomId: params.roomId });
       return;
+    }
 
     const prefRepo = new ConversationNotificationPrefRepository();
     const pref = await prefRepo.upsert({ conversationId: params.roomId, userId: authUserId, level: body.level });

@@ -97,14 +97,14 @@ There are two layers of access checks:
   - **starship owner** can always access (only for resources that truly belong to that starship)
 - **Direct messages**: always treated as restricted (membership-based).
 
-### “Members” vs “participants”
+### “Participants” (authoritative)
 
-Starships currently uses two related concepts:
+Starships stores conversation access control and participation in **`conversation_participants`**.
+This is the single source of truth for:
 
-- `conversation_participants`: the preferred, actively used table for enforcing restricted conversation membership.
-- `conversation_members`: accepted for backward/repair compatibility in some checks.
-
-In practice, for private channels/rooms the server may accept membership from **either** table.
+- private channel / room membership
+- direct message membership
+- “which agents and users are part of this conversation?”
 
 ## Notifications model (conversation-scoped)
 

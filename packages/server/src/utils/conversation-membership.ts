@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { sendError } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
-import { ChannelRepository, ConversationMemberRepository, ConversationParticipantRepository, DirectMessageRepository, RoomRepository } from '@starships/models';
+import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository, RoomRepository } from '@starships/models';
 
 /**
  * Enforce private channel membership (conversation-backed channels).
@@ -50,20 +50,11 @@ export async function enforcePrivateChannelMembership(args: {
     const participantRepo = new ConversationParticipantRepository();
     const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (okParticipant) return true;
-
-    // Backward/repair compatibility: some older code paths wrote to `conversation_members` only.
-    // Accept membership from either table (both are scoped to the same conversation id).
-    const memberRepo = new ConversationMemberRepository();
-    const okMember = await memberRepo.isMember(args.userId, args.conversationId).catch(() => false);
-    if (!okMember) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-        resource: 'channel',
-        conversationId: args.conversationId,
-      });
-      return false;
-    }
-
-    return true;
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
+      resource: 'channel',
+      conversationId: args.conversationId,
+    });
+    return false;
   } catch {
     // Best-effort: if we cannot evaluate channel membership, fail closed for safety.
     sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
@@ -116,18 +107,11 @@ export async function enforcePrivateRoomMembership(args: {
     const participantRepo = new ConversationParticipantRepository();
     const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (okParticipant) return true;
-
-    const memberRepo = new ConversationMemberRepository();
-    const okMember = await memberRepo.isMember(args.userId, args.conversationId).catch(() => false);
-    if (!okMember) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
-        resource: 'room',
-        conversationId: args.conversationId,
-      });
-      return false;
-    }
-
-    return true;
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+      resource: 'room',
+      conversationId: args.conversationId,
+    });
+    return false;
   } catch {
     sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
       resource: 'room',

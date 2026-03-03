@@ -171,7 +171,7 @@ export function RoomThreadIndexView(props: {
       {/* Room starter (conversation-starter style) */}
       <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
         <div className="w-full max-w-4xl mx-auto h-full flex">
-          <div className="w-full sm:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
+          <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
               <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
             </div>

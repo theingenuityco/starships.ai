@@ -1142,7 +1142,7 @@ export function ConversationInterface({
           <div
             className={cn(
               // Mobile: full width. Larger: constrain + center.
-              'w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative',
+              'w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto pointer-events-auto opacity-100 relative',
               !showMessagesArea && 'mt-8 sm:mt-12 lg:mt-16',
             )}
             data-message-input

@@ -67,7 +67,9 @@ export default function TablesIndexPage(): React.JSX.Element {
   const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
   const canHardDelete = Boolean(
     isInstanceAdmin === true ||
-      (user?.id && membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin')))
+      (user?.id &&
+        ((starship as any)?.ownerId && String((starship as any).ownerId) === String(user.id) ||
+          membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin'))))
   )
 
   const { data: datasets = [], isLoading: datasetsLoading } = useStarshipDatasets(starshipId, Boolean(starshipId))

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { sendError } from '@/utils/responseHelpers';
-import { StarshipMemberRepository } from '@starships/models';
+import { getConnection } from '@starships/models';
 
 /**
  * Verifies that a user has collaborator access to a starship:
@@ -84,7 +84,6 @@ export async function verifyStarshipOwnerAccess(starshipId: string, userId: stri
 export async function verifyStarshipAdminAccess(starshipId: string, userId: string, res: Response): Promise<boolean> {
   const starshipService = new StarshipService();
   const userService = new UserService();
-  const memberRepo = new StarshipMemberRepository();
 
   const starship = await starshipService.getStarship(starshipId);
   const user = await userService.getUserById(userId);
@@ -102,7 +101,16 @@ export async function verifyStarshipAdminAccess(starshipId: string, userId: stri
     return true;
   }
 
-  const isAdminMember = await memberRepo.isAdmin(userId, starshipId);
+  const conn = getConnection();
+  const row = await conn.queryOne<{ role: string | null }>(
+    `SELECT role
+       FROM starship_members
+      WHERE starship_id = $1
+        AND user_id = $2
+      LIMIT 1`,
+    [starshipId, userId]
+  );
+  const isAdminMember = String(row?.role || '').trim() === 'admin';
   if (!isAdminMember) {
     sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'not_admin' });
     return false;

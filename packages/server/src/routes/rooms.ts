@@ -27,7 +27,6 @@ import {
   getConnection,
 } from '@starships/models';
 import type { MessageModel, RoomModel } from '@starships/protocol';
-import { StarshipService } from '@/services/StarshipService';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 import { MessageService } from '@/services/MessageService';
 import { WalletService } from '@/services/WalletService';
@@ -1426,16 +1425,14 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
-    const toolsRepo = new RoomToolsRepository();
 
-    const [views, datasets, taskBoards, tools] = await Promise.all([
+    const [views, datasets, taskBoards] = await Promise.all([
       viewsRepo.list(access.room.conversationId),
       datasetsRepo.list(access.room.conversationId),
       boardsRepo.list(access.room.conversationId),
-      toolsRepo.list(access.room.conversationId),
     ]);
 
-    sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
+    sendSuccess(res, { views, datasets, taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
   }
@@ -1445,7 +1442,7 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
 // Pinned resource "view" endpoints (return resolved resource objects in pin order)
 // ---------------------------------------------------------------------------
 
-router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1462,7 +1459,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       }),
       req.query,
       res,
-      'pinned resources query'
+      'room resources query'
     );
     if (!query) return;
 
@@ -1716,7 +1713,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
         const r = toolsById.get(String(pin.toolId));
         if (!r) return null;
         return {
-          pin,
+          assignment: pin,
           tool: {
             id: String(r.id),
             name: String(r.name),
@@ -1745,7 +1742,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
 
     sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
   } catch (error) {
-    handleError(error, res, 'listing pinned resources');
+    handleError(error, res, 'listing room resources');
   }
 });
 
@@ -1926,7 +1923,7 @@ router.get('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Req
   }
 });
 
-router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1935,8 +1932,8 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
     if (!access) return;
 
     const toolsRepo = new RoomToolsRepository();
-    const pins = await toolsRepo.list(access.room.conversationId);
-    const ids = pins.map((p) => String(p.toolId)).filter(Boolean);
+    const assignments = await toolsRepo.list(access.room.conversationId);
+    const ids = assignments.map((p) => String(p.toolId)).filter(Boolean);
 
     if (ids.length === 0) {
       sendSuccess(res, { items: [] }, 200);
@@ -1959,12 +1956,12 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
       [ids, access.conversationStarshipId]
     );
     const byId = new Map(rows.map((r) => [String(r.id), r]));
-    const items = pins
-      .map((pin) => {
-        const r = byId.get(String(pin.toolId));
+    const items = assignments
+      .map((assignment) => {
+        const r = byId.get(String(assignment.toolId));
         if (!r) return null;
         return {
-          pin,
+          assignment,
           tool: {
             id: String(r.id),
             name: String(r.name),
@@ -1979,11 +1976,11 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
 
     sendSuccess(res, { items }, 200);
   } catch (error) {
-    handleError(error, res, 'listing pinned tools');
+    handleError(error, res, 'listing room tools');
   }
 });
 
-router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1995,12 +1992,11 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
     const body = validateData(
       z.object({
         toolId: IdSchema,
-        position: z.number().int().min(0).optional(),
         permission: z.enum(['allow', 'ask', 'deny']).optional(),
       }),
       req.body,
       res,
-      'pin tool'
+      'assign tool'
     );
     if (!body) return;
 
@@ -2019,7 +2015,7 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       return;
     }
     if (String(tool.starshipId) !== String(room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Pinned tool must belong to the same starship as the room', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Assigned tool must belong to the same starship as the room', 400, {
         toolId: body.toolId,
         roomStarshipId: room.starshipId,
         toolStarshipId: tool.starshipId,
@@ -2027,23 +2023,21 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       return;
     }
 
-    const pinnedRepo = new RoomToolsRepository();
-    const pin = await pinnedRepo.upsert({
+    const roomToolsRepo = new RoomToolsRepository();
+    const assignment = await roomToolsRepo.upsert({
       roomConversationId: room.conversationId,
       toolId: body.toolId,
-      position: body.position ?? null,
-      createdBy: authUserId,
       permission: body.permission ?? null,
     });
-    sendSuccess(res, { pin }, 200);
+    sendSuccess(res, { assignment }, 200);
   } catch (error) {
-    handleError(error, res, 'pinning tool');
+    handleError(error, res, 'assigning tool');
   }
 });
 
-router.delete('/rooms/:roomId/pins/tools/:toolId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/rooms/:roomId/tools/:toolId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'pin parameter');
+    const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'tool assignment parameter');
     if (!params) return;
     const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
@@ -2058,11 +2052,11 @@ router.delete('/rooms/:roomId/pins/tools/:toolId', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomToolsRepository();
-    const removed = await pinnedRepo.remove(room.conversationId, params.toolId);
+    const roomToolsRepo = new RoomToolsRepository();
+    const removed = await roomToolsRepo.remove(room.conversationId, params.toolId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
-    handleError(error, res, 'unpinning tool');
+    handleError(error, res, 'unassigning tool');
   }
 });
 
@@ -2514,80 +2508,6 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     sendSuccess(res, { taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'reordering pinned task boards');
-  }
-});
-
-router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const body = validateData(z.object({ toolIds: z.array(IdSchema) }), req.body, res, 'reorder pinned tools');
-    if (!body) return;
-
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const pinnedRepo = new RoomToolsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const existingIds = existing.map((p: { toolId: string }) => String(p.toolId));
-    const nextIds = body.toolIds.map((x) => String(x));
-
-    const uniq = new Set(nextIds);
-    if (uniq.size !== nextIds.length) {
-      sendError(res, 'VALIDATION_ERROR', 'Duplicate toolIds in reorder list', 400);
-      return;
-    }
-    if (existingIds.length !== nextIds.length || existingIds.some((id: string) => !uniq.has(id))) {
-      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned tools', 400, {
-        pinnedCount: existingIds.length,
-        providedCount: nextIds.length,
-      });
-      return;
-    }
-
-    const conn = getConnection();
-    const caseTemp = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${-(idx + 1)}`).join(' ');
-    const caseFinal = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${idx}`).join(' ');
-    const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
-    const args = [room.conversationId, ...nextIds];
-
-    await conn.query('BEGIN');
-    try {
-      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tools:${room.conversationId}`]);
-      await conn.query(
-        `UPDATE room_tools
-            SET position = CASE tool_id ${caseTemp} ELSE position END
-          WHERE room_conversation_id = $1
-            AND tool_id IN (${inList})`,
-        args
-      );
-      await conn.query(
-        `UPDATE room_tools
-            SET position = CASE tool_id ${caseFinal} ELSE position END
-          WHERE room_conversation_id = $1
-            AND tool_id IN (${inList})`,
-        args
-      );
-      await conn.query('COMMIT');
-    } catch (e) {
-      await conn.query('ROLLBACK');
-      throw e;
-    }
-
-    const tools = await pinnedRepo.list(room.conversationId);
-    sendSuccess(res, { tools }, 200);
-  } catch (error) {
-    handleError(error, res, 'reordering pinned tools');
   }
 });
 

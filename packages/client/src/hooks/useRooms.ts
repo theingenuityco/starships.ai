@@ -1,5 +1,5 @@
 import api from '@/lib/api'
-import type { ApiResponse, RoomModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView, TaskBoardModel } from '@starships/protocol'
+import type { ApiResponse, RoomModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment, TaskBoardModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
@@ -14,6 +14,7 @@ export const ROOM_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...ROOM_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (roomConversationId: string) => [...ROOM_QUERY_KEYS.all, 'detail', roomConversationId] as const,
   pins: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'pins'] as const,
+  tools: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'tools'] as const,
   participation: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participation'] as const,
   participants: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participants'] as const,
   inviteApprovalsPending: (roomConversationId: string, conversationId: string) =>
@@ -48,9 +49,9 @@ export function useStarshipRooms(starshipId: string, enabled: boolean = true) {
 export function useRoomPins(roomConversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.pins(roomConversationId),
-    queryFn: async (): Promise<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[]; tools: RoomPinnedTool[] }> => {
+    queryFn: async (): Promise<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }> => {
       const response: FetchResponse<
-        ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[]; tools: RoomPinnedTool[] }>
+        ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }>
       > = await api.get(
         `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/pins`
       )
@@ -58,8 +59,26 @@ export function useRoomPins(roomConversationId: string, enabled: boolean = true)
         views: response.data.data?.views || [],
         datasets: response.data.data?.datasets || [],
         taskBoards: response.data.data?.taskBoards || [],
-        tools: response.data.data?.tools || [],
       }
+    },
+    enabled: !!roomConversationId && enabled,
+    staleTime: 10_000,
+  })
+}
+
+export type RoomToolItem = {
+  assignment: RoomToolAssignment
+  tool: { id: string; name: string; slug: string; description: string; createdAt: string; updatedAt: string }
+}
+
+export function useRoomTools(roomConversationId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ROOM_QUERY_KEYS.tools(roomConversationId),
+    queryFn: async (): Promise<{ items: RoomToolItem[] }> => {
+      const response: FetchResponse<ApiResponse<{ items: RoomToolItem[] }>> = await api.get(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/tools`
+      )
+      return { items: Array.isArray(response.data.data?.items) ? response.data.data!.items : [] }
     },
     enabled: !!roomConversationId && enabled,
     staleTime: 10_000,
@@ -370,54 +389,39 @@ export function useUnpinRoomTaskBoard(roomId: string) {
   })
 }
 
-export function usePinRoomTool(roomId: string) {
+export function useAssignRoomTool(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { toolId: string; position?: number }) => {
-      const response: FetchResponse<ApiResponse<{ pin: RoomPinnedTool }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/tools`, {
+    mutationFn: async (args: { toolId: string; permission?: 'allow' | 'ask' | 'deny' }) => {
+      const response: FetchResponse<ApiResponse<{ assignment: RoomToolAssignment }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/tools`, {
         toolId: args.toolId,
-        ...(args.position !== undefined ? { position: args.position } : {}),
+        ...(args.permission ? { permission: args.permission } : {}),
       })
-      return response.data.data?.pin
+      return response.data.data?.assignment
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.tools(roomId) })
     },
     onError: (error: unknown) => {
-      toast.error('Failed to pin tool', { description: getSafeErrorMessage(error) })
+      toast.error('Failed to assign tool', { description: getSafeErrorMessage(error) })
     },
   })
 }
 
-export function useUnpinRoomTool(roomId: string) {
+export function useUnassignRoomTool(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (toolId: string) => {
       const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/tools/${encodeURIComponent(toolId)}`
+        `/api/v1/rooms/${encodeURIComponent(roomId)}/tools/${encodeURIComponent(toolId)}`
       )
       return response.data.data
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.tools(roomId) })
     },
     onError: (error: unknown) => {
-      toast.error('Failed to unpin tool', { description: getSafeErrorMessage(error) })
-    },
-  })
-}
-
-export function useReorderPinnedRoomTools(roomId: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (toolIds: string[]) => {
-      const response: FetchResponse<ApiResponse<{ tools: RoomPinnedTool[] }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/tools/reorder`, {
-        toolIds,
-      })
-      return response.data.data?.tools || []
-    },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
+      toast.error('Failed to unassign tool', { description: getSafeErrorMessage(error) })
     },
   })
 }

@@ -9,7 +9,7 @@ import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
@@ -28,7 +28,7 @@ export function RoomThreadIndexView(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
-  pinnedTools?: RoomPinnedTool[] | null
+  assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
@@ -100,8 +100,8 @@ export function RoomThreadIndexView(props: {
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const hasAnyResources = pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
+  const assignedTools = (props.assignedTools || []).slice()
+  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
 
   const openPinnedView = (viewId: string) => {
     const id = String(viewId || '').trim()
@@ -415,10 +415,10 @@ export function RoomThreadIndexView(props: {
               ) : null}
 
               {starterTab === 'tools' ? (
-                pinnedTools.length > 0 ? (
+                assignedTools.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedTools.map(p => {
-                      const id = String(p.toolId)
+                    {assignedTools.map(a => {
+                      const id = String(a.toolId)
                       const name = props.toolLabelById?.get(id) || `Tool ${id.slice(0, 8)}`
                       return (
                         <Button key={`starter:tool:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedTool(id)}>
@@ -430,7 +430,7 @@ export function RoomThreadIndexView(props: {
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
-                    No pinned tools in this room.
+                    No assigned tools in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}

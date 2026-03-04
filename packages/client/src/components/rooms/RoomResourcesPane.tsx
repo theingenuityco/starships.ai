@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import type { RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -17,7 +17,7 @@ export function RoomResourcesPane(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
-  pinnedTools?: RoomPinnedTool[] | null
+  assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
@@ -34,8 +34,8 @@ export function RoomResourcesPane(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
-  onPinTool?: (toolId: string) => void
-  onUnpinTool?: (toolId: string) => void
+  onAssignTool?: (toolId: string) => void
+  onUnassignTool?: (toolId: string) => void
   onOpenPinnedView?: (viewId: string) => void
   onClose: () => void
 }) {
@@ -51,8 +51,8 @@ export function RoomResourcesPane(props: {
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const totalSaved = pinnedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length
+  const assignedTools = (props.assignedTools || []).slice()
+  const totalSaved = assignedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length
 
   const roomLabel = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -179,7 +179,7 @@ export function RoomResourcesPane(props: {
                 onClick={() => {
                   const id = pickToolId.trim()
                   if (!id) return
-                  props.onPinTool?.(id)
+                  props.onAssignTool?.(id)
                   setPickToolId('')
                 }}
                 disabled={!pickToolId.trim()}
@@ -188,15 +188,15 @@ export function RoomResourcesPane(props: {
               </Button>
             </div>
           ) : null}
-          {pinnedTools.length === 0 ? (
+          {assignedTools.length === 0 ? (
             <div className="text-sm text-muted-foreground">None</div>
           ) : (
             <div className="space-y-1">
-              {pinnedTools.map(p => (
-                <div key={`pt:${p.toolId}`} className="flex items-center justify-between gap-2">
-                  <Row icon="workflow" label={props.toolLabelById?.get(String(p.toolId)) || String(p.toolId)} onClick={() => openPinnedTool(String(p.toolId))} />
+              {assignedTools.map(a => (
+                <div key={`rt:${a.toolId}`} className="flex items-center justify-between gap-2">
+                  <Row icon="workflow" label={props.toolLabelById?.get(String(a.toolId)) || String(a.toolId)} onClick={() => openPinnedTool(String(a.toolId))} />
                   {props.canManagePins ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTool?.(String(p.toolId))}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnassignTool?.(String(a.toolId))}>
                       Remove
                     </Button>
                   ) : null}

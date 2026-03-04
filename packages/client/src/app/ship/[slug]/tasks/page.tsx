@@ -45,7 +45,7 @@ const taskBoardsClient = {
     return unwrapApiData<TaskBoardDetailsResponse>(res)
   },
   archiveBoard: async (starshipId: string, boardIdOrSlug: string): Promise<TaskBoardModel> => {
-    const res = await api.delete(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}`)
+    const res = await api.post(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/archive`, {})
     return unwrapApiData<TaskBoardModel>(res)
   },
   listCards: async (starshipId: string, boardIdOrSlug: string): Promise<TaskCardModel[]> => {
@@ -66,7 +66,7 @@ const taskBoardsClient = {
     return unwrapApiData<TaskCardModel>(res)
   },
   hardDeleteBoard: async (starshipId: string, boardIdOrSlug: string): Promise<void> => {
-    await api.delete(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/hard-delete`)
+    await api.delete(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}`)
   },
 } as const
 
@@ -81,7 +81,9 @@ export default function StarshipTasksPage(): React.JSX.Element {
   const { data: membersAndInvites } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
   const canHardDelete = Boolean(
     isInstanceAdmin === true ||
-      (user?.id && membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin')))
+      (user?.id &&
+        ((starship as any)?.ownerId && String((starship as any).ownerId) === String(user.id) ||
+          membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin'))))
   )
 
   const [newBoardName, setNewBoardName] = useState('')

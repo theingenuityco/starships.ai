@@ -751,16 +751,58 @@ router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddlewa
 });
 
 /**
- * DELETE /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/hard-delete
+ * POST /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/archive
+ * Archive a dataset (soft-delete).
+ */
+router.post(
+  '/starships/:starshipId/datasets/:datasetIdOrSlug/archive',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = requireAuthUserId(req, res);
+      if (!userId) return;
+
+      const params = validateData(
+        z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+        req.params,
+        res,
+        'dataset archive params'
+      );
+      if (!params) return;
+      if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
+
+      const datasetRepo = new StarshipDatasetRepository();
+      const required = await requireDatasetInStarship({
+        datasetIdOrSlug: params.datasetIdOrSlug,
+        starshipId: params.starshipId,
+        datasetRepo,
+        res,
+      });
+      if (!required) return;
+
+      const updated = await datasetRepo.update(required.dataset.id, { archived: true });
+      if (!updated) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
+        return;
+      }
+      sendSuccess(res, { dataset: updated });
+    } catch (error) {
+      handleError(error, res, 'archive dataset');
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug
  * Permanently delete a dataset and all associated rows (hard delete).
  *
- * This is a destructive operation and is restricted to:
+ * Restricted to:
  * - starship owner
  * - starship admin
  * - instance admin
  */
 router.delete(
-  '/starships/:starshipId/datasets/:datasetIdOrSlug/hard-delete',
+  '/starships/:starshipId/datasets/:datasetIdOrSlug',
   jwtAuthMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -785,7 +827,9 @@ router.delete(
       });
       if (!required) return;
 
-      const ok = await datasetRepo.delete(required.dataset.id);
+      const conn = getConnection();
+      const result = await conn.queryWithResult(`DELETE FROM starship_datasets WHERE id = $1`, [required.dataset.id]);
+      const ok = (result.rowCount ?? 0) > 0;
       if (!ok) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
         return;

@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { verifyResourceAccess, verifyStarshipAccess } from '@/middleware/verify-starship-access';
+import { verifyResourceAccess, verifyStarshipAccess, verifyStarshipAdminAccess } from '@/middleware/verify-starship-access';
 import { IdSchema } from '@/schemas/common';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { TaskBoardService } from '@/services/TaskBoardService';
@@ -267,6 +267,41 @@ router.delete(
       sendSuccess(res, archived, 200);
     } catch (error) {
       handleError(error, res, 'archiving task board');
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/starships/:starshipId/task-boards/:boardIdOrSlug/hard-delete
+ * Permanently delete a task board and all its columns/cards (hard delete).
+ *
+ * Restricted to:
+ * - starship owner
+ * - starship admin
+ * - instance admin
+ */
+router.delete(
+  '/starships/:starshipId/task-boards/:boardIdOrSlug/hard-delete',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = requireAuthUserId(req, res);
+      if (!userId) return;
+
+      const params = z.object({ starshipId: IdSchema, boardIdOrSlug: BoardIdOrSlugSchema }).parse(req.params);
+      if (!(await verifyStarshipAdminAccess(params.starshipId, userId, res))) return;
+
+      const details = await requireBoardAccessForStarship(params.starshipId, params.boardIdOrSlug, userId, res);
+      if (!details) return;
+
+      const ok = await service.deleteBoard(details.board.id);
+      if (!ok) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Task board not found', 404);
+        return;
+      }
+      res.status(204).send();
+    } catch (error) {
+      handleError(error, res, 'deleting task board');
     }
   }
 );

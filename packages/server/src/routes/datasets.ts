@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
-import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
+import { verifyStarshipAccess, verifyStarshipAdminAccess } from '@/middleware/verify-starship-access';
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
 import { DatasetRowProjector } from '@/services/DatasetRowProjector';
 import { coerceBoolean, isPlainObject, toIsoDateOnly, toIsoInstantWithOffset as toIsoInstant } from '@/utils/value-coercion';
@@ -749,6 +749,53 @@ router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddlewa
     handleError(error, res, 'update dataset');
   }
 });
+
+/**
+ * DELETE /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/hard-delete
+ * Permanently delete a dataset and all associated rows (hard delete).
+ *
+ * This is a destructive operation and is restricted to:
+ * - starship owner
+ * - starship admin
+ * - instance admin
+ */
+router.delete(
+  '/starships/:starshipId/datasets/:datasetIdOrSlug/hard-delete',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = requireAuthUserId(req, res);
+      if (!userId) return;
+
+      const params = validateData(
+        z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema }),
+        req.params,
+        res,
+        'dataset delete params'
+      );
+      if (!params) return;
+      if (!(await verifyStarshipAdminAccess(params.starshipId, userId, res))) return;
+
+      const datasetRepo = new StarshipDatasetRepository();
+      const required = await requireDatasetInStarship({
+        datasetIdOrSlug: params.datasetIdOrSlug,
+        starshipId: params.starshipId,
+        datasetRepo,
+        res,
+      });
+      if (!required) return;
+
+      const ok = await datasetRepo.delete(required.dataset.id);
+      if (!ok) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Dataset not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
+        return;
+      }
+      res.status(204).send();
+    } catch (error) {
+      handleError(error, res, 'delete dataset');
+    }
+  }
+);
 
 /**
  * GET /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/rows?limit&offset

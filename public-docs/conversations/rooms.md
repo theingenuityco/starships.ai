@@ -271,3 +271,7 @@ Rooms are designed for threads implemented as **child conversations**:
 
 See [Threads](./threads.md) for the child conversation APIs.
 
+To list/search threads for a room via connector actions, use:
+
+- `list-conversation-children` (optional `q` for DB-level search on child conversation title)
+

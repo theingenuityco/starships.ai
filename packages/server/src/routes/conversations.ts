@@ -2512,9 +2512,20 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
     );
     if (!cursorValidation) return;
 
+    const searchValidation = validateData(
+      z.object({
+        q: z.string().optional(),
+      }),
+      req.query,
+      res,
+      'children search'
+    );
+    if (!searchValidation) return;
+
     const page = await conversationService.getChildConversationsPage({
       parentConversationId: conversationId,
       limit: paginationValidation.limit,
+      q: searchValidation.q,
       ...(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId
         ? { beforeUpdatedAt: cursorValidation.beforeUpdatedAt, beforeId: cursorValidation.beforeId }
         : {}),

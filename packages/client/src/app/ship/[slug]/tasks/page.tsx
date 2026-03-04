@@ -407,7 +407,7 @@ export default function StarshipTasksPage(): React.JSX.Element {
                                     className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive disabled:opacity-60"
                                   >
                                     <Icon name="trash" className="h-4 w-4" />
-                                    Delete permanently
+                                    Delete
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>

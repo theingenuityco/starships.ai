@@ -129,6 +129,13 @@ export class TaskBoardService {
     return this.boards.archive(boardId);
   }
 
+  /**
+   * Permanently delete a board. This will cascade-delete columns/cards in the DB.
+   */
+  async deleteBoard(boardId: string): Promise<boolean> {
+    return this.boards.delete(boardId);
+  }
+
   async createColumn(req: CreateTaskColumnRequest): Promise<TaskColumnModel> {
     const title = String(req.title || '').trim();
     if (!title) throw new ValidationError('Column title is required', 'title');

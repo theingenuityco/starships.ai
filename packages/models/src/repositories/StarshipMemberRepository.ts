@@ -7,6 +7,31 @@ export class StarshipMemberRepository extends BaseRepository {
     super('StarshipMemberRepository');
   }
 
+  async getRole(userId: string, starshipId: string): Promise<'collaborator' | 'admin' | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ role: string | null }>(
+          `SELECT role
+             FROM starship_members
+            WHERE starship_id = $1
+              AND user_id = $2
+            LIMIT 1`,
+          [starshipId, userId]
+        );
+        const role = typeof row?.role === 'string' ? row.role : null;
+        return role === 'admin' || role === 'collaborator' ? (role as any) : null;
+      },
+      'getRole',
+      'starship_members'
+    );
+  }
+
+  async isAdmin(userId: string, starshipId: string): Promise<boolean> {
+    const role = await this.getRole(userId, starshipId);
+    return role === 'admin';
+  }
+
   async isMember(userId: string, starshipId: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {

@@ -18,10 +18,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useCreateDataset, useStarshipDatasets } from '@/hooks/useDatasets'
+import { useArchiveDataset, useCreateDataset, useHardDeleteDataset, useStarshipDatasets } from '@/hooks/useDatasets'
 import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
+import { useAuth } from '@/hooks/useAuth'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 
 const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
   { value: 'string', label: 'String' },
@@ -57,9 +60,15 @@ export default function TablesIndexPage(): React.JSX.Element {
   const router = useRouter()
   const { slug: slugParam } = useParams<{ slug: string }>()
   const slug = typeof slugParam === 'string' ? slugParam : ''
+  const { user, isInstanceAdmin } = useAuth()
 
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
+  const canHardDelete = Boolean(
+    isInstanceAdmin === true ||
+      (user?.id && membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin')))
+  )
 
   const { data: datasets = [], isLoading: datasetsLoading } = useStarshipDatasets(starshipId, Boolean(starshipId))
 
@@ -70,6 +79,12 @@ export default function TablesIndexPage(): React.JSX.Element {
 
   const createDataset = useCreateDataset(starshipId)
   const canCreate = Boolean(starshipId) && !createDataset.isPending
+
+  const archiveDataset = useArchiveDataset(starshipId)
+  const hardDeleteDataset = useHardDeleteDataset(starshipId)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; slug?: string | null } | null>(null)
+  const [deletingDatasetId, setDeletingDatasetId] = useState<string | null>(null)
+  const [deleteMode, setDeleteMode] = useState<'archive' | 'hard'>('archive')
 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -132,6 +147,41 @@ export default function TablesIndexPage(): React.JSX.Element {
       router.push(`/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(created.id)}`)
     } catch (e) {
       toast.error('Failed to create dataset', { description: getSafeErrorMessage(e) })
+    }
+  }
+
+  async function onConfirmDeleteDataset() {
+    const target = deleteTarget
+    if (!target || !starshipId) return
+    if (deleteMode === 'hard') {
+      if (!canHardDelete) {
+        toast.error('Only owners/admins can permanently delete datasets')
+        return
+      }
+      if (hardDeleteDataset.isPending) return
+      setDeletingDatasetId(target.id)
+      try {
+        await hardDeleteDataset.mutateAsync(target.id)
+        toast.success('Dataset deleted permanently', { description: `${target.name} and its rows were deleted.` })
+        setDeleteTarget(null)
+      } catch (e) {
+        toast.error('Failed to delete dataset', { description: getSafeErrorMessage(e) })
+      } finally {
+        setDeletingDatasetId((prev) => (prev === target.id ? null : prev))
+      }
+      return
+    }
+
+    if (archiveDataset.isPending) return
+    setDeletingDatasetId(target.id)
+    try {
+      await archiveDataset.mutateAsync(target.id)
+      toast.success('Dataset deleted', { description: `${target.name} was archived.` })
+      setDeleteTarget(null)
+    } catch (e) {
+      toast.error('Failed to delete dataset', { description: getSafeErrorMessage(e) })
+    } finally {
+      setDeletingDatasetId((prev) => (prev === target.id ? null : prev))
     }
   }
 
@@ -205,7 +255,7 @@ export default function TablesIndexPage(): React.JSX.Element {
               {sorted.map(d => {
                 const href = `/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(d.id)}`
                 return (
-                  <Card key={d.id} className={cn('border-border/60 hover:shadow-sm transition-shadow')}>
+                  <Card key={d.id} className={cn('border-border/60 hover:shadow-sm transition-shadow group')}>
                     <CardHeader className="pb-4">
                       <CardTitle className="text-base flex items-center justify-between gap-2">
                         <Link href={href} className="truncate hover:underline underline-offset-2">
@@ -217,12 +267,59 @@ export default function TablesIndexPage(): React.JSX.Element {
                     </CardHeader>
                     <CardContent className="pt-0 flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">{d.columns?.length ?? 0} columns</div>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={href}>
-                          Open
-                          <Icon name="chevron-right" className="h-4 w-4 ml-1.5" />
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                              aria-label="Dataset actions"
+                            >
+                              <Icon name="dots-vertical" className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              onClick={() => router.push(href)}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <Icon name="arrow-right" className="h-4 w-4" />
+                              Open
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setDeleteMode('archive')
+                                setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
+                              }}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              <Icon name="archive" className="h-4 w-4" />
+                              Archive
+                            </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!canHardDelete}
+                            onClick={() => {
+                              setDeleteMode('hard')
+                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
+                            }}
+                            className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive disabled:opacity-60"
+                          >
+                            <Icon name="trash" className="h-4 w-4" />
+                            Delete permanently
+                          </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={href}>
+                            Open
+                            <Icon name="chevron-right" className="h-4 w-4 ml-1.5" />
+                          </Link>
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )
@@ -552,6 +649,60 @@ export default function TablesIndexPage(): React.JSX.Element {
             </Button>
             <Button onClick={onCreate} disabled={!canCreate}>
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            if (!archiveDataset.isPending && !hardDeleteDataset.isPending) setDeleteTarget(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">{deleteMode === 'hard' ? 'Delete dataset permanently' : 'Archive dataset'}</DialogTitle>
+            <DialogDescription>
+              {deleteMode === 'hard'
+                ? 'This will permanently delete the dataset and all of its rows. This action cannot be undone.'
+                : 'This will archive the dataset so it no longer appears in the list.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteTarget ? (
+            <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/10 text-sm">
+              <div className="flex items-start gap-2">
+                <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-medium text-destructive">You’re about to delete:</p>
+                  <p className="text-destructive/80 break-words">
+                    {deleteTarget.name}
+                    {deleteTarget.slug ? ` (${deleteTarget.slug})` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteTarget(null)}
+              disabled={archiveDataset.isPending || hardDeleteDataset.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onConfirmDeleteDataset}
+              disabled={!deleteTarget || archiveDataset.isPending || hardDeleteDataset.isPending || (deleteMode === 'hard' && !canHardDelete)}
+            >
+              {(archiveDataset.isPending || hardDeleteDataset.isPending) && deletingDatasetId === deleteTarget?.id ? 'Deleting…' : deleteMode === 'hard' ? 'Delete permanently' : 'Archive'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -19,6 +19,9 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import api from '@/lib/api'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/hooks/useAuth'
+import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 
 function unwrapApiData<T>(response: unknown): T {
   // Our client returns { data: ApiResponse<T> } where ApiResponse has shape { data: T }.
@@ -41,6 +44,10 @@ const taskBoardsClient = {
     const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}`)
     return unwrapApiData<TaskBoardDetailsResponse>(res)
   },
+  archiveBoard: async (starshipId: string, boardIdOrSlug: string): Promise<TaskBoardModel> => {
+    const res = await api.delete(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}`)
+    return unwrapApiData<TaskBoardModel>(res)
+  },
   listCards: async (starshipId: string, boardIdOrSlug: string): Promise<TaskCardModel[]> => {
     const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/cards`)
     const data = unwrapApiData<{ cards: TaskCardModel[] }>(res)
@@ -58,19 +65,31 @@ const taskBoardsClient = {
     const res = await api.delete(`/api/v1/task-cards/${cardId}`)
     return unwrapApiData<TaskCardModel>(res)
   },
+  hardDeleteBoard: async (starshipId: string, boardIdOrSlug: string): Promise<void> => {
+    await api.delete(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardIdOrSlug)}/hard-delete`)
+  },
 } as const
 
 export default function StarshipTasksPage(): React.JSX.Element {
   const { slug: slugParam } = useParams<{ slug: string }>()
   const slug = typeof slugParam === 'string' ? slugParam : ''
   const queryClient = useQueryClient()
+  const { user, isInstanceAdmin } = useAuth()
 
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id || ''
+  const { data: membersAndInvites } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
+  const canHardDelete = Boolean(
+    isInstanceAdmin === true ||
+      (user?.id && membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin')))
+  )
 
   const [newBoardName, setNewBoardName] = useState('')
   const [createBoardOpen, setCreateBoardOpen] = useState(false)
   const [selectedBoardId, setSelectedBoardId] = useState<string>('')
+  const [deleteBoardTarget, setDeleteBoardTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deletingBoardId, setDeletingBoardId] = useState<string | null>(null)
+  const [deleteMode, setDeleteMode] = useState<'archive' | 'hard'>('archive')
 
   const { data: boards = [], isLoading: boardsLoading } = useQuery<TaskBoardModel[]>({
     queryKey: ['task-boards', starshipId],
@@ -140,6 +159,44 @@ export default function StarshipTasksPage(): React.JSX.Element {
     },
   })
 
+  const archiveBoardMutation = useMutation({
+    mutationFn: async (boardIdOrSlug: string) => {
+      if (!starshipId) throw new Error('Missing starship id')
+      return await taskBoardsClient.archiveBoard(starshipId, boardIdOrSlug)
+    },
+    onSuccess: async (_, deletedBoardIdOrSlug) => {
+      const deletingId = String(deletedBoardIdOrSlug || '')
+      if (deletingId && effectiveBoardId === deletingId) {
+        setSelectedBoardId('')
+      } else if (selectedBoardId && deletingId && selectedBoardId === deletingId) {
+        setSelectedBoardId('')
+      }
+      await queryClient.invalidateQueries({ queryKey: ['task-boards', starshipId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-board', starshipId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId] })
+    },
+    onError: (error) => {
+      toast.error('Failed to delete board', { description: getSafeErrorMessage(error) })
+    },
+  })
+
+  const hardDeleteBoardMutation = useMutation({
+    mutationFn: async (boardIdOrSlug: string) => {
+      if (!starshipId) throw new Error('Missing starship id')
+      return await taskBoardsClient.hardDeleteBoard(starshipId, boardIdOrSlug)
+    },
+    onSuccess: async (_, deletedBoardIdOrSlug) => {
+      const deletingId = String(deletedBoardIdOrSlug || '')
+      if (deletingId && effectiveBoardId === deletingId) setSelectedBoardId('')
+      await queryClient.invalidateQueries({ queryKey: ['task-boards', starshipId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-board', starshipId] })
+      await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId] })
+    },
+    onError: (error) => {
+      toast.error('Failed to delete board', { description: getSafeErrorMessage(error) })
+    },
+  })
+
   const moveCardMutation = useMutation({
     mutationFn: async (args: { cardId: string; toColumnName: string; toPos: number }) => {
       return await taskBoardsClient.moveCard(args.cardId, { toColumnName: args.toColumnName, toPos: args.toPos })
@@ -157,6 +214,39 @@ export default function StarshipTasksPage(): React.JSX.Element {
       await queryClient.invalidateQueries({ queryKey: ['task-cards', starshipId, effectiveBoardId] })
     },
   })
+
+  const onConfirmDeleteBoard = async () => {
+    const target = deleteBoardTarget
+    if (!target) return
+    if (deleteMode === 'hard') {
+      if (!canHardDelete) {
+        toast.error('Only owners/admins can permanently delete boards')
+        return
+      }
+      if (hardDeleteBoardMutation.isPending) return
+      setDeletingBoardId(target.id)
+      try {
+        await hardDeleteBoardMutation.mutateAsync(target.id)
+        toast.success('Board deleted permanently', { description: `${target.name} and its cards were deleted.` })
+        setDeleteBoardTarget(null)
+      } finally {
+        setDeletingBoardId((prev) => (prev === target.id ? null : prev))
+      }
+      return
+    }
+
+    if (archiveBoardMutation.isPending) return
+    setDeletingBoardId(target.id)
+    try {
+      await archiveBoardMutation.mutateAsync(target.id)
+      toast.success('Board deleted', { description: `${target.name} was archived.` })
+      setDeleteBoardTarget(null)
+    } catch (error) {
+      // handled by onError, but keep selection state consistent
+    } finally {
+      setDeletingBoardId((prev) => (prev === target.id ? null : prev))
+    }
+  }
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
@@ -258,22 +348,68 @@ export default function StarshipTasksPage(): React.JSX.Element {
                       ) : (
                         boards.map(b => {
                           const isActive = b.id === effectiveBoardId
+                          const canDelete = Boolean(starshipId && b?.id)
                           return (
-                            <button
+                            <div
                               key={b.id}
-                              type="button"
-                              onClick={() => setSelectedBoardId(b.id)}
                               className={cn(
-                                'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-left transition-colors',
-                                isActive ? 'bg-muted/60 text-foreground' : 'hover:bg-muted/40 text-foreground'
+                                'w-full flex items-center gap-2 rounded-lg pr-1 transition-colors group',
+                                isActive ? 'bg-muted/60' : 'hover:bg-muted/40'
                               )}
-                              aria-current={isActive ? 'page' : undefined}
                             >
-                              <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-md ring-1 ring-border/50', isActive ? 'bg-background/70' : 'bg-muted/30')}>
-                                <Icon name="layout" className="h-4 w-4 text-muted-foreground" />
-                              </span>
-                              <span className="min-w-0 flex-1 truncate font-medium">{b.name}</span>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedBoardId(b.id)}
+                                className={cn('flex-1 min-w-0 flex items-center gap-2 px-3 py-2 text-sm text-left text-foreground')}
+                                aria-current={isActive ? 'page' : undefined}
+                              >
+                                <span className={cn('inline-flex h-6 w-6 items-center justify-center rounded-md ring-1 ring-border/50', isActive ? 'bg-background/70' : 'bg-muted/30')}>
+                                  <Icon name="layout" className="h-4 w-4 text-muted-foreground" />
+                                </span>
+                                <span className="min-w-0 flex-1 truncate font-medium">{b.name}</span>
+                              </button>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                    aria-label="Board actions"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Icon name="dots-vertical" className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem
+                                    disabled={!canDelete}
+                                    onClick={() => {
+                                      if (!canDelete) return
+                                      setDeleteMode('archive')
+                                      setDeleteBoardTarget({ id: String(b.id), name: String(b.name || 'Board') })
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Icon name="archive" className="h-4 w-4" />
+                                    Archive
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={!canDelete || !canHardDelete}
+                                    onClick={() => {
+                                      if (!canDelete || !canHardDelete) return
+                                      setDeleteMode('hard')
+                                      setDeleteBoardTarget({ id: String(b.id), name: String(b.name || 'Board') })
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive disabled:opacity-60"
+                                  >
+                                    <Icon name="trash" className="h-4 w-4" />
+                                    Delete permanently
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           )
                         })
                       )}
@@ -375,6 +511,61 @@ export default function StarshipTasksPage(): React.JSX.Element {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteBoardTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (!archiveBoardMutation.isPending && !hardDeleteBoardMutation.isPending) setDeleteBoardTarget(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">{deleteMode === 'hard' ? 'Delete board permanently' : 'Archive board'}</DialogTitle>
+            <DialogDescription>
+              {deleteMode === 'hard'
+                ? 'This will permanently delete the board, its columns, and all cards. This action cannot be undone.'
+                : 'This will archive the board so it no longer appears in the list.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteBoardTarget ? (
+            <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/10 text-sm">
+              <div className="flex items-start gap-2">
+                <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-medium text-destructive">You’re about to delete:</p>
+                  <p className="text-destructive/80 break-words">{deleteBoardTarget.name}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteBoardTarget(null)}
+              disabled={archiveBoardMutation.isPending || hardDeleteBoardMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onConfirmDeleteBoard}
+              disabled={!deleteBoardTarget || archiveBoardMutation.isPending || hardDeleteBoardMutation.isPending || (deleteMode === 'hard' && !canHardDelete)}
+            >
+              {(archiveBoardMutation.isPending || hardDeleteBoardMutation.isPending) && deletingBoardId === deleteBoardTarget?.id
+                ? 'Deleting…'
+                : deleteMode === 'hard'
+                  ? 'Delete permanently'
+                  : 'Archive'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

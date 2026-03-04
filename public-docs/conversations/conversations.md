@@ -217,12 +217,15 @@ Agents can use `connector_action` with `connector: "starships"` to call some con
 - `create-conversation` → `POST /conversations`
 - `send-message` → `POST /conversations/{conversationId}/messages`
 - `get-conversation-messages` → `GET /conversations/{conversationId}/messages` (pagination support)
+- `list-conversation-children` → `GET /conversations/{conversationId}/children` (pagination + optional `q`)
 - `authorize-and-maybe-execute-tool` → `POST /conversations/{conversationId}/tool-calls/authorize-and-maybe-execute`
 
 Notes:
 
 - `get-conversation-messages` is defined via the Starships connector endpoint catalog and supports `limit`, `offset`, and keyset cursor fields.
-- Thread-related endpoints (children, linked-message, thread notification-level) are **HTTP-only** today (no Starships connector actions seeded for them).
+- Thread-related endpoints are partially covered by connector actions:
+  - `list-conversation-children` exists (and supports optional `q`)
+  - `linked-message`, `children/pending-approvals`, and thread notification-level remain **HTTP-only** today
 
 ## Examples (Blueprint / DSL)
 

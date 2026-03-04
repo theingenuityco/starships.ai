@@ -1137,6 +1137,7 @@ export class ConversationService {
     limit: number;
     beforeUpdatedAt?: string;
     beforeId?: string;
+    q?: string;
   }): Promise<{
     conversations: Array<ConversationModel & { agents: AgentModel[] }>;
     hasMoreBefore: boolean;
@@ -1158,27 +1159,35 @@ export class ConversationService {
 
     const conn = getConnection();
 
+    const rawQ = typeof args.q === 'string' ? args.q.trim() : '';
+    const escapeLike = (s: string): string => s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+    const qLike = rawQ ? `%${escapeLike(rawQ)}%` : null;
+
     const convRows = await conn.query<Record<string, unknown>>(
       useCursor
         ? `
           SELECT *
           FROM conversations
           WHERE parent_conversation_id = $1
+            AND ($2::text IS NULL OR title ILIKE $2::text ESCAPE '\\')
             AND (
-              updated_at < $2::timestamptz
-              OR (updated_at = $2::timestamptz AND id < $3::text)
+              updated_at < $3::timestamptz
+              OR (updated_at = $3::timestamptz AND id < $4::text)
             )
           ORDER BY updated_at DESC, id DESC
-          LIMIT $4
+          LIMIT $5
         `
         : `
           SELECT *
           FROM conversations
           WHERE parent_conversation_id = $1
+            AND ($2::text IS NULL OR title ILIKE $2::text ESCAPE '\\')
           ORDER BY updated_at DESC, id DESC
-          LIMIT $2
+          LIMIT $3
         `,
-      useCursor ? [args.parentConversationId, args.beforeUpdatedAt, args.beforeId, pageSize] : [args.parentConversationId, pageSize]
+      useCursor
+        ? [args.parentConversationId, qLike, args.beforeUpdatedAt, args.beforeId, pageSize]
+        : [args.parentConversationId, qLike, pageSize]
     );
 
     const hasMoreBefore = convRows.length > limit;

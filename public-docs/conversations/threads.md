@@ -100,14 +100,15 @@ When a message becomes linked to a thread, the server best-effort ensures the ch
 
 ## Starships connector actions (threads)
 
-There are currently **no** Starships connector actions seeded specifically for thread-only endpoints:
+The following Starships connector action exists for thread/child-conversation operations:
 
-- children listing
+- `list-conversation-children` (DB-level search supported via optional `q`)
+
+Thread-specific operations that still require HTTP APIs:
+
 - linked-message lookup
 - thread notification-level
 - message linking
-
-Use the HTTP APIs above for thread-specific operations.
 
 ## Practical recipes
 

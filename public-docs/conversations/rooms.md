@@ -52,6 +52,10 @@ When using `connector_action` with `connector: "starships"`, the following room-
 - `add-room-member`
 - `remove-room-member`
 - `get-room-pins`
+- `get-room-resources` (combined resolved resources + assigned tools)
+- `get-room-pins-views`
+- `get-room-pins-datasets`
+- `get-room-pins-task-boards`
 - `get-room-tools`
 - `assign-room-tool` / `unassign-room-tool`
 - `pin-room-view` / `unpin-room-view`
@@ -95,7 +99,7 @@ Room tools are **assigned** (not pinned). This means:
 
 ## Tips for agents
 
-- **Rooms are HTTP-only today**: without a seeded connector action (or a custom tool wrapping these routes), an agent cannot call the rooms APIs via `connector_action`.
+- **Prefer Starships connector actions when available**: rooms, pins, resolved resources, and room tool assignments are available via `connector_action` on the `starships` connector template.
 - **Prefer pinning to teach context**: pins are the intended way to make “room context” discoverable (dashboards, datasets, task boards, etc.).
 - **Thread notification level**: thread notification-level endpoints are currently channel-thread only; do not rely on them for room threads.
 
@@ -200,10 +204,14 @@ To avoid fetching “all starship resources” just to render room resources, yo
 Combined response shape:
 
 ```json
-{ "views": [], "datasets": [], "taskBoards": [], "tools": [] }
+{ "views": [], "datasets": [], "taskBoards": [], "tools": [], "participants": { "users": [], "agents": [] } }
 ```
 
 Pinned-kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).\n\nRoom tools are returned as `{ assignment, tool }` objects.
+Participants are returned as:
+
+- `participants.users[]`: `{ id, slug: "u:<userId>", displayName, avatar, role }`
+- `participants.agents[]`: `{ id, slug: "<agentSlug>", name }`
 
 #### Filters & search (combined endpoint)
 
@@ -211,7 +219,7 @@ Pinned-kind endpoints return an `items` array of `{ pin, <resource> }` objects (
 
 - `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `datasets`, `taskBoards` (`task-boards`), `tools`, `all`.
 - `q`: optional case-insensitive search across `name` / `slug` / `description` (where applicable)
-- `includeArchived`: optional boolean (default `true`). When `false`, excludes archived datasets/task boards.
+- `includeArchived`: optional boolean (default `false`). When `true`, includes archived datasets/task boards.
 - `limitPerKind`: optional number (0–200). Caps results per kind after filtering.
 
 ### Pin / unpin (owner/admin only, MVP policy)

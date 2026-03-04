@@ -34,5 +34,5 @@ You can interact with conversation-backed concepts via:
 - **HTTP API** (server endpoints under `/api/v1`)
 - **Starships connector actions** via `connector_action` nodes (recommended for agents when available)
 
-Note: connector actions exist for **some** conversation-related operations (e.g. sending a message, creating a conversation, channel CRUD), but not all (e.g. rooms CRUD and room pins are HTTP-only today).
+Note: connector actions exist for **many** conversation-related operations (e.g. sending a message, creating a conversation, channel CRUD, room CRUD, room pins, and room tool assignments), but not all.
 

@@ -1,27 +1,24 @@
 import { BaseRepository } from './BaseRepository';
-import type { RoomPinnedTool } from '@starships/protocol';
+import type { RoomToolAssignment } from '@starships/protocol';
 
 type RoomToolPermission = 'allow' | 'ask' | 'deny';
 
 type DbRow = {
   room_conversation_id: string;
   tool_id: string;
-  position: number;
+  permission: RoomToolPermission | null;
   created_at: string;
-  created_by: string | null;
-  permission?: RoomToolPermission | null;
+  updated_at: string;
 };
 
-function fromDb(r: DbRow): RoomPinnedTool {
-  const p = r.permission === 'allow' || r.permission === 'ask' || r.permission === 'deny' ? r.permission : undefined;
+function fromDb(r: DbRow): RoomToolAssignment {
+  const p: RoomToolPermission = r.permission === 'ask' || r.permission === 'deny' || r.permission === 'allow' ? r.permission : 'allow';
   return {
-    kind: 'tool',
     roomConversationId: String(r.room_conversation_id),
     toolId: String(r.tool_id),
-    position: Number(r.position) || 0,
+    permission: p,
     createdAt: String(r.created_at),
-    createdBy: r.created_by ?? null,
-    ...(p ? { permission: p } : {}),
+    updatedAt: String(r.updated_at),
   };
 }
 
@@ -30,156 +27,39 @@ export class RoomToolsRepository extends BaseRepository {
     super('RoomToolsRepository');
   }
 
-  async list(roomConversationId: string): Promise<RoomPinnedTool[]> {
+  async list(roomConversationId: string): Promise<RoomToolAssignment[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
+        `SELECT room_conversation_id, tool_id, permission, created_at, updated_at
            FROM room_tools
           WHERE room_conversation_id = $1
-          ORDER BY position ASC, created_at ASC`,
+          ORDER BY created_at ASC`,
         [roomConversationId]
       );
       return rows.map(fromDb);
     }, 'list', 'room_tools', roomConversationId);
   }
 
-  async upsert(args: {
-    roomConversationId: string;
-    toolId: string;
-    position?: number | null;
-    createdBy?: string | null;
-    permission?: RoomToolPermission | null;
-  }): Promise<RoomPinnedTool> {
+  async upsert(args: { roomConversationId: string; toolId: string; permission?: RoomToolPermission | null }): Promise<RoomToolAssignment> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const roomConversationId = String(args.roomConversationId || '').trim();
       const toolId = String(args.toolId || '').trim();
-      const createdBy = args.createdBy ?? null;
-      const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
       const requestedPermission =
         args.permission === 'allow' || args.permission === 'ask' || args.permission === 'deny' ? args.permission : null;
-
-      await conn.query('BEGIN');
-      try {
-        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tools:${roomConversationId}`]);
-
-        const existing = await conn.queryOne<{ position: number }>(
-          `SELECT position FROM room_tools WHERE room_conversation_id = $1 AND tool_id = $2`,
-          [roomConversationId, toolId]
-        );
-
-        if (existing && requestedPosition == null && requestedPermission == null) {
-          const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
-               FROM room_tools
-              WHERE room_conversation_id = $1 AND tool_id = $2`,
-            [roomConversationId, toolId]
-          );
-          if (!row) throw new Error('Failed to upsert room tool');
-          await conn.query('COMMIT');
-          return fromDb(row);
-        }
-
-        if (!existing) {
-          const desired =
-            requestedPosition != null
-              ? requestedPosition
-              : Number(
-                  (
-                    await conn.queryOne<{ next_pos: number }>(
-                      `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos
-                         FROM room_tools
-                        WHERE room_conversation_id = $1`,
-                      [roomConversationId]
-                    )
-                  )?.next_pos ?? 0
-                );
-
-          await conn.query(
-            `UPDATE room_tools
-                SET position = position + 1
-              WHERE room_conversation_id = $1
-                AND position >= $2`,
-            [roomConversationId, desired]
-          );
-
-          const inserted = await conn.queryOne<DbRow>(
-            `INSERT INTO room_tools (room_conversation_id, tool_id, position, created_by, permission)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING room_conversation_id, tool_id, position, created_at, created_by, permission`,
-            [roomConversationId, toolId, desired, createdBy, requestedPermission ?? 'allow']
-          );
-          if (!inserted) throw new Error('Failed to upsert room tool');
-          await conn.query('COMMIT');
-          return fromDb(inserted);
-        }
-
-        const current = Number(existing.position) || 0;
-        const desired = requestedPosition ?? current;
-
-        if (requestedPermission != null) {
-          await conn.query(`UPDATE room_tools SET permission = $3 WHERE room_conversation_id = $1 AND tool_id = $2`, [
-            roomConversationId,
-            toolId,
-            requestedPermission,
-          ]);
-        }
-
-        if (desired !== current) {
-          const tmpRow = await conn.queryOne<{ tmp: number }>(
-            `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp
-               FROM room_tools
-              WHERE room_conversation_id = $1`,
-            [roomConversationId]
-          );
-          const tmp = Number(tmpRow?.tmp ?? -1);
-          await conn.query(`UPDATE room_tools SET position = $3 WHERE room_conversation_id = $1 AND tool_id = $2`, [
-            roomConversationId,
-            toolId,
-            tmp,
-          ]);
-
-          if (desired < current) {
-            await conn.query(
-              `UPDATE room_tools
-                  SET position = position + 1
-                WHERE room_conversation_id = $1
-                  AND position >= $2
-                  AND position < $3`,
-              [roomConversationId, desired, current]
-            );
-          } else {
-            await conn.query(
-              `UPDATE room_tools
-                  SET position = position - 1
-                WHERE room_conversation_id = $1
-                  AND position <= $2
-                  AND position > $3`,
-              [roomConversationId, desired, current]
-            );
-          }
-
-          await conn.query(`UPDATE room_tools SET position = $3 WHERE room_conversation_id = $1 AND tool_id = $2`, [
-            roomConversationId,
-            toolId,
-            desired,
-          ]);
-        }
-
-        const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, tool_id, position, created_at, created_by, permission
-             FROM room_tools
-            WHERE room_conversation_id = $1 AND tool_id = $2`,
-          [roomConversationId, toolId]
-        );
-        if (!row) throw new Error('Failed to upsert room tool');
-        await conn.query('COMMIT');
-        return fromDb(row);
-      } catch (e) {
-        await conn.query('ROLLBACK');
-        throw e;
-      }
+      const row = await conn.queryOne<DbRow>(
+        `
+        INSERT INTO room_tools (room_conversation_id, tool_id, permission, created_at, updated_at)
+        VALUES ($1, $2, $3, NOW(), NOW())
+        ON CONFLICT (room_conversation_id, tool_id)
+        DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()
+        RETURNING room_conversation_id, tool_id, permission, created_at, updated_at
+        `,
+        [roomConversationId, toolId, requestedPermission ?? 'allow']
+      );
+      if (!row) throw new Error('Failed to upsert room tool assignment');
+      return fromDb(row);
     }, 'upsert', 'room_tools');
   }
 

@@ -21,9 +21,9 @@ export interface RoomModel extends Room {
   updatedAt: string;
 }
 
-export type RoomPinnedResourceKind = 'view' | 'dataset' | 'task_board' | 'tool';
+export type RoomPinnedResourceKind = 'view' | 'dataset' | 'task_board';
 
-export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'dataset', 'task_board', 'tool'] as const;
+export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'dataset', 'task_board'] as const;
 
 export interface RoomPinBase {
   roomConversationId: string;
@@ -47,12 +47,17 @@ export interface RoomPinnedTaskBoard extends RoomPinBase {
   boardId: string;
 }
 
-export interface RoomPinnedTool extends RoomPinBase {
-  kind: 'tool';
-  toolId: string;
-  /** Optional room-scoped override permission for this tool. */
-  permission?: AgentToolPermission;
-}
+export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard;
 
-export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard | RoomPinnedTool;
+// ============================================================================
+// ROOM ↔ TOOL ASSIGNMENTS (unordered)
+// ============================================================================
+
+export interface RoomToolAssignment {
+  roomConversationId: string;
+  toolId: string;
+  permission: AgentToolPermission;
+  createdAt: string;
+  updatedAt: string;
+}
 

@@ -89,6 +89,7 @@ Requirements:
 - The Engine must be constructed with:
   - `hostRuntime.connectorAction` (and usually `hostRuntime.llm` for the LLM node)
   - `runtimeEnv.AGENT_ID` and `runtimeEnv.CONVERSATION_ID` (used by the default Agent blueprint)
+  - `runtimeEnv.ROOM_ID` (optional; present for room conversations and room threads)
 
 Example (as used by the default Agent blueprint):
 

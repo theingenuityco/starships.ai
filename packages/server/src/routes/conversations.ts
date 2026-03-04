@@ -1287,7 +1287,12 @@ router.post(
             return;
           }
 
-          const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
+          const runtimeEnv = buildAutopilotRuntimeEnv({
+            starshipId: conversation.starshipId,
+            conversationId,
+            roomId: roomConversationId || undefined,
+            agentId,
+          });
           const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
           const result = await executeToolBlueprint({
             blueprint: toolById.blueprint,
@@ -1362,7 +1367,12 @@ router.post(
         return;
       }
 
-      const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
+      const runtimeEnv = buildAutopilotRuntimeEnv({
+        starshipId: conversation.starshipId,
+        conversationId,
+        roomId: roomConversationId || undefined,
+        agentId,
+      });
       const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
 
       const bus = ConversationStreamBus.getInstance();

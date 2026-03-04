@@ -76,7 +76,11 @@ Runtime configuration and secrets
   - `llm` and `agent` require `hostRuntime.llm`
   - `connector_action` requires `hostRuntime.connectorAction`
 - Hosts may pass non-secret configuration via `Engine({ runtimeEnv })`. At runtime, templates can read these values via `env('KEY')` and Code nodes can read them via `ctx.env('KEY')`.
-- In the hosted Starships product, the server supplies `runtimeEnv` (for example `STARSHIP_ID`, `CONVERSATION_ID`, `SERVER_URL`) and a connector/LLM-capable `hostRuntime`. Blueprints never receive raw API keys or OAuth tokens.
+- In the hosted Starships product, the server supplies `runtimeEnv` (for example `STARSHIP_ID`, `CONVERSATION_ID`, `ROOM_ID`, `SERVER_URL`) and a connector/LLM-capable `hostRuntime`. Blueprints never receive raw API keys or OAuth tokens.
+  - `ROOM_ID` is **optional** and is only present for conversations that belong to a room:
+    - Room conversation: `ROOM_ID === CONVERSATION_ID`
+    - Room thread (child conversation): `ROOM_ID` is the parent room’s backing conversation id
+    - Outside a room: `ROOM_ID` is not set
 
 Binary handling (in-flight only)
 

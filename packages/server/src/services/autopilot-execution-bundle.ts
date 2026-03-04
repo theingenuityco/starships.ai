@@ -3,11 +3,18 @@ import type { EngineConfig } from '@starships/autopilot';
 import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
 import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
 
-export function buildAutopilotRuntimeEnv(args: { starshipId: string; conversationId: string; agentId: string }): Record<string, unknown> {
+export function buildAutopilotRuntimeEnv(args: {
+  starshipId: string;
+  conversationId: string;
+  /** Room id for room conversations + room threads; absent outside rooms. */
+  roomId?: string;
+  agentId: string;
+}): Record<string, unknown> {
   const env = getEnvConfig();
   return {
     STARSHIP_ID: args.starshipId,
     CONVERSATION_ID: args.conversationId,
+    ...(args.roomId ? { ROOM_ID: args.roomId } : {}),
     AGENT_ID: args.agentId,
     SERVER_URL: env.SERVER_URL,
   };

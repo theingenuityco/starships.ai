@@ -2506,9 +2506,13 @@ export class ConversationService {
 
       const env = getEnvConfig();
 
+      const roomCtx = await resolveRoomConversationContext({ conversationId: data.conversationId }).catch(() => null);
+      const roomId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: data.conversationId,
+        ...(roomId ? { ROOM_ID: roomId } : {}),
         // Used by internal Starships connector templates like:
         // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}
         SERVER_URL: env.SERVER_URL,
@@ -3058,9 +3062,13 @@ export class ConversationService {
 
       const env = getEnvConfig();
 
+      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
+      const roomId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+
       const runtimeEnv = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: conversationId,
+        ...(roomId ? { ROOM_ID: roomId } : {}),
         AGENT_ID: agentModel.id,
         // Used by internal Starships connector templates like:
         // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}

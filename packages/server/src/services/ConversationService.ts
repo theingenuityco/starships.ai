@@ -225,6 +225,8 @@ export class ConversationService {
   private suppressCompleteFor: Set<string> = new Set();
   // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
   private assistantPersistedThisTurn: Set<string> = new Set();
+  // Track if a usage row has been persisted for the current turn (provider or estimate)
+  private usagePersistedThisTurn: Set<string> = new Set();
   // When the user presses Stop, mark the conversation so we avoid persisting toolCalls without tool results.
   private stopRequestedForConversation: Set<string> = new Set();
   // Track which agent is currently producing streamed content for a conversation (for attribution)
@@ -541,6 +543,7 @@ export class ConversationService {
     // Per-turn persistence guards (no longer needed once the turn is complete/failed)
     this.assistantPersistedThisTurn.delete(conversationId);
     this.activeStreamPersisted.delete(conversationId);
+    this.usagePersistedThisTurn.delete(conversationId);
 
     // Also ensure we don't keep any outstanding cancellation handles around
     ConversationService.activeCancellations.delete(conversationId);
@@ -3076,9 +3079,7 @@ export class ConversationService {
       };
 
       // Load conversation-level state context (if any)
-      let conversationState = (
-        conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
-      ) as ConversationState;
+      let conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as ConversationState;
       if (conversation.parentConversationId) {
         conversationState = await this.ensureThreadContextFromLegacySeed({ conversationId, conversationState });
       }
@@ -3300,6 +3301,7 @@ export class ConversationService {
           cost: Number(computedCost ?? 0),
           ...(latest.model ? { model: latest.model } : {}),
         });
+        this.usagePersistedThisTurn.add(conversationId);
 
         // Also publish a turn.usage so the client can update UI immediately (best-effort).
         try {
@@ -3380,6 +3382,7 @@ export class ConversationService {
           cost: Number(computedCost ?? 0),
           ...(model ? { model } : {}),
         });
+        this.usagePersistedThisTurn.add(conversationId);
 
         // Publish turn.usage for UI (best-effort).
         try {
@@ -4378,6 +4381,7 @@ export class ConversationService {
                 cost: Number(computedCost ?? 0),
                 model: usagePayload.model,
               });
+              this.usagePersistedThisTurn.add(conversationId);
 
               // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
               this.latestStreamingUsage.delete(conversationId);
@@ -4885,6 +4889,94 @@ export class ConversationService {
           });
         } catch (err) {
           console.warn('[STREAMING] Failed to persist turn_completed state', err);
+        }
+
+        // Best-effort: if providers never emitted usage (no content_complete), estimate and persist now so totals update.
+        try {
+          if (!this.usagePersistedThisTurn.has(conversationId)) {
+            const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+            const starship = await this.getConversationStarship(conversationId);
+            if (starship) {
+              // Resolve model from active agent (best-effort) for cost estimation.
+              let model: string | undefined;
+              try {
+                const agent = this.currentAgentForConversation.get(conversationId);
+                if (agent?.id) {
+                  const agentService = new AgentService();
+                  const agentModel = await agentService.getAgent(agent.id).catch(() => null);
+                  const cfg = agentModel && typeof agentModel === 'object' ? (agentModel as unknown as Record<string, unknown>) : null;
+                  if (cfg && typeof cfg.model === 'string') {
+                    const m = cfg.model.trim();
+                    if (m) model = m;
+                  }
+                }
+              } catch {
+                /* best-effort */
+              }
+
+              // Use persisted messages (DB) for heuristic token estimates.
+              const page = await this.getConversationMessagesPage({ conversationId, limit: 30 }).catch(() => null);
+              const msgsRaw = page && typeof page === 'object' ? (page as Record<string, unknown>)['messages'] : undefined;
+              const msgs: Array<{ role?: unknown; content?: unknown }> = Array.isArray(msgsRaw)
+                ? (msgsRaw as Array<{ role?: unknown; content?: unknown }>)
+                : [];
+              const joined = msgs.map((m) => String(m?.content ?? '')).join('\n');
+              const promptTokens = ConversationService.estimateTokensFromText(joined);
+
+              let lastAssistantText = '';
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                const r = msgs[i]?.role;
+                if (r === 'assistant') {
+                  lastAssistantText = String(msgs[i]?.content ?? '');
+                  break;
+                }
+              }
+              const completionTokens = ConversationService.estimateTokensFromText(lastAssistantText);
+              const totalTokens = promptTokens + completionTokens;
+
+              const computedCost = await this.computeCostFromCatalog({ model, promptTokens, completionTokens });
+              await this.usageService.createUsageForTurn({
+                starshipId: starship.id,
+                conversationId,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                cost: Number(computedCost ?? 0),
+                ...(model ? { model } : {}),
+              });
+              this.usagePersistedThisTurn.add(conversationId);
+
+              // Publish turn.usage for UI (best-effort).
+              try {
+                const agent = this.currentAgentForConversation.get(conversationId);
+                await this.streamBus.publish(conversationId, {
+                  type: 'turn.usage',
+                  data: {
+                    conversationId,
+                    turnId,
+                    at: new Date().toISOString(),
+                    ...(agent?.id ? { agentId: agent.id } : {}),
+                    ...(agent?.name ? { agentName: agent.name } : {}),
+                    ...(model ? { model } : {}),
+                    usage: {
+                      promptTokens,
+                      completionTokens,
+                      totalTokens,
+                      ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
+                    },
+                  },
+                });
+              } catch {
+                /* best-effort */
+              }
+
+            }
+          }
+        } catch (e) {
+          console.warn('[USAGE] workflow_completed usage fallback failed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
 
         // Final cleanup now that the workflow turn has fully completed

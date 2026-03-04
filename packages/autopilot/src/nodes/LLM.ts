@@ -1140,6 +1140,23 @@ export class LLM extends BaseNode<LlmParams> {
         if (chunk.model && !responseMetadata.model) responseMetadata.model = chunk.model;
         if (chunk.created) responseMetadata.created = chunk.created;
 
+        // IMPORTANT: Some providers (including OpenAI/OpenRouter when stream_options.include_usage=true)
+        // send a final "usage-only" chunk with no choices. We must still capture usage from it.
+        if (chunk.usage) {
+          usage = this.normalizeUsage(chunk.usage);
+          // Track whether provider explicitly reported cost. If not, downstream (server) should compute cost from catalog.
+          try {
+            const u = chunk.usage as unknown as Record<string, unknown>;
+            const hasCost = typeof u.cost === 'number' && Number.isFinite(u.cost);
+            const costDetails = u.cost_details;
+            const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
+            const hasUpstream = cd ? typeof cd.upstream_inference_cost === 'number' && Number.isFinite(cd.upstream_inference_cost) : false;
+            lastUsageHadExplicitCost = hasCost || hasUpstream;
+          } catch {
+            lastUsageHadExplicitCost = false;
+          }
+        }
+
         const choice = chunk.choices[0];
         if (!choice) continue;
 
@@ -1435,22 +1452,6 @@ export class LLM extends BaseNode<LlmParams> {
 
         if (choice.finish_reason) {
           finishReason = choice.finish_reason;
-        }
-
-        // Extract usage if present
-        if (chunk.usage) {
-          usage = this.normalizeUsage(chunk.usage);
-          // Track whether provider explicitly reported cost. If not, downstream (server) should compute cost from catalog.
-          try {
-            const u = chunk.usage as unknown as Record<string, unknown>;
-            const hasCost = typeof u.cost === 'number' && Number.isFinite(u.cost);
-            const costDetails = u.cost_details;
-            const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
-            const hasUpstream = cd ? typeof cd.upstream_inference_cost === 'number' && Number.isFinite(cd.upstream_inference_cost) : false;
-            lastUsageHadExplicitCost = hasCost || hasUpstream;
-          } catch {
-            lastUsageHadExplicitCost = false;
-          }
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls

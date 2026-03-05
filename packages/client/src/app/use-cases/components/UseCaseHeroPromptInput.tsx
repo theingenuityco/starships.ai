@@ -142,9 +142,12 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
                   }}
                   className={cn(
                     'inline-flex items-center rounded-full px-5 py-2 text-sm font-semibold whitespace-nowrap',
-                    'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500',
-                    'shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px]',
-                    'transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    // Default: white pill with subtle border/shadow
+                    'text-slate-900 bg-white border border-slate-200 shadow-sm',
+                    // Hover/active: switch to 3D amber CTA style
+                    'hover:text-white hover:bg-gradient-to-b hover:from-amber-300 hover:via-amber-400 hover:to-amber-500 hover:border-transparent hover:shadow-[0_4px_0_0_rgba(180,83,9,1)]',
+                    'active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px]',
+                    'transition-colors transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
                   )}
                 >
                   {label}

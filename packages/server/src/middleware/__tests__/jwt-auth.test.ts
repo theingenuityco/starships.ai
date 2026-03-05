@@ -59,6 +59,7 @@ describe('optionalJwtAuth', () => {
 
     jest.mocked(UserService.getUserById).mockResolvedValue({
       id: 'user123',
+      slug: 'user123-abcd',
       createdAt: new Date().toISOString(),
       hasPassword: false,
       authMethods: ['password'],

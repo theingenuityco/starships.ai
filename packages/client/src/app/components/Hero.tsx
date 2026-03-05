@@ -92,20 +92,16 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
-    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pt-10 sm:pt-12 pb-10 sm:pb-12 overflow-hidden">
+    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pb-10 sm:pb-12 overflow-hidden">
       {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
         aria-hidden
         style={{
-          backgroundImage: "url('/landing/astro-bg.svg')",
+          backgroundImage: "url('/landing/astro-base.svg')",
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center bottom',
-          // Full-width astro base, keep aspect ratio.
           backgroundSize: 'cover',
-          // Fade the top of the illustration into the background sky.
-          maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 100%)',
-          WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 100%)',
         }}
       />
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
@@ -126,7 +122,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             </span>
             .
           </h1>
-          <p className="text-base sm:text-lg text-white/80 mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+          <p className="text-base sm:text-lg text-white/80 mb-5 md:mb-7 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">

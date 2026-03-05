@@ -663,11 +663,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
 
   return (
     <div className="relative isolate w-full overflow-visible text-left">
-      <div className="absolute inset-0 -z-10 rounded-2xl video-glow opacity-80 pointer-events-none" aria-hidden />
-      <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-90 pointer-events-none" aria-hidden />
-
       {/* Use light chat theme locally so the demo matches bright in-app conversations */}
-      <div className="star-theme-light relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
+      <div className="star-theme-light relative z-10 mb-12 md:mb-16 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
         <div
           className="relative w-full"
           style={{

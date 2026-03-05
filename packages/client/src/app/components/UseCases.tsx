@@ -7,17 +7,21 @@ import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 
 export default function UseCases() {
   return (
-    <section className="relative pt-5 pb-8 px-4 bg-background">
+    <section className="relative pt-0 pb-0 px-4 bg-[#FBF5ED] text-slate-900">
       <div className="relative max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Deploy agents, add tools, and collaborate in one workspace.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center text-slate-900">How it works?</h2>
+        <p className="text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto mb-10 md:mb-14">
+          Deploy agents, add tools, and collaborate in one workspace.
+        </p>
 
         {/* Deploy your agent */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">1. Deploy agents</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Deploy agentic teams of specialists to get the job done.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-slate-900">1. Deploy agents</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-slate-600 leading-relaxed max-w-2xl text-pretty">
+                Deploy agentic teams of specialists to get the job done.
+              </p>
             </div>
 
             <div className="py-8 sm:py-10">
@@ -32,8 +36,8 @@ export default function UseCases() {
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">2. Connect your apps</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Integrate with apps you already use.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-slate-900">2. Connect your apps</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-slate-600 leading-relaxed max-w-2xl text-pretty">Integrate with apps you already use.</p>
             </div>
 
             <div className="py-8 sm:py-10">
@@ -86,8 +90,10 @@ export default function UseCases() {
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-4 md:mb-5">
-              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">3. Schedule repetitive tasks</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Schedule agents. Review and approve.</p>
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-slate-900">3. Schedule repetitive tasks</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-slate-600 leading-relaxed max-w-2xl text-pretty">
+                Schedule agents. Review and approve.
+              </p>
             </div>
 
             <div className="py-8 sm:py-10">

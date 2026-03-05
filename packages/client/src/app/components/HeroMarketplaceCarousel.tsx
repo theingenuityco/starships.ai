@@ -117,7 +117,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   }
 
   return (
-    <div ref={containerRef} className="w-full max-w-6xl mx-auto mt-4 sm:mt-6 mb-14 sm:mb-16">
+    <div ref={containerRef} className="w-full mt-3 sm:mt-4 mb-3 sm:mb-4">
       <Carousel
         className="w-full px-2 sm:px-4 md:px-8"
         opts={{ loop: true, align: 'center' }}

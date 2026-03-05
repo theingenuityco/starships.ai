@@ -311,6 +311,26 @@ export async function invokeBedrock(
     // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
   }
 
+  // Provider-side attribution (best-effort).
+  // For Claude on Bedrock, model-specific request fields may accept Anthropic-style `metadata.user_id`.
+  try {
+    const endUserIdRaw = (request as unknown as { endUserId?: unknown }).endUserId;
+    const endUserId = typeof endUserIdRaw === 'string' ? endUserIdRaw.trim().slice(0, 64) : '';
+    const looksLikeClaude =
+      (typeof providerModelId === 'string' && providerModelId.toLowerCase().includes('claude')) ||
+      (typeof request.model === 'string' && request.model.toLowerCase().includes('anthropic/claude'));
+    if (endUserId && looksLikeClaude) {
+      const cur = (input.additionalModelRequestFields ?? {}) as Record<string, unknown>;
+      const existingMeta = cur.metadata && typeof cur.metadata === 'object' && !Array.isArray(cur.metadata) ? (cur.metadata as Record<string, unknown>) : {};
+      input.additionalModelRequestFields = {
+        ...(cur as AdditionalModelRequestFields),
+        metadata: { ...existingMeta, user_id: endUserId },
+      } as AdditionalModelRequestFields;
+    }
+  } catch {
+    // best-effort only
+  }
+
   // If thinking is not enabled, forward sampling params as-is.
   if (!input.additionalModelRequestFields?.thinking) {
     if (typeof request.temperature === 'number') inferenceConfig.temperature = request.temperature;

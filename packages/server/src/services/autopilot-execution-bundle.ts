@@ -8,6 +8,8 @@ export function buildAutopilotRuntimeEnv(args: {
   conversationId: string;
   /** Room id for room conversations + room threads; absent outside rooms. */
   roomId?: string;
+  /** Authenticated user id for provider-side attribution (opaque, stable). */
+  authUserId?: string;
   agentId: string;
   /**
    * Optional id of the assistant message that contains the currently executing tool call.
@@ -20,6 +22,7 @@ export function buildAutopilotRuntimeEnv(args: {
     STARSHIP_ID: args.starshipId,
     CONVERSATION_ID: args.conversationId,
     ...(args.roomId ? { ROOM_ID: args.roomId } : {}),
+    ...(typeof args.authUserId === 'string' && args.authUserId.trim().length > 0 ? { AUTH_USER_ID: args.authUserId.trim() } : {}),
     AGENT_ID: args.agentId,
     ...(args.toolCallMessageId ? { TOOL_CALL_MESSAGE_ID: args.toolCallMessageId } : {}),
     SERVER_URL: env.SERVER_URL,
@@ -94,6 +97,15 @@ export async function buildAutopilotExecutionBundle(args: {
   engineConfig: AutopilotRunnerExecuteConfig;
 }> {
   const env = getEnvConfig();
+  // Ensure provider-side end-user attribution is always available to the runner/LLM node.
+  // This should be an opaque internal id (no direct PII).
+  try {
+    if (typeof args.authUserId === 'string' && args.authUserId.trim().length > 0) {
+      args.runtimeEnv = { ...args.runtimeEnv, AUTH_USER_ID: args.authUserId.trim() };
+    }
+  } catch {
+    // best-effort only
+  }
 
   const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
   const { connectorTemplates, connectorSessions, connectorMetadata } = await sessionSvc.build(args.starshipId, args.authUserId);

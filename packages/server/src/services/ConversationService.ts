@@ -2539,6 +2539,8 @@ export class ConversationService {
       if (!authUserId) {
         throw new Error('Missing authUserId for connector_action session build');
       }
+      // Expose end-user id to the LLM host runtime for provider-side attribution (abuse detection / caching).
+      runtimeEnv.AUTH_USER_ID = authUserId;
       const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
         starshipId: starship.id,
         authUserId,

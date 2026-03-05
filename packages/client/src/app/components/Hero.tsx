@@ -92,13 +92,26 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
-    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pt-10 sm:pt-12 pb-10 sm:pb-12">
+    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pt-10 sm:pt-12 pb-10 sm:pb-12 overflow-hidden">
+      {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
+        aria-hidden
+        style={{
+          backgroundImage: "url('/landing/astro-bg.svg')",
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center bottom',
+          // Full-width astro base, keep aspect ratio.
+          backgroundSize: 'cover',
+          // Fade the top of the illustration into the background sky.
+          maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 100%)',
+          WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 35%, rgba(0,0,0,0) 100%)',
+        }}
+      />
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
-            Team chat,
-            <br className="hidden md:block" />
-            powered by{' '}
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[32ch] mx-auto break-words text-balance">
+            Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
               <span className="warp-letter">I</span>

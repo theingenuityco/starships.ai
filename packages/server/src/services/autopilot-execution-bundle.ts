@@ -9,6 +9,11 @@ export function buildAutopilotRuntimeEnv(args: {
   /** Room id for room conversations + room threads; absent outside rooms. */
   roomId?: string;
   agentId: string;
+  /**
+   * Optional id of the assistant message that contains the currently executing tool call.
+   * This is resolved server-side per toolCallId and is safe to treat as per-tool-call context.
+   */
+  toolCallMessageId?: string;
 }): Record<string, unknown> {
   const env = getEnvConfig();
   return {
@@ -16,6 +21,7 @@ export function buildAutopilotRuntimeEnv(args: {
     CONVERSATION_ID: args.conversationId,
     ...(args.roomId ? { ROOM_ID: args.roomId } : {}),
     AGENT_ID: args.agentId,
+    ...(args.toolCallMessageId ? { TOOL_CALL_MESSAGE_ID: args.toolCallMessageId } : {}),
     SERVER_URL: env.SERVER_URL,
   };
 }

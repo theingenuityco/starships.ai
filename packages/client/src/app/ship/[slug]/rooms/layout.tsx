@@ -258,7 +258,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   }, [activeConversationId])
 
   const routeThreadKey = useMemo(() => {
-    // In canonical nested routing, `threadId` is only used when `conversationId` is present.
     const raw = typeof routeParams.threadId === 'string' ? routeParams.threadId : ''
     const v = String(raw || '').trim()
     return v.length > 0 ? v : null
@@ -269,21 +268,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const v = String(raw || '').trim()
     return v.length > 0 ? v : null
   }, [routeParams.conversationId])
-
-  // Legacy route: /rooms/:roomSlug/thread/:threadId (used to represent the room's child conversation).
-  const legacyConversationKeyFromRoute = useMemo(() => {
-    if (routeConversationKey) return null
-    const raw = typeof routeParams.threadId === 'string' ? routeParams.threadId : ''
-    const v = String(raw || '').trim()
-    return v.length > 0 ? v : null
-  }, [routeConversationKey, routeParams.threadId])
-
-  // Back-compat: older room UI used `?thread=` to open a room child conversation.
-  const legacyConversationKeyFromQuery = useMemo(() => {
-    const raw = searchParams.get('thread')
-    const v = typeof raw === 'string' ? raw.trim() : ''
-    return v.length > 0 ? v : null
-  }, [searchParams])
 
   const viewKey = useMemo(() => {
     const raw = searchParams.get('view')
@@ -297,7 +281,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
   const isResourcesPaneOpen = roomPaneKey === 'resources'
-  const paneKind = (isResourcesPaneOpen ? 'resources' : null) as 'resources' | null
+  const threadKey = routeThreadKey
+  const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : null) as 'thread' | 'resources' | null
   const isSidePaneOpen = Boolean(paneKind)
   const PANE_ANIM_MS = 300
   const PANE_OPEN_CONTENT_DELAY_MS = 120
@@ -319,8 +304,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return () => window.clearTimeout(t)
   }, [isSidePaneOpen])
 
-  const threadKey = routeThreadKey
-  const conversationKey = routeConversationKey ?? legacyConversationKeyFromRoute ?? legacyConversationKeyFromQuery
+  const conversationKey = routeConversationKey
   const isDraftConversationOpen = conversationKey === 'draft'
   const conversationConversationId = useMemo(() => {
     if (!conversationKey) return null
@@ -343,11 +327,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const setConversationKeyInUrl = useCallback(
     (nextConversationKey: string | null) => {
+      // Only preserve room-relevant query params; pane/thread/view are mutually exclusive UI states.
+      const qs = ''
       if (nextConversationKey) {
-        router.push(`${roomBasePath}/conversation/${encodeURIComponent(String(nextConversationKey))}`)
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(String(nextConversationKey))}${qs ? `?${qs}` : ''}`)
         return
       }
-      router.push(roomBasePath)
+      router.push(`${roomBasePath}${qs ? `?${qs}` : ''}`)
     },
     [router, roomBasePath]
   )
@@ -356,11 +342,12 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     (nextThreadKey: string | null) => {
       const parentConversationId = typeof conversationConversationId === 'string' ? conversationConversationId.trim() : ''
       if (!parentConversationId) return
+      const qs = ''
       if (nextThreadKey) {
-        router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}/thread/${encodeURIComponent(String(nextThreadKey))}`)
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}/thread/${encodeURIComponent(String(nextThreadKey))}${qs ? `?${qs}` : ''}`)
         return
       }
-      router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}`)
+      router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}${qs ? `?${qs}` : ''}`)
     },
     [conversationConversationId, router, roomBasePath]
   )
@@ -371,13 +358,11 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       if (nextViewKey) next.set('view', nextViewKey)
       else next.delete('view')
       next.delete('pane')
-      next.delete('thread')
       const qs = next.toString()
-      const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
+      const basePath = conversationConversationId ? `${roomBasePath}/conversation/${encodeURIComponent(String(conversationConversationId))}` : roomBasePath
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
-    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+    [conversationConversationId, roomBasePath, router, searchParams]
   )
 
   const setRoomPaneInUrl = useCallback(
@@ -386,32 +371,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       if (nextPaneKey) next.set('pane', nextPaneKey)
       else next.delete('pane')
       next.delete('view')
-      next.delete('thread')
       const qs = next.toString()
-      const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
+      // Preserve the open conversation, but always close nested threads when switching panes.
+      const basePath = conversationConversationId ? `${roomBasePath}/conversation/${encodeURIComponent(String(conversationConversationId))}` : roomBasePath
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
-    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+    [conversationConversationId, roomBasePath, router, searchParams]
   )
-
-  useEffect(() => {
-    // Canonicalize legacy route `/thread/:id` into `/conversation/:id`.
-    const legacy = typeof legacyConversationKeyFromRoute === 'string' ? legacyConversationKeyFromRoute.trim() : ''
-    if (!legacy) return
-    if (routeConversationKey) return
-    if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
-    router.replace(`${roomBasePath}/conversation/${encodeURIComponent(String(legacy))}`)
-  }, [legacyConversationKeyFromRoute, roomBasePath, routeConversationKey, routeParams.roomSlug, router])
-
-  useEffect(() => {
-    // Canonicalize legacy `?thread=` query into `/conversation/:id` when no explicit route selection exists.
-    const legacy = typeof legacyConversationKeyFromQuery === 'string' ? legacyConversationKeyFromQuery.trim() : ''
-    if (!legacy) return
-    if (conversationKey) return
-    if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
-    router.replace(`${roomBasePath}/conversation/${encodeURIComponent(String(legacy))}`)
-  }, [conversationKey, legacyConversationKeyFromQuery, roomBasePath, routeParams.roomSlug, router])
 
   // Default parent for draft conversations is the active room conversation id.
   useEffect(() => {
@@ -745,62 +711,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       }}
     >
       <div className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}>
-        {activeConversationId && conversationKey && threadKey ? (
-          <ThreadPane
-            starshipId={starshipData.id}
-            starshipSlug={routeParams.slug}
-            conversationId={threadConversationId}
-            roomConversationId={activeConversationId}
-            pinnedFirstMessage={threadPinnedFirstMessage}
-            draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-            draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-            selectedAgent={threadAgent}
-            onAgentChange={setThreadAgent}
-            onThreadCreated={handleThreadCreated}
-            onClose={handleCloseThread}
-            allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
-            allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
-            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
-            contentWidth="constrained"
-            titlePrefix={
-              <button
-                type="button"
-                className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-                onClick={handleCloseThread}
-                aria-label="Back to conversation"
-                title="Back to conversation"
-              >
-                <Icon name="arrow-left" className="h-4 w-4" />
-              </button>
-            }
-            titlePrepend={
-              <span className="inline-flex items-center whitespace-nowrap text-foreground">
-                <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
-                <span className="mx-1">/</span>
-              </span>
-            }
-            mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
-            titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
-            rightSlot={
-              <div className="flex items-center gap-2">
-                <RoomParticipantsButton
-                  starshipId={starshipData.id}
-                  roomConversationId={activeConversationId}
-                  roomIsPrivate={Boolean(activeRoom?.isPrivate)}
-                  starshipOwnerId={starshipOwnerId}
-                />
-                {canManagePins || hasAnyResources ? (
-                  <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
-                    <Icon name="pin" className="h-4 w-4 mr-1" />
-                    Resources
-                  </Button>
-                ) : null}
-              </div>
-            }
-            hideCloseButton={true}
-            className="h-full"
-          />
-        ) : activeConversationId && conversationKey ? (
+        {activeConversationId && conversationKey ? (
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
@@ -942,7 +853,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
         ) : null}
       </div>
 
-      {/* Resources split pane (desktop/tablet) - match Channels thread pane behavior */}
+      {/* Right side pane (desktop/tablet): thread or resources */}
       <>
         <div
           className={`hidden md:block h-full flex-shrink-0 ${isResizingResourcesPane ? '' : 'transition-all duration-300 ease-in-out'}`}
@@ -976,7 +887,26 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
           <div className="h-full pl-[1px]">
             {isSidePaneMounted ? (
-              paneKind === 'resources' ? (
+              paneKind === 'thread' ? (
+                <ThreadPane
+                  starshipId={starshipData.id}
+                  starshipSlug={routeParams.slug}
+                  conversationId={threadConversationId}
+                  roomConversationId={activeConversationId}
+                  pinnedFirstMessage={threadPinnedFirstMessage}
+                  draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+                  draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+                  selectedAgent={threadAgent}
+                  onAgentChange={setThreadAgent}
+                  onThreadCreated={handleThreadCreated}
+                  onClose={handleCloseThread}
+                  allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+                  allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+                  allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+                  contentWidth="constrained"
+                  className="w-full min-w-0"
+                />
+              ) : paneKind === 'resources' ? (
                 <RoomResourcesPane
                   starshipId={starshipData.id}
                   starshipSlug={routeParams.slug}
@@ -1010,13 +940,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                 />
               ) : null
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
             )}
           </div>
         </aside>
       </>
 
-      {/* Resources full-screen overlay (mobile) */}
+      {/* Right side pane overlay (mobile) */}
       <aside
         className={cn('md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden', isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
         style={{
@@ -1026,7 +956,26 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
         aria-hidden={!isSidePaneOpen}
       >
         {isSidePaneMounted ? (
-          paneKind === 'resources' ? (
+          paneKind === 'thread' ? (
+            <ThreadPane
+              starshipId={starshipData.id}
+              starshipSlug={routeParams.slug}
+              conversationId={threadConversationId}
+              roomConversationId={activeConversationId}
+              pinnedFirstMessage={threadPinnedFirstMessage}
+              draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+              draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+              selectedAgent={threadAgent}
+              onAgentChange={setThreadAgent}
+              onThreadCreated={handleThreadCreated}
+              onClose={handleCloseThread}
+              allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+              allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+              allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+              contentWidth="constrained"
+              className="h-full w-full"
+            />
+          ) : paneKind === 'resources' ? (
             <RoomResourcesPane
               starshipId={starshipData.id}
               starshipSlug={routeParams.slug}
@@ -1060,7 +1009,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             />
           ) : null
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
         )}
       </aside>
 

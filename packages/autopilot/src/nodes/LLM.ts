@@ -818,35 +818,13 @@ export class LLM extends BaseNode<LlmParams> {
     return list.map((m) => this.convertMessageToOpenAI(m));
   }
 
-  private sanitizeOpenAIName(name: unknown): string | undefined {
-    if (typeof name !== 'string') return undefined;
-    const raw = name.trim();
-    if (!raw) return undefined;
-    // OpenAI expects <=64 chars and a restricted charset; keep it conservative for OpenRouter too.
-    const safe = raw
-      .replace(/[^a-zA-Z0-9_-]+/g, '_')
-      .replace(/_+/g, '_')
-      .slice(0, 64);
-    return safe || undefined;
-  }
-
-  private nameFromStarshipsMeta(meta: unknown): string | undefined {
-    if (!meta || typeof meta !== 'object') return undefined;
-    const m = meta as Record<string, unknown>;
-    const authorType = typeof m.authorType === 'string' ? m.authorType : '';
-    const authorId = typeof m.authorId === 'string' ? m.authorId : '';
-    if (!authorId) return undefined;
-    const safeId = this.sanitizeOpenAIName(authorId);
-    if (!safeId) return undefined;
-    const prefix = authorType === 'agent' ? 'a_' : authorType === 'user' ? 'u_' : 'x_';
-    return `${prefix}${safeId}`.slice(0, 64);
-  }
-
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
     const mRec = m as unknown as Record<string, unknown>;
-    const name = this.nameFromStarshipsMeta(m.starshipsMeta ?? mRec['starshipsMeta']);
+    // IMPORTANT:
+    // Do NOT send per-message `name` to providers. Some aggregators forward it to non-OpenAI models
+    // by rewriting message content (e.g. `{name}: {content}`), which makes attribution visible to the LLM.
 
     // OpenRouter reasoning preservation extension (only some providers accept these fields).
     // We attach them only on assistant messages, and downstream host runtimes that can't accept
@@ -922,7 +900,6 @@ export class LLM extends BaseNode<LlmParams> {
         content: getStringContent(),
         tool_calls: toolCalls,
         ...(reasoningForProvider as Record<string, unknown>),
-        ...(name ? { name } : {}),
       } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
@@ -957,14 +934,13 @@ export class LLM extends BaseNode<LlmParams> {
         role: 'assistant',
         content: getStringContent(),
         ...(reasoningForProvider as Record<string, unknown>),
-        ...(name ? { name } : {}),
       } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
     // USER MESSAGE: Support multimodal content (images, etc.)
     // If content is already an array of ContentBlocks, pass directly.
     // OpenAI SDK supports both string and ContentPart[] for user messages.
-    return { role: 'user', content: contentVal, ...(name ? { name } : {}) } as OpenAI.Chat.ChatCompletionUserMessageParam;
+    return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
   /**

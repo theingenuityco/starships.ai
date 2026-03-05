@@ -22,6 +22,7 @@ import {
   TurnRepository,
   LlmModelRepository,
   DirectMessageRepository,
+  UserRepository,
   getConnection,
 } from '@starships/models';
 import {
@@ -138,6 +139,7 @@ export class ConversationService {
   }
   private conversationRepository!: ConversationRepository;
   private agentRepository!: AgentRepository;
+  private userRepository!: UserRepository;
   private messageService!: MessageService;
   private turnRepository!: TurnRepository;
   private streamBus!: ConversationStreamBus;
@@ -257,6 +259,7 @@ export class ConversationService {
     }
     this.conversationRepository = new ConversationRepository();
     this.agentRepository = new AgentRepository();
+    this.userRepository = new UserRepository();
     this.messageService = new MessageService();
     this.turnRepository = new TurnRepository();
     this.llmModelRepository = new LlmModelRepository();
@@ -928,6 +931,66 @@ export class ConversationService {
     const userId = typeof message.userId === 'string' ? message.userId.trim() : '';
     if (!userId) return null;
     return { authorType: 'user', authorId: userId, ...(createdAt ? { createdAt } : null) };
+  }
+
+  private async buildAttributionDirectory(messages: MessageModel[]): Promise<{
+    usersById: Map<string, { displayName?: string; slug?: string }>;
+    agentsById: Map<string, { name?: string; slug?: string }>;
+  }> {
+    const list = Array.isArray(messages) ? messages : [];
+    const userIds = new Set<string>();
+    const agentIds = new Set<string>();
+
+    for (const m of list) {
+      const role = String(m?.role ?? '');
+      if (role === 'user') {
+        const uid = typeof m.userId === 'string' ? m.userId.trim() : '';
+        if (uid) userIds.add(uid);
+      } else if (role === 'assistant') {
+        const aid = typeof m.agentId === 'string' ? m.agentId.trim() : '';
+        if (aid) agentIds.add(aid);
+      }
+    }
+
+    const usersById = new Map<string, { displayName?: string; slug?: string }>();
+    const agentsById = new Map<string, { name?: string; slug?: string }>();
+
+    await Promise.all([
+      Promise.all(
+        Array.from(userIds).map(async (id) => {
+          try {
+            const u = await this.userRepository.findById(id).catch(() => null);
+            if (!u) return;
+            const displayName = typeof u.displayName === 'string' ? u.displayName.trim() : '';
+            const slug = typeof u.slug === 'string' ? u.slug.trim() : '';
+            usersById.set(id, {
+              ...(displayName ? { displayName } : {}),
+              ...(slug ? { slug } : {}),
+            });
+          } catch {
+            // ignore best-effort
+          }
+        })
+      ),
+      Promise.all(
+        Array.from(agentIds).map(async (id) => {
+          try {
+            const a = await this.agentRepository.findById(id).catch(() => null);
+            if (!a) return;
+            const name = typeof a.name === 'string' ? a.name.trim() : '';
+            const slug = typeof a.slug === 'string' ? a.slug.trim() : '';
+            agentsById.set(id, {
+              ...(name ? { name } : {}),
+              ...(slug ? { slug } : {}),
+            });
+          } catch {
+            // ignore best-effort
+          }
+        })
+      ),
+    ]);
+
+    return { usersById, agentsById };
   }
 
   private stripEchoedAttributionHeadersFromText(text: string): { stripped: number; text: string } {
@@ -1979,7 +2042,14 @@ export class ConversationService {
    * - We only inject metadata for `role=user|assistant` (system/tool messages are left unchanged).
    * - For multimodal `ContentBlock[]`, we prepend to the FIRST text block (which `buildMessageContent` guarantees).
    */
-  private injectAttributionIntoContent(message: MessageModel, content: MessageContent): MessageContent {
+  private injectAttributionIntoContent(
+    message: MessageModel,
+    content: MessageContent,
+    directory?: {
+      usersById: Map<string, { displayName?: string; slug?: string }>;
+      agentsById: Map<string, { name?: string; slug?: string }>;
+    }
+  ): MessageContent {
     const role = message?.role;
     if (role !== 'user' && role !== 'assistant') return content;
 
@@ -1987,21 +2057,38 @@ export class ConversationService {
     // Always use ISO UTC (includes trailing 'Z') for consistency.
     const at = atDate.toISOString();
 
-    const sender =
-      role === 'user'
-        ? typeof message.userName === 'string' && message.userName.trim().length > 0
-          ? message.userName.trim()
-          : typeof message.userId === 'string' && message.userId.trim().length > 0
-            ? `user:${message.userId.slice(0, 8)}`
-            : 'User'
-        : typeof message.agentName === 'string' && message.agentName.trim().length > 0
-          ? message.agentName.trim()
-          : typeof message.agentId === 'string' && message.agentId.trim().length > 0
-            ? `agent:${message.agentId.slice(0, 8)}`
-            : 'Assistant';
+    const sanitizeInline = (value: string, max = 64): string => {
+      const s = String(value || '').replace(/\s+/g, ' ').trim();
+      if (!s) return '';
+      return s.length > max ? s.slice(0, max) : s;
+    };
 
-    const senderWithType = `${sender} (${role === 'assistant' ? 'agent' : 'user'})`;
-    const prefix = `[${at}] ${senderWithType}`;
+    const userId = typeof message.userId === 'string' ? message.userId.trim() : '';
+    const agentId = typeof message.agentId === 'string' ? message.agentId.trim() : '';
+
+    const displayName =
+      role === 'user'
+        ? sanitizeInline(
+            directory?.usersById.get(userId || '')?.displayName ||
+              (typeof message.userName === 'string' ? message.userName.trim() : '') ||
+              (userId ? `user:${userId.slice(0, 8)}` : 'User'),
+            80
+          )
+        : sanitizeInline(
+            directory?.agentsById.get(agentId || '')?.name ||
+              (typeof message.agentName === 'string' ? message.agentName.trim() : '') ||
+              (agentId ? `agent:${agentId.slice(0, 8)}` : 'Assistant'),
+            80
+          );
+
+    const slug =
+      role === 'user'
+        ? sanitizeInline(directory?.usersById.get(userId || '')?.slug || '', 80) || (userId ? `u_${userId.slice(0, 8)}` : '')
+        : sanitizeInline(directory?.agentsById.get(agentId || '')?.slug || '', 80) || (agentId ? `a_${agentId.slice(0, 8)}` : '');
+
+    const sender = slug ? `${displayName} (${slug})` : displayName;
+
+    const prefix = `[${at}] ${sender}`;
 
     const firstNonEmptyLine = (text: string): string => {
       const s = typeof text === 'string' ? text : '';
@@ -2021,10 +2108,16 @@ export class ConversationService {
     // This keeps prompts clean and prevents runaway repetition over long conversations.
     const looksLikeBracketTs = (line: string): boolean => /^\[\d{4}-\d{2}-\d{2}T/.test(line);
     const shouldSkipDueToExisting = (() => {
+      const nameNeedle = String(displayName || '').trim();
+      const slugNeedle = String(slug || '').trim();
       const senderLabel = String(sender || '').trim();
       if (typeof content === 'string') {
         const first = firstNonEmptyLine(content);
-        return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
+        if (!looksLikeBracketTs(first)) return false;
+        if (senderLabel && first.includes(senderLabel)) return true;
+        // Back-compat: older headers may only contain the display name.
+        if (nameNeedle && first.includes(nameNeedle) && (!slugNeedle || first.includes(slugNeedle))) return true;
+        return false;
       }
       if (Array.isArray(content)) {
         type TextBlock = { type: 'text'; text: string };
@@ -2037,7 +2130,10 @@ export class ConversationService {
         const firstText = content.find(isTextBlock);
         const txt = firstText?.text ?? '';
         const first = firstNonEmptyLine(String(txt || ''));
-        return Boolean(senderLabel && looksLikeBracketTs(first) && first.includes(senderLabel));
+        if (!looksLikeBracketTs(first)) return false;
+        if (senderLabel && first.includes(senderLabel)) return true;
+        if (nameNeedle && first.includes(nameNeedle) && (!slugNeedle || first.includes(slugNeedle))) return true;
+        return false;
       }
       return false;
     })();
@@ -2051,7 +2147,9 @@ export class ConversationService {
       const line = lines[i];
       if (!looksLikeBracketTs(line)) return s;
       // Only rewrite headers that look like our injected format for this sender.
-      if (!line.includes(senderWithType) && !line.includes(String(sender || '').trim())) return s;
+      // (Back-compat: older headers may have included "(user)" / "(agent)" after the sender.)
+      if (!line.includes(String(sender || '').trim()) && !(String(displayName || '').trim() && line.includes(String(displayName || '').trim())))
+        return s;
       const m = line.match(/^\[([^\]]+)\]\s+(.*)$/);
       if (!m) return s;
       const d = new Date(m[1]);
@@ -2653,6 +2751,7 @@ export class ConversationService {
 
         // Exclude persisted system messages from LLM history. System instructions must come only from
         // the canonical system prompt for provider-stable semantics.
+        const attributionDirectory = await this.buildAttributionDirectory(messages);
         const llmMessagesCore: LlmMessage[] = await Promise.all(
           ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
@@ -2660,7 +2759,7 @@ export class ConversationService {
             const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
             const contentStripped = strippedInfo.content;
             const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameByRef, userNameByRef });
-            const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
+            const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions, attributionDirectory);
 
             const effectiveRole = (() => {
               const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';
@@ -3028,13 +3127,14 @@ export class ConversationService {
       })();
       // Exclude persisted system messages from LLM history. System instructions must come only from
       // the canonical system prompt for provider-stable semantics.
+      const attributionDirectory = await this.buildAttributionDirectory(messages);
       const llmMessagesCore: LlmMessage[] = await Promise.all(
         ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
           const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
           const contentStripped = strippedInfo.content;
           const contentWithMentions = this.replaceMentionTokensInContent({ content: contentStripped, agentNameByRef, userNameByRef });
-          const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions);
+          const contentWithAttribution = this.injectAttributionIntoContent(msg, contentWithMentions, attributionDirectory);
           const baseMessage: LlmMessage = {
             role: (() => {
               const r = msg.role as 'user' | 'assistant' | 'system' | 'tool';

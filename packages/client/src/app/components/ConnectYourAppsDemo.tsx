@@ -63,7 +63,11 @@ export default function ConnectYourAppsDemo() {
                   const showLogo = !hiddenLogos[item.provider]
                   const src = getConnectorLogoSrc(item.provider)
                   return (
-                    <div key={key} className="flex items-center gap-3 px-3.5 py-3 rounded bg-black/20 border border-white/10 min-w-[200px]" aria-label={item.label}>
+                    <div
+                      key={key}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-lg bg-white/70 border border-slate-200/80 shadow-sm min-w-[200px]"
+                      aria-label={item.label}
+                    >
                       {showLogo ? (
                         <div className="flex h-10 w-10 items-center justify-center rounded bg-white border border-border/40">
                           <Image
@@ -78,7 +82,7 @@ export default function ConnectYourAppsDemo() {
                         <div className="flex h-10 w-10 items-center justify-center rounded bg-white/10 border border-white/10" />
                       )}
 
-                      <div className="min-w-0 text-sm sm:text-base text-white/80 truncate">{item.label}</div>
+                      <div className="min-w-0 text-sm sm:text-base text-slate-800 truncate">{item.label}</div>
                     </div>
                   )
                 })}

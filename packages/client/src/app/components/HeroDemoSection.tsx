@@ -29,9 +29,7 @@ export default function HeroDemoSection(props: { initialAgentTemplates?: AgentTe
       <div className="relative max-w-6xl mx-auto">
         <div className="mb-12 md:mb-16 text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-slate-900">See it in action</h2>
-          <p className="text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">
-            A quick demo conversation using the same chat experience as your starship.
-          </p>
+          <p className="text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">A quick demo conversation using the same chat experience as your starship.</p>
         </div>
 
         <div className="w-full text-left">

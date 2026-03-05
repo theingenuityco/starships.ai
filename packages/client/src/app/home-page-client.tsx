@@ -20,7 +20,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-[100dvh] bg-background relative">
+      <div className="min-h-[100dvh] bg-[#020617] relative">
         <StarryBackground />
         {/* Bottom glow for the whole landing page (decorative background, never above content).
             NOTE: This is the original footer glow – kept as-is. */}

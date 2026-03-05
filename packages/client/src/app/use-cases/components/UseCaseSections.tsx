@@ -80,7 +80,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                             <Button
                               asChild
                               size="sm"
-                              className="relative inline-flex items-center justify-center h-10 px-6 rounded-full text-sm font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[1px] transition"
+                              className="relative inline-flex items-center justify-center h-10 px-6 rounded-full text-sm font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] active:-translate-y-[1px] transition"
                             >
                               <Link href={useCase.primaryTemplateSlug ? `/explore/agents/${useCase.primaryTemplateSlug}` : '/explore/agents'}>
                                 Get Started
@@ -120,7 +120,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                 <Button
                   asChild
                   size="lg"
-                  className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:shadow-[0_2px_0_0_rgba(180,83,9,1)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(180,83,9,1)] active:translate-y-[1px] transition gap-2"
+                  className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition gap-2"
                 >
                   <Link href="/login">
                     Sign up free
@@ -216,7 +216,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                       asChild
                       size="lg"
                       variant="outline"
-                      className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[1px] transition border-0"
+                      className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] active:-translate-y-[1px] transition border-0"
                     >
                       <Link href={l.href}>
                         {l.label}

@@ -13,13 +13,17 @@ export const agentCallTool: ToolParams = {
   name: 'Call Agent',
   slug: 'call-agent',
   description:
-    'Delegate a message to another agent by slug using a linked child conversation (create a new child or continue an existing childConversationId). Returns the child conversation/message result.',
+    'Delegate a message to another agent using a linked child conversation (create a new child or continue an existing childConversationId). You can specify the agent by slug, @mention-like selector, name, or <@a:AGENT_ID> token. Returns the child conversation/message result.',
   parameters: {
     type: 'object',
     properties: {
       slug: {
         type: 'string',
-        description: 'Agent slug to call',
+        description: 'Agent selector to call (supports slug, @slug, @"Agent Name", @[Agent Name], or <@a:AGENT_ID>)',
+      },
+      agent: {
+        type: 'string',
+        description: 'Agent selector (e.g. slug, @slug, @"Agent Name", @[Agent Name], or <@a:AGENT_ID>)',
       },
       content: {
         type: 'string',
@@ -34,6 +38,7 @@ export const agentCallTool: ToolParams = {
         description: 'Optional parent conversation id. Defaults to the current conversation when available.',
       },
     },
+    // Keep slug required for back-compat with existing tool calls; `agent` is an optional alias.
     required: ['slug', 'content'],
   },
   blueprint: {
@@ -48,8 +53,9 @@ export const agentCallTool: ToolParams = {
           code: `
             async function main(ctx) {
               const input = ctx.input || {};
-              const slug = input.slug;
-              if (!slug || typeof slug !== 'string') throw new Error('slug is required');
+              const selectorRaw = (typeof input.agent === 'string' && input.agent) ? input.agent : input.slug;
+              const selector = typeof selectorRaw === 'string' ? String(selectorRaw).trim() : '';
+              if (!selector) throw new Error('agent (or slug) is required');
 
               const content = typeof input.content === 'string' ? input.content : '';
               if (!content) {
@@ -68,7 +74,7 @@ export const agentCallTool: ToolParams = {
               }
 
               return {
-                slug,
+                agent: selector,
                 parentConversationId,
                 childConversationId: typeof input.childConversationId === 'string' ? input.childConversationId : null,
                 content,
@@ -96,7 +102,7 @@ export const agentCallTool: ToolParams = {
           connector: 'starships',
           action: 'create-conversation',
           failOnNon2xx: true,
-          args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const slug = prep.slug || "";\n            const title = "Delegated • " + (slug || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: slug || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
+          args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const selector = prep.agent || "";\n            const title = "Delegated • " + (selector || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: selector || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
           timeout: 10000,
         },
       },

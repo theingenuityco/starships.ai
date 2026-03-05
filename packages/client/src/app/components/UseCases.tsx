@@ -7,7 +7,7 @@ import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 
 export default function UseCases() {
   return (
-    <section className="relative pt-10 pb-14 px-4 bg-background">
+    <section className="relative pt-5 pb-8 px-4 bg-background">
       <div className="relative max-w-7xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
         <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Deploy agents, add tools, and collaborate in one workspace.</p>

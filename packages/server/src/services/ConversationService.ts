@@ -3615,87 +3615,31 @@ export class ConversationService {
   private extractMentionedAgents(text: string, availableAgents: AgentModel[]): AgentModel[] {
     try {
       if (typeof text !== 'string' || text.length === 0) return [];
-      // Preferred: structured agent mentions emitted by the client composer.
+      // Structured agent mentions emitted by the client composer.
       // Format: <@a:AGENT_ID>
       //
       // IMPORTANT:
       // - User mentions are emitted as <@u:USER_ID> and must NEVER trigger agent execution.
-      // - If we detect structured tokens, we prioritize them and ignore legacy @slug parsing to avoid collisions.
+      // - Legacy plain-text parsing (e.g. @slug / @name / @all) is intentionally unsupported.
       const tokenRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
       const tokenMatches = Array.from(text.matchAll(tokenRe));
-      if (tokenMatches.length > 0) {
-        const byId = new Map<string, AgentModel>();
-        for (const a of availableAgents) {
-          if (a?.id) byId.set(String(a.id), a);
-        }
-        const seen: Set<string> = new Set();
-        const out: AgentModel[] = [];
-        for (const m of tokenMatches) {
-          const id = String(m[1] || '').trim();
-          if (!id || !ConversationService.isValidMentionId(id)) continue;
-          const agent = byId.get(id);
-          if (!agent) continue;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          out.push(agent);
-        }
-        return out;
-      }
+      if (tokenMatches.length === 0) return [];
 
-      // Strip any structured mention tokens (<@u:...>, <@a:...>) before legacy parsing so we don't accidentally
-      // treat "@u" or "@a" inside those tokens as an agent mention.
-      const legacyText = text.replace(/<@[^>\n]+>/g, ' ');
-      // Mentions:
-      // - Plain: @slug_or_name (no spaces)
-      // - Quoted: @"Display Name With Spaces"
-      // - Bracketed: @[Display Name With Spaces]
-      // - Special: @all
-      const mentionRe = /@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|(all)|([a-z0-9._-]{1,100}))/gi;
+      const byId = new Map<string, AgentModel>();
+      for (const a of availableAgents) {
+        if (a?.id) byId.set(String(a.id), a);
+      }
       const seen: Set<string> = new Set();
       const out: AgentModel[] = [];
-
-      const normalize = (s: string): string => s.toLowerCase().trim().replace(/\s+/g, '').replace(/[_.-]/g, '');
-      type Entry = { id: string; agent: AgentModel; nameKey: string; slugKey: string };
-      const entries: Entry[] = availableAgents.map((a) => ({
-        id: a.id,
-        agent: a,
-        nameKey: normalize((a as { name?: string }).name || ''),
-        slugKey: normalize((a as { slug?: string }).slug || ''),
-      }));
-
-      let m: RegExpExecArray | null;
-      const resolvedLog: Array<{ raw: string; matchedId?: string; strategy?: string }> = [];
-      while ((m = mentionRe.exec(legacyText)) !== null) {
-        const token = (m[1] || m[2] || m[3] || m[4] || '').toLowerCase();
-        const raw = token;
-        if (!raw) continue;
-        if (raw === 'all') {
-          for (const a of availableAgents) {
-            if (!seen.has(a.id)) {
-              seen.add(a.id);
-              out.push(a);
-            }
-          }
-          resolvedLog.push({ raw, strategy: 'all' });
-          continue;
-        }
-        const key = normalize(raw);
-        // SECURITY:
-        // Only allow exact resolution for legacy @mentions. Prefix/contains heuristics are ambiguous and can cause
-        // @admin-style collisions as the agent set changes over time.
-        const candidates = entries.filter((e) => e.nameKey === key || e.slugKey === key);
-        if (candidates.length !== 1) {
-          resolvedLog.push({ raw, strategy: candidates.length > 1 ? 'ambiguous-exact' : 'no-match' });
-          continue;
-        }
-        const chosen = candidates[0];
-        if (!seen.has(chosen.id)) {
-          seen.add(chosen.id);
-          out.push(chosen.agent);
-          resolvedLog.push({ raw, matchedId: chosen.id, strategy: 'exact' });
-        } else resolvedLog.push({ raw, matchedId: chosen.id, strategy: 'exact-duplicate' });
+      for (const m of tokenMatches) {
+        const id = String(m[1] || '').trim();
+        if (!id || !ConversationService.isValidMentionId(id)) continue;
+        const agent = byId.get(id);
+        if (!agent) continue;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        out.push(agent);
       }
-
       return out;
     } catch (err) {
       console.error('[ConversationService] Failed to resolve agents from conversation mentions', {

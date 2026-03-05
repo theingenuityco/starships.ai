@@ -874,19 +874,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             if (matched) {
               effectiveAgent = matched
             }
-          } else {
-            // Back-compat: plain-text leading @handle
-            const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-            if (mentionMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
-              const handle = mentionMatch[1]
-              const lower = handle.toLowerCase()
-              const matched =
-                (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
-              if (matched) {
-                effectiveAgent = matched
-                // Do NOT strip the leading mention; keep it in the message content
-              }
-            }
           }
         }
       }

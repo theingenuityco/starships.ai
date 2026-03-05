@@ -13,17 +13,13 @@ export const agentCallTool: ToolParams = {
   name: 'Call Agent',
   slug: 'call-agent',
   description:
-    'Delegate a message to another agent using a linked child conversation (create a new child or continue an existing childConversationId). You can specify the agent by slug, @mention-like selector, name, or <@a:AGENT_ID> token. Returns the child conversation/message result.',
+    'Delegate a message to another agent using a linked child conversation (create a new child or continue an existing childConversationId). Requires target agentId. Returns the child conversation/message result.',
   parameters: {
     type: 'object',
     properties: {
-      slug: {
+      agentId: {
         type: 'string',
-        description: 'Agent selector to call (supports slug, @slug, @"Agent Name", @[Agent Name], or <@a:AGENT_ID>)',
-      },
-      agent: {
-        type: 'string',
-        description: 'Agent selector (e.g. slug, @slug, @"Agent Name", @[Agent Name], or <@a:AGENT_ID>)',
+        description: 'Agent id to call',
       },
       content: {
         type: 'string',
@@ -38,8 +34,7 @@ export const agentCallTool: ToolParams = {
         description: 'Optional parent conversation id. Defaults to the current conversation when available.',
       },
     },
-    // Keep slug required for back-compat with existing tool calls; `agent` is an optional alias.
-    required: ['slug', 'content'],
+    required: ['agentId', 'content'],
   },
   blueprint: {
     nodes: [
@@ -53,9 +48,8 @@ export const agentCallTool: ToolParams = {
           code: `
             async function main(ctx) {
               const input = ctx.input || {};
-              const selectorRaw = (typeof input.agent === 'string' && input.agent) ? input.agent : input.slug;
-              const selector = typeof selectorRaw === 'string' ? String(selectorRaw).trim() : '';
-              if (!selector) throw new Error('agent (or slug) is required');
+              const agentId = typeof input.agentId === 'string' ? String(input.agentId).trim() : '';
+              if (!agentId) throw new Error('agentId is required');
 
               const content = typeof input.content === 'string' ? input.content : '';
               if (!content) {
@@ -74,7 +68,7 @@ export const agentCallTool: ToolParams = {
               }
 
               return {
-                agent: selector,
+                agentId,
                 parentConversationId,
                 childConversationId: typeof input.childConversationId === 'string' ? input.childConversationId : null,
                 content,
@@ -102,7 +96,7 @@ export const agentCallTool: ToolParams = {
           connector: 'starships',
           action: 'create-conversation',
           failOnNon2xx: true,
-          args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const selector = prep.agent || "";\n            const title = "Delegated • " + (selector || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: selector || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
+          args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const agentId = prep.agentId || "";\n            const title = "Delegated • " + (agentId || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentId: agentId || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
           timeout: 10000,
         },
       },

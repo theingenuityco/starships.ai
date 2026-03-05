@@ -48,7 +48,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
   return (
     <>
       {isLeadGeneration ? (
-        <section className="mt-8 sm:mt-10 bg-white dark:bg-slate-950" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
+        <section className="mt-0 bg-white dark:bg-slate-950" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
             <div>
               <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">{useCase.workflowsSectionHeading ?? 'Lead generation workflows'}</h2>

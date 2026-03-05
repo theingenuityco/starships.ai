@@ -51,15 +51,18 @@ export default async function LeadGenerationUseCasePage() {
     <StarTheme theme="light">
       <div className="min-h-screen bg-background relative">
         <div className="relative z-10">
-          <div className="fixed top-0 left-0 right-0 z-50">
-            <PublicHeader />
+          {/* Top band (nav + hero) uses dark/starry theme so nav text matches main landing */}
+          <div className="star-theme-dark dark">
+            <div className="fixed top-0 left-0 right-0 z-50">
+              <PublicHeader />
+            </div>
+            <div className="overflow-x-hidden">
+              <LeadGenerationHero useCase={useCase} typewriterPrompts={previewPrompts} previewPromptTitles={useCase.previewPromptTitles} />
+            </div>
           </div>
 
+          {/* Everything below stays on the original light / cream palette */}
           <main className="overflow-x-hidden">
-            {/* Dark navy + astro-base hero at the top */}
-            <LeadGenerationHero useCase={useCase} typewriterPrompts={previewPrompts} previewPromptTitles={useCase.previewPromptTitles} />
-
-            {/* Everything below stays on the original light / cream palette */}
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
               <UseCaseSections useCase={useCase} previewPrompts={previewPrompts} />
             </div>

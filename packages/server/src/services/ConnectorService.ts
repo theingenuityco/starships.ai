@@ -694,7 +694,7 @@ export class ConnectorService {
     // Built-in reserved connector: "system" (not DB-backed).
     // Mark it connected when required platform secrets are configured; otherwise disconnected.
     try {
-      const apiKey = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_BRIGHTDATA_API_KEY');
+      const apiKey = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_WEB_GATEWAY_API_KEY');
       const webFetchZone = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_WEBFETCH_ZONE');
       const webSearchZone = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_WEBSEARCH_ZONE');
       const configured =

@@ -16,7 +16,7 @@ function sanitizeDisallowedAgentMentions(args: {
   agentIdByRef: Map<string, string>;
 }): string {
   if (!args.disallowedAgentIds || args.disallowedAgentIds.size === 0) return args.content;
-  return String(args.content || '').replace(/<@a:([^>\s]{1,100})>/gi, (full, refRaw) => {
+  return String(args.content || '').replace(/<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi, (full, refRaw) => {
     const ref = String(refRaw || '').trim();
     const resolvedId = ref ? args.agentIdByRef.get(ref) : null;
     if (resolvedId && args.disallowedAgentIds.has(resolvedId)) return '';
@@ -43,7 +43,7 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
   const content = String(args.content || '');
   const { userRefs: mentionedUserRefs, agentRefs: mentionedAgentRefs } = parseMentionTokens(content);
 
-  const starshipId = String((ctx.room as any)?.starshipId || '').trim();
+  const starshipId = String(ctx.room?.starshipId || '').trim();
   const conn = getConnection();
 
   const uniq = (xs: string[]) => Array.from(new Set(xs.map((x) => String(x || '').trim()).filter(Boolean)));
@@ -57,7 +57,7 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
             `
             SELECT u.id, u.slug
               FROM users u
-             WHERE (u.id = ANY($2::text[]) OR u.slug = ANY($2::text[]))
+             WHERE u.slug = ANY($2::text[])
                AND (
                  u.id = (SELECT owner_id FROM starships WHERE id = $1)
                  OR EXISTS (SELECT 1 FROM starship_members sm WHERE sm.starship_id = $1 AND sm.user_id = u.id)
@@ -74,7 +74,7 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
             SELECT id, slug
               FROM agents
              WHERE starship_id = $1
-               AND (id = ANY($2::text[]) OR slug = ANY($2::text[]))
+               AND slug = ANY($2::text[])
             `,
             [starshipId, agentRefs]
           )
@@ -82,27 +82,21 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
       : Promise.resolve([] as Array<{ id: string; slug: string | null }>),
   ]);
 
-  const userIdByRef = new Map<string, string>();
+  const userIdBySlug = new Map<string, string>();
   for (const r of Array.isArray(resolvedUsers) ? resolvedUsers : []) {
-    const id = String((r as any)?.id || '').trim();
-    const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
-    if (id) {
-      userIdByRef.set(id, id);
-      if (slug) userIdByRef.set(slug, id);
-    }
+    const id = String(r.id || '').trim();
+    const slug = typeof r.slug === 'string' ? String(r.slug).trim() : '';
+    if (slug && id) userIdBySlug.set(slug, id);
   }
-  const agentIdByRef = new Map<string, string>();
+  const agentIdBySlug = new Map<string, string>();
   for (const r of Array.isArray(resolvedAgents) ? resolvedAgents : []) {
-    const id = String((r as any)?.id || '').trim();
-    const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
-    if (id) {
-      agentIdByRef.set(id, id);
-      if (slug) agentIdByRef.set(slug, id);
-    }
+    const id = String(r.id || '').trim();
+    const slug = typeof r.slug === 'string' ? String(r.slug).trim() : '';
+    if (slug && id) agentIdBySlug.set(slug, id);
   }
 
-  const mentionedUserIds = uniq(userRefs.map((ref) => userIdByRef.get(ref) || ''));
-  const mentionedAgentIds = uniq(agentRefs.map((ref) => agentIdByRef.get(ref) || ''));
+  const mentionedUserIds = uniq(userRefs.map((slug) => userIdBySlug.get(slug) || ''));
+  const mentionedAgentIds = uniq(agentRefs.map((slug) => agentIdBySlug.get(slug) || ''));
 
   const missingUserIds = mentionedUserIds.filter((id) => id && !allowUsers.has(id));
   const missingAgentIdsFromMentions = mentionedAgentIds.filter((id) => id && !allowAgents.has(id));
@@ -117,7 +111,7 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
   const sanitizedContentForMessage = sanitizeDisallowedAgentMentions({
     content,
     disallowedAgentIds: disallowedMentionIdSet,
-    agentIdByRef,
+    agentIdByRef: agentIdBySlug,
   });
 
   return {

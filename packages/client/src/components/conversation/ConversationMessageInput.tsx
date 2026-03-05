@@ -509,11 +509,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const raw = String(message || '')
       if (!raw.trim()) return false
       // Preferred: structured agent mentions emitted by the composer.
-      if (raw.includes('<@a:')) return true
-      // Back-compat: plain-text @mentions. Mirror the server's mention token shapes loosely.
-      const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
-      const mentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
-      return mentionRe.test(legacyText)
+      return raw.includes('<@a:')
     }, [message])
 
     const requiresCreditsForDraft = useMemo(() => {
@@ -862,9 +858,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           effectiveAgent = linked[0] ?? null
         }
 
-        // Prefer stable leading agent mention token (<@a:AGENT_ID>) where not locked.
+        // Prefer stable leading agent mention token (<@a:AGENT_SLUG>) where not locked.
         // NOTE: even in channel/mention-only contexts, this is how an agent is selected.
-        // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
+        // Prefer stable leading agent mention token (<@a:AGENT_SLUG>) for mention-only threads.
         if (!dmLockedAgent) {
           const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
           if (tokenMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
@@ -907,12 +903,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         const raw = String(messageToSend || '')
         const hasUserMentionToken = raw.includes('<@u:')
-        // Mirror server mention behavior loosely:
-        // - Structured agent mention tokens: <@a:AGENT_ID>
-        // - Legacy @slug mentions (strip structured tokens first)
-        const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
-        const legacyMentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
-        const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
+        const hasAgentMention = raw.includes('<@a:')
 
         // Mention-only contexts only run when at least one agent is mentioned.
         if (isChannelContext || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
@@ -2159,8 +2150,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Mentions behave like normal atomic nodes (user can delete them).
           deleteTriggerWithBackspace: true,
           // Serialize mentions into stable tokens so `editor.getText()` preserves stable slugs:
-          // - users: <@u:USER_SLUG> (legacy: USER_ID)
-          // - agents: <@a:AGENT_SLUG> (legacy: AGENT_ID)
+          // - users: <@u:USER_SLUG>
+          // - agents: <@a:AGENT_SLUG>
           renderText: ({ options, node }: any) => {
             const id = node?.attrs?.id
             const kind = node?.attrs?.kind

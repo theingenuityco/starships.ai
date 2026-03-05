@@ -18,11 +18,6 @@ This page defines each concept and provides concrete usage recipes.
 
 Mentions are stored as **structured tokens** in message `content`:
 
-- **Agent mention**: `<@a:AGENT_ID>` (legacy)
-- **User mention**: `<@u:USER_ID>`
- 
-Newer clients emit slugs (legacy messages may still contain IDs):
-
 - **Agent mention**: `<@a:AGENT_SLUG>`
 - **User mention**: `<@u:USER_SLUG>`
 

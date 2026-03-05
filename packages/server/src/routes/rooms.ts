@@ -415,20 +415,18 @@ router.post(
           // Prefer mention-driven routing (can include multiple agents); otherwise fall back to a single explicit agentId.
           const allAgents = await new AgentRepository().findByStarship(sid).catch(() => []);
           const starshipAgentIdSet = new Set(allAgents.map((a) => String(a?.id || '').trim()).filter(Boolean));
-          const starshipAgentIdByRef = new Map<string, string>();
+          const agentIdBySlug = new Map<string, string>();
           for (const a of Array.isArray(allAgents) ? allAgents : []) {
-            const id = String((a as any)?.id || '').trim();
-            const slug = String((a as any)?.slug || '').trim();
-            if (!id) continue;
-            starshipAgentIdByRef.set(id, id);
-            if (slug) starshipAgentIdByRef.set(slug, id);
+            const id = String(a?.id || '').trim();
+            const slug = String(a?.slug || '').trim();
+            if (slug && id) agentIdBySlug.set(slug, id);
           }
 
           const mentionedAgentIds = Array.from(
             new Set(
-              (Array.from(content.matchAll(/<@a:([^>\s]{1,100})>/gi)) || [])
+              (Array.from(content.matchAll(/<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi)) || [])
                 .map((m) => String(m?.[1] || '').trim())
-                .map((ref) => (ref ? starshipAgentIdByRef.get(ref) || '' : ''))
+                .map((slug) => (slug ? agentIdBySlug.get(slug) || '' : ''))
                 .filter((id) => Boolean(id) && starshipAgentIdSet.has(id))
             )
           );

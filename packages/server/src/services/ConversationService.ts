@@ -732,8 +732,8 @@ export class ConversationService {
     if (text.length > 20_000) text = text.slice(0, 20_000);
     const userRefs = new Set<string>();
     const agentRefs = new Set<string>();
-    const userRe = /<@u:([^>\s]{1,100})>/gi;
-    const agentRe = /<@a:([^>\s]{1,100})>/gi;
+    const userRe = /<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi;
+    const agentRe = /<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi;
     let m: RegExpExecArray | null;
     while ((m = userRe.exec(text))) {
       const ref = String(m[1] || '').trim();
@@ -786,7 +786,7 @@ export class ConversationService {
               `SELECT id, slug, name
                  FROM agents
                 WHERE starship_id = $1
-                  AND (id = ANY($2::text[]) OR slug = ANY($2::text[]))`,
+                  AND slug = ANY($2::text[])`,
               [starshipId, agentRefs]
             )
             .catch(() => [])
@@ -797,7 +797,7 @@ export class ConversationService {
               `
               SELECT u.id, u.slug, u.display_name, u.email
                 FROM users u
-               WHERE (u.id = ANY($2::text[]) OR u.slug = ANY($2::text[]))
+               WHERE u.slug = ANY($2::text[])
                  AND (
                    u.id = (SELECT owner_id FROM starships WHERE id = $1)
                    OR EXISTS (SELECT 1 FROM starship_members sm WHERE sm.starship_id = $1 AND sm.user_id = u.id)
@@ -810,22 +810,18 @@ export class ConversationService {
     ]);
 
     for (const r of Array.isArray(agentRows) ? agentRows : []) {
-      const id = String(r?.id || '').trim();
       const name = typeof r?.name === 'string' ? r.name.trim() : '';
-      const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
       if (name) {
-        if (id) agentNameByRef.set(id, name);
+        const slug = typeof r.slug === 'string' ? r.slug.trim() : '';
         if (slug) agentNameByRef.set(slug, name);
       }
     }
     for (const r of Array.isArray(userRows) ? userRows : []) {
-      const id = String(r?.id || '').trim();
       const displayName = typeof r?.display_name === 'string' ? r.display_name.trim() : '';
       const email = typeof r?.email === 'string' ? r.email.trim() : '';
       const name = displayName || email;
-      const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
       if (name) {
-        if (id) userNameByRef.set(id, name);
+        const slug = typeof r.slug === 'string' ? r.slug.trim() : '';
         if (slug) userNameByRef.set(slug, name);
       }
     }
@@ -842,13 +838,13 @@ export class ConversationService {
     if (!input) return '';
     if (!input.includes('<@u:') && !input.includes('<@a:')) return input;
     return input
-      .replace(/<@a:([^>\s]{1,100})>/gi, (_m, refRaw) => {
+      .replace(/<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi, (_m, refRaw) => {
         const ref = String(refRaw || '').trim();
         const name = ref ? args.agentNameByRef.get(ref) : null;
         const label = name || ref || 'agent';
         return `@${label}`;
       })
-      .replace(/<@u:([^>\s]{1,100})>/gi, (_m, refRaw) => {
+      .replace(/<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi, (_m, refRaw) => {
         const ref = String(refRaw || '').trim();
         const name = ref ? args.userNameByRef.get(ref) : null;
         const label = name || ref || 'user';
@@ -2354,7 +2350,7 @@ export class ConversationService {
       noAgentToRun = true;
     } else {
       const content = typeof data.content === 'string' ? data.content : '';
-      const userTokenCountPre = (content.match(/<@u:([^>\s]{1,100})>/gi) || []).length;
+      const userTokenCountPre = (content.match(/<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi) || []).length;
       const hasUserMentions = userTokenCountPre > 0;
       // If any agent is explicitly mentioned, we should route by mention (mentions take precedence over explicitAgentId fallback).
       const mentionedAgentsPreAll = this.extractMentionedAgents(content, allStarshipAgents);
@@ -2839,7 +2835,7 @@ export class ConversationService {
       // Mentions are resolved against the full starship agent list (not only currently-linked agents).
       const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
       const hasMention = mentioned.length > 0;
-      const hasUserMentionToken = /<@u:([^>\s]{1,100})>/i.test(content);
+      const hasUserMentionToken = /<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/i.test(content);
 
       // Mention-only contexts only trigger when at least one agent is mentioned.
       if (isMentionOnlyChannel || isMentionOnlyThread) return hasMention;
@@ -3523,8 +3519,8 @@ export class ConversationService {
         // Remove structured mention tokens and replace legacy @mentions with a generic placeholder.
         // (We intentionally avoid resolving IDs -> names for titles.)
         return input
-          .replace(/<@a:([^>\s]{1,100})>/gi, ' agent ')
-          .replace(/<@u:([^>\s]{1,100})>/gi, ' user ')
+          .replace(/<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi, ' agent ')
+          .replace(/<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi, ' user ')
           .replace(/<@[^>\n]+>/g, ' ')
           .replace(/(^|\s)@(?:"([^"\n]{1,100})"|\[([^\]\n]{1,100})\]|([a-z0-9._-]{1,100}))/gi, '$1mention')
           .replace(/\s+/g, ' ')
@@ -3624,31 +3620,28 @@ export class ConversationService {
     try {
       if (typeof text !== 'string' || text.length === 0) return [];
       // Structured agent mentions emitted by the client composer.
-      // Format: <@a:AGENT_SLUG> (legacy: <@a:AGENT_ID>)
+      // Format: <@a:AGENT_SLUG>
       //
       // IMPORTANT:
-      // - User mentions are emitted as <@u:USER_ID> and must NEVER trigger agent execution.
+      // - User mentions are emitted as <@u:USER_SLUG> and must NEVER trigger agent execution.
       // - Legacy plain-text parsing (e.g. @slug / @name / @all) is intentionally unsupported.
-      const tokenRe = /<@a:([^>\s]{1,100})>/gi;
+      const tokenRe = /<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi;
       const tokenMatches = Array.from(text.matchAll(tokenRe));
       if (tokenMatches.length === 0) return [];
 
-      const byRef = new Map<string, AgentModel>();
+      const bySlug = new Map<string, AgentModel>();
       for (const a of availableAgents) {
-        const id = String((a as any)?.id || '').trim();
-        const slug = String((a as any)?.slug || '').trim();
-        if (!id) continue;
-        byRef.set(id, a);
-        if (slug) byRef.set(slug, a);
+        const slug = String(a.slug || '').trim();
+        if (slug) bySlug.set(slug, a);
       }
       const seen: Set<string> = new Set();
       const out: AgentModel[] = [];
       for (const m of tokenMatches) {
-        const ref = String(m[1] || '').trim();
-        if (!ref) continue;
-        const agent = byRef.get(ref);
+        const slug = String(m[1] || '').trim();
+        if (!slug) continue;
+        const agent = bySlug.get(slug);
         if (!agent) continue;
-        const agentId = String((agent as any)?.id || '').trim();
+        const agentId = String(agent.id || '').trim();
         if (!agentId) continue;
         if (seen.has(agentId)) continue;
         seen.add(agentId);

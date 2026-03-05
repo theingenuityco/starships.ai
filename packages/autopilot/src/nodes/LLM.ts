@@ -543,12 +543,14 @@ export class LLM extends BaseNode<LlmParams> {
       const responseFormat = this.coerceMaybeJson<Record<string, unknown>>(params.responseFormat);
 
       const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
+      const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
+      const endUserIdRaw = typeof runtime.AUTH_USER_ID === 'string' ? runtime.AUTH_USER_ID : '';
+      const endUserId = typeof endUserIdRaw === 'string' ? endUserIdRaw.trim().slice(0, 128) : '';
 
       // Log the prompt we are about to send (safe + bounded) ONLY when explicitly enabled.
       // This logs the provider request (after sanitization), with URL redaction for multimodal blocks.
       if (ENABLE_LLM_LOGGING) {
         try {
-          const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
           const conversationId = typeof runtime.CONVERSATION_ID === 'string' ? runtime.CONVERSATION_ID : undefined;
           const starshipId = typeof runtime.STARSHIP_ID === 'string' ? runtime.STARSHIP_ID : undefined;
           const agentId = typeof runtime.AGENT_ID === 'string' ? runtime.AGENT_ID : undefined;
@@ -601,6 +603,7 @@ export class LLM extends BaseNode<LlmParams> {
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: openAiMessagesForRequest,
+        ...(endUserId ? { endUserId } : {}),
         tools: Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined,
         temperature: typeof params.temperature === 'number' ? params.temperature : undefined,
         maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,

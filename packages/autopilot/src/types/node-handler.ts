@@ -33,6 +33,16 @@ export interface NodeHandler {
 export interface LlmHostRequest {
   model: string;
   messages: unknown[];
+  /**
+   * Stable, opaque end-user identifier for provider-side attribution/abuse detection.
+   *
+   * - OpenAI: map to `safety_identifier` (and optionally `prompt_cache_key`).
+   * - Anthropic: map to `metadata.user_id`.
+   * - Aggregators (e.g. OpenRouter): typically forward the OpenAI-compatible fields.
+   *
+   * This value must NOT contain direct PII (name/email/phone). Prefer an internal id or hash.
+   */
+  endUserId?: string;
   tools?: ToolParams[];
   temperature?: number;
   maxTokens?: number;

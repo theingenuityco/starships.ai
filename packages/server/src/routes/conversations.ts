@@ -1305,6 +1305,7 @@ router.post(
             starshipId: conversation.starshipId,
             conversationId,
             roomId: roomConversationId || undefined,
+            authUserId,
             agentId,
             toolCallMessageId: toolCallMessageId || undefined,
           });
@@ -1386,6 +1387,7 @@ router.post(
         starshipId: conversation.starshipId,
         conversationId,
         roomId: roomConversationId || undefined,
+        authUserId,
         agentId,
         toolCallMessageId: toolCallMessageId || undefined,
       });

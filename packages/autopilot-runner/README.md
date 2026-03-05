@@ -16,8 +16,6 @@ Env:
 - RUNNER_CONCURRENCY (default 4)
 - RUNNER_AUTH_TOKEN (optional, `Authorization: Bearer <token>`)
 - RUNNER_FASTPATH_ENABLED (default true)
-- BRIGHTDATA_API_KEY (required only when `http_request.useWebUnlocker: true`)
-- BRIGHTDATA_ZONE (required only when `http_request.useWebUnlocker: true`)
 
 ## API
 

@@ -71,25 +71,6 @@ describe('HttpRequest Node Handler', () => {
       );
     });
 
-    it('should forward useWebUnlocker flag to host runtime', async () => {
-      const params: HttpRequestParams = {
-        url: 'https://example.com',
-        method: 'GET',
-        useWebUnlocker: true,
-      };
-
-      const httpRequest = new HttpRequest(params, { hostRuntime });
-      await httpRequest.execute();
-
-      expect(httpMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          url: 'https://example.com',
-          method: 'GET',
-          useWebUnlocker: true,
-        })
-      );
-    });
-
     it('should execute POST request with JSON body', async () => {
       const params: HttpRequestParams = {
         url: 'https://api.example.com/submit',

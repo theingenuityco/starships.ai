@@ -268,7 +268,7 @@ export class ConnectorService {
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
     const templates = await this.connectorTemplateRepository.list();
-    return templates
+    const dbCatalog = templates
       .filter((tpl) => tpl.isEnabled !== false)
       .map((tpl): ConnectorCatalogItem => {
         const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
@@ -300,6 +300,18 @@ export class ConnectorService {
             : {}),
         };
       });
+
+    // Built-in reserved connector: "system" (not DB-backed).
+    // It is configured via platform secrets and does not require per-starship installation.
+    const systemCatalogItem: ConnectorCatalogItem = {
+      provider: 'system',
+      name: 'System',
+      description: 'Reserved platform connector providing native actions (webFetch, webSearch, etc).',
+      // Keep UI semantics simple: there is no per-starship connect flow.
+      auth: { type: 'none' },
+    };
+
+    return [...dbCatalog, systemCatalogItem];
   }
 
   /**
@@ -610,7 +622,7 @@ export class ConnectorService {
 
     const now = new Date().toISOString();
 
-    return visibleTemplates.map<ConnectorListItem>((template) => {
+    const listed = visibleTemplates.map<ConnectorListItem>((template) => {
       const existing = byProvider.get(template.provider);
       const templateAuthType = ((template.authJson as unknown as { type?: string })?.type || 'none') as NonNullable<
         ConnectorListItem['template']
@@ -678,6 +690,47 @@ export class ConnectorService {
         template: templateRuntime,
       };
     });
+
+    // Built-in reserved connector: "system" (not DB-backed).
+    // Mark it connected when required platform secrets are configured; otherwise disconnected.
+    try {
+      const apiKey = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_BRIGHTDATA_API_KEY');
+      const webFetchZone = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_WEBFETCH_ZONE');
+      const webSearchZone = await this.platformSecretService.getSecret('SYSTEM_CONNECTOR_WEBSEARCH_ZONE');
+      const configured =
+        typeof apiKey === 'string' &&
+        apiKey.trim().length > 0 &&
+        typeof webFetchZone === 'string' &&
+        webFetchZone.trim().length > 0 &&
+        typeof webSearchZone === 'string' &&
+        webSearchZone.trim().length > 0;
+
+      listed.push({
+        id: `${starshipId}:system`,
+        starshipId,
+        provider: 'system',
+        status: configured ? 'connected' : 'disconnected',
+        lastError: configured ? undefined : 'System connector is not configured (missing platform secrets)',
+        createdAt: now,
+        updatedAt: now,
+        scopes: [],
+        metadata: {},
+        template: {
+          id: 'system',
+          provider: 'system',
+          name: 'System',
+          description: 'Reserved platform connector providing native actions (webFetch, webSearch, etc).',
+          auth: { type: 'none' },
+          version: '1.0.0',
+          category: 'system',
+          baseUrl: 'builtin://system',
+        },
+      });
+    } catch {
+      // best-effort
+    }
+
+    return listed;
   }
 
   /**

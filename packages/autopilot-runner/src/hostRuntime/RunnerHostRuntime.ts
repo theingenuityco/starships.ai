@@ -193,11 +193,6 @@ export interface AzureAiFoundryRuntimeConfig {
   defaultHeaders?: Record<string, string>;
 }
 
-export interface WebUnlockerRuntimeConfig {
-  apiKey: string;
-  zone: string;
-}
-
 export interface ProviderRoute {
   provider: 'openrouter' | 'aws_bedrock' | 'azure_ai_foundry';
   providerModelId: string;
@@ -232,12 +227,6 @@ export interface RunnerHostRuntimeOptions {
    * use this instead of reading from process.env.
    */
   llm?: LlmRuntimeConfig;
-
-  /**
-   * Optional web-unlocking gateway configuration for HostRuntime.http. When provided,
-   * the runner will use this instead of reading from process.env.
-   */
-  webUnlocker?: WebUnlockerRuntimeConfig;
 
   /**
    * AWS runtime configuration for Bedrock.
@@ -423,7 +412,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       body?: unknown;
       timeoutMs?: number;
     };
-    const useWebUnlocker = (request as { useWebUnlocker?: unknown } | null | undefined)?.useWebUnlocker === true;
     // Backward/forward compatible: older @starships/autopilot types may not include this field.
     const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
     const responseType =
@@ -445,197 +433,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
-
-      if (useWebUnlocker) {
-        const apiKey = options.webUnlocker?.apiKey ?? process.env.BRIGHTDATA_API_KEY;
-        const zone = options.webUnlocker?.zone ?? process.env.BRIGHTDATA_ZONE;
-        if (!apiKey || !apiKey.trim()) {
-          throw new Error('BRIGHTDATA_API_KEY is required when useWebUnlocker=true');
-        }
-        if (!zone || !zone.trim()) {
-          throw new Error('BRIGHTDATA_ZONE is required when useWebUnlocker=true');
-        }
-
-        let u: URL;
-        try {
-          u = new URL(finalUrl);
-        } catch {
-          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
-        }
-        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
-        }
-        const hostLower = u.hostname.toLowerCase();
-        if (hostLower === 'localhost' || hostLower.endsWith('.localhost')) {
-          throw new Error('Blocked URL for useWebUnlocker=true: localhost is not allowed');
-        }
-        if (isPrivateIp(hostLower)) {
-          throw new Error('Blocked URL for useWebUnlocker=true: private/loopback IPs are not allowed');
-        }
-
-        if (responseType === 'arrayBuffer' || responseType === 'base64') {
-          throw new Error(`useWebUnlocker=true does not support responseType="${responseType}"`);
-        }
-        if (
-          body instanceof ArrayBuffer ||
-          ArrayBuffer.isView(body as ArrayBufferLike) ||
-          (typeof Blob !== 'undefined' && body instanceof Blob) ||
-          (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
-          (typeof FormData !== 'undefined' && body instanceof FormData)
-        ) {
-          throw new Error('useWebUnlocker=true does not support binary/FormData request bodies');
-        }
-
-        const safeTargetUrl = redactUrlForLogs(finalUrl);
-        const safeHeaders = redactHeadersForLogs(finalHeaders);
-
-        const unlockerPayload: Record<string, unknown> = {
-          zone: zone.trim(),
-          url: finalUrl,
-          format: 'raw',
-          method: finalMethod,
-        };
-
-        const hdrs = normalizeHeadersToStrings(finalHeaders);
-        if (Object.keys(hdrs).length > 0) unlockerPayload.headers = hdrs;
-
-        if (finalMethod !== 'GET' && finalMethod !== 'HEAD' && body !== undefined) {
-          unlockerPayload.body = typeof body === 'string' ? body : JSON.stringify(body);
-        }
-
-        let resp: Response;
-        try {
-          resp = await fetch('https://api.brightdata.com/request', {
-            method: 'POST',
-            headers: {
-              authorization: `Bearer ${apiKey.trim()}`,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify(unlockerPayload),
-            signal: combinedSignal,
-          });
-        } catch (e: unknown) {
-          if (options.signal?.aborted) {
-            throw new CancelledError('cancelled');
-          }
-          if (timeoutController.signal.aborted) {
-            const err = new Error(`HTTP (Web Unlocker) timed out after ${timeout}ms: ${finalMethod} ${safeTargetUrl}`);
-            console.error('[RunnerHostRuntime.http] web_unlocker_timeout', {
-              method: finalMethod,
-              url: safeTargetUrl,
-              timeoutMs: timeout,
-            });
-            throw err;
-          }
-
-          const summary = summarizeFetchError(e);
-          console.error('[RunnerHostRuntime.http] web_unlocker_failed', {
-            method: finalMethod,
-            url: safeTargetUrl,
-            timeoutMs: timeout,
-            headers: safeHeaders,
-            error: summary,
-          });
-
-          const wrapped = new Error(`HTTP (Web Unlocker) failed: ${finalMethod} ${safeTargetUrl} (${summary.summary})`) as Error & {
-            cause?: unknown;
-          };
-          wrapped.cause = e;
-          throw wrapped;
-        }
-
-        const bdHeaders: Record<string, string> = {};
-        resp.headers.forEach((value, key) => {
-          bdHeaders[key] = value;
-        });
-
-        // NOTE:
-        // Do not rely on `Response.ok` here. In our Jest tests, `fetch` is mocked with a minimal
-        // Response-like object that omits `ok`, which would incorrectly trip `!resp.ok` for 200s.
-        // Use status code semantics directly instead.
-        if (resp.status < 200 || resp.status >= 300) {
-          const errText = await resp.text().catch(() => '');
-          const snippet = errText.length > 1200 ? `${errText.slice(0, 1200)}…` : errText;
-          console.error('[RunnerHostRuntime.http] web_unlocker_gateway_non_2xx', {
-            status: resp.status,
-            statusText: resp.statusText,
-            url: 'https://api.brightdata.com/request',
-            targetUrl: safeTargetUrl,
-          });
-          throw new Error(
-            `HTTP (Web Unlocker) gateway returned ${resp.status} ${resp.statusText} for ${finalMethod} ${safeTargetUrl}${
-              snippet ? ` | body: ${snippet}` : ''
-            }`
-          );
-        }
-
-        // Web Unlocker responses are typically JSON like:
-        //   { result: "<html>...</html>", headers: {...}, url: "..." }
-        // But some flows can return the unlocked page body directly (raw HTML/text).
-        // Read once to avoid Undici "Body has already been read".
-        const respText = await resp.text();
-
-        // Try to interpret as JSON wrapper; fall back to raw text otherwise.
-        let payloadObj: Record<string, unknown> | null = null;
-        try {
-          const parsed = JSON.parse(respText);
-          if (parsed && typeof parsed === 'object') {
-            payloadObj = parsed as Record<string, unknown>;
-          }
-        } catch {
-          payloadObj = null;
-        }
-
-        const resultRaw = payloadObj?.result ?? payloadObj?.body;
-        const targetStatus =
-          coerceHttpStatusCode(payloadObj?.status_code) ??
-          coerceHttpStatusCode(payloadObj?.statusCode) ??
-          coerceHttpStatusCode(payloadObj?.status) ??
-          resp.status;
-        const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
-        const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
-        const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
-        const targetContentType = (getHeaderValue(targetHeaders as unknown as Record<string, unknown>, 'content-type') ?? '').toLowerCase();
-
-        const resultText =
-          resultRaw === undefined
-            ? respText // raw HTML/text response path
-            : resultRaw === null
-              ? ''
-              : typeof resultRaw === 'string'
-                ? resultRaw
-                : (() => {
-                    try {
-                      return JSON.stringify(resultRaw);
-                    } catch {
-                      return String(resultRaw);
-                    }
-                  })();
-
-        let responseBody: unknown;
-        if (responseType === 'text') {
-          responseBody = resultText;
-        } else {
-          // Default/json: parse JSON if we can infer it, otherwise return text
-          if (targetContentType.includes('application/json') || looksLikeJson(resultText)) {
-            try {
-              responseBody = JSON.parse(resultText);
-            } catch {
-              responseBody = resultText;
-            }
-          } else {
-            responseBody = resultText;
-          }
-        }
-
-        return {
-          status: targetStatus,
-          statusText: statusTextFromCode(targetStatus),
-          headers: targetHeaders,
-          body: responseBody,
-          url: targetUrl,
-        };
-      }
 
       const init: RequestInit = {
         method: finalMethod,
@@ -759,6 +556,46 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     } finally {
       clearTimeout(timeoutId);
     }
+  };
+
+  const unwrapBrightDataEnvelope = (
+    resp: Awaited<ReturnType<HostRuntime['http']>>
+  ): Awaited<ReturnType<HostRuntime['http']>> => {
+    const body = resp?.body as unknown;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return resp;
+    const obj = body as Record<string, unknown>;
+    const status =
+      coerceHttpStatusCode(obj.status_code) ?? coerceHttpStatusCode(obj.statusCode) ?? coerceHttpStatusCode(obj.status) ?? null;
+    if (status === null) return resp;
+
+    const headersRaw = obj.headers && typeof obj.headers === 'object' && !Array.isArray(obj.headers) ? (obj.headers as Record<string, unknown>) : null;
+    const headers = headersRaw ? normalizeHeadersToStrings(headersRaw) : (resp.headers as Record<string, string>);
+    const url = typeof obj.url === 'string' && obj.url.trim().length > 0 ? obj.url.trim() : resp.url;
+
+    const payloadBody = obj.body ?? obj.result;
+    const contentType = (getHeaderValue(headersRaw ?? (headers as unknown as Record<string, unknown>), 'content-type') ?? '').toLowerCase();
+
+    let outBody: unknown = payloadBody;
+    if (typeof payloadBody === 'string') {
+      const t = payloadBody;
+      if (contentType.includes('application/json') || looksLikeJson(t)) {
+        try {
+          outBody = t.trim().length ? JSON.parse(t) : t;
+        } catch {
+          outBody = t;
+        }
+      } else {
+        outBody = t;
+      }
+    }
+
+    return {
+      status,
+      statusText: statusTextFromCode(status),
+      headers,
+      body: outBody,
+      url,
+    };
   };
 
   const evalTemplate = (
@@ -1081,6 +918,10 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       body,
       timeoutMs,
     });
+    // Reserved system connector: unwrap Bright Data /request envelopes into a normalized HTTP response.
+    if (c === 'system' && (a === 'webFetch' || a === 'webSearch')) {
+      return unwrapBrightDataEnvelope(resp);
+    }
     return resp;
   };
 

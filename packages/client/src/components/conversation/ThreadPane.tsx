@@ -24,6 +24,15 @@ export function ThreadPane(props: {
   draftParentConversationId?: string | null
   draftTitle?: string | null
   onThreadCreated?: (conversationId: string) => void
+  /**
+   * When true, enable per-message child threads (nested child conversations) in the message list.
+   * Note: the underlying message list prop is historically named for channels, but it works for any parent conversation.
+   */
+  enableMessageThreads?: boolean
+  /** Optional thread opener used when `enableMessageThreads` is true. */
+  onOpenThread?: (args: { conversationId: string | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
+  /** Optional id of the currently-open child thread to highlight in the message list. */
+  activeThreadConversationId?: string | null
   selectedAgent: AgentModel | null
   onAgentChange: (agent: AgentModel | null) => void
   onClose: () => void
@@ -61,6 +70,9 @@ export function ThreadPane(props: {
     draftParentConversationId,
     draftTitle,
     onThreadCreated,
+    enableMessageThreads = false,
+    onOpenThread,
+    activeThreadConversationId,
     selectedAgent,
     onAgentChange,
     onClose,
@@ -297,6 +309,9 @@ export function ThreadPane(props: {
             bottomPaddingPx={inputHeight + 12}
             pinnedFirstMessage={pinnedFirstMessage ?? null}
             contentWidth={contentWidth}
+            enableChannelMessageThreads={enableMessageThreads}
+            onOpenThread={onOpenThread}
+            activeThreadConversationId={activeThreadConversationId ?? null}
           />
         </div>
 

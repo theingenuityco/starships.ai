@@ -3,7 +3,7 @@
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
-import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
+import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import Icon from '@/components/primitives/Icon'
@@ -30,23 +30,45 @@ import {
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomModel } from '@starships/protocol'
+import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipTools } from '@/hooks/useTools'
+import api from '@/lib/api'
 
 const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
 
+function sanitizeThreadTitleSnippetFromMessageContent(input: string): string {
+  const s = String(input || '')
+    .replace(/<@[^>\n]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return s
+}
+
 export default function RoomsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams<{ slug: string; roomSlug?: string; threadId?: string }>()
+  const params = useParams<{ slug: string; roomSlug?: string; conversationId?: string; threadId?: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuthContext()
 
+  const [conversationAgent, setConversationAgent] = useState<AgentModel | null>(null)
+  const [conversationDraftParentConversationId, setConversationDraftParentConversationId] = useState<string | null>(null)
+  const [conversationDraftTitle, setConversationDraftTitle] = useState<string | null>(null)
+
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
+  const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
+  const lastThreadConversationKeyRef = useRef<string | null>(null)
+  const pendingThreadStateRef = useRef<{
+    threadKey: string | null
+    threadAgent: AgentModel | null
+    pinnedFirstMessage: MessageModel | null
+    draftParentConversationId: string | null
+    draftTitle: string | null
+  } | null>(null)
 
   // Desktop side pane width (draggable resizer) - match Channels thread pane behavior
   const [resourcesPaneWidthPx, setResourcesPaneWidthPx] = useState<number>(() => {
@@ -188,9 +210,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     () => ({
       slug: params.slug as string,
       roomSlug: params.roomSlug as string | undefined,
-      threadId: params.threadId,
+      conversationId: params.conversationId as string | undefined,
+      threadId: params.threadId as string | undefined,
     }),
-    [params.slug, params.roomSlug, params.threadId]
+    [params.slug, params.roomSlug, params.conversationId, params.threadId]
   )
   const isRoomsIndexRoute = useMemo(() => {
     const raw = typeof routeParams.roomSlug === 'string' ? routeParams.roomSlug : ''
@@ -235,13 +258,28 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   }, [activeConversationId])
 
   const routeThreadKey = useMemo(() => {
+    // In canonical nested routing, `threadId` is only used when `conversationId` is present.
     const raw = typeof routeParams.threadId === 'string' ? routeParams.threadId : ''
     const v = String(raw || '').trim()
     return v.length > 0 ? v : null
   }, [routeParams.threadId])
 
-  // Back-compat: support old `?thread=` URLs by navigating to the new route.
-  const legacyThreadKey = useMemo(() => {
+  const routeConversationKey = useMemo(() => {
+    const raw = typeof routeParams.conversationId === 'string' ? routeParams.conversationId : ''
+    const v = String(raw || '').trim()
+    return v.length > 0 ? v : null
+  }, [routeParams.conversationId])
+
+  // Legacy route: /rooms/:roomSlug/thread/:threadId (used to represent the room's child conversation).
+  const legacyConversationKeyFromRoute = useMemo(() => {
+    if (routeConversationKey) return null
+    const raw = typeof routeParams.threadId === 'string' ? routeParams.threadId : ''
+    const v = String(raw || '').trim()
+    return v.length > 0 ? v : null
+  }, [routeConversationKey, routeParams.threadId])
+
+  // Back-compat: older room UI used `?thread=` to open a room child conversation.
+  const legacyConversationKeyFromQuery = useMemo(() => {
     const raw = searchParams.get('thread')
     const v = typeof raw === 'string' ? raw.trim() : ''
     return v.length > 0 ? v : null
@@ -282,6 +320,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   }, [isSidePaneOpen])
 
   const threadKey = routeThreadKey
+  const conversationKey = routeConversationKey ?? legacyConversationKeyFromRoute ?? legacyConversationKeyFromQuery
+  const isDraftConversationOpen = conversationKey === 'draft'
+  const conversationConversationId = useMemo(() => {
+    if (!conversationKey) return null
+    if (conversationKey === 'draft') return null
+    return conversationKey
+  }, [conversationKey])
+
   const isDraftThreadOpen = threadKey === 'draft'
   const threadConversationId = useMemo(() => {
     if (!threadKey) return null
@@ -295,16 +341,28 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
   }, [routeParams.roomSlug, routeParams.slug])
 
-  const setThreadKeyInUrl = useCallback(
-    (nextThreadKey: string | null) => {
-      if (nextThreadKey) {
-        router.push(`${roomBasePath}/thread/${encodeURIComponent(String(nextThreadKey))}`)
+  const setConversationKeyInUrl = useCallback(
+    (nextConversationKey: string | null) => {
+      if (nextConversationKey) {
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(String(nextConversationKey))}`)
         return
       }
-      // Clear thread route entirely.
       router.push(roomBasePath)
     },
     [router, roomBasePath]
+  )
+
+  const setThreadKeyInUrl = useCallback(
+    (nextThreadKey: string | null) => {
+      const parentConversationId = typeof conversationConversationId === 'string' ? conversationConversationId.trim() : ''
+      if (!parentConversationId) return
+      if (nextThreadKey) {
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}/thread/${encodeURIComponent(String(nextThreadKey))}`)
+        return
+      }
+      router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}`)
+    },
+    [conversationConversationId, router, roomBasePath]
   )
 
   const setViewKeyInUrl = useCallback(
@@ -338,21 +396,96 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   )
 
   useEffect(() => {
-    if (!legacyThreadKey) return
-    if (routeThreadKey) return
+    // Canonicalize legacy route `/thread/:id` into `/conversation/:id`.
+    const legacy = typeof legacyConversationKeyFromRoute === 'string' ? legacyConversationKeyFromRoute.trim() : ''
+    if (!legacy) return
+    if (routeConversationKey) return
     if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
-    router.replace(`${roomBasePath}/thread/${encodeURIComponent(String(legacyThreadKey))}`)
-  }, [legacyThreadKey, roomBasePath, routeParams.roomSlug, routeThreadKey, router])
+    router.replace(`${roomBasePath}/conversation/${encodeURIComponent(String(legacy))}`)
+  }, [legacyConversationKeyFromRoute, roomBasePath, routeConversationKey, routeParams.roomSlug, router])
 
-  // Default parent for draft threads is the active room conversation id.
   useEffect(() => {
+    // Canonicalize legacy `?thread=` query into `/conversation/:id` when no explicit route selection exists.
+    const legacy = typeof legacyConversationKeyFromQuery === 'string' ? legacyConversationKeyFromQuery.trim() : ''
+    if (!legacy) return
+    if (conversationKey) return
+    if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
+    router.replace(`${roomBasePath}/conversation/${encodeURIComponent(String(legacy))}`)
+  }, [conversationKey, legacyConversationKeyFromQuery, roomBasePath, routeParams.roomSlug, router])
+
+  // Default parent for draft conversations is the active room conversation id.
+  useEffect(() => {
+    if (!isDraftConversationOpen) return
+    if (conversationDraftParentConversationId) return
+    const parent = typeof activeConversationId === 'string' ? activeConversationId.trim() : ''
+    if (!parent) return
+    setConversationDraftParentConversationId(parent)
+    setConversationDraftTitle('New conversation')
+  }, [activeConversationId, conversationDraftParentConversationId, isDraftConversationOpen])
+
+  useEffect(() => {
+    // When opening a draft thread via URL, default its parent to the current conversation.
     if (!isDraftThreadOpen) return
     if (threadDraftParentConversationId) return
-    const parent = typeof activeConversationId === 'string' ? activeConversationId.trim() : ''
+    const parent = typeof conversationConversationId === 'string' ? conversationConversationId.trim() : ''
     if (!parent) return
     setThreadDraftParentConversationId(parent)
     setThreadDraftTitle('New thread')
-  }, [activeConversationId, isDraftThreadOpen, threadDraftParentConversationId])
+  }, [conversationConversationId, isDraftThreadOpen, threadDraftParentConversationId])
+
+  useEffect(() => {
+    // If thread key changes via back/forward / manual URL edits, restore or clear ephemeral thread state.
+    const prev = lastThreadConversationKeyRef.current
+    if (prev !== threadKey) {
+      lastThreadConversationKeyRef.current = threadKey
+      const pending = pendingThreadStateRef.current
+      if (pending && pending.threadKey === threadKey) {
+        pendingThreadStateRef.current = null
+        setThreadPinnedFirstMessage(pending.pinnedFirstMessage)
+        setThreadAgent(pending.threadAgent)
+        setThreadDraftParentConversationId(pending.draftParentConversationId)
+        setThreadDraftTitle(pending.draftTitle)
+      } else {
+        setThreadPinnedFirstMessage(null)
+        setThreadAgent(null)
+        setThreadDraftParentConversationId(null)
+        setThreadDraftTitle(null)
+      }
+    }
+  }, [threadKey])
+
+  useEffect(() => {
+    // Refresh-safe pin hydration for nested threads:
+    // derive pinned first message by asking the parent conversation for the linking message.
+    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
+    if (!threadId) return
+    if (isDraftThreadOpen) return
+    if (threadPinnedFirstMessage) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
+        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
+        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
+        if (!parentId) return
+
+        const pinnedResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/linked-message`, {
+          params: { linkedConversationId: threadId },
+        })
+        const payload = (pinnedResp as any)?.data?.data ?? (pinnedResp as any)?.data ?? null
+        const pinned = (payload as any)?.message ?? null
+        if (cancelled) return
+        if (pinned) setThreadPinnedFirstMessage(pinned as any)
+      } catch {
+        // ignore (best-effort hydration)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isDraftThreadOpen, threadConversationId, threadPinnedFirstMessage])
 
   // If slug is present but doesn't match a room, show a not-found UI (hard cutover; no redirects).
   const isInvalidRoomSlug = Boolean(routeParams.roomSlug && !roomsLoading && !activeRoom)
@@ -487,18 +620,48 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const handleThreadCreated = useCallback(
     (cid: string) => {
-      setThreadDraftParentConversationId(null)
-      setThreadDraftTitle(null)
-      setThreadKeyInUrl(String(cid))
+      // Persist pinned message across draft -> real thread transition.
+      const nextThreadKey = String(cid)
+      pendingThreadStateRef.current = {
+        threadKey: nextThreadKey,
+        threadAgent: threadAgent ?? null,
+        pinnedFirstMessage: threadPinnedFirstMessage ?? null,
+        draftParentConversationId: null,
+        draftTitle: null,
+      }
+      setThreadKeyInUrl(nextThreadKey)
     },
-    [setThreadKeyInUrl]
+    [setThreadKeyInUrl, threadAgent, threadPinnedFirstMessage]
   )
 
   const handleCloseThread = useCallback(() => {
+    setThreadPinnedFirstMessage(null)
     setThreadDraftParentConversationId(null)
     setThreadDraftTitle(null)
+    pendingThreadStateRef.current = {
+      threadKey: null,
+      threadAgent: null,
+      pinnedFirstMessage: null,
+      draftParentConversationId: null,
+      draftTitle: null,
+    }
     setThreadKeyInUrl(null)
   }, [setThreadKeyInUrl])
+
+  const handleConversationCreated = useCallback(
+    (cid: string) => {
+      setConversationDraftParentConversationId(null)
+      setConversationDraftTitle(null)
+      setConversationKeyInUrl(String(cid))
+    },
+    [setConversationKeyInUrl]
+  )
+
+  const handleCloseConversation = useCallback(() => {
+    setConversationDraftParentConversationId(null)
+    setConversationDraftTitle(null)
+    setConversationKeyInUrl(null)
+  }, [setConversationKeyInUrl])
 
   const onOpenPinnedView = useCallback(
     (viewId: string) => {
@@ -582,12 +745,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       }}
     >
       <div className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}>
-        {activeConversationId && threadKey ? (
+        {activeConversationId && conversationKey && threadKey ? (
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             conversationId={threadConversationId}
             roomConversationId={activeConversationId}
+            pinnedFirstMessage={threadPinnedFirstMessage}
             draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
             draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
             selectedAgent={threadAgent}
@@ -603,6 +767,98 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                 type="button"
                 className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
                 onClick={handleCloseThread}
+                aria-label="Back to conversation"
+                title="Back to conversation"
+              >
+                <Icon name="arrow-left" className="h-4 w-4" />
+              </button>
+            }
+            titlePrepend={
+              <span className="inline-flex items-center whitespace-nowrap text-foreground">
+                <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                <span className="mx-1">/</span>
+              </span>
+            }
+            mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
+            titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+            rightSlot={
+              <div className="flex items-center gap-2">
+                <RoomParticipantsButton
+                  starshipId={starshipData.id}
+                  roomConversationId={activeConversationId}
+                  roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                  starshipOwnerId={starshipOwnerId}
+                />
+                {canManagePins || hasAnyResources ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
+                    <Icon name="pin" className="h-4 w-4 mr-1" />
+                    Resources
+                  </Button>
+                ) : null}
+              </div>
+            }
+            hideCloseButton={true}
+            className="h-full"
+          />
+        ) : activeConversationId && conversationKey ? (
+          <ThreadPane
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            conversationId={conversationConversationId}
+            roomConversationId={activeConversationId}
+            draftParentConversationId={isDraftConversationOpen ? conversationDraftParentConversationId : null}
+            draftTitle={isDraftConversationOpen ? conversationDraftTitle : null}
+            selectedAgent={conversationAgent}
+            onAgentChange={setConversationAgent}
+            onThreadCreated={handleConversationCreated}
+            onClose={handleCloseConversation}
+            allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+            allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+            contentWidth="constrained"
+            enableMessageThreads={true}
+            onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
+              const nextThreadKey = conversationId ? String(conversationId) : 'draft'
+              const nextPinned = linkedMessage ?? null
+              const nextAgent = nextThreadKey === threadKey ? (threadAgent ?? null) : null
+
+              pendingThreadStateRef.current = {
+                threadKey: nextThreadKey,
+                threadAgent: nextAgent,
+                pinnedFirstMessage: nextPinned,
+                draftParentConversationId: null,
+                draftTitle: null,
+              }
+
+              setThreadAgent(nextAgent)
+              setThreadPinnedFirstMessage(nextPinned)
+
+              if (conversationId) {
+                setThreadKeyInUrl(conversationId)
+                return
+              }
+
+              const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
+              setThreadDraftParentConversationId(parent || conversationConversationId || null)
+              const rawInput = String((linkedMessage as any)?.content ?? '')
+              const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput)
+              const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
+              const title = snippet ? snippet : 'New thread'
+              setThreadDraftTitle(title)
+              pendingThreadStateRef.current = {
+                threadKey: 'draft',
+                threadAgent: nextAgent,
+                pinnedFirstMessage: nextPinned,
+                draftParentConversationId: parent || conversationConversationId || null,
+                draftTitle: title,
+              }
+              setThreadKeyInUrl('draft')
+            }}
+            titlePrefix={
+              <button
+                type="button"
+                className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                onClick={handleCloseConversation}
                 aria-label="Back to room"
                 title="Back to room"
               >
@@ -637,7 +893,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             className="h-full"
           />
         ) : activeConversationId ? (
-          <RoomThreadIndexView
+          <RoomConversationIndexView
             starshipId={starshipData.id}
             roomConversationId={activeConversationId}
             roomSlug={activeRoom?.slug ?? null}
@@ -672,12 +928,15 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
             onAssignTool={toolId => assignTool.mutate({ toolId })}
             onUnassignTool={toolId => unassignTool.mutate(toolId)}
-            onCreateDraftThread={() => {
-              setThreadKeyInUrl('draft')
+            onCreateDraftConversation={() => {
+              setConversationKeyInUrl('draft')
             }}
-            onThreadConversationStarted={({ conversationId, selectedAgent }) => {
-              setThreadAgent(selectedAgent ?? null)
-              setThreadKeyInUrl(String(conversationId))
+            onConversationStarted={({ conversationId, selectedAgent }) => {
+              setConversationAgent(selectedAgent ?? null)
+              setConversationKeyInUrl(String(conversationId))
+            }}
+            onOpenConversation={(conversationId) => {
+              setConversationKeyInUrl(String(conversationId))
             }}
           />
         ) : null}

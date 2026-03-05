@@ -22,6 +22,7 @@ This folder contains documentation for the Starships workflow system, including 
 - **Conversations**
   - [Conversations overview](./conversations/README.md)
   - [Concepts (theory)](./conversations/concepts.md)
+  - [Mentions, delegation, and handoff](./conversations/mentions-delegation-handoff.md)
   - [Conversations API + connector actions](./conversations/conversations.md)
   - [Messages (CRUD + linking)](./conversations/messages.md)
   - [Streaming + notifications (SSE)](./conversations/streaming-and-notifications.md)

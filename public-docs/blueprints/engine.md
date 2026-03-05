@@ -81,6 +81,9 @@ Runtime configuration and secrets
     - Room conversation: `ROOM_ID === CONVERSATION_ID`
     - Room thread (child conversation): `ROOM_ID` is the parent room’s backing conversation id
     - Outside a room: `ROOM_ID` is not set
+  - `TOOL_CALL_MESSAGE_ID` is **optional** and is only present during tool execution in Starships hosted tool mode.
+    - Meaning: the id of the **assistant message in the current conversation** that contains the currently executing tool call.
+    - Semantics: resolved **per toolCallId** (not “latest message”), so it is safe to use for operations that must refer back to the calling message (for example linking a newly created child conversation back to its originating message).
 
 Binary handling (in-flight only)
 

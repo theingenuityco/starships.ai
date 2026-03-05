@@ -90,6 +90,7 @@ Requirements:
   - `hostRuntime.connectorAction` (and usually `hostRuntime.llm` for the LLM node)
   - `runtimeEnv.AGENT_ID` and `runtimeEnv.CONVERSATION_ID` (used by the default Agent blueprint)
   - `runtimeEnv.ROOM_ID` (optional; present for room conversations and room threads)
+  - `runtimeEnv.TOOL_CALL_MESSAGE_ID` (optional; Starships hosted only; present during tool execution)
 
 Example (as used by the default Agent blueprint):
 
@@ -149,3 +150,15 @@ Cross-links
 - See `../connectors/README.md` and `../connectors/connector_templates.md` for connector templates, auth models, and endpoint mapping.
 - See `node-http-request.md` for raw absolute HTTP calls without connector auth/mapping.
 - See `node-agent.md` for the default hosted Agent behavior (server-side tool authorization/execution).
+
+## Starships runtime env fields (hosted)
+
+When a tool is executed in Starships hosted tool mode, the server injects a small set of non-secret values into `runtimeEnv`:
+
+- `STARSHIP_ID`: current starship id
+- `CONVERSATION_ID`: current conversation id
+- `ROOM_ID` (optional): room backing conversation id (see `engine.md`)
+- `AGENT_ID`: executing agent id
+- `TOOL_CALL_MESSAGE_ID` (optional): the assistant message id that contains the currently executing tool call
+
+`TOOL_CALL_MESSAGE_ID` is useful when a tool must “write back” to the calling message (for example: set `linkedConversationId` on that message after creating a child conversation so the UI renders a thread card).

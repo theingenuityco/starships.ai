@@ -68,6 +68,8 @@ Execution behavior
     - Room conversation: `ROOM_ID === CONVERSATION_ID`
     - Room thread: `ROOM_ID` is the parent room’s backing conversation id
     - Outside a room: `ROOM_ID` is not set
+  - `runtimeEnv.TOOL_CALL_MESSAGE_ID` is optional and is set by Starships during tool execution (hosted mode only).
+    - It refers to the assistant message id that contains the currently executing tool call (resolved per `toolCallId`).
 
 Validation rules
 
@@ -124,7 +126,7 @@ const agent = new Agent(
   },
   {
     hostRuntime,
-    runtimeEnv: { AGENT_ID: '<agent-id>', CONVERSATION_ID: '<conversation-id>', ROOM_ID: '<room-conversation-id?>' },
+    runtimeEnv: { AGENT_ID: '<agent-id>', CONVERSATION_ID: '<conversation-id>', ROOM_ID: '<room-conversation-id?>', TOOL_CALL_MESSAGE_ID: '<tool-call-message-id?>' },
   }
 );
 const result = await agent.execute();

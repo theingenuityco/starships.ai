@@ -9,6 +9,13 @@ import type { Client } from 'pg';
  * - Enforces uniqueness + NOT NULL
  */
 export async function up(client: Client): Promise<void> {
+  // NOTE: Some installations have drifted schema where messages.metadata was referenced by server code
+  // but never added. Keep this idempotent fix here to avoid requiring a separate migration number.
+  await client.query(`
+    ALTER TABLE messages
+      ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+  `);
+
   await client.query(`
     ALTER TABLE users
       ADD COLUMN IF NOT EXISTS slug VARCHAR(100);
@@ -100,6 +107,12 @@ export async function down(client: Client): Promise<void> {
   await client.query(`
     ALTER TABLE users
       DROP COLUMN IF EXISTS slug;
+  `);
+
+  // Best-effort revert (some deployments may already rely on this column).
+  await client.query(`
+    ALTER TABLE messages
+      DROP COLUMN IF EXISTS metadata;
   `);
 }
 

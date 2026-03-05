@@ -25,9 +25,6 @@ export interface EnvironmentConfig {
 
   // LLM Provider Configuration
   OPENROUTER_API_KEY?: string;
-  // Web-unlocking gateway (optional)
-  BRIGHTDATA_API_KEY?: string;
-  BRIGHTDATA_ZONE?: string;
   /**
    * Controls which avatar generation pipeline is used by default when callers do not specify a mode.
    * - '3d': current game-character style pipeline

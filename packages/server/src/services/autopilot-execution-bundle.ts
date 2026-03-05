@@ -58,16 +58,6 @@ export interface AutopilotRunnerExecuteConfig extends EngineConfig {
     baseUrl?: string;
   };
   /**
-   * Optional web-unlocking gateway configuration used by runner HostRuntime.http.
-   *
-   * This is injected by the embedding host so the runner does not need these
-   * credentials in its own environment.
-   */
-  webUnlocker?: {
-    apiKey: string;
-    zone: string;
-  };
-  /**
    * AWS runtime configuration for Bedrock.
    */
   aws: {
@@ -135,14 +125,6 @@ export async function buildAutopilotExecutionBundle(args: {
       }
     : undefined;
 
-  const webUnlocker =
-    env.BRIGHTDATA_API_KEY && env.BRIGHTDATA_ZONE
-      ? {
-          apiKey: env.BRIGHTDATA_API_KEY,
-          zone: env.BRIGHTDATA_ZONE,
-        }
-      : undefined;
-
   const aws = {
     accessKeyId: process.env.AWS_BEDROCK_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_BEDROCK_SECRET_ACCESS_KEY,
@@ -164,7 +146,6 @@ export async function buildAutopilotExecutionBundle(args: {
     connectorSessions: connectorSessions as Record<string, ConnectorSession | undefined>,
     connectorMetadata: connectorMetadata as Record<string, Record<string, unknown> | undefined>,
     llm,
-    webUnlocker,
     aws,
     azureAiFoundry,
     modelRoutes,

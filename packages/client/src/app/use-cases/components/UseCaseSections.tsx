@@ -50,7 +50,9 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
       <section className="mt-0 bg-white dark:bg-slate-950" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-0 pb-16 sm:pb-20">
           <div>
-            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-foreground">The <span className="text-primary">Workflow</span></h2>
+            <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-foreground">
+              The <span className="text-primary">Workflow</span>
+            </h2>
             <p className="mt-2 text-base sm:text-lg text-muted-foreground max-w-[70ch]">Agents research and draft. Automations schedule and enrich. Simple and consistent.</p>
           </div>
 
@@ -60,10 +62,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                 <div className="text-sm font-semibold tracking-tight text-foreground">How it works</div>
 
                 <ol className="mt-4 relative pl-6">
-                  <div
-                    className="pointer-events-none absolute left-[11px] top-0 bottom-0 w-0.5 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-600"
-                    aria-hidden
-                  />
+                  <div className="pointer-events-none absolute left-[11px] top-0 bottom-0 w-0.5 rounded-full bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-600" aria-hidden />
                   {useCase.steps.map((s, idx) => (
                     <li key={`${useCase.slug}-step-${idx}`} className="relative pb-4 last:pb-0 animate-workflow-step" style={{ animationDelay: `${idx * 0.12}s` }}>
                       <div className="absolute left-0 top-0 h-7 w-7 rounded-full bg-white dark:bg-slate-800 border-2 border-emerald-500 flex items-center justify-center">
@@ -172,9 +171,11 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
             <div>
               <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight text-foreground">
                 {useCase.workflowsSectionHeading === 'Try it yourself' ? (
-                  <><span className="text-primary">Try it</span> yourself</>
+                  <>
+                    <span className="text-primary">Try it</span> yourself
+                  </>
                 ) : (
-                  useCase.workflowsSectionHeading ?? 'Lead generation workflows'
+                  (useCase.workflowsSectionHeading ?? 'Lead generation workflows')
                 )}
               </h2>
               <p className="mt-2 text-base sm:text-lg text-muted-foreground max-w-[70ch]">

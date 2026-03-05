@@ -31,17 +31,17 @@ function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<strin
 }
 
 const TASK_TYPE_DOT: Record<string, string> = {
-  inbox: 'bg-blue-500/80',
-  report: 'bg-emerald-500/80',
-  research: 'bg-amber-500/80',
-  content: 'bg-violet-500/80',
+  inbox: 'bg-blue-500',
+  report: 'bg-emerald-500',
+  research: 'bg-amber-500',
+  content: 'bg-violet-500',
 }
 
 const TASK_TYPE_BG: Record<string, string> = {
-  inbox: 'bg-blue-100 dark:bg-blue-900/50 border-blue-300',
-  report: 'bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300',
-  research: 'bg-amber-100 dark:bg-amber-900/50 border-amber-300',
-  content: 'bg-violet-100 dark:bg-violet-900/50 border-violet-300',
+  inbox: 'bg-blue-50 dark:bg-blue-950/60 border-blue-400',
+  report: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-400',
+  research: 'bg-amber-50 dark:bg-amber-950/60 border-amber-400',
+  content: 'bg-violet-50 dark:bg-violet-950/60 border-violet-400',
 }
 
 export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runsByDay, onDayClick, className }: MonthScheduleCalendarProps) {
@@ -149,9 +149,7 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                             )}
                           >
                             <div className="flex items-center gap-1 mb-1">
-                              {run.taskType && TASK_TYPE_DOT[run.taskType] ? (
-                                <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[run.taskType])} aria-hidden />
-                              ) : null}
+                              {run.taskType && TASK_TYPE_DOT[run.taskType] ? <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[run.taskType])} aria-hidden /> : null}
                               <span className="font-medium truncate">{run.agentName}</span>
                             </div>
                             {run.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(run.prompt)}</div>}

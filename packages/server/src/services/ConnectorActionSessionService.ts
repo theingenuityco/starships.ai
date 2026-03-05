@@ -291,7 +291,7 @@ export class ConnectorActionSessionService {
         baseUrl: 'https://api.brightdata.com',
         auth: {
           type: 'api_key',
-          apiKeyRef: { type: 'platform_secret', key: 'SYSTEM_CONNECTOR_BRIGHTDATA_API_KEY' },
+          apiKeyRef: { type: 'platform_secret', key: 'SYSTEM_CONNECTOR_WEB_GATEWAY_API_KEY' },
           injection: { style: 'header', headerName: 'Authorization', tokenPrefix: 'Bearer' },
         },
         endpoints: [
@@ -384,7 +384,7 @@ export class ConnectorActionSessionService {
       };
 
       // Only inject auth when configured; callers will receive 401s otherwise.
-      const apiKey = await this.platformSecrets.getSecret('SYSTEM_CONNECTOR_BRIGHTDATA_API_KEY').catch(() => undefined);
+      const apiKey = await this.platformSecrets.getSecret('SYSTEM_CONNECTOR_WEB_GATEWAY_API_KEY').catch(() => undefined);
       if (typeof apiKey === 'string' && apiKey.trim()) {
         connectorSessions[provider] = { headers: { Authorization: `Bearer ${apiKey.trim()}` } };
       }

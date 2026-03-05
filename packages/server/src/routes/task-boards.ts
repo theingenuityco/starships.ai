@@ -42,8 +42,11 @@ const UserAssigneeSlugSchema = z
     const m = raw.match(/^<@u:([^>]+)>$/i);
     const unwrapped = m ? String(m[1] || '').trim() : raw;
     const inner = unwrapped.startsWith('u:') ? unwrapped.slice(2) : unwrapped.toLowerCase().startsWith('u-') ? unwrapped.slice(2) : unwrapped;
-    return IdSchema.safeParse(inner.trim()).success;
-  }, 'user assignee slug must be u:<userId> (or <@u:userId>)');
+    const v = inner.trim();
+    const isId = IdSchema.safeParse(v).success;
+    const isSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v);
+    return isId || isSlug;
+  }, 'user assignee slug must be u:<userId> or u:<userSlug> (or <@u:...>)');
 
 const TaskAssigneeRefSchema = z
   .object({

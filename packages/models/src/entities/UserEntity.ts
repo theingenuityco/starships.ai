@@ -101,6 +101,21 @@ export class UserEntity implements UserModel {
   @Length(1, 255)
   id!: string;
 
+  /**
+   * Stable, human-readable handle (used by @mentions).
+   *
+   * Optional in the model layer for backward compatibility with legacy rows,
+   * but new rows should always set it.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'Slug must be lower-case and contain only a-z0-9 and hyphens',
+  })
+  slug?: string;
+
   @Expose()
   @IsISO8601()
   createdAt!: string;

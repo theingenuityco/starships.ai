@@ -228,9 +228,12 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
     for (const a of list) {
       const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      const slug = typeof (a as any)?.slug === 'string' ? String((a as any).slug).trim() : ''
       if (!id) continue
       const label = formatAgentDisplayName(a as any)
-      m.set(id, String(label || '').trim() || String((a as any)?.name || (a as any)?.slug || 'Agent'))
+      const out = String(label || '').trim() || String((a as any)?.name || (a as any)?.slug || 'Agent')
+      m.set(id, out)
+      if (slug) m.set(slug, out)
     }
     return m
   }, [agentsData])
@@ -240,10 +243,12 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
     for (const it of list) {
       const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
+      const slug = typeof it?.userSlug === 'string' ? String(it.userSlug).trim() : ''
       if (!id) continue
       const label = String(it?.displayName || it?.email || '').trim()
       if (!label) continue
       m.set(id, label)
+      if (slug) m.set(slug, label)
     }
     return m
   }, [membersAndInvites])

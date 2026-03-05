@@ -281,11 +281,11 @@ export class TaskBoardService {
     const raw = String(input || '').trim();
     if (!raw) return null;
 
-    // Accept mention token form: <@u:USER_ID>
+    // Accept mention token form: <@u:USER_SLUG> (legacy: <@u:USER_ID>)
     const m = raw.match(/^<@u:([^>]+)>$/i);
     const unwrapped = m ? String(m[1] || '').trim() : raw;
 
-    // Accept both `u:ID` and `u-ID`
+    // Accept both `u:<ref>` and `u-<ref>` where <ref> is either a userId or userSlug.
     const s = unwrapped.startsWith('u:') ? unwrapped.slice(2) : unwrapped.toLowerCase().startsWith('u-') ? unwrapped.slice(2) : unwrapped;
     const id = String(s || '').trim();
     return id.length > 0 ? id : null;
@@ -315,9 +315,44 @@ export class TaskBoardService {
         return { assigneeAgentId: agent.id, assigneeUserId: null };
       }
       if (type === 'user') {
-        const userId = this.parseUserSlugToId(slug);
-        if (!userId) throw new ValidationError('Invalid user assignee slug', 'assignee', { type, slug });
-        const ok = await this.starshipMembers.isMember(userId, starshipId);
+        const userRef = this.parseUserSlugToId(slug);
+        if (!userRef) throw new ValidationError('Invalid user assignee slug', 'assignee', { type, slug });
+
+        const conn = getConnection();
+        const ownerRow = await conn.queryOne<{ owner_id: string }>(`SELECT owner_id FROM starships WHERE id = $1`, [starshipId]).catch(() => null);
+        const ownerId = typeof ownerRow?.owner_id === 'string' ? String(ownerRow.owner_id).trim() : '';
+
+        const treatAsIdFirst = async (candidateId: string): Promise<boolean> => {
+          if (ownerId && candidateId === ownerId) return true;
+          return await this.starshipMembers.isMember(candidateId, starshipId);
+        };
+
+        let userId = userRef;
+        const okAsId = await treatAsIdFirst(userId).catch(() => false);
+        if (!okAsId) {
+          // If it doesn't validate as a member id, treat it as a userSlug and resolve to userId.
+          const row = await conn
+            .queryOne<{ id: string }>(
+              `
+              SELECT u.id
+                FROM users u
+               WHERE u.slug = $2
+                 AND (
+                   u.id = (SELECT owner_id FROM starships WHERE id = $1)
+                   OR EXISTS (SELECT 1 FROM starship_members sm WHERE sm.starship_id = $1 AND sm.user_id = u.id)
+                 )
+               LIMIT 1
+              `,
+              [starshipId, userRef]
+            )
+            .catch(() => null);
+          const resolved = typeof row?.id === 'string' ? String(row.id).trim() : '';
+          if (!resolved) throw new ValidationError('Assignee user not found', 'assignee', { type, slug });
+          userId = resolved;
+        }
+
+        // Final membership check (owner OR member).
+        const ok = await treatAsIdFirst(userId).catch(() => false);
         if (!ok) throw new ValidationError('Assignee user is not a member of this starship', 'assignee', { type, slug });
         return { assigneeAgentId: null, assigneeUserId: userId };
       }

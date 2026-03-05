@@ -18,6 +18,11 @@ export type AuthMethod = 'password' | 'google' | 'github';
  */
 export interface UserModel {
   id: string;
+  /**
+   * Stable, human-readable handle for mentions and URLs.
+   * Optional for backward compatibility with older servers/clients.
+   */
+  slug?: string;
   email?: string;
   displayName?: string;
   avatar?: string;

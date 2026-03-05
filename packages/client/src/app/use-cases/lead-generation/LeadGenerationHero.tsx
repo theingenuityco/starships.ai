@@ -19,10 +19,7 @@ export function LeadGenerationHero(props: { useCase: UseCaseModel; typewriterPro
       : heroExamples
 
   return (
-    <section
-      className="relative min-h-[95vh] flex flex-col justify-center overflow-hidden text-white"
-      style={{ backgroundColor: '#020617' }}
-    >
+    <section className="relative min-h-[100vh] flex flex-col justify-center overflow-hidden text-white" style={{ backgroundColor: '#020617' }}>
       <StarryBackground position="absolute" className="opacity-70" style={{ '--star-color': 'rgba(255,255,255,0.9)' } as any} />
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[42vh] sm:h-[50vh]"

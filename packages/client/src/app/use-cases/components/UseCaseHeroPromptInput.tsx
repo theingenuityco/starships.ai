@@ -84,8 +84,8 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
         }}
       >
         <div className="relative">
-          <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-indigo-500/45 via-fuchsia-500/45 to-amber-500/35 opacity-15 blur-md" aria-hidden />
-          <div className="relative rounded-2xl bg-card shadow-sm border border-border/40 px-4 py-3 transition-colors focus-within:border-primary/70">
+          <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-white/40 via-white/60 to-white/40 opacity-80 blur-md" aria-hidden />
+          <div className="relative rounded-2xl bg-white shadow-sm border border-slate-200 px-4 py-3 transition-colors focus-within:border-amber-400/80">
             <div className="relative text-left">
               {showTypewriter && (
                 <div className="pointer-events-none absolute inset-0 p-0 pr-14 text-left text-base sm:text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap break-words" aria-hidden>
@@ -107,7 +107,7 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
                 aria-label="Describe your lead generation task"
                 rows={4}
                 className={cn(
-                  'min-h-[120px] resize-none border-0 bg-transparent shadow-none p-0 pr-14 text-base sm:text-lg leading-relaxed',
+                  'min-h-[120px] resize-none border-0 bg-transparent shadow-none p-0 pr-14 text-base sm:text-lg leading-relaxed text-slate-900 placeholder:text-slate-500',
                   'focus-visible:ring-0 focus-visible:ring-offset-0',
                   showTypewriter && 'caret-transparent'
                 )}
@@ -141,9 +141,10 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
                     inputRef.current?.focus()
                   }}
                   className={cn(
-                    'inline-flex items-center rounded-full border border-border/40 bg-card shadow-sm px-4 py-2 text-sm font-semibold text-foreground/90',
-                    'hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    'inline-flex items-center rounded-full px-5 py-2 text-sm font-semibold whitespace-nowrap',
+                    'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500',
+                    'shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px]',
+                    'transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
                   )}
                 >
                   {label}

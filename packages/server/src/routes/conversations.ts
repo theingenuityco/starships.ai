@@ -1194,7 +1194,7 @@ router.post(
         try {
           const repo = new MessageRepository();
           const msg = await repo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
-          const id = msg && typeof (msg as any)?.id === 'string' ? String((msg as any).id).trim() : '';
+          const id = msg && typeof msg.id === 'string' ? String(msg.id).trim() : '';
           return id || null;
         } catch {
           return null;
@@ -2826,32 +2826,101 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
 
     // Resolve agent from either agentId or agentSlug, and verify access/ownership
     let resolvedAgentId: string | undefined;
-    if (!isInternal && bodyValidation.agentSlug) {
-      const agentService = new AgentService();
-      const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
-      const agent = starshipAgents.find((a) => a.slug === bodyValidation.agentSlug) || null;
+    if (bodyValidation.agentSlug) {
+      const rawSelector = String(bodyValidation.agentSlug || '').trim();
 
-      if (!agent) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-          resource: 'agent',
-          slug: bodyValidation.agentSlug,
-          starshipId: bodyValidation.starshipId,
-        });
-        return;
+      const normalize = (s: string): string => s.toLowerCase().trim().replace(/\s+/g, '').replace(/[_.-]/g, '');
+      const parseSelector = (s: string): { kind: 'id' | 'text'; value: string } | null => {
+        const input = String(s || '').trim();
+        if (!input) return null;
+
+        // Structured token: <@a:AGENT_ID>
+        const tokenMatch = input.match(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/i);
+        if (tokenMatch && tokenMatch[1]) return { kind: 'id', value: String(tokenMatch[1]).trim() };
+
+        // Legacy/typed mentions: @slug, @"Name With Spaces", @[Name With Spaces]
+        let out = input;
+        if (out.startsWith('@')) out = out.slice(1).trim();
+        if (out.startsWith('"') && out.endsWith('"') && out.length >= 2) out = out.slice(1, -1).trim();
+        if (out.startsWith('[') && out.endsWith(']') && out.length >= 2) out = out.slice(1, -1).trim();
+        if (!out) return null;
+        if (normalize(out) === 'all') return null;
+        return { kind: 'text', value: out };
+      };
+
+      const selector = parseSelector(rawSelector);
+      if (!selector) {
+        // `@all` is meaningful in message routing but does not map to a single agent for conversation creation.
+        const norm = normalize(rawSelector.replace(/^@/, ''));
+        if (norm === 'all') {
+          sendError(res, 'VALIDATION_ERROR', 'Agent selector "@all" is not supported for conversation creation', 400, {
+            resource: 'agent',
+            selector: rawSelector,
+            starshipId: bodyValidation.starshipId,
+          });
+          return;
+        }
       }
+      if (selector) {
+        const agentService = new AgentService();
+        const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
 
-      // Verify user owns the agent's starship
-      if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agent.id, res))) {
-        return;
+        const resolve = (): { agent: (typeof starshipAgents)[number] | null; ambiguous?: boolean } => {
+          if (selector.kind === 'id') {
+            const found = starshipAgents.find((a) => String(a.id) === selector.value) || null;
+            return { agent: found };
+          }
+
+          // 1) Keep strict exact slug match as first priority (back-compat behavior)
+          const exactSlug = starshipAgents.find((a) => a.slug === selector.value) || null;
+          if (exactSlug) return { agent: exactSlug };
+
+          // 2) Exact normalized match on either name or slug (must be unique)
+          const key = normalize(selector.value);
+          const candidates = (starshipAgents || []).filter((a) => {
+            const nameKey = normalize((a as { name?: string }).name || '');
+            const slugKey = normalize((a as { slug?: string }).slug || '');
+            return nameKey === key || slugKey === key;
+          });
+          if (candidates.length === 1) return { agent: candidates[0] };
+          if (candidates.length > 1) return { agent: null, ambiguous: true };
+          return { agent: null };
+        };
+
+        const { agent, ambiguous } = resolve();
+
+        if (!agent) {
+          if (ambiguous) {
+            sendError(res, 'VALIDATION_ERROR', 'Agent selector is ambiguous; please use a unique slug or pick from suggestions', 409, {
+              resource: 'agent',
+              selector: rawSelector,
+              starshipId: bodyValidation.starshipId,
+            });
+            return;
+          }
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+            resource: 'agent',
+            selector: rawSelector,
+            starshipId: bodyValidation.starshipId,
+          });
+          return;
+        }
+
+        // Verify agent belongs to the same starship as the conversation
+        if (agent.starshipId !== bodyValidation.starshipId) {
+          sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
+          return;
+        }
+
+        // External callers: verify user owns the agent's starship (internal callers already trusted by auth)
+        if (!isInternal) {
+          if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agent.id, res))) {
+            return;
+          }
+        }
+
+        resolvedAgentId = agent.id;
       }
-
-      // Verify agent belongs to the same starship as the conversation
-      if (agent.starshipId !== bodyValidation.starshipId) {
-        sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
-        return;
-      }
-
-      resolvedAgentId = agent.id;
     }
 
     // No-stray enforcement:

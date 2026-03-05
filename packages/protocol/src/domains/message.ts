@@ -68,6 +68,12 @@ export interface Message extends Omit<LlmMessage, 'content'> {
    * Used for generic "thread preview" / "index post" messages in channels.
    */
   linkedConversationId?: string;
+
+  /**
+   * Optional message metadata stored in Postgres (JSONB).
+   * Used for internal flags (e.g. hidden seed messages) and future extensibility.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 // Sentinel used to mark a message as deleted (soft delete).

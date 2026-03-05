@@ -29,6 +29,7 @@ export class MigrationRunner {
   // In dist, this file lives at dist/scripts/, and migrations live at dist/migrations/.
   // So `../migrations` is the correct relative path in BOTH cases.
   private migrationsPath = join(__dirname, '../migrations');
+  private sourceMigrationsPath = join(__dirname, '../../src/migrations');
 
   private isDistBuild(): boolean {
     return __dirname.includes('/dist/') || __dirname.includes('\\dist\\');
@@ -36,6 +37,10 @@ export class MigrationRunner {
 
   private getMigrationsPath(): string {
     return this.migrationsPath;
+  }
+
+  private getSourceMigrationsPath(): string {
+    return this.sourceMigrationsPath;
   }
 
   private getConnection() {
@@ -46,10 +51,19 @@ export class MigrationRunner {
   }
 
   private resolveMigrationModulePath(id: string): string | null {
-    const base = this.getMigrationsPath();
-    const ext = this.isDistBuild() ? '.js' : '.ts';
-    const p = join(base, id + ext);
-    if (existsSync(p)) return p;
+    const isDist = this.isDistBuild();
+    const distBase = this.getMigrationsPath();
+    const distPath = join(distBase, id + '.js');
+    if (isDist && existsSync(distPath)) return distPath;
+
+    const srcBase = isDist ? this.getSourceMigrationsPath() : this.getMigrationsPath();
+    const srcPath = join(srcBase, id + '.ts');
+    if (existsSync(srcPath)) return srcPath;
+
+    // Dev fallback: if running from source but only JS exists (uncommon), allow it.
+    const jsFallback = join(distBase, id + '.js');
+    if (!isDist && existsSync(jsFallback)) return jsFallback;
+
     return null;
   }
 
@@ -244,11 +258,24 @@ export class MigrationRunner {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
-    const base = this.getMigrationsPath();
-    if (!existsSync(base)) return [];
-    const ext = this.isDistBuild() ? '.js' : '.ts';
-    const files = readdirSync(base).filter((file) => file.endsWith(ext) && !file.endsWith('.d.ts'));
-    const ids = files.map((f) => f.slice(0, -ext.length));
+    const idsSet = new Set<string>();
+
+    const distBase = this.getMigrationsPath();
+    if (existsSync(distBase)) {
+      const files = readdirSync(distBase).filter((file) => file.endsWith('.js') && !file.endsWith('.d.ts'));
+      for (const f of files) idsSet.add(f.slice(0, -'.js'.length));
+    }
+
+    // When the server is run via tsx in dev, we may be executing the models package from `dist/`
+    // while still having up-to-date migrations only in `src/`. Include them so startup can
+    // apply new migrations without requiring a separate models build.
+    const srcBase = this.isDistBuild() ? this.getSourceMigrationsPath() : this.getMigrationsPath();
+    if (existsSync(srcBase)) {
+      const files = readdirSync(srcBase).filter((file) => file.endsWith('.ts') && !file.endsWith('.d.ts'));
+      for (const f of files) idsSet.add(f.slice(0, -'.ts'.length));
+    }
+
+    const ids = Array.from(idsSet);
 
     // Sort by numeric prefix, then lexicographically
     const sortedIds = ids.sort((a, b) => {

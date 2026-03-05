@@ -266,7 +266,9 @@ export function ThreadPane(props: {
             titleRightSlot !== undefined
               ? titleRightSlot
               : effectiveConversationId
-                ? <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} />
+                ? roomConversationId
+                  ? <NotificationMenu type="room" roomId={roomConversationId} starshipId={starshipId} />
+                  : <NotificationMenu type="thread" conversationId={effectiveConversationId} starshipId={starshipId} />
                 : null
           }
           maxTokens={

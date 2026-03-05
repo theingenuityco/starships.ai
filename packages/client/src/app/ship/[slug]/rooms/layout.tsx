@@ -5,6 +5,7 @@ import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
+import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -374,6 +375,19 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return Boolean(uid && ownerId && String(uid) === String(ownerId))
   }, [starshipData, user?.id])
 
+  const starshipOwnerId = useMemo(() => {
+    const ownerId = (starshipData as any)?.ownerId
+    return typeof ownerId === 'string' && ownerId.trim() ? ownerId.trim() : null
+  }, [starshipData])
+
+  const hasAnyResources = useMemo(() => {
+    const v = pinsData?.views?.length ?? 0
+    const d = pinsData?.datasets?.length ?? 0
+    const b = pinsData?.taskBoards?.length ?? 0
+    const t = roomToolsData?.items?.length ?? 0
+    return v + d + b + t > 0
+  }, [pinsData?.datasets?.length, pinsData?.taskBoards?.length, pinsData?.views?.length, roomToolsData?.items?.length])
+
   const pinView = usePinRoomView(activeConversationId || '', starshipData?.id ?? '')
   const unpinView = useUnpinRoomView(activeConversationId || '')
   const pinDataset = usePinRoomDataset(activeConversationId || '')
@@ -603,6 +617,22 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             }
             mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
             titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+            rightSlot={
+              <div className="flex items-center gap-2">
+                <RoomParticipantsButton
+                  starshipId={starshipData.id}
+                  roomConversationId={activeConversationId}
+                  roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                  starshipOwnerId={starshipOwnerId}
+                />
+                {canManagePins || hasAnyResources ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
+                    <Icon name="pin" className="h-4 w-4 mr-1" />
+                    Resources
+                  </Button>
+                ) : null}
+              </div>
+            }
             hideCloseButton={true}
             className="h-full"
           />
@@ -613,6 +643,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             roomSlug={activeRoom?.slug ?? null}
             roomName={activeRoom?.name ?? null}
             roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+            starshipOwnerId={starshipOwnerId}
             starshipSlug={routeParams.slug}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}

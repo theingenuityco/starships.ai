@@ -17,8 +17,7 @@ export const ROOM_QUERY_KEYS = {
   tools: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'tools'] as const,
   participation: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participation'] as const,
   participants: (roomConversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'participants'] as const,
-  inviteApprovalsPending: (roomConversationId: string, conversationId: string) =>
-    [...ROOM_QUERY_KEYS.detail(roomConversationId), 'invite-approvals', 'pending', conversationId] as const,
+  inviteApprovalsPending: (roomConversationId: string, conversationId: string) => [...ROOM_QUERY_KEYS.detail(roomConversationId), 'invite-approvals', 'pending', conversationId] as const,
 } as const
 
 export type PendingRoomInviteApproval = {
@@ -50,9 +49,7 @@ export function useRoomPins(roomConversationId: string, enabled: boolean = true)
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.pins(roomConversationId),
     queryFn: async (): Promise<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }> => {
-      const response: FetchResponse<
-        ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }>
-      > = await api.get(
+      const response: FetchResponse<ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }>> = await api.get(
         `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/pins`
       )
       return {
@@ -75,9 +72,7 @@ export function useRoomTools(roomConversationId: string, enabled: boolean = true
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.tools(roomConversationId),
     queryFn: async (): Promise<{ items: RoomToolItem[] }> => {
-      const response: FetchResponse<ApiResponse<{ items: RoomToolItem[] }>> = await api.get(
-        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/tools`
-      )
+      const response: FetchResponse<ApiResponse<{ items: RoomToolItem[] }>> = await api.get(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/tools`)
       return { items: Array.isArray(response.data.data?.items) ? response.data.data!.items : [] }
     },
     enabled: !!roomConversationId && enabled,
@@ -107,10 +102,7 @@ export function useJoinRoom(roomConversationId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const response: FetchResponse<ApiResponse<{ joined: boolean; created: boolean }>> = await api.post(
-        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/join`,
-        {}
-      )
+      const response: FetchResponse<ApiResponse<{ joined: boolean; created: boolean }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/join`, {})
       return response.data.data
     },
     onSuccess: async () => {
@@ -128,10 +120,7 @@ export function useLeaveRoom(roomConversationId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      const response: FetchResponse<ApiResponse<{ left: boolean; removed: boolean }>> = await api.post(
-        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/leave`,
-        {}
-      )
+      const response: FetchResponse<ApiResponse<{ left: boolean; removed: boolean }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/leave`, {})
       return response.data.data
     },
     onSuccess: async () => {
@@ -149,9 +138,7 @@ export function useRoomParticipants(roomConversationId: string, enabled: boolean
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.participants(roomConversationId),
     queryFn: async (): Promise<{ userIds: string[]; agentIds: string[] }> => {
-      const response: FetchResponse<ApiResponse<{ userIds: string[]; agentIds: string[] }>> = await api.get(
-        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/participants`
-      )
+      const response: FetchResponse<ApiResponse<{ userIds: string[]; agentIds: string[] }>> = await api.get(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/participants`)
       return {
         userIds: (response.data.data?.userIds || []).map((x: unknown) => String(x)).filter(Boolean),
         agentIds: (response.data.data?.agentIds || []).map((x: unknown) => String(x)).filter(Boolean),
@@ -162,14 +149,96 @@ export function useRoomParticipants(roomConversationId: string, enabled: boolean
   })
 }
 
+export function useAddRoomMember(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { userId: string; role?: 'member' | 'admin' }) => {
+      const userId = String(args.userId || '').trim()
+      if (!userId) throw new Error('Missing userId')
+      const response: FetchResponse<ApiResponse<{ created: boolean }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/members`, {
+        userId,
+        ...(args.role ? { role: args.role } : {}),
+      })
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      toast.success('Participant added')
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to add participant', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useRemoveRoomMember(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const uid = String(userId || '').trim()
+      if (!uid) throw new Error('Missing userId')
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
+        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/members/${encodeURIComponent(uid)}`
+      )
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      toast.success('Participant removed')
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to remove participant', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useAddRoomAgent(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { agentId: string }) => {
+      const agentId = String(args.agentId || '').trim()
+      if (!agentId) throw new Error('Missing agentId')
+      const response: FetchResponse<ApiResponse<{ created: boolean }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/agents`, {
+        agentId,
+      })
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      toast.success('Agent added')
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to add agent', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useRemoveRoomAgent(roomConversationId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (agentId: string) => {
+      const aid = String(agentId || '').trim()
+      if (!aid) throw new Error('Missing agentId')
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/agents/${encodeURIComponent(aid)}`)
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.participants(roomConversationId) })
+      toast.success('Agent removed')
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to remove agent', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
 export function useRoomInviteApprovalsPending(roomConversationId: string, conversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.inviteApprovalsPending(roomConversationId, conversationId),
     queryFn: async (): Promise<{ approvals: PendingRoomInviteApproval[] }> => {
-      const response: FetchResponse<ApiResponse<{ approvals: PendingRoomInviteApproval[] }>> = await api.get(
-        `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/invite-approvals/pending`,
-        { params: { conversationId } }
-      )
+      const response: FetchResponse<ApiResponse<{ approvals: PendingRoomInviteApproval[] }>> = await api.get(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/invite-approvals/pending`, {
+        params: { conversationId },
+      })
       return { approvals: Array.isArray(response.data.data?.approvals) ? response.data.data!.approvals : [] }
     },
     enabled: !!roomConversationId && !!conversationId && enabled,
@@ -301,9 +370,7 @@ export function useUnpinRoomView(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (viewId: string) => {
-      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/views/${encodeURIComponent(viewId)}`
-      )
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/views/${encodeURIComponent(viewId)}`)
       return response.data.data
     },
     onSuccess: async () => {
@@ -338,9 +405,7 @@ export function useUnpinRoomDataset(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (datasetId: string) => {
-      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/datasets/${encodeURIComponent(datasetId)}`
-      )
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/datasets/${encodeURIComponent(datasetId)}`)
       return response.data.data
     },
     onSuccess: async () => {
@@ -375,9 +440,7 @@ export function useUnpinRoomTaskBoard(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (boardId: string) => {
-      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/task-boards/${encodeURIComponent(boardId)}`
-      )
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/task-boards/${encodeURIComponent(boardId)}`)
       return response.data.data
     },
     onSuccess: async () => {
@@ -412,9 +475,7 @@ export function useUnassignRoomTool(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (toolId: string) => {
-      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/tools/${encodeURIComponent(toolId)}`
-      )
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomId)}/tools/${encodeURIComponent(toolId)}`)
       return response.data.data
     },
     onSuccess: async () => {
@@ -445,10 +506,7 @@ export function useReorderPinnedRoomDatasets(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (datasetIds: string[]) => {
-      const response: FetchResponse<ApiResponse<{ datasets: RoomPinnedDataset[] }>> = await api.post(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/datasets/reorder`,
-        { datasetIds }
-      )
+      const response: FetchResponse<ApiResponse<{ datasets: RoomPinnedDataset[] }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/datasets/reorder`, { datasetIds })
       return response.data.data?.datasets || []
     },
     onSuccess: async () => {
@@ -461,10 +519,7 @@ export function useReorderPinnedRoomTaskBoards(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (boardIds: string[]) => {
-      const response: FetchResponse<ApiResponse<{ taskBoards: RoomPinnedTaskBoard[] }>> = await api.post(
-        `/api/v1/rooms/${encodeURIComponent(roomId)}/pins/task-boards/reorder`,
-        { boardIds }
-      )
+      const response: FetchResponse<ApiResponse<{ taskBoards: RoomPinnedTaskBoard[] }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/task-boards/reorder`, { boardIds })
       return response.data.data?.taskBoards || []
     },
     onSuccess: async () => {
@@ -484,4 +539,3 @@ export function useStarshipTaskBoards(starshipId: string, enabled: boolean = tru
     staleTime: 10_000,
   })
 }
-

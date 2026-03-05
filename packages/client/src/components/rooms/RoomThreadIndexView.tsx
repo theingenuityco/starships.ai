@@ -5,6 +5,7 @@ import { ConversationSummaryBar } from '@/components/conversation/ConversationSu
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
+import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
@@ -20,6 +21,7 @@ export function RoomThreadIndexView(props: {
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  starshipOwnerId?: string | null
   starshipSlug?: string | null
   /** Optional allowlists to scope @mention and agent selection within room threads. */
   allowedMentionUserIds?: string[] | null
@@ -162,6 +164,12 @@ export function RoomThreadIndexView(props: {
         fallbackTitle={label}
         rightSlot={
           <div className="flex items-center gap-2">
+            <RoomParticipantsButton
+              starshipId={props.starshipId}
+              roomConversationId={props.roomConversationId}
+              roomIsPrivate={Boolean(props.roomIsPrivate)}
+              starshipOwnerId={props.starshipOwnerId ?? null}
+            />
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />

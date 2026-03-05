@@ -1,0 +1,234 @@
+// Important: RunnerHostRuntime imports `CancelledError` from `@starships/autopilot`.
+// The compiled Autopilot bundle pulls in some ESM-only deps (e.g. nanoid) that
+// Jest (CJS) won't transform by default. We only need `CancelledError` at runtime
+// for these tests, so we mock it to avoid importing the whole package.
+jest.mock(
+  '@starships/autopilot',
+  () => {
+    class CancelledError extends Error {
+      constructor(message = 'cancelled') {
+        super(message);
+        this.name = 'CancelledError';
+      }
+    }
+    return { CancelledError };
+  },
+  { virtual: true }
+);
+
+let createRunnerHostRuntime: typeof import('../RunnerHostRuntime').createRunnerHostRuntime;
+
+type MockResponseInit = {
+  status?: number;
+  statusText?: string;
+  url?: string;
+  headers?: Record<string, string>;
+  json?: unknown;
+  text?: string;
+};
+
+const makeHeaders = (headers: Record<string, string>) => {
+  const lower: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers || {})) lower[k.toLowerCase()] = v;
+  return {
+    get(name: string) {
+      return lower[String(name || '').toLowerCase()] ?? null;
+    },
+    forEach(cb: (value: string, key: string) => void) {
+      for (const [k, v] of Object.entries(lower)) cb(v, k);
+    },
+  };
+};
+
+const makeResponse = (init: MockResponseInit) => {
+  const status = typeof init.status === 'number' ? init.status : 200;
+  const statusText = typeof init.statusText === 'string' ? init.statusText : status === 200 ? 'OK' : 'Error';
+  const url = typeof init.url === 'string' ? init.url : '';
+  const headers = makeHeaders(init.headers ?? {});
+  const jsonVal = init.json;
+  const textVal = typeof init.text === 'string' ? init.text : typeof jsonVal === 'string' ? jsonVal : JSON.stringify(jsonVal ?? '');
+  return {
+    status,
+    statusText,
+    url,
+    headers,
+    async json() {
+      return jsonVal;
+    },
+    async text() {
+      return textVal;
+    },
+    async arrayBuffer() {
+      return new ArrayBuffer(0);
+    },
+  } as unknown as Response;
+};
+
+describe('RunnerHostRuntime Web Unlocker', () => {
+  const envSnapshot = { ...process.env };
+  const fetchSnapshot = (globalThis as unknown as { fetch?: unknown }).fetch;
+
+  beforeAll(async () => {
+    ({ createRunnerHostRuntime } = await import('../RunnerHostRuntime'));
+  });
+
+  afterEach(() => {
+    process.env = { ...envSnapshot };
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchSnapshot,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it('uses direct fetch when useWebUnlocker is not set', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://example.com',
+        headers: { 'content-type': 'application/json' },
+        json: { ok: true },
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime();
+    await rt.http({ method: 'GET', url: 'https://example.com' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.com',
+      expect.objectContaining({
+        method: 'GET',
+      })
+    );
+  });
+
+  it('routes through Bright Data when useWebUnlocker=true', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.brightdata.com/request',
+        headers: { 'content-type': 'application/json' },
+        json: {
+          result: '<html>ok</html>',
+          status_code: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+          url: 'https://example.com',
+        },
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({
+      method: 'GET',
+      url: 'https://example.com',
+      headers: { 'user-agent': 'StarshipsTest/1.0' },
+      useWebUnlocker: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.brightdata.com/request',
+      expect.objectContaining({
+        method: 'POST',
+      })
+    );
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const payload = JSON.parse(String(init.body ?? '{}'));
+    expect(payload).toEqual(
+      expect.objectContaining({
+        zone: 'test-zone',
+        url: 'https://example.com',
+        format: 'raw',
+        method: 'GET',
+      })
+    );
+    expect(payload.headers).toEqual(expect.objectContaining({ 'user-agent': 'StarshipsTest/1.0' }));
+
+    expect(resp.status).toBe(200);
+    expect(resp.body).toBe('<html>ok</html>');
+    expect((resp.headers as Record<string, unknown>)['content-type']).toContain('text/html');
+    expect(resp.url).toBe('https://example.com');
+  });
+
+  it('parses JSON result when target content-type is application/json', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        json: {
+          result: '{"a":1}',
+          status_code: 200,
+          headers: { 'content-type': 'application/json' },
+          url: 'https://example.com/json',
+        },
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({ method: 'GET', url: 'https://example.com/json', useWebUnlocker: true });
+    expect(resp.body).toEqual({ a: 1 });
+  });
+
+  it('returns target status_code from envelope (e.g. 404)', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        json: {
+          result: 'Not Found',
+          status_code: 404,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+          url: 'https://example.com/missing',
+        },
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({ method: 'GET', url: 'https://example.com/missing', useWebUnlocker: true, responseType: 'text' });
+    expect(resp.status).toBe(404);
+    expect(resp.statusText).toMatch(/Not Found|404/);
+    expect(resp.body).toBe('Not Found');
+  });
+
+  it('throws when gateway returns non-2xx (e.g. 401)', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { 'content-type': 'application/json' },
+        text: JSON.stringify({ error: 'unauthorized' }),
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'bad', zone: 'bad' } });
+    await expect(
+      rt.http({ method: 'GET', url: 'https://example.com', useWebUnlocker: true, responseType: 'text' })
+    ).rejects.toThrow(/gateway returned 401/i);
+  });
+
+  it('returns raw text when gateway returns non-JSON body', async () => {
+    const fetchMock = jest.fn(async () =>
+      makeResponse({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+        text: '<html><body>ok</body></html>',
+      })
+    );
+    Object.defineProperty(globalThis, 'fetch', { value: fetchMock, writable: true, configurable: true });
+
+    const rt = createRunnerHostRuntime({ webUnlocker: { apiKey: 'test-key', zone: 'test-zone' } });
+    const resp = await rt.http({ method: 'GET', url: 'https://example.com', useWebUnlocker: true, responseType: 'text' });
+    expect(resp.body).toBe('<html><body>ok</body></html>');
+  });
+});
+

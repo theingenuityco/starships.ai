@@ -52,11 +52,14 @@ import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentP
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
   starshipId: string
   conversationId?: string | null
+  /** Optional: when composing inside a room thread, pass the room conversation id for invite-on-mention. */
+  roomConversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   /**
    * Optional: draft direct message target.
@@ -99,6 +102,12 @@ interface ConversationMessageInputProps {
   budgetTokens?: number
   onAgentChange?: (agent: AgentModel | null) => void
   starshipSlug?: string
+  /** Optional allowlists to scope @mention suggestions (users). */
+  allowedMentionUserIds?: string[] | null
+  /** Optional allowlists to scope @mention suggestions (agents). */
+  allowedMentionAgentIds?: string[] | null
+  /** Optional allowlists to scope execution agent selection. */
+  allowedAgentIds?: string[] | null
 }
 
 export interface ConversationMessageInputRef {
@@ -113,6 +122,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       selectedAgent,
       starshipId,
       conversationId,
+      roomConversationId,
       onConversationStart,
       draftDirectMessageTarget,
       newConversationParentConversationId,
@@ -132,6 +142,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       budgetTokens,
       onAgentChange,
       starshipSlug,
+      allowedMentionUserIds,
+      allowedMentionAgentIds,
+      allowedAgentIds,
     },
     ref
   ) => {
@@ -141,6 +154,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [sending, setSending] = useState(false)
     const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
     const isStarter = !conversationId
+    const isExpandedStarterLayout = Boolean(isStarter && !minimal)
     // Load channels so we can detect "channel context" for both channel roots AND channel threads.
     // (Channel threads have conversationId != channelConversationId, so we must check parentConversationId.)
     const { data: channelsData } = useStarshipChannels(
@@ -337,6 +351,44 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const list = (membersData as any)?.members
       return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
     }, [membersData])
+
+    // Allowlist semantics:
+    // - undefined => unrestricted (non-room contexts)
+    // - [] => restrict to none (e.g. room has no allowlisted agents)
+    const allowedMentionUserIdSet = useMemo(() => {
+      if (allowedMentionUserIds === undefined) return null
+      const raw = Array.isArray(allowedMentionUserIds) ? allowedMentionUserIds : []
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedMentionUserIds])
+
+    const allowedMentionAgentIdSet = useMemo(() => {
+      if (allowedMentionAgentIds === undefined) return null
+      const raw = Array.isArray(allowedMentionAgentIds) ? allowedMentionAgentIds : []
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedMentionAgentIds])
+
+    const allowedAgentIdSet = useMemo(() => {
+      if (allowedAgentIds === undefined) return null
+      const raw = Array.isArray(allowedAgentIds) ? allowedAgentIds : []
+      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
+    }, [allowedAgentIds])
+
+    const starshipAgentsForExecution = useMemo(() => {
+      const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
+      const allow = allowedAgentIdSet
+      if (allow === null) return list
+      return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
+    }, [allowedAgentIdSet, starshipAgents])
+
+    // If the current selection becomes disallowed (e.g. room allowlist changes), clear it.
+    useEffect(() => {
+      const allow = allowedAgentIdSet
+      const id = String((selectedAgent as any)?.id || '').trim()
+      if (allow === null || !id) return
+      if (!allow.has(id)) {
+        onAgentChange?.(null)
+      }
+    }, [allowedAgentIdSet, onAgentChange, selectedAgent])
     const mentionAvatarAttachmentIds = useMemo(() => {
       return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
         .map(a => (a as any)?.avatarAttachmentId as string | undefined)
@@ -348,6 +400,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
     const membersRef = useRef<StarshipMemberListItem[]>([])
+    const allowedMentionUserIdSetRef = useRef<Set<string> | null>(null)
+    const allowedMentionAgentIdSetRef = useRef<Set<string> | null>(null)
+    useEffect(() => {
+      allowedMentionUserIdSetRef.current = allowedMentionUserIdSet
+    }, [allowedMentionUserIdSet])
+    useEffect(() => {
+      allowedMentionAgentIdSetRef.current = allowedMentionAgentIdSet
+    }, [allowedMentionAgentIdSet])
     useEffect(() => {
       const latest = Array.isArray(memberUsers) ? memberUsers : []
       if (latest.length > 0) membersRef.current = latest
@@ -764,9 +824,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const resolveAgentById = (id: string): AgentModel | null => {
         const aid = String(id || '').trim()
         if (!aid) return null
-        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+          a => String(a?.id || '').trim() === aid
+        ) ?? null
         if (fromStarship) return fromStarship
-        const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        if (fromConvRaw && allowedAgentIdSet && !allowedAgentIdSet.has(String(fromConvRaw.id || '').trim())) return null
+        const fromConv = fromConvRaw
         return fromConv ?? null
       }
 
@@ -804,7 +868,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
         if (!dmLockedAgent) {
           const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
-          if (tokenMatch && starshipAgents.length > 0) {
+          if (tokenMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
             const id = String(tokenMatch[1] || '').trim()
             const matched = id ? resolveAgentById(id) : null
             if (matched) {
@@ -813,10 +877,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           } else {
             // Back-compat: plain-text leading @handle
             const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-            if (mentionMatch && starshipAgents.length > 0) {
+            if (mentionMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
               const handle = mentionMatch[1]
               const lower = handle.toLowerCase()
-              const matched = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
+              const matched =
+                (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
               if (matched) {
                 effectiveAgent = matched
                 // Do NOT strip the leading mention; keep it in the message content
@@ -971,53 +1036,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               }
             } catch {}
 
-            // Seed hidden thread context into the NEW thread conversation so the agent sees the linked message.
-            // This message is not shown in the UI (ConversationMessageList filters it out).
-            try {
-              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
-              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
-              const sourceContent = typeof linkMessageToNewConversation?.content === 'string' ? linkMessageToNewConversation.content : ''
-              if (parentId && msgId && sourceContent.trim().length > 0) {
-                const createdAt = typeof linkMessageToNewConversation?.createdAt === 'string' ? linkMessageToNewConversation.createdAt : ''
-                const role = typeof linkMessageToNewConversation?.role === 'string' ? linkMessageToNewConversation.role : ''
-                const userName = typeof linkMessageToNewConversation?.userName === 'string' ? linkMessageToNewConversation.userName : ''
-                const agentName = typeof linkMessageToNewConversation?.agentName === 'string' ? linkMessageToNewConversation.agentName : ''
-                const attachmentIds = Array.isArray(linkMessageToNewConversation?.attachmentIds) ? linkMessageToNewConversation.attachmentIds : []
-
-                const seedContent = [
-                  '[THREAD_CONTEXT_SEED]',
-                  'Thread context seed (system instruction). Use this as upstream context for the thread.',
-                  '',
-                  `Source conversation id: ${parentId}`,
-                  `Source message id: ${msgId}`,
-                  role ? `Source role: ${role}` : null,
-                  userName ? `Source userName: ${userName}` : null,
-                  agentName ? `Source agentName: ${agentName}` : null,
-                  createdAt ? `Source createdAt: ${createdAt}` : null,
-                  attachmentIds.length > 0 ? `Source attachmentIds: ${attachmentIds.join(', ')}` : null,
-                  '',
-                  'Source message content:',
-                  '"""',
-                  sourceContent,
-                  '"""',
-                ]
-                  .filter(Boolean)
-                  .join('\n')
-
-                await api.post('/api/v1/messages', {
-                  role: 'system',
-                  content: seedContent,
-                  starshipId: starshipId,
-                  conversationId: currentConversationId,
-                  messageType: 'system_instruction',
-                  metadata: {
-                    thread_context_seed: true,
-                    sourceConversationId: parentId,
-                    sourceMessageId: msgId,
-                  },
-                })
-              }
-            } catch {}
+            // Thread context is now persisted server-side when linking the parent message to the new thread
+            // (via linkedConversationId). No hidden system seed message is required.
 
             // Apply pending web browsing preference if enabled
             await applyPendingWebBrowsing(currentConversationId)
@@ -1223,6 +1243,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       uploadFile,
       queryClient,
       applyPendingWebBrowsing,
+      roomConversationId,
+      memberUsers,
     ])
 
     // Keep a stable ref for TipTap's Enter key handler.
@@ -1389,7 +1411,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // DMs: lock UI hints to the DM target agent when applicable.
       if (resolvedDmTarget?.dmType === 'user_agent') {
         const id = resolvedDmTarget.agentId
-        const fromStarship = (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
+          a => String(a?.id || '').trim() === id
+        ) ?? null
         if (fromStarship) return fromStarship
         const fromConv = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === id) ?? null
         return fromConv ?? null
@@ -1402,7 +1426,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       return null
-    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgents])
+    }, [conversationAgents, isChannelContext, isMentionOnlyThread, isThreadContext, linkedAgentCount, resolvedDmTarget, starshipAgentsForExecution])
 
     const getPlaceholder = () => {
       const label = agentLabelForUI(contextAgentForUI)
@@ -1458,8 +1482,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       active,
       onHover,
     }: {
-      items: Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }>
-      command: (item: { id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem }) => void
+      items: Array<{ id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem; inRoom?: boolean }>
+      command: (item: { id: string; label: string; kind?: 'agent' | 'user'; agent?: AgentModel; user?: StarshipMemberListItem; inRoom?: boolean }) => void
       anchorRect: DOMRect | null
       active: number
       onHover: (i: number) => void
@@ -1492,6 +1516,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         : 0
       const left = rect ? Math.min(Math.max(8, rect.left), vw - menuWidth - 8) : 0
       const style: React.CSSProperties | undefined = anchorRect ? { position: 'fixed', left, top, zIndex: 9999, width: menuWidth, willChange: 'transform' } : undefined
+      const hasRoomSegregation = (Array.isArray(items) ? items : []).some(i => (i as any)?.inRoom === false)
+      const firstNotInRoomIdx = hasRoomSegregation ? (Array.isArray(items) ? items : []).findIndex(i => (i as any)?.inRoom === false) : -1
       return (
         <div
           style={style}
@@ -1500,6 +1526,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           aria-label="Mention suggestions"
         >
           {(Array.isArray(items) ? items : []).map((item, idx: number) => {
+            const showNotInRoomHeader = hasRoomSegregation && firstNotInRoomIdx >= 0 && idx === firstNotInRoomIdx
+            const showInRoomHeader = hasRoomSegregation && idx === 0
             const kind = (item as any)?.kind === 'user' ? 'user' : 'agent'
             const agent = kind === 'agent' ? ((item as any).agent as AgentModel | undefined) : undefined
             const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
@@ -1508,51 +1536,62 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const userIdForPresence = kind === 'user' ? String((user as any)?.userId || (item as any)?.id || '').trim() : ''
             const online = kind === 'user' ? isUserOnline(userIdForPresence) : true
             const fallback = (label || '?').trim().slice(0, 1).toUpperCase()
+            const inRoom = (item as any)?.inRoom !== false
             return (
-              <button
-                key={key}
-                id={`mention-option-${key}`}
-                ref={idx === active ? activeItemRef : null}
-                type="button"
-                tabIndex={-1}
-                role="option"
-                aria-selected={idx === active}
-                className={cn(
-                  // Match navbar item styling: muted by default, foreground on hover/active.
-                  'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
-                  idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-                )}
-                onMouseEnter={() => onHover(idx)}
-                onMouseDown={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  command(item)
-                }}
-                onPointerDown={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onClick={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  command(item)
-                }}
-              >
-                <div className="relative">
-                  <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
-                    {kind === 'user' ? (
-                      <>
-                        {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
-                        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
-                      </>
-                    ) : (
-                      <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={20} rounded />
-                    )}
-                  </Avatar>
-                  <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
-                </div>
-                <span className="min-w-0 truncate font-medium">{label}</span>
-              </button>
+              <div key={key}>
+                {showInRoomHeader ? (
+                  <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">In this room</div>
+                ) : null}
+                {showNotInRoomHeader ? (
+                  <div className="px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">Not in this room</div>
+                ) : null}
+                <button
+                  id={`mention-option-${key}`}
+                  ref={idx === active ? activeItemRef : null}
+                  type="button"
+                  tabIndex={-1}
+                  role="option"
+                  aria-selected={idx === active}
+                  className={cn(
+                    // Match navbar item styling: muted by default, foreground on hover/active.
+                    'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
+                    idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                  )}
+                  onMouseEnter={() => onHover(idx)}
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    command(item)
+                  }}
+                  onPointerDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                >
+                  <div className="relative">
+                    <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
+                      {kind === 'user' ? (
+                        <>
+                          {user?.avatar ? (
+                            <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" />
+                          ) : null}
+                          <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+                        </>
+                      ) : (
+                        <AgentAvatar
+                          seed={label || 'Mention'}
+                          imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
+                          size={20}
+                          rounded
+                        />
+                      )}
+                    </Avatar>
+                    <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
+                  </div>
+                  <span className="min-w-0 truncate font-medium flex-1">{label}</span>
+                  {!inRoom ? <span className="ml-2 text-[11px] font-medium text-muted-foreground">Needs approval</span> : null}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -1571,8 +1610,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const dmKind = dmAllowed?.kind ?? null
         const dmId = typeof dmAllowed?.id === 'string' ? dmAllowed.id : null
         const restrictToSingleDmPeer = Boolean(dmKind && dmId)
+        const mentionAllowUsers = allowedMentionUserIdSetRef.current
+        const mentionAllowAgents = allowedMentionAgentIdSetRef.current
         const agents = (mentionAgentsSnapshotRef.current && mentionAgentsSnapshotRef.current.length > 0 ? mentionAgentsSnapshotRef.current : agentsRef.current) || []
         const users = membersRef.current || []
+        const hasRoomSegregation = Boolean(roomConversationId && (mentionAllowUsers || mentionAllowAgents))
 
         const matchesQuery = (haystacks: string[]) => {
           if (!q) return true
@@ -1592,8 +1634,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           kind: 'agent' | 'user'
           agent?: AgentModel
           user?: StarshipMemberListItem
+          inRoom?: boolean
           _kindRank: number
           _matchRank: number
+          _roomRank: number
         }> = []
 
         // Humans first
@@ -1611,13 +1655,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const label = String(u.displayName || u.email || 'User').trim() || 'User'
           const haystacks = [label.toLowerCase(), String(u.email || '').toLowerCase()]
           if (!matchesQuery(haystacks)) continue
+          const inRoom = hasRoomSegregation && mentionAllowUsers ? mentionAllowUsers.has(uid) : true
           items.push({
             id: uid,
             label,
             kind: 'user',
             user: u,
+            inRoom,
             _kindRank: 0,
             _matchRank: matchRank(haystacks),
+            _roomRank: inRoom ? 0 : 1,
           })
         }
 
@@ -1632,17 +1679,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
           const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
           if (!matchesQuery(haystacks)) continue
+          const inRoom = hasRoomSegregation && mentionAllowAgents ? mentionAllowAgents.has(id) : true
           items.push({
             id,
             label,
             kind: 'agent',
             agent: a as any,
+            inRoom,
             _kindRank: 1,
             _matchRank: matchRank(haystacks),
+            _roomRank: inRoom ? 0 : 1,
           })
         }
 
         items.sort((a, b) => {
+          if (a._roomRank !== b._roomRank) return a._roomRank - b._roomRank // in-room first
           if (a._kindRank !== b._kindRank) return a._kindRank - b._kindRank // users first
           if (a._matchRank !== b._matchRank) return a._matchRank - b._matchRank // starts-with first
           return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
@@ -1650,9 +1701,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         return items
           .filter(i => Boolean(i.id))
-          .slice(0, 8)
+          .slice(0, 10)
           .map(i => {
-            const { _kindRank: _kr, _matchRank: _mr, ...rest } = i
+            const { _kindRank: _kr, _matchRank: _mr, _roomRank: _rr, ...rest } = i
             return rest
           })
       },
@@ -1749,24 +1800,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const choice = items[active]
             if (choice) {
               try {
-                lastProps.command(choice)
-                try {
-                  cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
-                } catch {}
-                // Update selected agent (mirror mouse selection)
-                try {
-                  const kind = (choice as any)?.kind
-                  const id = (choice as any)?.id
-                  const label = (choice as any)?.label
-                  if (kind === 'agent') {
-                    let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                    if (!agent && label) {
-                      const lower = String(label).toLowerCase()
-                      agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                const cmd = (component as any)?.props?.command
+                if (typeof cmd === 'function') {
+                  cmd(choice)
+                } else {
+                  // Fallback: legacy behavior (no invite-on-mention)
+                  lastProps.command(choice)
+                  try {
+                    cleanupTrailingQueryAfterMention(lastProps.editor, lastQuery)
+                  } catch {}
+                  try {
+                    const kind = (choice as any)?.kind
+                    const id = (choice as any)?.id
+                    const label = (choice as any)?.label
+                    if (kind === 'agent') {
+                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                      if (!agent && label) {
+                        const lower = String(label).toLowerCase()
+                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                      }
+                      if (agent) onAgentChange?.(agent)
                     }
-                    if (agent) onAgentChange?.(agent)
-                  }
-                } catch {}
+                  } catch {}
+                }
               } catch {}
             }
             return
@@ -1897,24 +1953,29 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               const choice = items[active]
               if (choice) {
                 try {
-                  props.command(choice)
-                  try {
-                    cleanupTrailingQueryAfterMention(props.editor, lastQuery)
-                  } catch {}
-                  // Update selected agent state (mirror mouse path)
-                  try {
-                    const kind = (choice as any)?.kind
-                    const id = (choice as any)?.id
-                    const label = (choice as any)?.label
-                    if (kind === 'agent') {
-                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
-                      if (!agent && label) {
-                        const lower = String(label).toLowerCase()
-                        agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                  const cmd = (component as any)?.props?.command
+                  if (typeof cmd === 'function') {
+                    cmd(choice)
+                  } else {
+                    // Fallback: legacy behavior (no invite-on-mention)
+                    props.command(choice)
+                    try {
+                      cleanupTrailingQueryAfterMention(props.editor, lastQuery)
+                    } catch {}
+                    try {
+                      const kind = (choice as any)?.kind
+                      const id = (choice as any)?.id
+                      const label = (choice as any)?.label
+                      if (kind === 'agent') {
+                        let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                        if (!agent && label) {
+                          const lower = String(label).toLowerCase()
+                          agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
+                        }
+                        if (agent) onAgentChange?.(agent)
                       }
-                      if (agent) onAgentChange?.(agent)
-                    }
-                  } catch {}
+                    } catch {}
+                  }
                 } catch (err) {
                   try {
                     const label = (choice as any)?.label || ''
@@ -2368,6 +2429,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               />
             )
           })}
+
         {/* Low credits warning banner */}
         {showLowBalanceWarning && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-50/80 to-orange-50/60 dark:from-yellow-950/20 dark:to-orange-950/10 border border-yellow-200/50 dark:border-yellow-800/30 backdrop-blur-sm shadow-sm">
@@ -2462,184 +2524,323 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.java,.cpp,.c,.go,.rs,.rb,.php,.swift"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.java,.cpp,.c,.go,.rs,.rb,.php,.swift"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
 
-            {/* Left-side Actions */}
-            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-              {/* Secondary actions (mobile: fade back while typing/focused) */}
+          {isExpandedStarterLayout ? (
+            <div className="px-3 py-2.5">
+              {/* Row 1: Editor gets full width */}
               <div
-                className={cn(
-                  'flex items-center gap-1 transition-opacity duration-200',
-                  // Mobile: don't dim attachment/emoji while the editor is focused (they should still look tappable).
-                  isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
-                  'sm:opacity-100'
-                )}
+                className={cn('w-full min-w-0 relative z-10')}
+                onPaste={handlePaste}
+                style={{
+                  paddingBottom: attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
+                }}
               >
-                {/* Attachment Button */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled || fileUploading}
-                  className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                  aria-label="Attach file"
-                  title="Attach file (images, PDFs)"
+                <div
+                  className={cn('overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent', 'max-h-[300px]')}
+                  style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                  <Icon name="paperclip" className="h-5 w-5" />
-                </button>
+                  <EditorContent editor={tiptap} />
+                </div>
 
-                {/* Emoji Picker */}
-                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={!canEditComposer}
-                      className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
-                      aria-label="Insert emoji"
-                      title="Insert emoji"
-                    >
-                      <Icon name="smiley" className="h-5 w-5" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverPrimitive.Portal>
-                    <PopoverPrimitive.Content
-                      asChild
-                      align="start"
-                      side="top"
-                      sideOffset={8}
-                      // NOTE: With `asChild`, these classes land on the picker element.
-                      // Do not include bg/border/shadow resets here or we'll override the theme styling.
-                      className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
-                    >
-                      <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-                    </PopoverPrimitive.Content>
-                  </PopoverPrimitive.Portal>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Optional left-side controls in expanded mode */}
-            {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
-
-            {/* Text Input (TipTap) with attachments */}
-            <div
-              className={cn('flex-1 min-w-0 relative z-10')}
-              onPaste={handlePaste}
-              style={{
-                paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
-              }}
-            >
-              <div
-                className={cn(
-                  'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-                  minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
-                )}
-                style={{ WebkitOverflowScrolling: 'touch' }}
-              >
-                <EditorContent editor={tiptap} />
-              </div>
-
-              {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
-              {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
-                  <div className="flex flex-wrap gap-2">
-                    {pendingFiles.map(file => (
-                      <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
-                    ))}
+                {pendingFiles.length > 0 && (
+                  <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
+                    <div className="flex flex-wrap gap-2">
+                      {pendingFiles.map(file => (
+                        <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right-side Action Buttons Container */}
-            <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-              {/* Secondary actions (mobile: fade back while typing/focused) */}
-              <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
-                {/* Web Browsing Toggle Button - Available from the start */}
-                <button
-                  onClick={() => {
-                    if (conversationId) {
-                      // Update existing conversation
-                      const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
-                      updateConversationState.mutate({
-                        conversationId,
-                        state: {
-                          plugins: newPlugins,
-                        } as ConversationState,
-                      })
-                    } else {
-                      // Store preference for when conversation is created
-                      setPendingWebBrowsing(!pendingWebBrowsing)
-                    }
-                  }}
-                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
-                  className={cn(
-                    'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
-                    hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    // Mobile: when engaged, hide the toggle to keep the composer feeling focused.
-                    isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
-                  )}
-                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
-                >
-                  {hasWebBrowsing ? (
-                    <>
-                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
-                    </>
-                  ) : (
-                    <Icon name="globe" className="h-5 w-5" />
-                  )}
-                </button>
+                )}
               </div>
 
-              {/* Stop (when streaming) or Send Button */}
-              {shouldShowStop ? (
-                <div className="relative h-8 w-8">
-                  <Button
-                    onClick={() => {
-                      const id = lastConversationIdRef.current
-                      if (!id) return
-                      void stopConversation(id)
-                    }}
-                    variant="outline"
-                    size="icon"
-                    className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
-                    aria-label="Stop response"
-                    title="Stop response"
+              {/* Row 2: Actions toolbar (doesn't steal editor width) */}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'flex items-center gap-1 transition-opacity duration-200',
+                      isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                      'sm:opacity-100'
+                    )}
                   >
-                    <Icon name="stop" weight="fill" className="h-4 w-4" />
-                  </Button>
-                  {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={disabled || fileUploading}
+                      className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                      aria-label="Attach file"
+                      title="Attach file (images, PDFs)"
+                    >
+                      <Icon name="paperclip" className="h-5 w-5" />
+                    </button>
+
+                    <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!canEditComposer}
+                          className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                          aria-label="Insert emoji"
+                          title="Insert emoji"
+                        >
+                          <Icon name="smiley" className="h-5 w-5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverPrimitive.Portal>
+                        <PopoverPrimitive.Content
+                          asChild
+                          align="start"
+                          side="top"
+                          sideOffset={8}
+                          className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                        >
+                          <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                        </PopoverPrimitive.Content>
+                      </PopoverPrimitive.Portal>
+                    </Popover>
+                  </div>
+
+                  {children ? <div className="ml-1 flex items-center gap-3">{children}</div> : null}
                 </div>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!canSend}
-                  size="icon"
-                  className={cn(
-                    'h-8 w-8 rounded-full shrink-0 transition-all',
-                    canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+
+                <div className="flex items-center gap-2">
+                  <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
+                    <button
+                      onClick={() => {
+                        if (conversationId) {
+                          const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                          updateConversationState.mutate({
+                            conversationId,
+                            state: {
+                              plugins: newPlugins,
+                            } as ConversationState,
+                          })
+                        } else {
+                          setPendingWebBrowsing(!pendingWebBrowsing)
+                        }
+                      }}
+                      disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                      className={cn(
+                        'group inline-flex items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                        hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                        'disabled:opacity-50 disabled:cursor-not-allowed',
+                        isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                      )}
+                      aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                      title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                    >
+                      {hasWebBrowsing ? (
+                        <>
+                          <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                            <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                            <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                        </>
+                      ) : (
+                        <Icon name="globe" className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {shouldShowStop ? (
+                    <div className="relative h-8 w-8">
+                      <Button
+                        onClick={() => {
+                          const id = lastConversationIdRef.current
+                          if (!id) return
+                          void stopConversation(id)
+                        }}
+                        variant="outline"
+                        size="icon"
+                        className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                        aria-label="Stop response"
+                        title="Stop response"
+                      >
+                        <Icon name="stop" weight="fill" className="h-4 w-4" />
+                      </Button>
+                      {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!canSend}
+                      size="icon"
+                      className={cn(
+                        'h-8 w-8 rounded-full shrink-0 transition-all',
+                        canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      )}
+                      aria-label="Send"
+                      title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
+                    >
+                      {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                    </Button>
                   )}
-                  aria-label="Send"
-                  title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
-                >
-                  {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
-                </Button>
-              )}
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
+              {/* Left-side Actions */}
+              <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+                <div
+                  className={cn(
+                    'flex items-center gap-1 transition-opacity duration-200',
+                    isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
+                    'sm:opacity-100'
+                  )}
+                >
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={disabled || fileUploading}
+                    className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                    aria-label="Attach file"
+                    title="Attach file (images, PDFs)"
+                  >
+                    <Icon name="paperclip" className="h-5 w-5" />
+                  </button>
+
+                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={!canEditComposer}
+                        className={cn('p-1.5 rounded-full transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                        aria-label="Insert emoji"
+                        title="Insert emoji"
+                      >
+                        <Icon name="smiley" className="h-5 w-5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverPrimitive.Portal>
+                      <PopoverPrimitive.Content
+                        asChild
+                        align="start"
+                        side="top"
+                        sideOffset={8}
+                        className="z-[1004] p-0 outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-popover-content-transform-origin]"
+                      >
+                        <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                      </PopoverPrimitive.Content>
+                    </PopoverPrimitive.Portal>
+                  </Popover>
+                </div>
+              </div>
+
+              {!minimal && children && <div className="mr-1 flex items-center gap-3">{children}</div>}
+
+              <div
+                className={cn('flex-1 min-w-0 relative z-10')}
+                onPaste={handlePaste}
+                style={{
+                  paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
+                }}
+              >
+                <div
+                  className={cn(
+                    'overflow-y-auto overflow-x-visible scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                    minimal ? 'max-h-[140px]' : isStarter ? 'max-h-[300px]' : 'max-h-[220px]'
+                  )}
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <EditorContent editor={tiptap} />
+                </div>
+
+                {!minimal && pendingFiles.length > 0 && (
+                  <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0">
+                    <div className="flex flex-wrap gap-2">
+                      {pendingFiles.map(file => (
+                        <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
+                <div className={cn('flex items-center gap-2 transition-opacity duration-200', isMobileComposerEngaged && 'opacity-30', 'sm:opacity-100')}>
+                  <button
+                    onClick={() => {
+                      if (conversationId) {
+                        const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                        updateConversationState.mutate({
+                          conversationId,
+                          state: {
+                            plugins: newPlugins,
+                          } as ConversationState,
+                        })
+                      } else {
+                        setPendingWebBrowsing(!pendingWebBrowsing)
+                      }
+                    }}
+                    disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                    className={cn(
+                      'group items-center gap-1.5 px-1.5 sm:px-2 py-1.5 rounded-lg transition-colors',
+                      hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                      'disabled:opacity-50 disabled:cursor-not-allowed',
+                      isMobileComposerEngaged ? 'hidden sm:inline-flex' : 'inline-flex'
+                    )}
+                    aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                    title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                  >
+                    {hasWebBrowsing ? (
+                      <>
+                        <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                          <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                          <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Search</span>
+                      </>
+                    ) : (
+                      <Icon name="globe" className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+
+                {shouldShowStop ? (
+                  <div className="relative h-8 w-8">
+                    <Button
+                      onClick={() => {
+                        const id = lastConversationIdRef.current
+                        if (!id) return
+                        void stopConversation(id)
+                      }}
+                      variant="outline"
+                      size="icon"
+                      className={cn('h-8 w-8 rounded-full shrink-0 transition-all border-primary text-primary hover:bg-primary/10 relative z-10')}
+                      aria-label="Stop response"
+                      title="Stop response"
+                    >
+                      <Icon name="stop" weight="fill" className="h-4 w-4" />
+                    </Button>
+                    {showLoaderRing && <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
+                  </div>
+                ) : (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canSend}
+                    size="icon"
+                    className={cn(
+                      'h-8 w-8 rounded-full shrink-0 transition-all',
+                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                    )}
+                    aria-label="Send"
+                    title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
+                  >
+                    {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Disclaimer: only show when an agent is tagged in the draft */}
           {draftHasAgentMention && (
@@ -2649,17 +2850,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
         </div>
 
-        {/* Cost hint (non-minimal) - moved below the composer */}
-        {!minimal && (
-          <div className="mt-2 px-1 text-xs text-muted-foreground text-right">
-            Each user message costs
-            {'\u00A0'}
-            <span className="ml-1 font-semibold text-muted-foreground">
-              <Icon name="coins" className="inline-block h-3 w-3 align-text-bottom text-muted-foreground mr-1" />
-              {CREDITS_PER_MESSAGE} credits
-            </span>
-          </div>
-        )}
+        {/* Cost hint removed (per product/UI request). */}
       </div>
     )
   }

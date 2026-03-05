@@ -358,6 +358,54 @@ export class LLM extends BaseNode<LlmParams> {
     return value as T;
   }
 
+  private mergeSystemMessagesIntoOne(messages: LlmMessage[]): LlmMessage[] {
+    const list = Array.isArray(messages) ? messages : [];
+    if (list.length === 0) return [];
+
+    const toText = (content: unknown): string => {
+      if (typeof content === 'string') return content;
+      if (Array.isArray(content)) {
+        // ContentBlock[] – only text parts are meaningful for system prompts
+        return (content as Array<{ type?: unknown; text?: unknown }>)
+          .map((p) => (p && p.type === 'text' && typeof p.text === 'string' ? p.text : ''))
+          .filter(Boolean)
+          .join('\n');
+      }
+      try {
+        return JSON.stringify(content ?? '');
+      } catch {
+        return '';
+      }
+    };
+
+    let firstSystemIndex = -1;
+    const systemParts: string[] = [];
+    const out: LlmMessage[] = [];
+
+    for (const m of list) {
+      if (!m || typeof m !== 'object') continue;
+      const role = (m as unknown as { role?: unknown }).role;
+      if (role === 'system') {
+        const txt = toText((m as unknown as { content?: unknown }).content).trim();
+        if (txt) systemParts.push(txt);
+        if (firstSystemIndex === -1) {
+          firstSystemIndex = out.length;
+          // placeholder; content replaced after loop
+          out.push({ role: 'system', content: '' } as LlmMessage);
+        }
+        continue;
+      }
+      out.push(m);
+    }
+
+    if (firstSystemIndex >= 0) {
+      const combined = systemParts.join('\n\n').trim();
+      (out[firstSystemIndex] as unknown as { content?: unknown }).content = combined.length > 0 ? combined : 'System instructions';
+    }
+
+    return out;
+  }
+
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This mirrors the ConversationService
@@ -436,7 +484,9 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Ensure provider request is valid even when host truncates history:
       // remove tool results that no longer have their corresponding tool call in context.
-      const providerMessagesForRequest = this.dropOrphanToolResults(providerMessagesWithResolved);
+      const providerMessagesForRequest = this.mergeSystemMessagesIntoOne(
+        this.dropOrphanToolResults(providerMessagesWithResolved)
+      );
       // Condensed request log: essential params only, with truncated message previews
       // const truncate = (text: unknown, max = 160): string => {
       //   if (typeof text !== 'string') return typeof text === 'undefined' ? '' : '[non-text content]';
@@ -490,6 +540,7 @@ export class LLM extends BaseNode<LlmParams> {
       const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
+      const responseFormat = this.coerceMaybeJson<Record<string, unknown>>(params.responseFormat);
 
       const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
 
@@ -557,6 +608,7 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        ...(responseFormat && typeof responseFormat === 'object' ? { responseFormat } : {}),
         ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),

@@ -86,7 +86,17 @@ export type MultipartPart =
       filename?: ExprString;
     };
 
-export interface ConnectorEndpointV2 {
+export type ConnectorEndpointKindV2 = 'http' | 'sql';
+
+export type SqlDriverV2 = 'postgres' | string;
+
+export type SqlEndpointModeV2 = 'query' | 'execute';
+
+export interface ConnectorHttpEndpointV2 {
+  /**
+   * Endpoint kind. Omitted implies "http" for backwards compatibility.
+   */
+  kind?: 'http';
   name: string; // action key used by connector_action.action
   description?: string;
 
@@ -142,6 +152,83 @@ export interface ConnectorEndpointV2 {
   };
 
   timeoutMs?: number;
+}
+
+export interface ConnectorSqlEndpointV2 {
+  kind: 'sql';
+  name: string; // action key used by connector_action.action
+  description?: string;
+
+  driver: SqlDriverV2;
+
+  /**
+   * SQL string (may be an expression) evaluated by the HostRuntime.
+   *
+   * IMPORTANT: Use parameterization for user-provided values. The host/runtime
+   * should not encourage string concatenation.
+   */
+  sql: ExprString;
+
+  /**
+   * JSON Schema for validating connector_action.args for this endpoint.
+   */
+  parameters?: JsonSchemaObject;
+
+  /**
+   * query: SELECT-like statements returning rows
+   * execute: statements returning only rowCount/command (writes may be blocked by runtime policy)
+   */
+  mode?: SqlEndpointModeV2;
+
+  /**
+   * Optional hint to cap returned rows (runtime may enforce a stricter cap).
+   */
+  rowLimit?: number;
+
+  /**
+   * When true, the runtime should reject non-read-only statements.
+   * Defaults to true when omitted.
+   */
+  readOnly?: boolean;
+
+  response?: {
+    select?: ExprString;
+  };
+
+  timeoutMs?: number;
+}
+
+export type ConnectorEndpointV2 = ConnectorHttpEndpointV2 | ConnectorSqlEndpointV2;
+
+// ============================================================================
+// CONNECTOR SESSIONS (HOST -> RUNNER) - NON-WORKFLOW
+// ============================================================================
+
+/**
+ * ConnectorDbSessionV2
+ *
+ * Connection configuration passed from an embedding host (API server) to the runner.
+ * This may include sensitive values (e.g. password) and must never be exposed to workflows.
+ */
+export interface ConnectorDbSessionV2 {
+  driver: SqlDriverV2;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  /**
+   * Sensitive: database password (or token) for authentication.
+   */
+  password?: string;
+  /**
+   * SSL/TLS controls. Runtimes may override for safety.
+   */
+  ssl?: boolean;
+}
+
+export interface ConnectorSessionV2 {
+  headers?: Record<string, string>;
+  db?: ConnectorDbSessionV2;
 }
 
 /**

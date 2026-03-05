@@ -157,7 +157,7 @@ export function Navigation(props: NavigationProps) {
       }
       // If we're in a specific conversation, don't carry the conversationId across starships.
       // It may not exist / be accessible in the destination starship.
-      if (p.includes('/conversations/') || p.includes('/channels/') || p.includes('/dm/')) {
+      if (p.includes('/conversations/') || p.includes('/channels/') || p.includes('/rooms/') || p.includes('/dm/')) {
         return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
@@ -310,6 +310,12 @@ export function Navigation(props: NavigationProps) {
               label: 'Members',
               icon: 'users',
               isActive: isMembersRoute,
+            },
+            {
+              href: `/ship/${starshipSlug}/datasets`,
+              label: 'Datasets',
+              icon: 'database',
+              isActive: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
             },
           ]
         : []),
@@ -508,7 +514,7 @@ export function Navigation(props: NavigationProps) {
 
         {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
         <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
-          <div className="flex flex-col gap-2 w-full">
+          <div className="flex flex-col gap-0 w-full">
             {isAuthenticated && starshipData?.id && canManageBilling ? (
               isExpanded ? (
                 <button
@@ -544,12 +550,16 @@ export function Navigation(props: NavigationProps) {
                         <Icon name="coins" className="h-3 w-3" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="right" className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]" sideOffset={10}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Credits</span>
-                        <Icon name="coins" className="h-3 w-3" />
-                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
-                      </div>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={10}
+                      className="bg-card text-foreground border border-border/40 shadow-lg"
+                    >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Credits</span>
+                          <Icon name="coins" className="h-3 w-3" />
+                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[10px]" />
+                        </div>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -566,7 +576,11 @@ export function Navigation(props: NavigationProps) {
                       <UserProfileMenu />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-popover text-popover-foreground border border-border shadow-xl rounded-lg z-[1001]" sideOffset={10}>
+                  <TooltipContent
+                    side="right"
+                    sideOffset={10}
+                    className="bg-card text-foreground border border-border/40 shadow-lg"
+                  >
                     Account
                   </TooltipContent>
                 </Tooltip>

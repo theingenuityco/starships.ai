@@ -41,6 +41,13 @@ export interface LlmHostRequest {
   presencePenalty?: number;
   reasoning?: unknown;
   /**
+   * Optional structured output / response formatting.
+   * OpenRouter forwards OpenAI-compatible `response_format` to underlying providers when supported.
+   * Example:
+   * { type: 'json_schema', json_schema: { name: 'mirror_prompt', schema: {...}, strict: true } }
+   */
+  responseFormat?: Record<string, unknown>;
+  /**
    * Optional streaming control.
    *
    * - When true/omitted: host may stream tokens/chunks.
@@ -86,6 +93,12 @@ export interface HostRuntime {
     headers?: Record<string, unknown>;
     body?: unknown;
     timeoutMs?: number;
+    /**
+     * Optional host-specific routing hint. When true, the host runtime may route
+     * this request through a web unlocking provider (e.g., Bright Data Web Unlocker)
+     * instead of a direct server-side fetch.
+     */
+    useWebUnlocker?: boolean;
     /**
      * Controls how the host returns the response body.
      * - json: parse JSON when possible (default)

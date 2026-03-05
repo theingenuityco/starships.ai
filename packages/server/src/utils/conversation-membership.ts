@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { sendError } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
-import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository } from '@starships/models';
+import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository, RoomRepository, getConnection } from '@starships/models';
 
 /**
  * Enforce private channel membership (conversation-backed channels).
@@ -48,20 +48,73 @@ export async function enforcePrivateChannelMembership(args: {
     if (starship && String(starship.ownerId) === String(args.userId)) return true;
 
     const participantRepo = new ConversationParticipantRepository();
-    const ok = await participantRepo.isUserParticipant(args.userId, args.conversationId);
-    if (!ok) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-        resource: 'channel',
-        conversationId: args.conversationId,
-      });
-      return false;
-    }
-
-    return true;
+    const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
+    if (okParticipant) return true;
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
+      resource: 'channel',
+      conversationId: args.conversationId,
+    });
+    return false;
   } catch {
     // Best-effort: if we cannot evaluate channel membership, fail closed for safety.
     sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
       resource: 'channel',
+      conversationId: args.conversationId,
+      reason: 'membership_check_failed',
+    });
+    return false;
+  }
+}
+
+/**
+ * Enforce private room membership (conversation-backed rooms).
+ *
+ * Same policy as private channels.
+ */
+export async function enforcePrivateRoomMembership(args: {
+  conversationId: string;
+  conversationStarshipId: string;
+  userId: string;
+  req: Request;
+  res: Response;
+  /** Optional already-fetched room to avoid redundant DB lookup. */
+  room?: { starshipId: string; isPrivate: boolean } | null;
+}): Promise<boolean> {
+  try {
+    const room =
+      args.room ??
+      (await (async () => {
+        const roomRepo = new RoomRepository();
+        return await roomRepo.findByConversationId(args.conversationId).catch(() => null);
+      })());
+    if (!room || !room.isPrivate) return true;
+
+    if (String(room.starshipId) !== String(args.conversationStarshipId)) {
+      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+        resource: 'room',
+        conversationId: args.conversationId,
+        reason: 'starship_mismatch',
+      });
+      return false;
+    }
+
+    if (isInstanceAdmin(args.req.user)) return true;
+
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(room.starshipId).catch(() => null);
+    if (starship && String(starship.ownerId) === String(args.userId)) return true;
+
+    const participantRepo = new ConversationParticipantRepository();
+    const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
+    if (okParticipant) return true;
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+      resource: 'room',
+      conversationId: args.conversationId,
+    });
+    return false;
+  } catch {
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+      resource: 'room',
       conversationId: args.conversationId,
       reason: 'membership_check_failed',
     });
@@ -104,6 +157,111 @@ export async function enforceDirectMessageMembership(args: {
     // Best-effort: if we cannot evaluate DM membership, fail closed for safety.
     sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
       resource: 'direct_message',
+      conversationId: args.conversationId,
+      reason: 'membership_check_failed',
+    });
+    return false;
+  }
+}
+
+type RoomConversationContext = {
+  /** True when the checked conversation is the room conversation itself. */
+  isRoom: boolean;
+  /** True when the checked conversation is a child thread whose parent is a room. */
+  isRoomThread: boolean;
+  /** The room's backing conversation id (when isRoom or isRoomThread). */
+  roomConversationId: string;
+  /** Best-effort: room row, if loaded. */
+  room: { starshipId: string; isPrivate: boolean } | null;
+};
+
+/**
+ * Resolve whether a conversation is a room conversation or a room thread.
+ *
+ * IMPORTANT:
+ * - We treat room membership as membership of the *room conversation* itself.
+ * - Threads inherit room membership from their parent room (parent_conversation_id).
+ */
+export async function resolveRoomConversationContext(args: { conversationId: string }): Promise<RoomConversationContext | null> {
+  const conversationId = String(args.conversationId || '').trim();
+  if (!conversationId) return null;
+
+  const roomRepo = new RoomRepository();
+  const room = await roomRepo.findByConversationId(conversationId).catch(() => null);
+  if (room) {
+    return { isRoom: true, isRoomThread: false, roomConversationId: conversationId, room };
+  }
+
+  // Check parent conversation id (room threads are child conversations with parent_conversation_id = room.conversationId).
+  try {
+    const conn = getConnection();
+    const row = await conn.queryOne<{ parent_conversation_id: string | null }>(
+      `SELECT parent_conversation_id FROM conversations WHERE id = $1`,
+      [conversationId]
+    );
+    const parentId = typeof row?.parent_conversation_id === 'string' ? String(row.parent_conversation_id).trim() : '';
+    if (!parentId) return null;
+
+    const parentRoom = await roomRepo.findByConversationId(parentId).catch(() => null);
+    if (!parentRoom) return null;
+    return { isRoom: false, isRoomThread: true, roomConversationId: parentId, room: parentRoom };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enforce explicit room participation for rooms + room threads.
+ *
+ * Policy (per product requirement):
+ * - NO owner/admin bypass.
+ * - If `conversationId` is a room OR a child thread of a room, the user must be a participant of the room conversation.
+ */
+export async function enforceRoomParticipantMembershipForConversation(args: {
+  conversationId: string;
+  conversationStarshipId: string;
+  userId: string;
+  req: Request;
+  res: Response;
+  /**
+   * Optional status code override for endpoints that must not return non-2xx
+   * (e.g. server-tools HttpRequest wrappers).
+   */
+  statusCode?: number;
+}): Promise<boolean> {
+  try {
+    const ctx = await resolveRoomConversationContext({ conversationId: args.conversationId });
+    if (!ctx) return true;
+
+    // Defense-in-depth: fail closed if room row does not match conversation starship.
+    const statusCode = typeof args.statusCode === 'number' ? args.statusCode : 403;
+
+    if (ctx.room && String(ctx.room.starshipId) !== String(args.conversationStarshipId)) {
+      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', statusCode, {
+        resource: 'room',
+        conversationId: args.conversationId,
+        roomConversationId: ctx.roomConversationId,
+        reason: 'starship_mismatch',
+      });
+      return false;
+    }
+
+    const participantRepo = new ConversationParticipantRepository();
+    const ok = await participantRepo.isUserParticipant(args.userId, ctx.roomConversationId);
+    if (ok) return true;
+
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', statusCode, {
+      resource: 'room',
+      conversationId: args.conversationId,
+      roomConversationId: ctx.roomConversationId,
+      reason: 'room_membership_required',
+      kind: ctx.isRoom ? 'room' : 'room_thread',
+    });
+    return false;
+  } catch {
+    const statusCode = typeof args.statusCode === 'number' ? args.statusCode : 403;
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', statusCode, {
+      resource: 'room',
       conversationId: args.conversationId,
       reason: 'membership_check_failed',
     });

@@ -15,6 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { motion } from 'motion/react'
@@ -139,6 +141,10 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v)
+}
+
 function getYouTubeEmbedUrl(raw: string | null | undefined): string | null {
   const url = typeof raw === 'string' ? raw.trim() : ''
   if (!url) return null
@@ -237,6 +243,9 @@ export function StarshipConnectorsPanel({
   const [basicUsernameValue, setBasicUsernameValue] = useState('')
   const [basicPasswordValue, setBasicPasswordValue] = useState('')
   const [basicExtraConfigText, setBasicExtraConfigText] = useState('')
+  const [basicMetadataValues, setBasicMetadataValues] = useState<Record<string, unknown>>({})
+  const [basicMetadataErrors, setBasicMetadataErrors] = useState<Record<string, string>>({})
+  const [basicAdvancedOpen, setBasicAdvancedOpen] = useState(false)
   const [preOauthProvider, setPreOauthProvider] = useState<string | null>(null)
   const [preOauthMissingKeys, setPreOauthMissingKeys] = useState<string[]>([])
   const [preOauthSchema, setPreOauthSchema] = useState<any>(null)
@@ -371,11 +380,96 @@ export function StarshipConnectorsPanel({
     setApiKeyDialogProvider(null)
   }
 
+  type MetadataField = {
+    key: string
+    required: boolean
+    title?: string
+    description?: string
+    type: 'string' | 'number' | 'boolean'
+    pattern?: string
+    default?: unknown
+    examples?: unknown[]
+  }
+
+  const getMetadataFieldsFromSchema = (schema: unknown): MetadataField[] => {
+    if (!isRecord(schema)) return []
+    const propsRaw = schema.properties
+    const props = isRecord(propsRaw) ? propsRaw : {}
+    const requiredRaw = schema.required
+    const required = Array.isArray(requiredRaw) ? new Set(requiredRaw.map(x => String(x))) : new Set<string>()
+
+    const fields: MetadataField[] = []
+    for (const [key, propRaw] of Object.entries(props)) {
+      if (!key) continue
+      const prop = isRecord(propRaw) ? propRaw : {}
+      const tRaw = prop.type
+      const t = tRaw === 'boolean' ? 'boolean' : tRaw === 'number' || tRaw === 'integer' ? 'number' : 'string'
+      fields.push({
+        key,
+        required: required.has(key),
+        title: typeof prop.title === 'string' ? prop.title : undefined,
+        description: typeof prop.description === 'string' ? prop.description : undefined,
+        type: t,
+        pattern: typeof prop.pattern === 'string' ? prop.pattern : undefined,
+        default: prop.default,
+        examples: Array.isArray(prop.examples) ? prop.examples : undefined,
+      })
+    }
+    return fields
+  }
+
+  const validateMetadataFields = (fields: MetadataField[], values: Record<string, unknown>): Record<string, string> => {
+    const errors: Record<string, string> = {}
+    for (const f of fields) {
+      const v = values?.[f.key]
+      if (f.required) {
+        const missing =
+          v === undefined || v === null || (typeof v === 'string' && v.trim().length === 0)
+        if (missing) {
+          errors[f.key] = 'Required'
+          continue
+        }
+      }
+      if (typeof v === 'string' && f.pattern) {
+        try {
+          const re = new RegExp(f.pattern)
+          if (!re.test(v)) errors[f.key] = 'Invalid format'
+        } catch {
+          // ignore invalid regex
+        }
+      }
+    }
+    return errors
+  }
+
   const openBasicDialog = (provider: string) => {
     setBasicDialogProvider(provider)
     setBasicUsernameValue('')
     setBasicPasswordValue('')
     setBasicExtraConfigText('')
+    setBasicAdvancedOpen(false)
+
+    const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider) as
+      | { metadataSchema?: unknown }
+      | undefined
+    const schema = catalogItem?.metadataSchema
+    const fields = getMetadataFieldsFromSchema(schema)
+    const existingMetadata = ((getConnectorState(provider)?.metadata || {}) as Record<string, unknown>) || {}
+
+    const initial: Record<string, unknown> = {}
+    for (const f of fields) {
+      if (existingMetadata[f.key] !== undefined) {
+        initial[f.key] = existingMetadata[f.key]
+        continue
+      }
+      if (f.default !== undefined) {
+        initial[f.key] = f.default
+        continue
+      }
+    }
+
+    setBasicMetadataValues(initial)
+    setBasicMetadataErrors({})
   }
 
   const handleBasicConnect = async () => {
@@ -392,6 +486,18 @@ export function StarshipConnectorsPanel({
         return
       }
       extraConfig = parsed as Record<string, unknown>
+    }
+
+    // Merge schema-driven metadata values into extraConfig (they win on conflict).
+    const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === basicDialogProvider) as
+      | { metadataSchema?: unknown }
+      | undefined
+    const fields = getMetadataFieldsFromSchema(catalogItem?.metadataSchema)
+    if (fields.length > 0) {
+      const errors = validateMetadataFields(fields, basicMetadataValues)
+      setBasicMetadataErrors(errors)
+      if (Object.keys(errors).length > 0) return
+      extraConfig = { ...(extraConfig || {}), ...basicMetadataValues }
     }
 
     await basicMutation.mutateAsync({
@@ -441,6 +547,38 @@ export function StarshipConnectorsPanel({
     }
     return base
   }, [catalogItems, onlyProviders])
+
+  const basicDialogMetadataFields = useMemo(() => {
+    if (!basicDialogProvider) return []
+    const catalogItem = visibleCatalog.find(c => String((c as { provider?: unknown })?.provider || '') === basicDialogProvider) as
+      | { metadataSchema?: unknown }
+      | undefined
+    return getMetadataFieldsFromSchema(catalogItem?.metadataSchema)
+  }, [basicDialogProvider, visibleCatalog])
+
+  const basicAuthDialogConfig = useMemo(() => {
+    const provider = basicDialogProvider
+    const isPostgres = provider === 'postgres'
+
+    const fields = basicDialogMetadataFields
+    const byKey = new Map(fields.map(f => [f.key, f]))
+    const dbPrimaryKeys = ['host', 'port', 'database']
+    const hasDbShape = byKey.has('host') && byKey.has('database')
+
+    const primaryFields = dbPrimaryKeys.map(k => byKey.get(k)).filter(Boolean) as MetadataField[]
+    const remainingFields = fields.filter(f => !dbPrimaryKeys.includes(f.key))
+    const remainingRequired = remainingFields.filter(f => f.required)
+    const remainingOptional = remainingFields.filter(f => !f.required)
+
+    return {
+      provider,
+      isPostgres,
+      hasDbShape,
+      primaryFields,
+      remainingRequired,
+      remainingOptional,
+    }
+  }, [basicDialogMetadataFields, basicDialogProvider])
 
   const connectedProviderSet = useMemo(() => {
     return new Set((connectors ?? []).filter(c => (c as any)?.status === 'connected').map(c => String((c as any)?.provider)))
@@ -1147,38 +1285,312 @@ export function StarshipConnectorsPanel({
       </Dialog>
 
       <Dialog open={basicDialogProvider !== null} onOpenChange={open => !open && setBasicDialogProvider(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitlePrimitive>Connect with Basic auth</DialogTitlePrimitive>
-            <DialogDescription>{basicDialogProvider ? `Enter credentials for ${getProviderLabel(basicDialogProvider)}. These will be stored securely for this starship.` : null}</DialogDescription>
+            <DialogTitlePrimitive>
+              {basicAuthDialogConfig.provider ? `Connect ${getProviderLabel(basicAuthDialogConfig.provider)}` : 'Connect'}
+            </DialogTitlePrimitive>
+            <DialogDescription>
+              {basicAuthDialogConfig.provider
+                ? `Enter credentials for ${getProviderLabel(basicAuthDialogConfig.provider)}. These will be stored securely for this starship.`
+                : null}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-username">
-                Username / API key
-              </label>
-              <Input id="basic-username" value={basicUsernameValue} onChange={e => setBasicUsernameValue(e.target.value)} placeholder="API key or username" />
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4 py-2">
+            <div className="space-y-3">
+              <div className={cn('grid grid-cols-1 gap-3', basicAuthDialogConfig.hasDbShape ? 'sm:grid-cols-2' : '')}>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-username">
+                    {basicAuthDialogConfig.isPostgres ? 'Database user' : 'Username / API key'}
+                  </label>
+                  <Input
+                    id="basic-username"
+                    value={basicUsernameValue}
+                    onChange={e => setBasicUsernameValue(e.target.value)}
+                    placeholder={basicAuthDialogConfig.isPostgres ? 'e.g. readonly_user' : 'API key or username'}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-password">
+                    {basicAuthDialogConfig.isPostgres ? 'Password' : 'Password (optional)'}
+                  </label>
+                  <Input
+                    id="basic-password"
+                    type="password"
+                    value={basicPasswordValue}
+                    onChange={e => setBasicPasswordValue(e.target.value)}
+                    placeholder={basicAuthDialogConfig.isPostgres ? 'Database password' : 'Leave empty if not required'}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-password">
-                Password (optional)
-              </label>
-              <Input id="basic-password" type="password" value={basicPasswordValue} onChange={e => setBasicPasswordValue(e.target.value)} placeholder="Leave empty if not required" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-extra-config">
-                extraConfig (optional JSON object)
-              </label>
-              <Textarea
-                id="basic-extra-config"
-                value={basicExtraConfigText}
-                onChange={e => setBasicExtraConfigText(e.target.value)}
-                placeholder='e.g. { "accountId": "123" }'
-                className="min-h-[120px] font-mono text-xs"
-                spellCheck={false}
-              />
-            </div>
+
+            {basicDialogMetadataFields.length > 0 ? (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
+                <div className="text-xs font-medium text-muted-foreground">
+                  {basicAuthDialogConfig.hasDbShape ? 'Database connection' : 'Connection details'}
+                </div>
+
+                {basicAuthDialogConfig.hasDbShape ? (
+                  <div className="space-y-3">
+                    {/* Primary DB fields: host/port/database */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {basicAuthDialogConfig.primaryFields
+                        .filter(f => f.key === 'host')
+                        .map(f => (
+                          <div key={f.key} className="space-y-1 sm:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">
+                              {f.title ?? f.key}
+                              {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                              {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
+                            </label>
+                            {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}
+                            <Input
+                              value={basicMetadataValues[f.key] === undefined || basicMetadataValues[f.key] === null ? '' : String(basicMetadataValues[f.key])}
+                              onChange={e => {
+                                setBasicMetadataValues(prev => ({ ...prev, [f.key]: e.target.value }))
+                                setBasicMetadataErrors(prev => {
+                                  if (!prev[f.key]) return prev
+                                  const next = { ...prev }
+                                  delete next[f.key]
+                                  return next
+                                })
+                              }}
+                              placeholder={Array.isArray(f.examples) && f.examples.length > 0 ? String(f.examples[0]) : f.default !== undefined ? String(f.default) : ''}
+                              autoCapitalize="none"
+                              autoCorrect="off"
+                              spellCheck={false}
+                            />
+                          </div>
+                        ))}
+                      {basicAuthDialogConfig.primaryFields
+                        .filter(f => f.key === 'port')
+                        .map(f => (
+                          <div key={f.key} className="space-y-1 sm:col-span-1">
+                            <label className="text-xs font-medium text-muted-foreground">
+                              {f.title ?? f.key}
+                              {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                              {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
+                            </label>
+                            <Input
+                              value={basicMetadataValues[f.key] === undefined || basicMetadataValues[f.key] === null ? '' : String(basicMetadataValues[f.key])}
+                              onChange={e => {
+                                const raw = e.target.value
+                                const nextVal = raw.trim().length ? Number(raw) : undefined
+                                setBasicMetadataValues(prev => ({ ...prev, [f.key]: nextVal }))
+                                setBasicMetadataErrors(prev => {
+                                  if (!prev[f.key]) return prev
+                                  const next = { ...prev }
+                                  delete next[f.key]
+                                  return next
+                                })
+                              }}
+                              inputMode="numeric"
+                              placeholder={f.default !== undefined ? String(f.default) : '5432'}
+                              className="font-mono"
+                              spellCheck={false}
+                            />
+                          </div>
+                        ))}
+                    </div>
+                    {basicAuthDialogConfig.primaryFields
+                      .filter(f => f.key === 'database')
+                      .map(f => (
+                        <div key={f.key} className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            {f.title ?? f.key}
+                            {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                            {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
+                          </label>
+                          <Input
+                            value={basicMetadataValues[f.key] === undefined || basicMetadataValues[f.key] === null ? '' : String(basicMetadataValues[f.key])}
+                            onChange={e => {
+                              setBasicMetadataValues(prev => ({ ...prev, [f.key]: e.target.value }))
+                              setBasicMetadataErrors(prev => {
+                                if (!prev[f.key]) return prev
+                                const next = { ...prev }
+                                delete next[f.key]
+                                return next
+                              })
+                            }}
+                            placeholder={Array.isArray(f.examples) && f.examples.length > 0 ? String(f.examples[0]) : ''}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                          />
+                        </div>
+                      ))}
+
+                    {(basicAuthDialogConfig.remainingRequired.length > 0 || basicAuthDialogConfig.remainingOptional.length > 0) && (
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-between h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setBasicAdvancedOpen(v => !v)}
+                        >
+                          <span>Advanced options</span>
+                          <Icon name={basicAdvancedOpen ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 opacity-70" />
+                        </Button>
+                        {basicAdvancedOpen ? (
+                          <div className="mt-2 rounded-md border border-border/60 bg-background/40 p-3 space-y-3">
+                            <div className="grid grid-cols-1 gap-3">
+                              {[...basicAuthDialogConfig.remainingRequired, ...basicAuthDialogConfig.remainingOptional].map(f => (
+                                <div key={f.key} className="space-y-1">
+                                  <label className="text-xs font-medium text-muted-foreground">
+                                    {f.title ?? f.key}
+                                    {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                                    {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
+                                  </label>
+                                  {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}
+                                  {f.type === 'boolean' ? (
+                                    <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/60 px-3 py-2">
+                                      <div className="text-xs text-muted-foreground">{String(basicMetadataValues[f.key] ?? false) === 'true' ? 'true' : 'false'}</div>
+                                      <Switch
+                                        checked={Boolean(basicMetadataValues[f.key])}
+                                        onCheckedChange={checked => {
+                                          setBasicMetadataValues(prev => ({ ...prev, [f.key]: checked }))
+                                          setBasicMetadataErrors(prev => {
+                                            if (!prev[f.key]) return prev
+                                            const next = { ...prev }
+                                            delete next[f.key]
+                                            return next
+                                          })
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <Input
+                                      value={basicMetadataValues[f.key] === undefined || basicMetadataValues[f.key] === null ? '' : String(basicMetadataValues[f.key])}
+                                      onChange={e => {
+                                        const raw = e.target.value
+                                        const nextVal = f.type === 'number' ? (raw.trim().length ? Number(raw) : undefined) : raw
+                                        setBasicMetadataValues(prev => ({ ...prev, [f.key]: nextVal }))
+                                        setBasicMetadataErrors(prev => {
+                                          if (!prev[f.key]) return prev
+                                          const next = { ...prev }
+                                          delete next[f.key]
+                                          return next
+                                        })
+                                      }}
+                                      inputMode={f.type === 'number' ? 'numeric' : undefined}
+                                      placeholder={
+                                        Array.isArray(f.examples) && f.examples.length > 0
+                                          ? String(f.examples[0])
+                                          : f.default !== undefined
+                                            ? String(f.default)
+                                            : ''
+                                      }
+                                      className={f.type === 'number' ? 'font-mono' : undefined}
+                                      spellCheck={false}
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            <Separator className="opacity-70" />
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-extra-config">
+                                extraConfig (optional JSON object)
+                              </label>
+                              <Textarea
+                                id="basic-extra-config"
+                                value={basicExtraConfigText}
+                                onChange={e => setBasicExtraConfigText(e.target.value)}
+                                placeholder='e.g. { "accountId": "123" }'
+                                className="min-h-[96px] font-mono text-xs"
+                                spellCheck={false}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {basicDialogMetadataFields.map(f => (
+                      <div key={f.key} className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          {f.title ?? f.key}
+                          {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                          {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
+                        </label>
+                        {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}
+                        {f.type === 'boolean' ? (
+                          <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/60 px-3 py-2">
+                            <div className="text-xs text-muted-foreground">{String(basicMetadataValues[f.key] ?? false) === 'true' ? 'true' : 'false'}</div>
+                            <Switch
+                              checked={Boolean(basicMetadataValues[f.key])}
+                              onCheckedChange={checked => {
+                                setBasicMetadataValues(prev => ({ ...prev, [f.key]: checked }))
+                                setBasicMetadataErrors(prev => {
+                                  if (!prev[f.key]) return prev
+                                  const next = { ...prev }
+                                  delete next[f.key]
+                                  return next
+                                })
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <Input
+                            value={basicMetadataValues[f.key] === undefined || basicMetadataValues[f.key] === null ? '' : String(basicMetadataValues[f.key])}
+                            onChange={e => {
+                              const raw = e.target.value
+                              const nextVal = f.type === 'number' ? (raw.trim().length ? Number(raw) : undefined) : raw
+                              setBasicMetadataValues(prev => ({ ...prev, [f.key]: nextVal }))
+                              setBasicMetadataErrors(prev => {
+                                if (!prev[f.key]) return prev
+                                const next = { ...prev }
+                                delete next[f.key]
+                                return next
+                              })
+                            }}
+                            inputMode={f.type === 'number' ? 'numeric' : undefined}
+                            placeholder={
+                              Array.isArray(f.examples) && f.examples.length > 0
+                                ? String(f.examples[0])
+                                : f.default !== undefined
+                                  ? String(f.default)
+                                  : ''
+                            }
+                            className={f.type === 'number' ? 'font-mono' : undefined}
+                            spellCheck={false}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {!basicAuthDialogConfig.hasDbShape ? (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-extra-config">
+                  extraConfig (optional JSON object)
+                </label>
+                <Textarea
+                  id="basic-extra-config"
+                  value={basicExtraConfigText}
+                  onChange={e => setBasicExtraConfigText(e.target.value)}
+                  placeholder='e.g. { "accountId": "123" }'
+                  className="min-h-[96px] font-mono text-xs"
+                  spellCheck={false}
+                />
+              </div>
+            ) : null}
           </div>
+
+          <Separator />
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setBasicDialogProvider(null)} disabled={basicMutation.isPending}>
               Cancel

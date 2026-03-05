@@ -272,11 +272,16 @@ export class ConnectorService {
       .filter((tpl) => tpl.isEnabled !== false)
       .map((tpl): ConnectorCatalogItem => {
         const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
+        const metadataSchema =
+          tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
+            ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
+            : undefined;
         return {
           provider: tpl.provider as ConnectorProvider,
           name: tpl.name,
           description: tpl.description,
           auth: { type: authType },
+          metadataSchema,
           ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
           ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
             ? (() => {
@@ -290,7 +295,6 @@ export class ConnectorService {
                       ...this.extractUrlTemplateVars(tokenUrl),
                     ])
                   ),
-                  metadataSchema: tpl.metadataSchemaJson ?? undefined,
                 };
               })()
             : {}),

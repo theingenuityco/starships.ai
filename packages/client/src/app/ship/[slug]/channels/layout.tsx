@@ -2,10 +2,11 @@
 
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
+import { ViewPane } from '@/components/views/ViewPane'
 import { useStarshipChannels } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
-import type { AgentModel, MessageModel } from '@starships/protocol'
+import type { AgentModel, ChannelModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStarshipAgents } from '@/hooks/useAgents'
@@ -260,13 +261,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     if (!normalizedChannelSlug) return null
     return (
       channels.find(
-        (ch: any) =>
-          String(ch?.slug || '')
+        (ch: ChannelModel) =>
+          String(ch.slug || '')
             .trim()
             .toLowerCase() === normalizedChannelSlug
       ) ?? null
     )
   }, [channelsData?.channels, normalizedChannelSlug])
+
+  const attachedViewIdForActiveChannel = useMemo(() => {
+    const raw = activeChannel?.attachedViewId
+    const id = typeof raw === 'string' ? raw.trim() : ''
+    return id || null
+  }, [activeChannel?.attachedViewId])
 
   const activeConversationId = useMemo(() => {
     const cid = activeChannel?.conversationId
@@ -289,6 +296,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return v.length > 0 ? v : null
   }, [searchParams])
 
+  const VIEW_PANE_ATTACHED = 'attached'
+  const viewKey = useMemo(() => {
+    const raw = searchParams.get('view')
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v.length > 0 ? v : null
+  }, [searchParams])
+
+  const viewId = useMemo(() => {
+    if (!viewKey) return null
+    if (viewKey === VIEW_PANE_ATTACHED) return attachedViewIdForActiveChannel
+    return viewKey
+  }, [attachedViewIdForActiveChannel, viewKey])
+
   const isDraftThreadOpen = threadKey === 'draft'
   const threadConversationId = useMemo(() => {
     if (!threadKey) return null
@@ -296,17 +316,18 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return threadKey
   }, [threadKey])
 
-  const isThreadPaneOpen = Boolean(threadKey)
+  const paneKind = (threadKey ? 'thread' : viewId ? 'view' : null) as 'thread' | 'view' | null
+  const isSidePaneOpen = Boolean(paneKind)
   const THREAD_PANE_ANIM_MS = 300
   const THREAD_PANE_OPEN_CONTENT_DELAY_MS = 120
-  const [isThreadPaneMounted, setIsThreadPaneMounted] = useState<boolean>(isThreadPaneOpen)
+  const [isSidePaneMounted, setIsSidePaneMounted] = useState<boolean>(isSidePaneOpen)
   const openMountTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (isThreadPaneOpen) {
+    if (isSidePaneOpen) {
       // Let the pane animate open immediately; mount heavy content shortly after.
       if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
-      openMountTimerRef.current = window.setTimeout(() => setIsThreadPaneMounted(true), THREAD_PANE_OPEN_CONTENT_DELAY_MS)
+      openMountTimerRef.current = window.setTimeout(() => setIsSidePaneMounted(true), THREAD_PANE_OPEN_CONTENT_DELAY_MS)
       return () => {
         if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
         openMountTimerRef.current = null
@@ -314,9 +335,9 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     }
     if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
     openMountTimerRef.current = null
-    const t = window.setTimeout(() => setIsThreadPaneMounted(false), THREAD_PANE_ANIM_MS)
+    const t = window.setTimeout(() => setIsSidePaneMounted(false), THREAD_PANE_ANIM_MS)
     return () => window.clearTimeout(t)
-  }, [isThreadPaneOpen])
+  }, [isSidePaneOpen])
 
   useEffect(() => {
     const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
@@ -324,6 +345,15 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     void markRead.mutateAsync(cid).catch(() => undefined)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadConversationId])
+
+  // If the URL requests `view=attached` but the current channel has no attached view, close the pane.
+  useEffect(() => {
+    if (viewKey !== VIEW_PANE_ATTACHED) return
+    if (threadKey) return
+    if (attachedViewIdForActiveChannel) return
+    setViewKeyInUrl(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewKey, threadKey, attachedViewIdForActiveChannel])
 
   const setThreadConversationIdInUrl = useCallback(
     (conversationId: string | null) => {
@@ -336,6 +366,19 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.channelSlug, routeParams.slug, searchParams]
+  )
+
+  const setViewKeyInUrl = useCallback(
+    (nextViewKey: string | null) => {
+      // Only persist channel-relevant query params.
+      const next = new URLSearchParams()
+      if (nextViewKey) next.set('view', nextViewKey)
+      const qs = next.toString()
+      const basePath =
+        routeParams.channelSlug && String(routeParams.channelSlug).trim() ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(String(routeParams.channelSlug))}` : `/ship/${routeParams.slug}`
+      router.push(qs ? `${basePath}?${qs}` : basePath)
+    },
+    [router, routeParams.channelSlug, routeParams.slug]
   )
 
   useEffect(() => {
@@ -473,6 +516,8 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     const next = new URLSearchParams()
     const thread = (searchParams.get('thread') || '').trim()
     if (thread) next.set('thread', thread)
+    const view = (searchParams.get('view') || '').trim()
+    if (view) next.set('view', view)
     const qs = next.toString()
 
     const href = pickAutoChannelSlug
@@ -498,29 +543,6 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     }
   }, [starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
-  // If the channel slug is invalid (no matching channel), redirect to default channel.
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (channelsLoading) return
-    if (!routeParams.channelSlug) return
-    if (activeChannel) return
-    if (!pickAutoChannelSlug) return
-    // When redirecting to a channel, only carry channel-relevant query params.
-    const next = new URLSearchParams()
-    const thread = (searchParams.get('thread') || '').trim()
-    if (thread) next.set('thread', thread)
-    const qs = next.toString()
-    const href = qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
-    let cancelled = false
-    queueMicrotask(() => {
-      if (cancelled) return
-      router.replace(href)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [activeChannel, channelsLoading, pickAutoChannelSlug, routeParams.channelSlug, routeParams.slug, router, searchParams, starshipData?.id])
-
   // Handle conversation change from ConversationInterface:
   // - If it maps to a channel, stay in /channels/:channelSlug
   // - Otherwise (DM or non-channel conversation), go to /conversations/:conversationId
@@ -542,12 +564,14 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
       const cid = String(newConversationId)
       const channels = channelsData?.channels ?? []
-      const matchingChannel = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
+      const matchingChannel = channels.find((ch: ChannelModel) => String(ch.conversationId || '') === cid) ?? null
       if (matchingChannel?.slug) {
         // When routing into channels, only carry channel-relevant query params.
         const next = new URLSearchParams()
         const thread = (sp.get('thread') || '').trim()
         if (thread) next.set('thread', thread)
+        const view = (sp.get('view') || '').trim()
+        if (view) next.set('view', view)
         const qs = next.toString()
         const channelSlug = String(matchingChannel.slug)
         router.push(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}`)
@@ -562,6 +586,23 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   if (!starshipData) {
     return null
+  }
+
+  const isInvalidChannelSlug = Boolean(routeParams.channelSlug && !channelsLoading && !activeChannel)
+  if (isInvalidChannelSlug) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center space-y-3">
+          <div className="text-lg font-semibold">Channel not found</div>
+          <div className="text-sm text-muted-foreground">This channel doesn’t exist.</div>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button type="button" className="text-sm underline underline-offset-2" onClick={() => router.replace(`/ship/${routeParams.slug}`)}>
+              Go to starship
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Prevent a brief "starter screen" flash on hard reloads inside a channel:
@@ -599,9 +640,9 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       }}
     >
       <div
-        className={cn('flex-1 min-w-0 h-full', isThreadPaneOpen && 'hidden md:block')}
+        className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}
         style={{
-          ['--conversation-right-gutter' as any]: isThreadPaneOpen ? '16px' : '52px',
+          ['--conversation-right-gutter' as any]: isSidePaneOpen ? '16px' : '52px',
         }}
       >
         <ConversationInterface
@@ -635,7 +676,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
             const rawInput = String((linkedMessage as any)?.content ?? '')
             const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
-            const title = snippet ? `Thread: ${snippet}` : 'New thread'
+            const title = snippet ? snippet : 'New thread'
             setThreadDraftTitle(title)
             pendingThreadStateRef.current = {
               threadKey: 'draft',
@@ -657,7 +698,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
         <div
           className={`hidden md:block h-full flex-shrink-0 ${isResizingThreadPane ? '' : 'transition-all duration-300 ease-in-out'}`}
           style={{
-            width: isThreadPaneOpen ? 'var(--thread-pane-width)' : 0,
+            width: isSidePaneOpen ? 'var(--thread-pane-width)' : 0,
             willChange: 'width',
           }}
           aria-hidden="true"
@@ -665,15 +706,15 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
         {/* Thread pane (overlay): slide using transform for smoothness. */}
         <aside
-          className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
           style={{
             width: 'var(--thread-pane-width)',
-            transform: isThreadPaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
+            transform: isSidePaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
             transition: isResizingThreadPane ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out',
             willChange: 'transform, opacity',
             contain: 'layout style paint',
           }}
-          aria-hidden={!isThreadPaneOpen}
+          aria-hidden={!isSidePaneOpen}
         >
           {/* Divider + resize hit-area */}
           <div className="absolute inset-y-0 left-0 w-[1px] bg-border" aria-hidden="true" />
@@ -681,16 +722,20 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
             className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
             role="separator"
             aria-orientation="vertical"
-            aria-label="Resize thread pane"
+            aria-label="Resize side pane"
             onPointerDown={handleThreadResizePointerDown}
             title="Drag to resize"
           />
 
           <div className="h-full pl-[1px]">
-            {isThreadPaneMounted ? (
-              <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
+            {isSidePaneMounted ? (
+              paneKind === 'thread' ? (
+                <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
+              ) : paneKind === 'view' && viewId ? (
+                <ViewPane starshipId={starshipData.id} viewId={viewId} onClose={() => setViewKeyInUrl(null)} className="w-full min-w-0" />
+              ) : null
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'view' ? 'Loading view…' : 'Loading thread…'}</div>
             )}
           </div>
         </aside>
@@ -700,18 +745,22 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       <aside
         className={cn(
           'md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden',
-          isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}
         style={{
           transition: 'opacity 200ms ease-out',
           willChange: 'opacity',
         }}
-        aria-hidden={!isThreadPaneOpen}
+        aria-hidden={!isSidePaneOpen}
       >
-        {isThreadPaneMounted ? (
-          <ThreadPane {...threadPaneSharedProps} className="h-full w-full" />
+        {isSidePaneMounted ? (
+          paneKind === 'thread' ? (
+            <ThreadPane {...threadPaneSharedProps} className="h-full w-full" />
+          ) : paneKind === 'view' && viewId ? (
+            <ViewPane starshipId={starshipData.id} viewId={viewId} onClose={() => setViewKeyInUrl(null)} className="h-full w-full" />
+          ) : null
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'view' ? 'Loading view…' : 'Loading thread…'}</div>
         )}
       </aside>
 

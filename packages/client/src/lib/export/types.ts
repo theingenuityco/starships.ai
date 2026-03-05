@@ -6,7 +6,7 @@ export interface ExportableTable {
 export interface DataColumnLike {
   key: string
   label: string
-  format?: 'text' | 'number' | 'currency' | 'date' | 'percentage'
+  format?: 'text' | 'number' | 'currency' | 'date' | 'datetime' | 'percentage'
 }
 
-export type DataCellValue = string | number | boolean | null | undefined
+export type DataCellValue = unknown

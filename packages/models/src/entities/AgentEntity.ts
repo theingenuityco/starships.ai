@@ -32,6 +32,13 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   id!: string;
 
+  // Stable content hash used for import/export conflict detection (stored in DB)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(64, 64)
+  contentHash?: string;
+
   /**
    * Human-readable role label for this agent (required).
    */

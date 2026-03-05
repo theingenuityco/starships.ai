@@ -84,7 +84,7 @@ export class DirectMessageRepository extends BaseRepository {
         //
         // IMPORTANT:
         // DM access control is enforced via `conversation_participants` (see enforceDirectMessageMembership).
-        // Using `conversation_members` here can omit legitimate DMs (and causes `/dm/<peer>` to mis-resolve as "draft").
+        // Do not rely on any legacy membership tables here.
         const rows = await connection.query<Record<string, unknown>>(
           `
           SELECT dm.*

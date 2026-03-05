@@ -5,7 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
-import { ForumChannelView } from '@/components/conversation/ForumChannelView'
 import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
 import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
 import type { SearchResult } from '@/components/conversation/conversationSearch'
@@ -33,7 +32,8 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
-import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
+import type { AgentModel, ChannelModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
+import { Button } from '@/components/ui/button'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -283,9 +283,8 @@ export function ConversationInterface({
   const isChannelConversation = useMemo(() => {
     const cid = String(currentConversationId || '')
     if (!cid) return false
-    const chans = (starshipChannelsData as any)?.channels
-    if (!Array.isArray(chans)) return false
-    return chans.some((c: any) => String(c?.conversationId || '') === cid)
+    const chans = starshipChannelsData?.channels ?? []
+    return chans.some((c: ChannelModel) => String(c.conversationId || '') === cid)
   }, [starshipChannelsData, currentConversationId])
 
   // In draft DM mode, lock the agent selection to the DM target agent (if applicable).
@@ -304,24 +303,24 @@ export function ConversationInterface({
   const currentChannel = useMemo(() => {
     const cid = String(currentConversationId || '')
     if (!cid) return null
-    const chans = (starshipChannelsData as any)?.channels
-    if (!Array.isArray(chans)) return null
-    return chans.find((c: any) => String(c?.conversationId || '') === cid) || null
+    const chans = starshipChannelsData?.channels ?? []
+    return chans.find((c: ChannelModel) => String(c.conversationId || '') === cid) || null
   }, [starshipChannelsData, currentConversationId])
+
+  const currentChannelAttachedViewId = useMemo(() => {
+    const raw = currentChannel?.attachedViewId
+    const id = typeof raw === 'string' ? raw.trim() : ''
+    return id.length > 0 ? id : null
+  }, [currentChannel])
 
   const isCurrentChannelPrivate = useMemo(() => {
     if (!currentChannel) return false
-    return Boolean((currentChannel as any)?.isPrivate)
-  }, [currentChannel])
-
-  const isForumChannel = useMemo(() => {
-    const t = typeof (currentChannel as any)?.channelType === 'string' ? String((currentChannel as any).channelType) : ''
-    return t.trim().toLowerCase() === 'forum'
+    return Boolean(currentChannel.isPrivate)
   }, [currentChannel])
 
   // Child conversation approvals: if any child conversation is awaiting tool approval,
   // show a compact callout above the parent composer.
-  const shouldCheckChildApprovals = Boolean(currentConversationId && !isForumChannel)
+  const shouldCheckChildApprovals = Boolean(currentConversationId)
   const { children: childPendingApprovals = [] } = useChildConversationsPendingApprovals(currentConversationId, {
     enabled: shouldCheckChildApprovals,
     limit: 10,
@@ -928,29 +927,6 @@ export function ConversationInterface({
     )
   }
 
-  // Forum channel view (cards/threads, no chat timeline).
-  if (isForumChannel && currentConversationId) {
-    return (
-      <div className="relative flex flex-col h-full">
-        <ForumChannelView
-          starshipId={starshipId}
-          channelConversationId={currentConversationId}
-          channelSlug={typeof (currentChannel as any)?.slug === 'string' ? String((currentChannel as any).slug) : null}
-          channelName={typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null}
-          channelIsPrivate={Boolean((currentChannel as any)?.isPrivate)}
-          starshipSlug={starshipSlug ?? null}
-          onCreateDraftThread={() => {
-            // Open a draft thread in the thread pane without persisting a conversation yet.
-            // The conversation is created on the first message send from the thread composer.
-            // Default agent selection is dynamic; do not force a global default here.
-            const defaultAgent = selectedAgent ?? null
-            onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
-          }}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex flex-col h-full">
       {/* Main column (shrinks when thread pane is open) */}
@@ -965,7 +941,32 @@ export function ConversationInterface({
                 starshipId={starshipId}
                 titleRightSlot={
                   isChannelConversation && currentConversationId ? (
-                    <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />
+                    <div className="flex items-center gap-2">
+                      {currentChannelAttachedViewId && starshipSlug ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            try {
+                              const next = new URLSearchParams(searchParams?.toString() || '')
+                              const cur = String(next.get('view') || '').trim()
+                              // Toggle: if a side pane is open, close it; otherwise open the attached-view pane.
+                              if (cur) next.delete('view')
+                              else next.set('view', 'attached')
+                              // Single-pane UX: opening view closes thread (and vice versa).
+                              next.delete('thread')
+                              const qs = next.toString()
+                              router.push(qs ? `${pathname}?${qs}` : pathname)
+                            } catch {
+                              // ignore
+                            }
+                          }}
+                        >
+                          {String(searchParams?.get('view') || '').trim() ? 'Close view' : 'Open view'}
+                        </Button>
+                      ) : null}
+                      <NotificationMenu type="channel" channelId={currentConversationId} starshipId={starshipId} />
+                    </div>
                   ) : null
                 }
                 titlePrefix={
@@ -1051,7 +1052,7 @@ export function ConversationInterface({
                 <ConversationMessageList
                   conversationId={currentConversationId}
                   starshipId={starshipId}
-                  channelName={isChannelConversation ? (typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null) : null}
+                  channelName={isChannelConversation ? (currentChannel?.name ?? null) : null}
                   emptyHeroTitleOverride={
                     draftDm && !currentConversationId
                       ? draftDm.dmType === 'user_agent'
@@ -1080,7 +1081,7 @@ export function ConversationInterface({
                       : null
                   }
                   bottomPaddingPx={inputHeight + 12}
-                  enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                  enableChannelMessageThreads={Boolean(isChannelConversation)}
                   activeThreadConversationId={activeThreadConversationId}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                   submittedQuery={submittedQuery.trim() || undefined}
@@ -1141,7 +1142,7 @@ export function ConversationInterface({
           <div
             className={cn(
               // Mobile: full width. Larger: constrain + center.
-              'w-full sm:max-w-3xl lg:max-w-4xl sm:mx-auto pointer-events-auto opacity-100 relative',
+              'w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto pointer-events-auto opacity-100 relative',
               !showMessagesArea && 'mt-8 sm:mt-12 lg:mt-16',
             )}
             data-message-input

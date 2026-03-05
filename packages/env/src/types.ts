@@ -25,6 +25,15 @@ export interface EnvironmentConfig {
 
   // LLM Provider Configuration
   OPENROUTER_API_KEY?: string;
+  // Web-unlocking gateway (optional)
+  BRIGHTDATA_API_KEY?: string;
+  BRIGHTDATA_ZONE?: string;
+  /**
+   * Controls which avatar generation pipeline is used by default when callers do not specify a mode.
+   * - '3d': current game-character style pipeline
+   * - '2d': legacy anime-style pipeline
+   */
+  AVATAR_GENERATION_MODE?: '2d' | '3d';
 
   // AWS Bedrock Configuration (optional; used by autopilot execution bundle)
   AWS_BEDROCK_ACCESS_KEY_ID?: string;

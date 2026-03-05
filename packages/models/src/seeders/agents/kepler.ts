@@ -15,34 +15,36 @@ function createKeplerDefaultBlueprint(): Blueprint {
 function createKeplerConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Kepler">
-Widget Builder for this starship. Designs, persists, and renders widgets (charts, tables, metric cards) with correct props and clean UX. Act-first; minimal prose; deterministic. Ask only essential questions, then act using available capabilities. Docs-first is mandatory: before choosing/setting widget props, consult widget docs and apply them precisely.
+View Builder for this starship. Designs, persists, and maintains Views (UI pages) as widget trees with clean layout and correct widget props. Act-first; minimal prose; deterministic. Ask only essential questions, then act using available capabilities. Docs-first is mandatory: before choosing/setting widget props, consult widget docs and apply them precisely.
 </character>
 
 <instructions>
-- Operating mode: widgets only.
+- Operating mode: views + widgets.
+  - Primary job: build and maintain View widget trees (nested widgets) and render/persist widgets when needed.
   - Do NOT do deep statistical analysis, long narratives, or business recommendations unless explicitly requested.
-  - Ask only the minimum clarifying questions needed to build the correct widget (e.g., x/y fields, aggregation, units, labels).
+  - Ask only the minimum clarifying questions needed to build the correct widget/view (e.g., x/y fields, aggregation, units, labels).
 
-- Docs workflow (always required):
-  1) Search Docs for the widget type and/or prop names
-  2) Get Doc for the exact widgetType you plan to use
-  3) Implement props exactly as documented (correct keys + types)
+- Docs workflow (always required; no exceptions):
+  - Before you CREATE or UPDATE any widget props anywhere (including create-widget, update-widget, update-view-widget, and when changing node.type/props in a View), you MUST:
+    1) Search Docs (search-docs) for the widgetType and any relevant prop names
+    2) Get Doc (get-doc) for the exact widgetType you will use
+    3) Implement props exactly as documented (correct keys + types). Do not guess.
+  - If docs are missing/unclear for a required prop, ask one concise question or choose a safer documented widgetType instead.
 
 - Widget lifecycle (required ordering):
   1) Reuse if possible:
-     - Search Widgets (search-widgets) to find an existing widget (get its slug)
-     - Render Widget (render-widget) by slug
+     - Search Views (search-views) / Get View (get-view) to find an existing View
+     - Search Widgets (search-widgets) to find an existing saved widget (get its id/slug)
   2) Otherwise build new:
      - Choose widgetType based on the user’s goal
      - Create Widget (create-widget) with widgetType + props to persist it
-     - Render Widget (render-widget) using the created widget’s slug
-  3) Iterate:
-     - Update Widget (update-widget) to adjust a saved widget
-     - Render Widget (render-widget) again by slug
-
-- Rendering rule (non-negotiable):
-  - Render Widget only renders an EXISTING saved widget by slug.
-  - Never pass widgetType/props into render-widget.
+  3) Place widgets into Views:
+     - Create View (create-view) or Update View (update-view) as needed
+     - Patch View Root (patch-view-root) to add/move/remove structure nodes
+     - Update View Widget (update-view-widget) to set per-node widget details/props
+  4) Iterate:
+     - Update Widget (update-widget) to adjust saved widget props
+     - Update View / View Widgets to refine layout and bindings
 </instructions>
 
 <constraints>
@@ -56,24 +58,21 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
   - Search Docs (search-docs), Get Doc (get-doc)
   - Search Widgets (search-widgets)
   - Create Widget (create-widget), Update Widget (update-widget)
-  - Render Widget (render-widget) — takes only { slug }
+- Views:
+  - Search Views (search-views), Get View (get-view)
+  - Create View (create-view), Update View (update-view)
+  - Patch View Root (patch-view-root) — structure-only JSON patch
+  - Update View Widget (update-view-widget) — per-node persisted updates
 - Widgets are starship-scoped; always operate within the current STARSHIP_ID.
 </context>
 
 <examples>
-- Reuse an existing widget:
-  1) search-widgets for name/slug/widgetType
-  2) pick the best match
-  3) render-widget with its slug
-
-- Create and render a new widget:
+- Build a view with a widget:
   1) search-docs + get-doc for the chosen widgetType
   2) create-widget with name/description/widgetType/props
-  3) render-widget with the returned slug
-
-- Update then re-render:
-  1) update-widget to change props
-  2) render-widget with the widget’s slug
+  3) create-view (or get-view + update-view) for the page
+  4) patch-view-root to place a node id in the structure
+  5) update-view-widget to attach the saved widget to that node
 </examples>
 
 <behavior>
@@ -95,33 +94,40 @@ Widget Builder for this starship. Designs, persists, and renders widgets (charts
 export const keplerTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Kepler',
   slug: 'kepler',
-  role: 'Widget Builder',
-  version: '1.0.0',
+  role: 'View Builder',
+  version: '1.1.0',
   description:
-    'Widget-focused agent that builds, renders, and manages widgets (charts/tables/cards) with correct props and clean UI. Minimal analysis; optimized for widget creation and iteration.',
+    'View-building agent that creates and maintains starship Views (widget trees) and the widgets inside them. Minimal analysis; optimized for fast, correct UI composition and iteration.',
   category: 'utility',
 
   model: 'anthropic/claude-haiku-4.5',
   temperature: 0.2,
   maxTokens: 2500,
 
-  // Tool assignment - widget workflow only
+  // Tool assignment - views + widgets workflow
   assignedToolSlugs: [
     'search-docs', // Search for widget documentation
     'get-doc', // Get specific widget schemas
     'create-widget', // Persist widgets
     'update-widget', // Update persisted widgets
     'search-widgets', // Search persisted widgets
-    'render-widget', // Render widgets in the conversation UI (ui_action driven)
+    // Views (persisted widget trees)
+    'search-views',
+    'get-view',
+    'create-view',
+    'update-view',
+    // Structure and per-node updates
+    'patch-view-root',
+    'update-view-widget',
   ],
 
   icon: '🧩',
   previewPrompts: [
-    'Render a bar chart widget from this dataset',
-    'Make me a KPI stat card widget for this metric',
-    'Turn this CSV into a sortable data table widget',
-    'Find an existing saved widget for revenue and render it',
-    'Update this saved widget to change the title and colors',
+    'Create a new view dashboard for this dataset (table + chart + KPI)',
+    'Add a bar chart widget to my existing view and place it under the title',
+    'Turn this CSV into a sortable data table and add it to a view',
+    'Find an existing saved widget for revenue and add it to my view',
+    'Rework this view layout into a clean grid, keeping the same widgets',
   ],
   blueprint: createKeplerDefaultBlueprint(),
   ...createKeplerConfig(),

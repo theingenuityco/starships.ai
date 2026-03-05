@@ -387,7 +387,7 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
       ]);
       if (ch?.is_private) {
         const member = await db.queryOne<{ ok: boolean }>(
-          'SELECT true as ok FROM conversation_members WHERE conversation_id = $1 AND user_id = $2 LIMIT 1',
+          'SELECT true as ok FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2 LIMIT 1',
           [params.conversationId, authUserId]
         );
         if (!member?.ok) {
@@ -506,7 +506,7 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
              -- Channel access: public OR private membership
              (ch.conversation_id IS NOT NULL AND (
                ch.is_private = false
-               OR EXISTS (SELECT 1 FROM conversation_members cm WHERE cm.conversation_id = c.id AND cm.user_id = $2::text LIMIT 1)
+               OR EXISTS (SELECT 1 FROM conversation_participants cp WHERE cp.conversation_id = c.id AND cp.user_id = $2::text LIMIT 1)
              ))
              OR
              -- Other conversation types: owner or explicit member

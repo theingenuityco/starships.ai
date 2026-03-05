@@ -1,11 +1,16 @@
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { ConnectorEndpointV2, HttpMethod, RequestStyle } from '@starships/protocol';
+import type { ConnectorEndpointV2, ConnectorHttpEndpointV2, ConnectorSqlEndpointV2, HttpMethod, RequestStyle } from '@starships/protocol';
+
+function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
+  return (endpoint as { kind?: unknown }).kind === 'sql';
+}
 
 type ActionRow = {
   id: string;
   template_id: string;
   action_name: string;
   ordinal: number;
+  kind?: string | null;
   method: string;
   path: string;
   description: string | null;
@@ -15,12 +20,42 @@ type ActionRow = {
   parameters_json: unknown | null;
   mapping_json: unknown | null;
   response_json: unknown | null;
+  driver?: string | null;
+  sql_text?: string | null;
+  sql_mode?: string | null;
+  row_limit?: number | null;
+  read_only?: boolean | null;
   created_at: string;
   updated_at: string;
 };
 
 function toAction(row: ActionRow): ConnectorEndpointV2 {
-  const action: ConnectorEndpointV2 = {
+  const kind = String(row.kind || 'http').trim().toLowerCase();
+
+  if (kind === 'sql') {
+    const action: ConnectorSqlEndpointV2 = {
+      kind: 'sql',
+      name: row.action_name,
+      driver: typeof row.driver === 'string' && row.driver.trim() ? row.driver.trim() : 'postgres',
+      sql: typeof row.sql_text === 'string' ? row.sql_text : '',
+    };
+    if (row.description) action.description = row.description;
+    if (typeof row.timeout_ms === 'number') action.timeoutMs = row.timeout_ms;
+    if (row.parameters_json && typeof row.parameters_json === 'object' && !Array.isArray(row.parameters_json)) {
+      action.parameters = row.parameters_json as ConnectorSqlEndpointV2['parameters'];
+    }
+    if (row.response_json && typeof row.response_json === 'object' && !Array.isArray(row.response_json)) {
+      action.response = row.response_json as ConnectorSqlEndpointV2['response'];
+    }
+    if (typeof row.sql_mode === 'string' && (row.sql_mode === 'query' || row.sql_mode === 'execute')) {
+      action.mode = row.sql_mode;
+    }
+    if (typeof row.row_limit === 'number') action.rowLimit = row.row_limit;
+    if (typeof row.read_only === 'boolean') action.readOnly = row.read_only;
+    return action;
+  }
+
+  const action: ConnectorHttpEndpointV2 = {
     name: row.action_name,
     method: row.method as HttpMethod,
     path: row.path,
@@ -30,13 +65,13 @@ function toAction(row: ActionRow): ConnectorEndpointV2 {
   if (typeof row.timeout_ms === 'number') action.timeoutMs = row.timeout_ms;
   if (row.request_style) action.requestStyle = row.request_style as RequestStyle;
   if (row.parameters_json && typeof row.parameters_json === 'object' && !Array.isArray(row.parameters_json)) {
-    action.parameters = row.parameters_json as ConnectorEndpointV2['parameters'];
+    action.parameters = row.parameters_json as unknown as ConnectorHttpEndpointV2['parameters'];
   }
   if (row.mapping_json && typeof row.mapping_json === 'object' && !Array.isArray(row.mapping_json)) {
-    action.mapping = row.mapping_json as ConnectorEndpointV2['mapping'];
+    action.mapping = row.mapping_json as unknown as ConnectorHttpEndpointV2['mapping'];
   }
   if (row.response_json && typeof row.response_json === 'object' && !Array.isArray(row.response_json)) {
-    action.response = row.response_json as ConnectorEndpointV2['response'];
+    action.response = row.response_json as unknown as ConnectorHttpEndpointV2['response'];
   }
   return action;
 }
@@ -215,13 +250,32 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
         const e = args.action;
         const actionName = String(e?.name || '').trim();
         if (!actionName) throw new Error('action.name is required');
-        const method = String(e?.method || '').trim().toUpperCase();
-        const path = String(e?.path || '').trim();
+        const isSql = isSqlEndpoint(e);
+        const kind = isSql ? 'sql' : 'http';
+
+        // Keep DB constraints satisfied even for SQL actions.
+        const method = isSql ? 'POST' : String((e as ConnectorHttpEndpointV2).method || '').trim().toUpperCase();
+        const path = isSql ? '/sql' : String((e as ConnectorHttpEndpointV2).path || '').trim();
         if (!method) throw new Error('action.method is required');
         if (!path) throw new Error('action.path is required');
 
         const id = `${templateId}:${actionName}`;
         const ordinal = typeof args.ordinal === 'number' ? Math.max(0, Math.floor(args.ordinal)) : 0;
+
+        const driver = isSql ? String(e.driver || '').trim() : '';
+        const sqlText = isSql ? String(e.sql || '') : '';
+        const sqlMode = isSql && (e.mode === 'execute' || e.mode === 'query') ? e.mode : null;
+        const rowLimit = isSql && typeof e.rowLimit === 'number' ? Math.floor(e.rowLimit) : null;
+        const readOnly = isSql && typeof e.readOnly === 'boolean' ? e.readOnly : null;
+
+        if (isSql) {
+          if (!driver) throw new Error('action.driver is required for SQL actions');
+          if (!sqlText.trim()) throw new Error('action.sql is required for SQL actions');
+        }
+
+        const baseUrlOverride = !isSql ? (e as ConnectorHttpEndpointV2).baseUrlOverride ?? null : null;
+        const requestStyle = !isSql ? (e as ConnectorHttpEndpointV2).requestStyle ?? null : null;
+        const mapping = !isSql ? (e as ConnectorHttpEndpointV2).mapping ?? null : null;
 
         const connection = this.getConnection();
         await connection.query(
@@ -231,27 +285,39 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
               template_id,
               action_name,
               ordinal,
+              kind,
               method,
               path,
               description,
               base_url_override,
               timeout_ms,
               request_style,
+              driver,
+              sql_text,
+              sql_mode,
+              row_limit,
+              read_only,
               parameters_json,
               mapping_json,
               response_json,
               created_at,
               updated_at
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),NOW())
             ON CONFLICT (id) DO UPDATE SET
               ordinal = EXCLUDED.ordinal,
+              kind = EXCLUDED.kind,
               method = EXCLUDED.method,
               path = EXCLUDED.path,
               description = EXCLUDED.description,
               base_url_override = EXCLUDED.base_url_override,
               timeout_ms = EXCLUDED.timeout_ms,
               request_style = EXCLUDED.request_style,
+              driver = EXCLUDED.driver,
+              sql_text = EXCLUDED.sql_text,
+              sql_mode = EXCLUDED.sql_mode,
+              row_limit = EXCLUDED.row_limit,
+              read_only = EXCLUDED.read_only,
               parameters_json = EXCLUDED.parameters_json,
               mapping_json = EXCLUDED.mapping_json,
               response_json = EXCLUDED.response_json,
@@ -262,14 +328,20 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
             templateId,
             actionName,
             ordinal,
+            kind,
             method,
             path,
             (e.description ?? null) as string | null,
-            (e.baseUrlOverride ?? null) as string | null,
+            baseUrlOverride,
             (typeof e.timeoutMs === 'number' ? Math.floor(e.timeoutMs) : null) as number | null,
-            (e.requestStyle ?? null) as string | null,
+            requestStyle as string | null,
+            isSql ? driver : null,
+            isSql ? sqlText : null,
+            isSql ? sqlMode : null,
+            isSql ? rowLimit : null,
+            isSql ? readOnly : null,
             (e.parameters ?? null) as unknown | null,
-            (e.mapping ?? null) as unknown | null,
+            isSql ? null : (mapping as unknown | null),
             (e.response ?? null) as unknown | null,
           ]
         );
@@ -293,9 +365,26 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
           for (let i = 0; i < actions.length; i++) {
             const e = actions[i] as ConnectorEndpointV2;
             const actionName = String(e?.name || '').trim();
-            const method = String(e?.method || '').trim().toUpperCase();
-            const path = String(e?.path || '').trim();
-            if (!actionName || !method || !path) continue;
+            if (!actionName) continue;
+
+            const isSql = isSqlEndpoint(e);
+            const kind = isSql ? 'sql' : 'http';
+
+            // Keep DB constraints satisfied even for SQL actions.
+            const method = isSql ? 'POST' : String((e as ConnectorHttpEndpointV2).method || '').trim().toUpperCase();
+            const path = isSql ? '/sql' : String((e as ConnectorHttpEndpointV2).path || '').trim();
+            if (!method || !path) continue;
+
+            const driver = isSql ? String(e.driver || '').trim() : '';
+            const sqlText = isSql ? String(e.sql || '') : '';
+            const sqlMode = isSql && (e.mode === 'execute' || e.mode === 'query') ? e.mode : null;
+            const rowLimit = isSql && typeof e.rowLimit === 'number' ? Math.floor(e.rowLimit) : null;
+            const readOnly = isSql && typeof e.readOnly === 'boolean' ? e.readOnly : null;
+            if (isSql && (!driver || !sqlText.trim())) continue;
+
+            const baseUrlOverride = !isSql ? (e as ConnectorHttpEndpointV2).baseUrlOverride ?? null : null;
+            const requestStyle = !isSql ? (e as ConnectorHttpEndpointV2).requestStyle ?? null : null;
+            const mapping = !isSql ? (e as ConnectorHttpEndpointV2).mapping ?? null : null;
 
             const id = `${templateId}:${actionName}`;
             await tx.query(
@@ -305,40 +394,52 @@ export class ConnectorTemplateActionRepository extends BaseRepository {
                   template_id,
                   action_name,
                   ordinal,
+                  kind,
                   method,
                   path,
                   description,
                   base_url_override,
                   timeout_ms,
                   request_style,
+                  driver,
+                  sql_text,
+                  sql_mode,
+                  row_limit,
+                  read_only,
                   parameters_json,
                   mapping_json,
                   response_json,
                   created_at,
                   updated_at
                 )
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW(),NOW())
               `,
               [
                 id,
                 templateId,
                 actionName,
                 i,
+                kind,
                 method,
                 path,
                 (e.description ?? null) as string | null,
-                (e.baseUrlOverride ?? null) as string | null,
+                baseUrlOverride,
                 (typeof e.timeoutMs === 'number' ? Math.floor(e.timeoutMs) : null) as number | null,
-                (e.requestStyle ?? null) as string | null,
+                requestStyle as string | null,
+                isSql ? driver : null,
+                isSql ? sqlText : null,
+                isSql ? sqlMode : null,
+                isSql ? rowLimit : null,
+                isSql ? readOnly : null,
                 (e.parameters ?? null) as unknown | null,
-                (e.mapping ?? null) as unknown | null,
+                isSql ? null : (mapping as unknown | null),
                 (e.response ?? null) as unknown | null,
               ]
             );
           }
         });
       },
-      'replaceAllEndpoints',
+      'replaceAllActions',
       'connector_template_actions',
       args.templateId
     );

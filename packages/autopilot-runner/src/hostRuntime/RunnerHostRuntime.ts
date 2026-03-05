@@ -1,6 +1,10 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
 import type {
   ConnectorEndpointV2,
+  ConnectorHttpEndpointV2,
+  ConnectorSqlEndpointV2,
+  ConnectorSessionV2,
+  ConnectorDbSessionV2,
   ConnectorTemplateRuntimeFieldsV2,
   ConnectorQueryParamMapping,
   ExprString,
@@ -12,15 +16,156 @@ import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
 import { invokeAzureAiFoundry } from './azure-ai-foundry';
+import { Pool } from 'pg';
+import type { FieldDef, PoolClient } from 'pg';
+import { lookup } from 'node:dns/promises';
+import { STATUS_CODES } from 'node:http';
+import { Socket } from 'node:net';
+import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
+
+function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
+  return (endpoint as { kind?: unknown }).kind === 'sql';
+}
+
+const SENSITIVE_HEADER_KEYS = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'api-key',
+  'apikey',
+  'x-auth-token',
+]);
+
+const SENSITIVE_URL_PARAM_KEYS = new Set([
+  'token',
+  'access_token',
+  'auth',
+  'authorization',
+  'api_key',
+  'apikey',
+  'key',
+  'secret',
+  'signature',
+]);
+
+function redactHeadersForLogs(h: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(h)) {
+    const lk = k.toLowerCase();
+    out[k] = SENSITIVE_HEADER_KEYS.has(lk) ? '[REDACTED]' : v;
+  }
+  return out;
+}
+
+function redactUrlForLogs(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    for (const [k] of u.searchParams) {
+      if (SENSITIVE_URL_PARAM_KEYS.has(k.toLowerCase())) {
+        u.searchParams.set(k, '[REDACTED]');
+      }
+    }
+    return u.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function summarizeFetchError(err: unknown): Record<string, unknown> {
+  const e =
+    err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
+  const cause = e?.cause;
+  const pick = (x: unknown): Record<string, unknown> => {
+    if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+    const rec = x as Record<string, unknown>;
+    return {
+      name: typeof rec.name === 'string' ? rec.name : undefined,
+      message: typeof rec.message === 'string' ? rec.message : undefined,
+      code: typeof rec.code === 'string' ? rec.code : undefined,
+      errno: typeof rec.errno === 'number' ? rec.errno : undefined,
+      syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
+      address: typeof rec.address === 'string' ? rec.address : undefined,
+      port: typeof rec.port === 'number' ? rec.port : undefined,
+      hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
+    };
+  };
+
+  const primary = pick(e);
+  const underlying = pick(cause);
+  const code = (underlying.code ?? primary.code) as string | undefined;
+  const msg = (underlying.message ?? primary.message) as string | undefined;
+
+  // A compact one-liner that is safe to embed in Error.message.
+  const summary = code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
+
+  return {
+    summary,
+    error: primary,
+    cause: underlying,
+  };
+}
+
+function getHeaderValue(h: Record<string, unknown> | undefined, name: string): string | undefined {
+  if (!h) return undefined;
+  const direct = h[name];
+  if (typeof direct === 'string') return direct;
+  const alt = h[name.toLowerCase()];
+  if (typeof alt === 'string') return alt;
+  const alt2 = h[name.toUpperCase()];
+  if (typeof alt2 === 'string') return alt2;
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(h)) {
+    if (k.toLowerCase() === target && typeof v === 'string') return v;
+  }
+  return undefined;
+}
+
+function normalizeHeadersToStrings(h: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(h || {})) {
+    if (!k) continue;
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'string') out[k] = v;
+    else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
+    else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
+    else out[k] = String(v);
+  }
+  return out;
+}
+
+function looksLikeJson(s: string): boolean {
+  const t = s.trim();
+  if (!t) return false;
+  return t.startsWith('{') || t.startsWith('[');
+}
+
+function coerceHttpStatusCode(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const n = Math.floor(v);
+    return n >= 100 && n <= 599 ? n : null;
+  }
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v);
+    if (Number.isFinite(n)) {
+      const m = Math.floor(n);
+      return m >= 100 && m <= 599 ? m : null;
+    }
+  }
+  return null;
+}
+
+function statusTextFromCode(code: number): string {
+  return STATUS_CODES[code] ?? String(code);
+}
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
  *
  * Sessions carry injected auth headers (never exposed to workflows).
  */
-export interface ConnectorSession {
-  headers?: Record<string, string>;
-}
+export type ConnectorSession = ConnectorSessionV2;
 
 /**
  * LLM runtime configuration passed from the embedding host.
@@ -46,6 +191,11 @@ export interface AzureAiFoundryRuntimeConfig {
   endpoint: string;
   apiVersion?: string;
   defaultHeaders?: Record<string, string>;
+}
+
+export interface WebUnlockerRuntimeConfig {
+  apiKey: string;
+  zone: string;
 }
 
 export interface ProviderRoute {
@@ -82,6 +232,12 @@ export interface RunnerHostRuntimeOptions {
    * use this instead of reading from process.env.
    */
   llm?: LlmRuntimeConfig;
+
+  /**
+   * Optional web-unlocking gateway configuration for HostRuntime.http. When provided,
+   * the runner will use this instead of reading from process.env.
+   */
+  webUnlocker?: WebUnlockerRuntimeConfig;
 
   /**
    * AWS runtime configuration for Bedrock.
@@ -125,6 +281,122 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
 
+  const tcpProbe = async (
+    host: string,
+    port: number,
+    timeoutMs: number = 1500
+  ): Promise<{ outcome: 'connected' | 'timeout' | 'error'; elapsedMs: number; error: string | null }> => {
+    const startedAt = Date.now();
+    const socket = new Socket();
+    let finished = false;
+
+    return await new Promise((resolve) => {
+      const finish = (outcome: 'connected' | 'timeout' | 'error', err?: unknown) => {
+      if (finished) return;
+      finished = true;
+      try {
+        socket.destroy();
+      } catch {
+        // ignore
+      }
+      const payload = {
+        outcome,
+        elapsedMs: Date.now() - startedAt,
+        error: err instanceof Error ? err.message : err ? String(err) : null,
+      };
+      resolve(payload);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish('connected'));
+    socket.once('timeout', () => finish('timeout'));
+    socket.once('error', (e) => finish('error', e));
+    socket.connect({ host, port });
+    });
+  };
+
+  // Best-effort DB pool cache (per-process).
+  const pgPools = new Map<string, Pool>();
+  const getPgPool = (db: ConnectorDbSessionV2): Pool => {
+    const key = JSON.stringify({
+      driver: db.driver,
+      host: db.host,
+      port: db.port,
+      database: db.database,
+      user: db.user,
+      password: db.password ?? '',
+      ssl: Boolean(db.ssl),
+    });
+    const existing = pgPools.get(key);
+    if (existing) return existing;
+
+    const ssl =
+      db.ssl === true
+        ? {
+            rejectUnauthorized: true,
+          }
+        : db.ssl === false
+          ? false
+          : undefined;
+
+    const pool = new Pool({
+      host: db.host,
+      port: db.port,
+      database: db.database,
+      user: db.user,
+      password: db.password,
+      ssl,
+      max: 3,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    });
+    pgPools.set(key, pool);
+    return pool;
+  };
+
+  const assertDbHostAllowed = async (host: string): Promise<void> => {
+    const h = host.trim();
+    if (!h) throw new Error('DB host is required');
+    if (h.toLowerCase() === 'localhost' || h.toLowerCase().endsWith('.localhost')) {
+      throw new Error('DB host is not allowed');
+    }
+
+    const allowPrivate = process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === 'true' || process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === '1';
+    const allowlistRaw = process.env.CONNECTOR_DB_ALLOWED_HOSTS ?? '';
+    const allowlist = allowlistRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (allowlist.length > 0 && !hostMatchesAllowlist(h, allowlist)) {
+      throw new Error('DB host is not in allowlist');
+    }
+
+    // If host is a literal IP, enforce private checks directly.
+    if (isPrivateIp(h)) {
+      if (!allowPrivate) throw new Error('DB host resolves to a private network and is blocked by policy');
+      return;
+    }
+
+    // Best-effort DNS resolution to catch private endpoints behind hostnames.
+    try {
+      const dnsStartedAt = Date.now();
+      const records = await lookup(h, { all: true });
+      const dnsElapsedMs = Date.now() - dnsStartedAt;
+      const privateAddrs = records.filter((r) => isPrivateIp(r.address)).map((r) => r.address);
+      const resolved = records.slice(0, 3).map((r) => ({ address: r.address, family: r.family ?? null }));
+      void dnsElapsedMs;
+      void resolved;
+      void privateAddrs;
+      for (const r of records) {
+        if (isPrivateIp(r.address) && !allowPrivate) {
+          throw new Error('DB host resolves to a private network and is blocked by policy');
+        }
+      }
+    } catch (e) {
+      // If DNS lookup fails, fall back to the allowlist result (if configured),
+      // otherwise let the connection attempt fail with a clearer error.
+      if (allowlist.length > 0) throw e;
+    }
+  };
+
+
   // Initialize clients lazily or once
   let _bedrockClient: BedrockRuntimeClient | null = null;
   const getBedrockClient = (): BedrockRuntimeClient => {
@@ -151,6 +423,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       body?: unknown;
       timeoutMs?: number;
     };
+    const useWebUnlocker = (request as { useWebUnlocker?: unknown } | null | undefined)?.useWebUnlocker === true;
     // Backward/forward compatible: older @starships/autopilot types may not include this field.
     const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
     const responseType =
@@ -160,85 +433,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       responseTypeRaw === 'base64'
         ? responseTypeRaw
         : undefined;
-    const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
-      const out: Record<string, unknown> = {};
-      const sensitive = new Set([
-        'authorization',
-        'proxy-authorization',
-        'cookie',
-        'set-cookie',
-        'x-api-key',
-        'api-key',
-        'apikey',
-        'x-auth-token',
-      ]);
-      for (const [k, v] of Object.entries(h)) {
-        const lk = k.toLowerCase();
-        out[k] = sensitive.has(lk) ? '[REDACTED]' : v;
-      }
-      return out;
-    };
-
-    const redactUrlForLogs = (rawUrl: string): string => {
-      try {
-        const u = new URL(rawUrl);
-        const sensitiveParams = new Set([
-          'token',
-          'access_token',
-          'auth',
-          'authorization',
-          'api_key',
-          'apikey',
-          'key',
-          'secret',
-          'signature',
-        ]);
-        for (const [k] of u.searchParams) {
-          if (sensitiveParams.has(k.toLowerCase())) {
-            u.searchParams.set(k, '[REDACTED]');
-          }
-        }
-        return u.toString();
-      } catch {
-        return rawUrl;
-      }
-    };
-
-    const summarizeFetchError = (err: unknown): Record<string, unknown> => {
-      const e =
-        err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
-      const cause = e?.cause;
-      const pick = (x: unknown): Record<string, unknown> => {
-        if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
-        const rec = x as Record<string, unknown>;
-        return {
-          name: typeof rec.name === 'string' ? rec.name : undefined,
-          message: typeof rec.message === 'string' ? rec.message : undefined,
-          code: typeof rec.code === 'string' ? rec.code : undefined,
-          errno: typeof rec.errno === 'number' ? rec.errno : undefined,
-          syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
-          address: typeof rec.address === 'string' ? rec.address : undefined,
-          port: typeof rec.port === 'number' ? rec.port : undefined,
-          hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
-        };
-      };
-
-      const primary = pick(e);
-      const underlying = pick(cause);
-      const code = (underlying.code ?? primary.code) as string | undefined;
-      const msg = (underlying.message ?? primary.message) as string | undefined;
-
-      // A compact one-liner that is safe to embed in Error.message.
-      const summary =
-        code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
-
-      return {
-        summary,
-        error: primary,
-        cause: underlying,
-      };
-    };
-
     const timeoutController = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
@@ -251,6 +445,197 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
+
+      if (useWebUnlocker) {
+        const apiKey = options.webUnlocker?.apiKey ?? process.env.BRIGHTDATA_API_KEY;
+        const zone = options.webUnlocker?.zone ?? process.env.BRIGHTDATA_ZONE;
+        if (!apiKey || !apiKey.trim()) {
+          throw new Error('BRIGHTDATA_API_KEY is required when useWebUnlocker=true');
+        }
+        if (!zone || !zone.trim()) {
+          throw new Error('BRIGHTDATA_ZONE is required when useWebUnlocker=true');
+        }
+
+        let u: URL;
+        try {
+          u = new URL(finalUrl);
+        } catch {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          throw new Error('Invalid URL for useWebUnlocker=true: must be an absolute http(s) URL');
+        }
+        const hostLower = u.hostname.toLowerCase();
+        if (hostLower === 'localhost' || hostLower.endsWith('.localhost')) {
+          throw new Error('Blocked URL for useWebUnlocker=true: localhost is not allowed');
+        }
+        if (isPrivateIp(hostLower)) {
+          throw new Error('Blocked URL for useWebUnlocker=true: private/loopback IPs are not allowed');
+        }
+
+        if (responseType === 'arrayBuffer' || responseType === 'base64') {
+          throw new Error(`useWebUnlocker=true does not support responseType="${responseType}"`);
+        }
+        if (
+          body instanceof ArrayBuffer ||
+          ArrayBuffer.isView(body as ArrayBufferLike) ||
+          (typeof Blob !== 'undefined' && body instanceof Blob) ||
+          (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
+          (typeof FormData !== 'undefined' && body instanceof FormData)
+        ) {
+          throw new Error('useWebUnlocker=true does not support binary/FormData request bodies');
+        }
+
+        const safeTargetUrl = redactUrlForLogs(finalUrl);
+        const safeHeaders = redactHeadersForLogs(finalHeaders);
+
+        const unlockerPayload: Record<string, unknown> = {
+          zone: zone.trim(),
+          url: finalUrl,
+          format: 'raw',
+          method: finalMethod,
+        };
+
+        const hdrs = normalizeHeadersToStrings(finalHeaders);
+        if (Object.keys(hdrs).length > 0) unlockerPayload.headers = hdrs;
+
+        if (finalMethod !== 'GET' && finalMethod !== 'HEAD' && body !== undefined) {
+          unlockerPayload.body = typeof body === 'string' ? body : JSON.stringify(body);
+        }
+
+        let resp: Response;
+        try {
+          resp = await fetch('https://api.brightdata.com/request', {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${apiKey.trim()}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify(unlockerPayload),
+            signal: combinedSignal,
+          });
+        } catch (e: unknown) {
+          if (options.signal?.aborted) {
+            throw new CancelledError('cancelled');
+          }
+          if (timeoutController.signal.aborted) {
+            const err = new Error(`HTTP (Web Unlocker) timed out after ${timeout}ms: ${finalMethod} ${safeTargetUrl}`);
+            console.error('[RunnerHostRuntime.http] web_unlocker_timeout', {
+              method: finalMethod,
+              url: safeTargetUrl,
+              timeoutMs: timeout,
+            });
+            throw err;
+          }
+
+          const summary = summarizeFetchError(e);
+          console.error('[RunnerHostRuntime.http] web_unlocker_failed', {
+            method: finalMethod,
+            url: safeTargetUrl,
+            timeoutMs: timeout,
+            headers: safeHeaders,
+            error: summary,
+          });
+
+          const wrapped = new Error(`HTTP (Web Unlocker) failed: ${finalMethod} ${safeTargetUrl} (${summary.summary})`) as Error & {
+            cause?: unknown;
+          };
+          wrapped.cause = e;
+          throw wrapped;
+        }
+
+        const bdHeaders: Record<string, string> = {};
+        resp.headers.forEach((value, key) => {
+          bdHeaders[key] = value;
+        });
+
+        // NOTE:
+        // Do not rely on `Response.ok` here. In our Jest tests, `fetch` is mocked with a minimal
+        // Response-like object that omits `ok`, which would incorrectly trip `!resp.ok` for 200s.
+        // Use status code semantics directly instead.
+        if (resp.status < 200 || resp.status >= 300) {
+          const errText = await resp.text().catch(() => '');
+          const snippet = errText.length > 1200 ? `${errText.slice(0, 1200)}…` : errText;
+          console.error('[RunnerHostRuntime.http] web_unlocker_gateway_non_2xx', {
+            status: resp.status,
+            statusText: resp.statusText,
+            url: 'https://api.brightdata.com/request',
+            targetUrl: safeTargetUrl,
+          });
+          throw new Error(
+            `HTTP (Web Unlocker) gateway returned ${resp.status} ${resp.statusText} for ${finalMethod} ${safeTargetUrl}${
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
+
+        // Web Unlocker responses are typically JSON like:
+        //   { result: "<html>...</html>", headers: {...}, url: "..." }
+        // But some flows can return the unlocked page body directly (raw HTML/text).
+        // Read once to avoid Undici "Body has already been read".
+        const respText = await resp.text();
+
+        // Try to interpret as JSON wrapper; fall back to raw text otherwise.
+        let payloadObj: Record<string, unknown> | null = null;
+        try {
+          const parsed = JSON.parse(respText);
+          if (parsed && typeof parsed === 'object') {
+            payloadObj = parsed as Record<string, unknown>;
+          }
+        } catch {
+          payloadObj = null;
+        }
+
+        const resultRaw = payloadObj?.result ?? payloadObj?.body;
+        const targetStatus =
+          coerceHttpStatusCode(payloadObj?.status_code) ??
+          coerceHttpStatusCode(payloadObj?.statusCode) ??
+          coerceHttpStatusCode(payloadObj?.status) ??
+          resp.status;
+        const targetHeadersRaw = payloadObj && payloadObj.headers && typeof payloadObj.headers === 'object' ? (payloadObj.headers as Record<string, unknown>) : undefined;
+        const targetHeaders = targetHeadersRaw ? normalizeHeadersToStrings(targetHeadersRaw) : bdHeaders;
+        const targetUrl = (payloadObj?.url && typeof payloadObj.url === 'string' ? payloadObj.url : undefined) ?? finalUrl;
+        const targetContentType = (getHeaderValue(targetHeaders as unknown as Record<string, unknown>, 'content-type') ?? '').toLowerCase();
+
+        const resultText =
+          resultRaw === undefined
+            ? respText // raw HTML/text response path
+            : resultRaw === null
+              ? ''
+              : typeof resultRaw === 'string'
+                ? resultRaw
+                : (() => {
+                    try {
+                      return JSON.stringify(resultRaw);
+                    } catch {
+                      return String(resultRaw);
+                    }
+                  })();
+
+        let responseBody: unknown;
+        if (responseType === 'text') {
+          responseBody = resultText;
+        } else {
+          // Default/json: parse JSON if we can infer it, otherwise return text
+          if (targetContentType.includes('application/json') || looksLikeJson(resultText)) {
+            try {
+              responseBody = JSON.parse(resultText);
+            } catch {
+              responseBody = resultText;
+            }
+          } else {
+            responseBody = resultText;
+          }
+        }
+
+        return {
+          status: targetStatus,
+          statusText: statusTextFromCode(targetStatus),
+          headers: targetHeaders,
+          body: responseBody,
+          url: targetUrl,
+        };
+      }
 
       const init: RequestInit = {
         method: finalMethod,
@@ -345,15 +730,17 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       } else if (responseType === 'text') {
         responseBody = await resp.text();
       } else {
-        // Default: best-effort JSON, otherwise text
+        // Default: best-effort JSON, otherwise text. Read once to avoid
+        // Undici "Body has already been read" when JSON parsing fails.
+        const text = await resp.text();
         if (contentType.includes('application/json')) {
           try {
-            responseBody = await resp.json();
+            responseBody = text.trim().length ? JSON.parse(text) : text;
           } catch {
-            responseBody = await resp.text();
+            responseBody = text;
           }
         } else {
-          responseBody = await resp.text();
+          responseBody = text;
         }
       }
 
@@ -465,15 +852,150 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
     const ctx = { args, runtimeEnv, metadata, vars };
 
-    const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
+    // SQL endpoints (native DB transport)
+    if (isSqlEndpoint(endpoint)) {
+      const e = endpoint;
+      if (String(e.driver || '').trim().toLowerCase() !== 'postgres') {
+        throw new Error(`Unsupported SQL driver for connector "${c}": ${String(e.driver || '')}`);
+      }
+
+      const session = connectorSessions[c] as ConnectorSession | undefined;
+      const db = session?.db;
+      if (!db) {
+        throw new Error(`Connector "${c}" does not have a DB session (not connected or missing db config)`);
+      }
+
+      await assertDbHostAllowed(db.host);
+
+      const sqlRaw = evalTemplate(e.sql, ctx);
+      const sql = ensureSingleStatement(String(sqlRaw ?? ''));
+      if (!sql.trim()) throw new Error(`Empty SQL for connector "${c}" action "${a}"`);
+
+      const readOnly = e.readOnly !== false;
+      if (readOnly && !isReadOnlyStatement(sql)) {
+        throw new Error('SQL statement is not allowed (read-only policy)');
+      }
+
+      const mode: 'query' | 'execute' = e.mode === 'execute' ? 'execute' : 'query';
+      const rowLimitHint = typeof e.rowLimit === 'number' && Number.isFinite(e.rowLimit) ? Math.max(1, Math.floor(e.rowLimit)) : null;
+      const maxRows = Math.min(rowLimitHint ?? 1000, 5000);
+
+      const argsRec = args as Record<string, unknown>;
+      const paramsRaw = argsRec.params;
+      const params: unknown[] = paramsRaw === undefined ? [] : Array.isArray(paramsRaw) ? paramsRaw : (() => { throw new Error('args.params must be an array when provided'); })();
+
+      const hostLower = String(db.host).toLowerCase();
+      const isSupabaseHost = hostLower.endsWith('.supabase.co');
+      const isDefaultPgPort = Number(db.port) === 5432;
+
+      // Fast preflight: if we can't open a TCP connection, the query will never succeed.
+      const preflightMain = await tcpProbe(db.host, db.port, 1500);
+      const preflightPooler = isSupabaseHost && isDefaultPgPort ? await tcpProbe(db.host, 6543, 1500) : null;
+
+      if (preflightMain.outcome !== 'connected' && (preflightPooler?.outcome ?? 'timeout') !== 'connected') {
+        let resolvedIp: string | null = null;
+        try {
+          const r = await lookup(String(db.host), { family: 4 });
+          resolvedIp = r?.address ?? null;
+        } catch {
+          // ignore
+        }
+        const extra =
+          isSupabaseHost && isDefaultPgPort
+            ? ' For Supabase, also verify your project Network Restrictions / IP allowlist and consider using the pooler port (6543) if required.'
+            : '';
+        throw new Error(
+          `Cannot reach Postgres host "${db.host}" on port ${db.port} (TCP ${preflightMain.outcome}${resolvedIp ? `; resolved IPv4 ${resolvedIp}` : ''}). This looks like a network/firewall/egress restriction: the runner must be able to open outbound TCP to your database port.${extra}`
+        );
+      }
+
+      const pool = getPgPool(db);
+
+      // Ensure timeouts are bounded and safe.
+      const effectiveTimeoutMs =
+        typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+          ? Math.min(120_000, Math.floor(timeoutMs))
+          : typeof e.timeoutMs === 'number' && Number.isFinite(e.timeoutMs) && e.timeoutMs > 0
+            ? Math.min(120_000, Math.floor(e.timeoutMs))
+            : 30_000;
+
+      const safeUrl = `sql:postgres://${encodeURIComponent(db.host)}:${encodeURIComponent(String(db.port))}/${encodeURIComponent(db.database)}`;
+
+      const connectStartedAt = Date.now();
+      let client: PoolClient;
+      try {
+        client = await pool.connect();
+      } catch (err) {
+        const code = (err as { code?: unknown } | null)?.code;
+        if (
+          code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+          code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+          code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+        ) {
+          throw new Error(
+            [
+              `Postgres SSL verification failed while connecting to "${db.host}:${db.port}" (${String(code)}).`,
+              `This usually means the server (or a network proxy) presented a certificate chain that isn't trusted by the runner.`,
+              `Fix options:`,
+              `- Ensure your DB endpoint presents a publicly trusted TLS certificate chain (no MITM/proxy inserting a self-signed cert).`,
+              `- If you're using a pooler/proxy, ensure it is configured with a trusted certificate chain.`,
+            ].join(' ')
+          );
+        }
+        throw err;
+      }
+      try {
+        void connectStartedAt;
+
+        // Apply statement timeout for this session.
+        // Note: statement_timeout is per-connection; we reset defensively for every call.
+        await client.query(`SET statement_timeout = ${effectiveTimeoutMs}`);
+
+        // Best-effort: cap query result size by truncating rows array (does not stop the server from producing more).
+        // For strict limits, prefer writing templates with LIMIT, or add a gateway in front.
+        const startedAt = Date.now();
+        const result =
+          mode === 'execute'
+            ? await client.query({ text: sql, values: params })
+            : await client.query({ text: sql, values: params });
+        const elapsedMs = Date.now() - startedAt;
+        void elapsedMs;
+
+        const fields = Array.isArray(result.fields)
+          ? (result.fields as FieldDef[]).map((f: FieldDef) => ({ name: f.name, dataTypeId: f.dataTypeID }))
+          : [];
+        const rows = Array.isArray(result.rows) ? result.rows.slice(0, maxRows) : [];
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: {
+            driver: 'postgres',
+            command: result.command,
+            rowCount: typeof result.rowCount === 'number' ? result.rowCount : null,
+            fields,
+            rows,
+            truncated: Array.isArray(result.rows) ? result.rows.length > rows.length : false,
+          },
+          url: safeUrl,
+        };
+      } finally {
+        client.release();
+      }
+    }
+
+    // HTTP endpoints (existing behavior)
+    const httpEndpoint: ConnectorHttpEndpointV2 = endpoint;
+    const baseUrlRaw = httpEndpoint.baseUrlOverride || tpl.baseUrl;
     const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();
     if (!/^https?:\/\//i.test(baseUrlEvaluated)) {
       throw new Error(`Invalid baseUrl for connector "${c}": must be absolute http(s) URL`);
     }
 
     // Resolve path variables
-    const pathVars: Record<string, ExprString> = endpoint.mapping?.path ?? {};
-    const resolvedPath = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
+    const pathVars: Record<string, ExprString> = httpEndpoint.mapping?.path ?? {};
+    const resolvedPath = String(httpEndpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
       const key = String(name);
       const expr = pathVars[key];
       const val = expr !== undefined ? evalTemplate(expr, ctx) : args[key];
@@ -488,19 +1010,19 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // Build headers (sessions first, then mapping overrides)
     const sessionHeaders = connectorSessions[c]?.headers ?? {};
     const headers: Record<string, unknown> = { ...sessionHeaders };
-    if (endpoint.mapping?.headers) {
-      for (const [k, v] of Object.entries(endpoint.mapping.headers)) {
+    if (httpEndpoint.mapping?.headers) {
+      for (const [k, v] of Object.entries(httpEndpoint.mapping.headers)) {
         const out = evalTemplate(v, ctx);
         headers[k] = out;
       }
     }
 
     // Build query/body based on mapping or requestStyle
-    const method: HttpMethod = endpoint.method;
+    const method: HttpMethod = httpEndpoint.method;
     let finalUrl = url;
     let body: unknown = undefined;
 
-    const mapping = endpoint.mapping;
+    const mapping = httpEndpoint.mapping;
     if (mapping?.query) {
       const defaultEncoding: QueryParamEncoding = mapping.queryEncoding ?? 'standard';
       const parts: string[] = [];

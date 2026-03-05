@@ -7,7 +7,7 @@ import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ChannelRepository, ConversationMemberRepository, ConversationNotificationPrefRepository, getConnection } from '@starships/models';
+import { ChannelRepository, ConversationNotificationPrefRepository, ConversationParticipantRepository, ViewRepository, getConnection } from '@starships/models';
 import type { ChannelModel } from '@starships/protocol';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { StarshipService } from '@/services/StarshipService';
@@ -60,8 +60,8 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       slug: string;
       name: string;
       is_private: boolean;
-      channel_type?: string | null;
       topic: string | null;
+      attached_view_id?: string | null;
       created_at: string;
       updated_at: string;
       conversation_created_at: string;
@@ -80,9 +80,9 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
           OR $2::boolean = true
           OR EXISTS (
             SELECT 1
-            FROM conversation_members cm
-            WHERE cm.conversation_id = c.conversation_id
-              AND cm.user_id = $3
+            FROM conversation_participants cp
+            WHERE cp.conversation_id = c.conversation_id
+              AND cp.user_id = $3
             LIMIT 1
           )
         )
@@ -97,13 +97,9 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       slug: String(r.slug),
       name: String(r.name),
       isPrivate: Boolean(r.is_private),
-      channelType:
-        String((r as any).channel_type || 'chat')
-          .trim()
-          .toLowerCase() === 'forum'
-          ? 'forum'
-          : 'chat',
+      channelType: 'chat',
       topic: r.topic ?? null,
+      attachedViewId: r.attached_view_id ?? null,
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),
     }));
@@ -152,7 +148,7 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
 
     const conversationService = new ConversationService();
     const channelRepo = new ChannelRepository();
-    const memberRepo = new ConversationMemberRepository();
+    const participantRepo = new ConversationParticipantRepository();
 
     // Create backing conversation first (reuses existing conversation page + message routes).
     const conversation = await conversationService.createConversation({
@@ -173,7 +169,7 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
 
       // Private channels: add creator as a member (idempotent).
       if (channel.isPrivate) {
-        await memberRepo.createOrIgnoreMember({
+        await participantRepo.addUserParticipant({
           conversationId: channel.conversationId,
           userId: authUserId,
           role: 'admin',
@@ -193,6 +189,66 @@ router.post('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Re
     }
   } catch (error) {
     handleError(error, res, 'creating channel');
+  }
+});
+
+/**
+ * GET /channels/:channelId
+ *
+ * Returns a conversation-backed channel by its conversation id.
+ *
+ * Notes:
+ * - `channelId` is the backing conversation id (channels.conversation_id).
+ * - For private channels, membership is enforced (owner/admin bypass supported).
+ */
+router.get('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ channelId: IdSchema }), req.params, res, 'channel parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(params.channelId);
+    if (!channel) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Channel not found', 404, { channelId: params.channelId });
+      return;
+    }
+
+    // Resolve starshipId from authoritative conversation row (defense-in-depth).
+    const conn = getConnection();
+    const convoRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [params.channelId]);
+    const conversationStarshipId = convoRow?.starship_id ? String(convoRow.starship_id) : '';
+    if (!conversationStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.channelId });
+      return;
+    }
+
+    // Fail closed if channel row starship_id ever diverges from the conversation.
+    if (String(channel.starshipId) !== String(conversationStarshipId)) {
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this channel', 403, { channelId: params.channelId });
+      return;
+    }
+
+    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId: params.channelId,
+        conversationStarshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    sendSuccess(res, { channel }, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching channel');
   }
 });
 
@@ -227,6 +283,7 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
           .optional(),
         isPrivate: z.boolean().optional(),
         topic: z.string().max(2000).optional().nullable(),
+        attachedViewId: IdSchema.optional().nullable(),
       }),
       req.body,
       res,
@@ -248,6 +305,25 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     const nextName = body.name !== undefined ? String(body.name) : undefined;
     const nextIsPrivate = body.isPrivate !== undefined ? Boolean(body.isPrivate) : undefined;
     const nextTopic = body.topic !== undefined ? (body.topic ?? null) : undefined;
+    const nextAttachedViewId = body.attachedViewId !== undefined ? (body.attachedViewId ? String(body.attachedViewId) : null) : undefined;
+
+    // Validate attached view belongs to this starship (if provided and non-null).
+    if (nextAttachedViewId !== undefined && nextAttachedViewId !== null) {
+      const viewRepo = new ViewRepository();
+      const view = await viewRepo.findById(nextAttachedViewId);
+      if (!view) {
+        sendError(res, 'VALIDATION_ERROR', 'Attached view not found', 400, { attachedViewId: nextAttachedViewId });
+        return;
+      }
+      if (String(view.starshipId) !== String(channel.starshipId)) {
+        sendError(res, 'VALIDATION_ERROR', 'Attached view must belong to the same starship as the channel', 400, {
+          attachedViewId: nextAttachedViewId,
+          channelStarshipId: channel.starshipId,
+          viewStarshipId: view.starshipId,
+        });
+        return;
+      }
+    }
 
     // Update the channels row.
     const setParts: string[] = [];
@@ -265,6 +341,10 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
       setParts.push(`topic = $${i++}`);
       values.push(nextTopic);
     }
+    if (nextAttachedViewId !== undefined) {
+      setParts.push(`attached_view_id = $${i++}`);
+      values.push(nextAttachedViewId);
+    }
     // Always bump updated_at.
     setParts.push(`updated_at = NOW()`);
 
@@ -276,7 +356,17 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
     `;
     values.push(channel.conversationId);
 
-    const updatedRow = await conn.queryOne<Record<string, any>>(sql, values);
+    const updatedRow = await conn.queryOne<{
+      conversation_id: string;
+      starship_id: string;
+      slug: string;
+      name: string;
+      is_private: boolean;
+      topic: string | null;
+      attached_view_id: string | null;
+      created_at: string;
+      updated_at: string;
+    }>(sql, values);
     if (!updatedRow) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update channel', 500);
       return;
@@ -295,9 +385,9 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
 
     // If the channel is now private, ensure the updater is a member (idempotent).
     if (nextIsPrivate === true) {
-      const memberRepo = new ConversationMemberRepository();
+      const participantRepo = new ConversationParticipantRepository();
       try {
-        await memberRepo.createOrIgnoreMember({
+        await participantRepo.addUserParticipant({
           conversationId: channel.conversationId,
           userId: authUserId,
           role: 'admin',
@@ -314,13 +404,9 @@ router.patch('/channels/:channelId', jwtAuthMiddleware, async (req: Request, res
       slug: String(updatedRow.slug),
       name: String(updatedRow.name),
       isPrivate: Boolean(updatedRow.is_private),
-      channelType:
-        String((updatedRow as any).channel_type || 'chat')
-          .trim()
-          .toLowerCase() === 'forum'
-          ? 'forum'
-          : 'chat',
+      channelType: 'chat',
       topic: updatedRow.topic ?? null,
+      attachedViewId: updatedRow.attached_view_id ?? null,
       createdAt: String(updatedRow.created_at),
       updatedAt: String(updatedRow.updated_at),
     };
@@ -544,8 +630,8 @@ router.post('/channels/:channelId/members', jwtAuthMiddleware, async (req: Reque
     // MVP: owner-only (owner/admin/instance-admin). Tighten later if desired.
     if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
-    const result = await memberRepo.createOrIgnoreMember({
+    const participantRepo = new ConversationParticipantRepository();
+    const result = await participantRepo.addUserParticipant({
       conversationId: channel.conversationId,
       userId: body.userId,
       role: body.role ?? 'member',
@@ -588,8 +674,12 @@ router.delete('/channels/:channelId/members/:userId', jwtAuthMiddleware, async (
 
     if (!(await verifyStarshipOwnerAccess(channel.starshipId, authUserId, res))) return;
 
-    const memberRepo = new ConversationMemberRepository();
-    const removed = await memberRepo.removeMember(channel.conversationId, params.userId);
+    const conn = getConnection();
+    const result = await conn.queryWithResult(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [
+      channel.conversationId,
+      params.userId,
+    ]);
+    const removed = (result.rowCount ?? 0) > 0;
     sendSuccess(res, { removed }, 200);
   } catch (error) {
     handleError(error, res, 'removing channel member');

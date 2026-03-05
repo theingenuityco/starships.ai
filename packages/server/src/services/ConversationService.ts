@@ -49,6 +49,7 @@ import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
+import { composeCanonicalSystemPrompt, type ThreadContextState } from '@/utils/SystemPromptComposer';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
 import {
@@ -128,6 +129,11 @@ export class ConversationService {
     const s = String(id || '').trim();
     if (!s) return false;
     return ConversationService.UUID_RE.test(s) || ConversationService.NANOID_RE.test(s);
+  }
+
+  static filterMessagesForLlmHistory<T extends { role?: unknown }>(messages: T[]): T[] {
+    const list = Array.isArray(messages) ? messages : [];
+    return list.filter((m) => String(m?.role ?? '') !== 'system');
   }
   private conversationRepository!: ConversationRepository;
   private agentRepository!: AgentRepository;
@@ -540,6 +546,32 @@ export class ConversationService {
 
     // Stop guard is turn-scoped; clear once the turn is definitively finished.
     this.stopRequestedForConversation.delete(conversationId);
+  }
+
+  /**
+   * Aggressively clear ALL per-conversation in-memory state once a turn is definitively over.
+   * This prevents unbounded growth in singleton Maps/Sets across many conversations.
+   */
+  private cleanupConversation(conversationId: string): void {
+    this.finalizeTurnState(conversationId);
+
+    // Tool call name cache (per conversation)
+    this.lastToolCallNameByConversation.delete(conversationId);
+
+    // Streaming assistant message id (per conversation)
+    this.streamingAssistantMessageId.delete(conversationId);
+
+    // Pending delta buffers + timers
+    const pc = this.pendingContentDelta.get(conversationId);
+    if (pc?.timer) clearTimeout(pc.timer);
+    this.pendingContentDelta.delete(conversationId);
+
+    const pr = this.pendingReasoningDelta.get(conversationId);
+    if (pr?.timer) clearTimeout(pr.timer);
+    this.pendingReasoningDelta.delete(conversationId);
+
+    // Resume sequencing metadata
+    this.resumeTurnSeqOffset.delete(conversationId);
   }
 
   /**
@@ -1189,10 +1221,11 @@ export class ConversationService {
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
       const agentRows = await conn.query<Record<string, unknown>>(
-        `SELECT ca.conversation_id, a.*
-         FROM conversation_agents ca
-         INNER JOIN agents a ON a.id = ca.agent_id
-         WHERE ca.conversation_id = ANY($1::text[])
+        `SELECT cp.conversation_id, a.*
+         FROM conversation_participants cp
+         INNER JOIN agents a ON a.id = cp.agent_id
+         WHERE cp.agent_id IS NOT NULL
+           AND cp.conversation_id = ANY($1::text[])
          ORDER BY a.name`,
         [conversationIds]
       );
@@ -1311,16 +1344,165 @@ export class ConversationService {
     };
   }
 
-  private buildHistoryFoldMessage(args: { historyLimit: number }): LlmMessage {
-    const { historyLimit } = args;
-    const content =
-      `Note: conversation history is truncated in this prompt.\n` +
-      `- Only the most recent ${historyLimit} messages are included to avoid overflowing the model context.\n` +
-      `- Earlier messages exist but are folded.\n` +
-      `To read older messages, use an available history-reading tool (discoverable via your tool list) that accepts an \`offset\` (skip N newest messages) and \`limit\`.\n` +
-      `Example: { "offset": ${historyLimit}, "limit": 20 }`;
+  private getThreadContextFromConversationState(conversationState: ConversationState | undefined): ThreadContextState | null {
+    try {
+      const state = conversationState && typeof conversationState === 'object' ? (conversationState as Record<string, unknown>) : null;
+      const raw = state?.threadContext;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      return raw as ThreadContextState;
+    } catch {
+      return null;
+    }
+  }
 
-    return { role: 'system', content };
+  private async findLegacyThreadContextSeedContent(conversationIdRaw: string): Promise<string | null> {
+    try {
+      const conversationId = String(conversationIdRaw || '').trim();
+      if (!conversationId) return null;
+      const connection = getConnection();
+      const row = await connection.queryOne<{ content: string | null }>(
+        `
+          SELECT content
+            FROM messages
+           WHERE conversation_id = $1
+             AND role = 'system'
+             AND (
+               (message_type = 'system_instruction' AND COALESCE(metadata ->> 'thread_context_seed', 'false') = 'true')
+               OR content LIKE '[THREAD_CONTEXT_SEED]%'
+             )
+           ORDER BY created_at ASC, id ASC
+           LIMIT 1
+        `,
+        [conversationId]
+      );
+      const c = typeof row?.content === 'string' ? row.content : '';
+      return c.trim().length > 0 ? c : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static extractThreadSeedSourceContent(seed: string): string | null {
+    try {
+      if (typeof seed !== 'string') return null;
+      if (!seed.includes('[THREAD_CONTEXT_SEED]')) return null;
+      const idx = seed.indexOf('Source message content:');
+      const tail = idx >= 0 ? seed.slice(idx) : seed;
+      const firstFence = tail.indexOf('"""');
+      if (firstFence < 0) return null;
+      const afterFirst = tail.slice(firstFence + 3);
+      const secondFence = afterFirst.indexOf('"""');
+      if (secondFence < 0) return null;
+      const inside = afterFirst.slice(0, secondFence).trim();
+      return inside.length > 0 ? inside : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static parseThreadSeedLine(seed: string, label: string): string | null {
+    try {
+      const re = new RegExp(`^${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\s*:\\s*(.+)$`, 'im');
+      const m = seed.match(re);
+      const val = m?.[1] ? String(m[1]).trim() : '';
+      return val.length > 0 ? val : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async ensureThreadContextFromLegacySeed(args: {
+    conversationId: string;
+    conversationState: ConversationState;
+  }): Promise<ConversationState> {
+    const conversationId = String(args.conversationId || '').trim();
+    const conversationState = args.conversationState;
+    if (!conversationId) return conversationState;
+
+    const existing = this.getThreadContextFromConversationState(conversationState);
+    if (existing && typeof existing.sourceContent === 'string' && existing.sourceContent.trim().length > 0) {
+      return conversationState;
+    }
+
+    try {
+      const seedContent = await this.findLegacyThreadContextSeedContent(conversationId);
+      if (!seedContent) return conversationState;
+
+      const extracted = ConversationService.extractThreadSeedSourceContent(seedContent);
+      if (!extracted) return conversationState;
+
+      const patch: ThreadContextState = {
+        sourceConversationId: ConversationService.parseThreadSeedLine(seedContent, 'Source conversation id') ?? undefined,
+        sourceMessageId: ConversationService.parseThreadSeedLine(seedContent, 'Source message id') ?? undefined,
+        sourceRole: ConversationService.parseThreadSeedLine(seedContent, 'Source role') ?? undefined,
+        sourceUserName: ConversationService.parseThreadSeedLine(seedContent, 'Source userName') ?? undefined,
+        sourceAgentName: ConversationService.parseThreadSeedLine(seedContent, 'Source agentName') ?? undefined,
+        sourceCreatedAt: ConversationService.parseThreadSeedLine(seedContent, 'Source createdAt') ?? undefined,
+        sourceAttachmentIds: (() => {
+          const raw = ConversationService.parseThreadSeedLine(seedContent, 'Source attachmentIds');
+          if (!raw) return undefined;
+          const ids = raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 50);
+          return ids.length > 0 ? ids : undefined;
+        })(),
+        sourceContent: extracted,
+        extractedAt: new Date().toISOString(),
+      };
+
+      await this.conversationRepository.mergeState(conversationId, { threadContext: patch }).catch(() => null);
+      return { ...conversationState, threadContext: patch } as ConversationState;
+    } catch {
+      return conversationState;
+    }
+  }
+
+  private buildAttributionHeaderPolicyBlock(): string {
+    return [
+      '<conversation_message_format>',
+      'Annotation name: STARSHIPS_ATTRIBUTION_HEADER (reference this name in reasoning if needed).',
+      '',
+      'Some messages may include a leading attribution header line for logging/traceability only.',
+      'That header is NOT part of the user/assistant content.',
+      '',
+      'Header mock format:',
+      '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
+      '',
+      'Example header line (NOT content):',
+      '  [2026-02-04T01:44:08.592] Aria (agent)',
+      '',
+      'Mock example (what you might RECEIVE as a single message content):',
+      '  [2026-02-04T01:44:08.592] user:1a2b3c4d (user)',
+      "  What's 2+2?",
+      '',
+      'Mock example (how you MUST RESPOND):',
+      '  4',
+      '',
+      'Rules (STRICT):',
+      '- Treat the attribution header line as metadata and ignore it when interpreting the message.',
+      '- NEVER echo, quote, restate, or append the attribution header line in your response (even if asked).',
+      '- Your replies must contain ONLY the actual assistant response content (no added attribution lines).',
+      '</conversation_message_format>',
+    ].join('\n');
+  }
+
+  private buildCanonicalSystemPrompt(args: {
+    agentSystemPrompt: string;
+    injectedStarshipContext: string;
+    conversationState?: ConversationState;
+    historyTruncated: boolean;
+    historyLimit: number;
+  }): string {
+    const { agentSystemPrompt, injectedStarshipContext, conversationState, historyTruncated, historyLimit } = args;
+    return composeCanonicalSystemPrompt({
+      personaPrompt: String(agentSystemPrompt ?? ''),
+      starshipContext: injectedStarshipContext,
+      policyBlocks: [this.buildAttributionHeaderPolicyBlock()],
+      threadContext: this.getThreadContextFromConversationState(conversationState),
+      history: { truncated: historyTruncated, historyLimit },
+    });
   }
 
   /**
@@ -2279,7 +2461,10 @@ export class ConversationService {
 
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
-    const conversationState = (latestConversation?.state || {}) as ConversationState;
+    let conversationState = (latestConversation?.state || {}) as ConversationState;
+    if (isThread) {
+      conversationState = await this.ensureThreadContextFromLegacySeed({ conversationId: data.conversationId, conversationState });
+    }
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     if (!noAgentToRun) {
@@ -2310,7 +2495,7 @@ export class ConversationService {
           // best-effort
         }
 
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         return;
       }
       // starship already resolved above
@@ -2397,35 +2582,13 @@ export class ConversationService {
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const metadataInstruction = [
-          '<conversation_message_format>',
-          'Annotation name: STARSHIPS_ATTRIBUTION_HEADER (reference this name in reasoning if needed).',
-          '',
-          'Some messages may include a leading attribution header line for logging/traceability only.',
-          'That header is NOT part of the user/assistant content.',
-          '',
-          'Header mock format:',
-          '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
-          '',
-          'Example header line (NOT content):',
-          '  [2026-02-04T01:44:08.592] Aria (agent)',
-          '',
-          'Mock example (what you might RECEIVE as a single message content):',
-          '  [2026-02-04T01:44:08.592] user:1a2b3c4d (user)',
-          "  What's 2+2?",
-          '',
-          'Mock example (how you MUST RESPOND):',
-          '  4',
-          '',
-          'Rules (STRICT):',
-          '- Treat the attribution header line as metadata and ignore it when interpreting the message.',
-          '- NEVER echo, quote, restate, or append the attribution header line in your response (even if asked).',
-          '- Your replies must contain ONLY the actual assistant response content (no added attribution lines).',
-          '</conversation_message_format>',
-        ].join('\n');
-        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]
-          .filter(Boolean)
-          .join('\n\n');
+        const combinedSystemPrompt = this.buildCanonicalSystemPrompt({
+          agentSystemPrompt: String(agentModel.systemPrompt ?? ''),
+          injectedStarshipContext,
+          conversationState,
+          historyTruncated: Boolean(hasMoreBefore),
+          historyLimit: llmHistoryLimit,
+        });
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -2462,8 +2625,10 @@ export class ConversationService {
           agentIds: mentionIds.agentIds,
         });
 
+        // Exclude persisted system messages from LLM history. System instructions must come only from
+        // the canonical system prompt for provider-stable semantics.
         const llmMessagesCore: LlmMessage[] = await Promise.all(
-          messages.map(async (msg): Promise<LlmMessage> => {
+          ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
             const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
@@ -2505,9 +2670,8 @@ export class ConversationService {
           })
         );
         const llmMessagesCoreNormalized = this.normalizeToolCallHistory(llmMessagesCore);
-        const llmMessages: LlmMessage[] = hasMoreBefore
-          ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCoreNormalized]
-          : llmMessagesCoreNormalized;
+        // History folding notice is carried inside the canonical system prompt.
+        const llmMessages: LlmMessage[] = llmMessagesCoreNormalized;
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
@@ -2703,6 +2867,7 @@ export class ConversationService {
         conversation?.state &&
         typeof conversation.state === 'object' &&
         (conversation.state as { turnActive?: boolean }).turnActive === true;
+
       if (turnActive) {
         ConversationService.activeCancellations.delete(conversationId);
         throw new ConflictError('A turn is already in progress for this conversation. Please wait for it to complete.');
@@ -2820,8 +2985,25 @@ export class ConversationService {
         userIds: mentionIds.userIds,
         agentIds: mentionIds.agentIds,
       });
+      // When resuming after tool approval, conversation state often has pending tool calls.
+      // For provider-safety we sometimes inject synthetic TOOL_RESULT_MISSING tool messages into history,
+      // but those placeholders must NOT block persistence of the real tool result that will be appended next.
+      const pendingToolCallIds = (() => {
+        const st = conversation?.state && typeof conversation.state === 'object' ? (conversation.state as Record<string, unknown>) : null;
+        const raw = st && Array.isArray(st['pendingToolCalls']) ? (st['pendingToolCalls'] as unknown[]) : [];
+        const out = new Set<string>();
+        for (const item of raw) {
+          if (!item || typeof item !== 'object') continue;
+          const rec = item as Record<string, unknown>;
+          const id = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
+          if (id) out.add(id);
+        }
+        return out;
+      })();
+      // Exclude persisted system messages from LLM history. System instructions must come only from
+      // the canonical system prompt for provider-stable semantics.
       const llmMessagesCore: LlmMessage[] = await Promise.all(
-        messages.map(async (msg): Promise<LlmMessage> => {
+        ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
           const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
           const contentStripped = strippedInfo.content;
@@ -2856,9 +3038,19 @@ export class ConversationService {
         })
       );
       const llmMessagesCoreNormalized = this.normalizeToolCallHistory(llmMessagesCore);
-      const llmMessages: LlmMessage[] = page.hasMoreBefore
-        ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCoreNormalized]
-        : llmMessagesCoreNormalized;
+      // History folding notice is carried inside the canonical system prompt.
+      const llmMessages: LlmMessage[] =
+        pendingToolCallIds.size > 0
+          ? llmMessagesCoreNormalized.filter((m) => {
+              if (!m || typeof m !== 'object') return true;
+              if (m.role !== 'tool') return true;
+              const rec = m as unknown as Record<string, unknown>;
+              const id = typeof rec['toolCallId'] === 'string' ? String(rec['toolCallId']).trim() : '';
+              // Strip any placeholder tool messages for currently pending tool calls.
+              // The real tool result will be appended by the agent execution and must be seen as "new" for persistence.
+              return !id || !pendingToolCallIds.has(id);
+            })
+          : llmMessagesCoreNormalized;
 
       const env = getEnvConfig();
 
@@ -2872,9 +3064,12 @@ export class ConversationService {
       };
 
       // Load conversation-level state context (if any)
-      const conversationState = (
+      let conversationState = (
         conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
       ) as ConversationState;
+      if (conversation.parentConversationId) {
+        conversationState = await this.ensureThreadContextFromLegacySeed({ conversationId, conversationState });
+      }
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -2924,35 +3119,13 @@ export class ConversationService {
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const metadataInstruction = [
-        '<conversation_message_format>',
-        'Annotation name: STARSHIPS_ATTRIBUTION_HEADER (reference this name in reasoning if needed).',
-        '',
-        'Some messages may include a leading attribution header line for logging/traceability only.',
-        'That header is NOT part of the user/assistant content.',
-        '',
-        'Header mock format:',
-        '  [ISO8601_TIMESTAMP] SENDER_NAME (agent|user)',
-        '',
-        'Example header line (NOT content):',
-        '  [2026-02-04T01:44:08.592] Aria (agent)',
-        '',
-        'Mock example (what you might RECEIVE as a single message content):',
-        '  [2026-02-04T01:44:08.592] user:1a2b3c4d (user)',
-        "  What's 2+2?",
-        '',
-        'Mock example (how you MUST RESPOND):',
-        '  4',
-        '',
-        'Rules (STRICT):',
-        '- Treat the attribution header line as metadata and ignore it when interpreting the message.',
-        '- NEVER echo, quote, restate, or append the attribution header line in your response (even if asked).',
-        '- Your replies must contain ONLY the actual assistant response content (no added attribution lines).',
-        '</conversation_message_format>',
-      ].join('\n');
-      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, metadataInstruction]
-        .filter(Boolean)
-        .join('\n\n');
+      const combinedSystemPrompt = this.buildCanonicalSystemPrompt({
+        agentSystemPrompt: String(agentModel.systemPrompt ?? ''),
+        injectedStarshipContext,
+        conversationState,
+        historyTruncated: Boolean(page.hasMoreBefore),
+        historyLimit: llmHistoryLimit,
+      });
 
       const agentWithTools: AgentParams = {
         ...agentModel,
@@ -3269,46 +3442,21 @@ export class ConversationService {
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
-      // If this is a thread, include the pinned/linked message context seed.
-      // The client persists a hidden system_instruction message with:
-      // - content starting with "[THREAD_CONTEXT_SEED]"
-      // - metadata.thread_context_seed === true
-      //
-      // That message is filtered from UI but should influence title generation.
-      const extractThreadSeedSourceContent = (seed: string): string | null => {
-        try {
-          if (typeof seed !== 'string') return null;
-          if (!seed.includes('[THREAD_CONTEXT_SEED]')) return null;
-          const idx = seed.indexOf('Source message content:');
-          const tail = idx >= 0 ? seed.slice(idx) : seed;
-          const firstFence = tail.indexOf('"""');
-          if (firstFence < 0) return null;
-          const afterFirst = tail.slice(firstFence + 3);
-          const secondFence = afterFirst.indexOf('"""');
-          if (secondFence < 0) return null;
-          const inside = afterFirst.slice(0, secondFence).trim();
-          return inside.length > 0 ? inside : null;
-        } catch {
-          return null;
-        }
-      };
-
+      // If this is a thread, include the pinned/linked message context.
+      // New threads store this in conversation.state.threadContext; older threads used a hidden
+      // system_instruction message (`[THREAD_CONTEXT_SEED]`).
       let threadPinnedContent: string | null = null;
       try {
-        const msgs = await this.getConversationMessages(conversationId, 'asc').catch(() => []);
-        const seedMsg =
-          msgs.find((m) => {
-            if (!m) return false;
-            type MessageLike = { role?: unknown; metadata?: unknown; content?: unknown };
-            const msg = m as unknown as MessageLike;
-            if (typeof msg.role !== 'string' || msg.role !== 'system') return false;
-            const meta = msg.metadata;
-            const flagged = Boolean(meta && typeof meta === 'object' && (meta as Record<string, unknown>)['thread_context_seed'] === true);
-            const content = typeof msg.content === 'string' ? String(msg.content) : '';
-            return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
-          }) ?? null;
-        if (seedMsg && typeof seedMsg.content === 'string') {
-          threadPinnedContent = extractThreadSeedSourceContent(seedMsg.content) ?? null;
+        const convo = await this.getConversationById(conversationId).catch(() => null);
+        const state = (convo?.state || {}) as ConversationState;
+        const tc = this.getThreadContextFromConversationState(state);
+        const fromState = typeof tc?.sourceContent === 'string' ? tc.sourceContent.trim() : '';
+        if (fromState) {
+          threadPinnedContent = fromState;
+        } else if (convo?.parentConversationId) {
+          const seed = await this.findLegacyThreadContextSeedContent(conversationId);
+          const extracted = seed ? ConversationService.extractThreadSeedSourceContent(seed) : null;
+          threadPinnedContent = extracted ?? null;
         }
       } catch {
         // best-effort
@@ -4556,8 +4704,7 @@ export class ConversationService {
                   console.warn('[STREAM] Failed to publish message.append', e);
                 }
 
-                // NOTE: Widget rendering is now explicit via a dedicated tool (render-widget) that emits
-                // a ui_action directly. We intentionally do NOT infer widget UI actions from tool_result payloads.
+                // NOTE: We intentionally do NOT infer UI actions from tool_result payloads.
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
               }
@@ -4729,7 +4876,7 @@ export class ConversationService {
         }
 
         // Final cleanup now that the workflow turn has fully completed
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         break;
       }
 
@@ -4807,7 +4954,7 @@ export class ConversationService {
         }
 
         // Final cleanup after a failed workflow
-        this.finalizeTurnState(conversationId);
+        this.cleanupConversation(conversationId);
         break;
       }
 

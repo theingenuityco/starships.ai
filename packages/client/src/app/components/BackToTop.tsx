@@ -47,9 +47,9 @@ export default function BackToTop() {
       <motion.button
         ref={buttonRef}
         onClick={scrollToTop}
-        className="relative px-3 py-2 rounded-lg bg-white/5 backdrop-blur-md border border-white/10 shadow-sm hover:bg-white/10 hover:border-white/20 active:scale-95 transition-all duration-200 flex items-center gap-2 group"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        className="relative w-11 h-11 rounded-full bg-gradient-to-b from-amber-300 to-amber-500 shadow-md hover:shadow-lg transition-colors transition-shadow flex items-center justify-center group"
+        whileHover={{ scale: 1.03 }}
+        whileTap={{ scale: 0.97 }}
       >
         <motion.div
           animate={{
@@ -61,10 +61,10 @@ export default function BackToTop() {
             ease: 'easeInOut',
           }}
         >
-          <Icon name="arrow-up" className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
+          <Icon name="arrow-up" className="w-4 h-4 text-white group-hover:text-white transition-colors" />
         </motion.div>
 
-        <span className="text-xs font-normal text-white/60 group-hover:text-white/90 whitespace-nowrap transition-colors">Top</span>
+        <span className="sr-only">Back to top</span>
       </motion.button>
 
       {/* Flying rocket - rendered at document level with fixed positioning */}

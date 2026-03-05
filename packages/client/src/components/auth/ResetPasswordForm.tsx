@@ -15,6 +15,9 @@ import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui
 import { validatePassword } from '@/utils/passwordStrength'
 import { track } from '@/lib/analytics'
 
+const authPrimaryButtonClass =
+  'relative w-full h-11 rounded-full text-sm font-semibold text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-white'
+
 interface ResetPasswordFormProps {
   token: string
 }
@@ -114,7 +117,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
                   track({ type: 'reset_password_request_new_link_clicked' })
                   router.push('/forgot-password')
                 }}
-                className="w-full"
+                className={authPrimaryButtonClass}
               >
                 <Icon name="mail" className="h-4 w-4 mr-2" />
                 Request New Reset Link
@@ -214,11 +217,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={resetPassword.isPending}
-            >
+            <Button type="submit" className={authPrimaryButtonClass} disabled={resetPassword.isPending}>
               {resetPassword.isPending ? (
                 <>
                   <Icon name="loader-2" className="h-4 w-4 mr-2 animate-spin" />

@@ -92,13 +92,22 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
-    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
-      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
+    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pb-10 sm:pb-12 overflow-hidden">
+      {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
+        aria-hidden
+        style={{
+          backgroundImage: "url('/landing/astro-base.svg')",
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center bottom',
+          backgroundSize: 'cover',
+        }}
+      />
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
-            Team chat,
-            <br className="hidden md:block" />
-            powered by{' '}
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[32ch] mx-auto break-words text-balance">
+            Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
               <span className="warp-letter">I</span>
@@ -113,23 +122,23 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             </span>
             .
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
-            Chat with your team, delegate work to agents, and ship faster across your tools.
+          <p className="text-base sm:text-lg text-white/80 mb-5 md:mb-7 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+            Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-white [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-white"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
               aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
             >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-white">
                 <StarshipsLogo
                   width={48}
                   height={48}
-                  className="text-primary-foreground"
+                  className="text-white"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
                   activeStroke="currentColor"
@@ -140,15 +149,15 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               {shouldBlockCtaWhileResolving ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Loading your starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-white/80 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
                 </span>
               ) : isAuthenticated ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Enter my starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-white/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
                 </span>
               ) : (
-                'Get started for free'
+                'Get Started for free'
               )}
             </Button>
           </div>
@@ -183,11 +192,9 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           --warp-delay: 0ms;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) var(--warp-delay) both,
-            /* Keep these independent of per-letter entry delay */
-            gradient-shift 8s ease-in-out 1.2s infinite,
+            /* Keep these independent of per-letter entry delay */ gradient-shift 8s ease-in-out 1.2s infinite,
             warp-blur 3.6s ease-in-out 1.3s infinite,
-            /* Continuous subtle warping after entry finishes */
-            warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
+            /* Continuous subtle warping after entry finishes */ warp-wobble 4.2s ease-in-out calc(700ms + var(--warp-delay)) infinite;
           will-change: transform, opacity, filter, background-position;
           background: linear-gradient(120deg, rgba(168, 85, 247, 0.95) 0%, rgba(139, 92, 246, 0.9) 35%, rgba(124, 58, 237, 0.9) 70%, rgba(168, 85, 247, 0.95) 100%);
           background-size: 250% 250%;

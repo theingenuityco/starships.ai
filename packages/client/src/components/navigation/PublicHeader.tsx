@@ -7,6 +7,7 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 import { Orbitron } from 'next/font/google'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -99,15 +100,50 @@ export function PublicHeader(): React.JSX.Element {
           </span>
         </button>
 
-        <nav className="hidden sm:flex items-center gap-3 md:gap-6 text-sm leading-none">
-          <Link
-            href="/"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/', variant: 'desktop' })}
-            className={`hidden md:inline ${pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
-            aria-current={pathname === '/' ? 'page' : undefined}
-          >
-            Home
-          </Link>
+        <nav className="hidden sm:flex items-center gap-4 md:gap-7 text-[15px] md:text-base leading-none">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={[
+                  'inline-flex items-center gap-1.5',
+                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors',
+                ].join(' ')}
+                aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
+              >
+                <span>Use cases</span>
+                <Icon name="chevron-down" className="h-4 w-4 opacity-80" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Use cases</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
+                  router.push('/use-cases/lead-generation')
+                }}
+              >
+                <Icon name="sparkles" />
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-foreground">Lead generation</div>
+                  <div className="text-xs text-muted-foreground truncate">Research → personalize → follow up → improve</div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
+                  router.push('/use-cases/wordpress-site')
+                }}
+              >
+                <Icon name="globe" />
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-foreground">WordPress site</div>
+                  <div className="text-xs text-muted-foreground truncate">Plan → write → SEO → launch checklist</div>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link
             href="/explore"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
@@ -124,6 +160,15 @@ export function PublicHeader(): React.JSX.Element {
           >
             Login
           </Link>
+          {pathname !== '/' ? (
+            <Link
+              href="/login"
+              onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
+              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+            >
+              Get Started
+            </Link>
+          ) : null}
         </nav>
 
         {/* Mobile menu toggle */}
@@ -157,15 +202,26 @@ export function PublicHeader(): React.JSX.Element {
 
           {mobileMenuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg p-1 z-[60]">
+              <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground">Use cases</div>
               <Link
-                href="/"
+                href="/use-cases/lead-generation"
                 onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/', variant: 'mobile' })
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
-                Home
+                Lead generation
+              </Link>
+              <Link
+                href="/use-cases/wordpress-site"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              >
+                WordPress site
               </Link>
               <Link
                 href="/explore"
@@ -187,6 +243,18 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Login
               </Link>
+              {pathname !== '/' ? (
+                <Link
+                  href="/login"
+                  onClick={() => {
+                    track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
+                    setMobileMenuOpen(false)
+                  }}
+                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+                >
+                  Get Started
+                </Link>
+              ) : null}
             </div>
           )}
         </div>

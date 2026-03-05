@@ -4,7 +4,8 @@ import type { Client } from 'pg';
  * Migration 174: Add `users.slug` for stable @mentions.
  *
  * - Adds `slug` column
- * - Backfills existing users with a unique slug derived from display_name or email local-part
+ * - Backfills existing users with a unique slug derived from display_name or email local-part,
+ *   using the same "template slug" strategy as agent_templates: `${base}-${rand4}` (always-on suffix)
  * - Enforces uniqueness + NOT NULL
  */
 export async function up(client: Client): Promise<void> {
@@ -19,13 +20,33 @@ export async function up(client: Client): Promise<void> {
     return Array.isArray(anyRes?.rows) ? (anyRes.rows as T[]) : [];
   };
 
-  const slugify = (input: string): string => {
-    return String(input || '')
+  const slugify = (input: string): string =>
+    String(input || '')
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .replace(/-+/g, '-');
+
+  const generateRandomSuffix = (): string => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let out = '';
+    for (let i = 0; i < 4; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+    return out;
+  };
+
+  const generateUniqueSlugRandomSuffix = async (baseSlug: string, maxLength = 100, maxAttempts = 100): Promise<string> => {
+    const base = slugify(baseSlug) || 'user';
+    const effectiveBase = base.slice(0, Math.max(1, Math.min(maxLength, base.length)));
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+      const rand = generateRandomSuffix();
+      const suffix = `-${rand}`;
+      const candidate = `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+      if (!(await exists(candidate))) return candidate;
+    }
+    const ts = Date.now().toString(36);
+    const suffix = `-${ts}`;
+    return `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
   };
 
   const rowsRes = await client.query<{
@@ -43,25 +64,16 @@ export async function up(client: Client): Promise<void> {
   };
 
   for (const r of Array.isArray(rows) ? rows : []) {
-    const id = String((r as any)?.id || '').trim();
+    const id = String(r.id || '').trim();
     if (!id) continue;
-    const existing = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
+    const existing = typeof r.slug === 'string' ? String(r.slug).trim() : '';
     if (existing) continue;
 
     const base =
-      (typeof (r as any)?.display_name === 'string' && String((r as any).display_name).trim()) ||
-      (typeof (r as any)?.email === 'string' && String((r as any).email).trim().split('@')[0]) ||
+      (typeof r.display_name === 'string' && String(r.display_name).trim()) ||
+      (typeof r.email === 'string' && String(r.email).trim().split('@')[0]) ||
       'user';
-    const baseSlug = slugify(base) || 'user';
-
-    let candidate = baseSlug;
-    if (await exists(candidate)) {
-      for (let counter = 2; counter < 10_000; counter++) {
-        const suffix = `-${counter}`;
-        candidate = `${baseSlug.slice(0, Math.max(1, 100 - suffix.length))}${suffix}`;
-        if (!(await exists(candidate))) break;
-      }
-    }
+    const candidate = await generateUniqueSlugRandomSuffix(base, 100, 100);
 
     await client.query(`UPDATE users SET slug = $1 WHERE id = $2`, [candidate, id]);
   }

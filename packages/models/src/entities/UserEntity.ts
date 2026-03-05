@@ -108,13 +108,12 @@ export class UserEntity implements UserModel {
    * but new rows should always set it.
    */
   @Expose()
-  @IsOptional()
   @IsString()
   @Length(1, 100)
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
     message: 'Slug must be lower-case and contain only a-z0-9 and hyphens',
   })
-  slug?: string;
+  slug!: string;
 
   @Expose()
   @IsISO8601()

@@ -665,12 +665,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
     <div className="relative isolate w-full overflow-visible text-left">
       {/* Use light chat theme locally so the demo matches bright in-app conversations */}
       <div className="star-theme-light relative z-10 mb-12 md:mb-16 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
-        <div
-          className="relative w-full"
-          style={{
-            background: 'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.10) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.07) 0%, transparent 56%)',
-          }}
-        >
+        <div className="relative w-full bg-background">
           <div className="h-[640px] sm:h-[620px] md:h-[680px] flex flex-col">
             <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -742,9 +737,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             type="button"
                             onClick={() => handleDemoChoice('iris')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-white hover:border-primary/50 [&:hover_svg]:text-white',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 0
-                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
+                                ? 'bg-primary/20 backdrop-blur-sm text-white border-primary/40 [&_svg]:text-white'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Sort my inbox"
@@ -758,9 +753,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             type="button"
                             onClick={() => handleDemoChoice('saga')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-white hover:border-primary/50 [&:hover_svg]:text-white',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 1
-                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
+                                ? 'bg-primary/20 backdrop-blur-sm text-white border-primary/40 [&_svg]:text-white'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Publish a blog post"

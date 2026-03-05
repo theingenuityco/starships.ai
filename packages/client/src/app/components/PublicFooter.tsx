@@ -19,12 +19,7 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
   return (
     <footer className="pt-4 pb-6 relative">
       {/* Gradient horizontal line */}
-      {showTopDivider ? (
-        <div
-          suppressHydrationWarning
-          className={topDividerClassName}
-        />
-      ) : null}
+      {showTopDivider ? <div suppressHydrationWarning className={topDividerClassName} /> : null}
       <div className="w-full relative px-4 sm:px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="mb-6 md:mb-0 text-center md:text-left">

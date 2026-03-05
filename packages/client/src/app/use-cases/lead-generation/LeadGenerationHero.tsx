@@ -33,14 +33,14 @@ export function LeadGenerationHero(props: { useCase: UseCaseModel; typewriterPro
       />
       <div className="relative z-10 max-w-3xl mx-auto w-full text-center px-4">
         <h1 className="flex justify-center">
-          <span className="text-5xl sm:text-7xl font-semibold tracking-tight leading-[1.05] text-balance">
+          <span className="text-5xl sm:text-7xl font-semibold tracking-tight leading-[1.05] whitespace-nowrap">
             Lead generation made <span className="text-primary">simple</span>.
           </span>
         </h1>
         <p className="mt-6 text-base sm:text-lg text-white/80 text-balance">{useCase.heroSubtitle}</p>
 
         <div className="mt-8 sm:mt-12 flex justify-center">
-          <UseCaseHeroPromptInput className="w-full max-w-3xl" typewriterPrompts={typewriterPrompts} examples={examples} />
+          <UseCaseHeroPromptInput className="w-full max-w-3xl" typewriterPrompts={typewriterPrompts} examples={examples} submitRedirect="login" />
         </div>
       </div>
     </section>

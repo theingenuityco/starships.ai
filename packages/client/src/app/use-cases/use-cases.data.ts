@@ -66,7 +66,7 @@ export const USE_CASES: UseCaseModel[] = [
     videoEmbedUrl: 'https://www.youtube.com/embed/VIDEO_ID',
     primaryTemplateSlug: 'piper',
     previewPromptTitles: ['Batch Enrichment', 'Build Lead Lists', 'Find Contact Info', 'Research Companies', 'Personalize Your Outreach'],
-    workflowsSectionHeading: 'Try it yourself:',
+    workflowsSectionHeading: 'Try it yourself',
     workflowsSectionSubheading: 'Copy these prompts to get started. Tweak them for your segment, offer, and tone.',
     heroPrompt: {
       placeholder: 'Find finance decision makers at Series A SaaS startups…',
@@ -77,14 +77,12 @@ export const USE_CASES: UseCaseModel[] = [
         { label: 'Meeting prep', prompt: 'Create a 1-page meeting brief for each prospect: company context, key initiatives, likely pain points, and 3 tailored questions.' },
       ],
     },
-    tip: 'Focus on one industry and one role first. Add more once you get replies.',
+    tip: 'Start narrow: pick one industry and one role. Once you see what gets replies, expand to more segments.',
     outputs: ['Prospect lists + fit scores', 'Personalized messages', 'Sequences + learnings'],
     steps: [
-      { title: 'Target audience', description: 'Define your ICP and generate a prospect list.' },
-      { title: 'Enrich leads', description: 'Validate contacts and score leads by fit.' },
-      { title: 'Personalize outreach', description: 'Draft messages tied to each prospect, no spray-and-pray.' },
-      { title: 'Follow up automatically', description: 'Schedule sequences; hand off replies when needed.' },
-      { title: 'Iterate', description: 'Learn which segments and angles work.' },
+      { title: 'Target audience', description: 'Describe who you want to reach (industry, company size, job title). Get a list of prospects that match.' },
+      { title: 'Enrich leads', description: 'Add real contact emails, LinkedIn URLs, and rank leads so you know who to contact first.' },
+      { title: 'Personalize outreach', description: 'Export your list to a CRM and draft relevant messages for each prospect so your outreach feels human, not generic.' },
     ],
     examplePrompts: [
       'Build a list of 50 SaaS startups (10–50 employees) hiring for RevOps, with website + LinkedIn + 1 sentence “why now”.',

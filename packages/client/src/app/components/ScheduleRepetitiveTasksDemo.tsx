@@ -188,8 +188,8 @@ export default function ScheduleRepetitiveTasksDemo() {
   return (
     <div className="w-full">
       {/* Use bright chat theme inside the calendar card to match the hero demo */}
-      <div className="star-theme-light relative z-10 rounded-2xl overflow-hidden border border-white/20 bg-background shadow-md shadow-black/30">
-        <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
+      <div className="star-theme-light relative z-10 rounded-3xl overflow-hidden border-2 border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.12)]">
+        <div className="px-4 sm:px-6 py-3.5 border-b-2 border-slate-200 bg-slate-100">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex items-center gap-2">
               <div className="text-sm font-medium leading-none truncate text-slate-900">This month</div>

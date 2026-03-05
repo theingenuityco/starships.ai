@@ -17,7 +17,14 @@ const TYPEWRITER_TYPING_MS = 60
 const TYPEWRITER_PAUSE_MS = 2500
 const TYPEWRITER_DELETE_MS = 35
 
-export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; placeholder?: string; examples: PromptExample[]; className?: string }) {
+export function UseCaseHeroPromptInput(props: {
+  typewriterPrompts?: string[]
+  placeholder?: string
+  examples: PromptExample[]
+  className?: string
+  /** When 'login', submit redirects to /login instead of explore. Used on lead-gen hero. */
+  submitRedirect?: 'login' | 'explore'
+}) {
   const router = useRouter()
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -25,6 +32,7 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
   const examples = useMemo(() => props.examples ?? [], [props.examples])
   const className = props.className
   const fallbackPlaceholder = props.placeholder?.trim() || ''
+  const submitRedirect = props.submitRedirect ?? 'explore'
 
   const [value, setValue] = useState<string>('')
   const [typewriterText, setTypewriterText] = useState('')
@@ -36,9 +44,13 @@ export function UseCaseHeroPromptInput(props: { typewriterPrompts?: string[]; pl
     (q: string) => {
       const query = String(q || '').trim()
       if (!query) return
+      if (submitRedirect === 'login') {
+        router.push('/login')
+        return
+      }
       router.push(`/explore/agents?q=${encodeURIComponent(query)}`)
     },
-    [router]
+    [router, submitRedirect]
   )
 
   useEffect(() => {

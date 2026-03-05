@@ -37,6 +37,13 @@ const TASK_TYPE_DOT: Record<string, string> = {
   content: 'bg-violet-500/80',
 }
 
+const TASK_TYPE_BG: Record<string, string> = {
+  inbox: 'bg-blue-100 dark:bg-blue-900/50 border-blue-300',
+  report: 'bg-emerald-100 dark:bg-emerald-900/50 border-emerald-300',
+  research: 'bg-amber-100 dark:bg-amber-900/50 border-amber-300',
+  content: 'bg-violet-100 dark:bg-violet-900/50 border-violet-300',
+}
+
 export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runsByDay, onDayClick, className }: MonthScheduleCalendarProps) {
   const CellTag: any = onDayClick ? 'button' : 'div'
 
@@ -44,10 +51,10 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
     <div className={cn('space-y-3', className)}>
       {/* Mobile: allow horizontal scrolling like responsive tables */}
       <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
-        <div className="min-w-[640px] sm:min-w-0 rounded-lg bg-muted/10 p-2">
-          <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
+        <div className="min-w-[640px] sm:min-w-0 rounded-xl border border-slate-200 bg-[#F3F4F6] shadow-sm p-2">
+          <div className="grid grid-cols-7 gap-1 text-[11px] text-slate-600 font-medium mb-2">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="px-2 py-1 text-center font-medium">
+              <div key={d} className="px-2 py-1.5 text-center rounded-md bg-slate-100 text-slate-600">
                 {d}
               </div>
             ))}
@@ -76,10 +83,10 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                   type={onDayClick ? 'button' : undefined}
                   onClick={onDayClick ? () => onDayClick(cell.date) : undefined}
                   className={cn(
-                    'relative group min-h-[104px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left transition-colors',
+                    'relative group min-h-[104px] rounded-lg border p-2 flex flex-col gap-1 bg-white text-left shadow-sm transition-colors',
                     onDayClick && 'hover:border-primary/60 hover:bg-primary/5 cursor-pointer',
-                    inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
-                    isToday && 'ring-1 ring-primary/60 border-primary/60 bg-primary/5'
+                    inCurrentMonth ? 'border-slate-300' : 'border-dashed border-slate-300/70 opacity-70',
+                    isToday && 'ring-1 ring-amber-400 border-amber-400 bg-amber-50'
                   )}
                 >
                   <div className="flex items-center justify-between">
@@ -103,13 +110,14 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                           const zIndex = 10 + i
                           const transform = isTop ? 'translate(0, 0)' : `translate(${offsetX}px, ${offsetY}px)`
 
+                          const cardBg = latest.taskType ? (TASK_TYPE_BG[latest.taskType] ?? 'bg-muted border-border/60') : 'bg-muted border-border/60'
                           return (
                             <div
                               // index is fine: purely visual stack
                               key={i}
                               className={cn(
-                                'absolute inset-x-0 h-14 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden transition-transform',
-                                isTop ? 'border border-border/60 bg-muted shadow-sm' : 'border border-border/40 bg-muted/80 shadow-sm'
+                                'absolute inset-x-0 h-14 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden transition-transform border shadow-sm',
+                                isTop ? cardBg : 'border-border/40 bg-muted/80'
                               )}
                               style={{ top: 0, zIndex, transform }}
                             >
@@ -133,7 +141,13 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                       {/* Expanded ordered list on hover */}
                       <div className="hidden group-hover:flex flex-col gap-1 h-full">
                         {sortedDayRuns.map(run => (
-                          <div key={run.id} className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden">
+                          <div
+                            key={run.id}
+                            className={cn(
+                              'w-full h-14 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden',
+                              run.taskType ? TASK_TYPE_BG[run.taskType] : 'bg-muted border-border/60'
+                            )}
+                          >
                             <div className="flex items-center gap-1 mb-1">
                               {run.taskType && TASK_TYPE_DOT[run.taskType] ? (
                                 <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[run.taskType])} aria-hidden />

@@ -2,7 +2,7 @@ import { UserEntity } from '@/entities/UserEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateSlug } from '@/helpers/slugUtils';
-import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
 import type { UserModel } from '@starships/protocol';
 
 export class UserRepository extends BaseRepository {
@@ -45,27 +45,25 @@ export class UserRepository extends BaseRepository {
     }, 'findByEmail');
   }
 
-  async create(entity: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserModel> {
+  async create(entity: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
 
       // Ensure a stable unique slug exists for mention tokens / display.
-      const existingSlug = typeof (entity as any)?.slug === 'string' ? String((entity as any).slug).trim() : '';
       const baseForSlug =
-        typeof (entity as any)?.displayName === 'string' && String((entity as any).displayName).trim().length > 0
-          ? String((entity as any).displayName).trim()
-          : typeof (entity as any)?.email === 'string' && String((entity as any).email).trim().length > 0
-            ? String((entity as any).email).trim().split('@')[0] || 'user'
+        typeof entity.displayName === 'string' && entity.displayName.trim().length > 0
+          ? entity.displayName.trim()
+          : typeof entity.email === 'string' && entity.email.trim().length > 0
+            ? entity.email.trim().split('@')[0] || 'user'
             : 'user';
       const slug =
-        existingSlug ||
-        (await generateUniqueSlugIncremental(generateSlug(baseForSlug) || 'user', async (candidate) => {
+        await generateUniqueSlugRandomSuffix(generateSlug(baseForSlug) || 'user', async (candidate) => {
           const row = await connection.queryOne<{ id: string }>('SELECT id FROM users WHERE slug = $1 LIMIT 1', [candidate]).catch(() => null);
           return Boolean(row?.id);
-        }));
+        }, { fallbackBase: 'user', maxLength: 100, alwaysSuffix: true });
 
       // Validate using Entity
-      await UserEntity.validate({ ...(entity as any), slug }, 'create');
+      await UserEntity.validate({ ...entity, slug }, 'create');
 
       // Prepare entity data with timestamps
       const entityData = {

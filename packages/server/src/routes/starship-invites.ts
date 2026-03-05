@@ -28,7 +28,7 @@ type MemberRow = {
   user_id: string;
   role: 'admin' | 'collaborator';
   created_at: string;
-  slug: string | null;
+  slug: string;
   email: string | null;
   display_name: string | null;
   avatar: string | null;
@@ -129,7 +129,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     };
 
     const ownerRowPromise = connection.queryOne<{
-      slug: string | null;
+      slug: string;
       email: string | null;
       display_name: string | null;
       avatar: string | null;
@@ -212,7 +212,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
 
       const owner = {
         userId: starship.ownerId,
-        userSlug: ownerRow?.slug ?? null,
+        userSlug: String(ownerRow?.slug || ''),
         role: 'owner' as const,
         createdAt: starship.createdAt,
         email: canViewEmails ? (ownerRow?.email ?? null) : null,
@@ -224,7 +224,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
         ...(ownerMatches ? [owner] : []),
         ...memberRows.map((m) => ({
           userId: String(m.user_id),
-          userSlug: m.slug ?? null,
+          userSlug: String(m.slug || ''),
           role: m.role,
           createdAt: String(m.created_at),
           email: canViewEmails ? (m.email ?? null) : null,
@@ -284,7 +284,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
 
     const owner = {
       userId: starship.ownerId,
-      userSlug: ownerRow?.slug ?? null,
+      userSlug: String(ownerRow?.slug || ''),
       role: 'owner' as const,
       createdAt: starship.createdAt,
       email: canViewEmails ? (ownerRow?.email ?? null) : null,
@@ -357,7 +357,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       ...(ownerSlotOnThisPage ? [owner] : []),
       ...memberRows.map((m) => ({
         userId: String(m.user_id),
-        userSlug: m.slug ?? null,
+        userSlug: String(m.slug || ''),
         role: m.role,
         createdAt: String(m.created_at),
         email: canViewEmails ? (m.email ?? null) : null,

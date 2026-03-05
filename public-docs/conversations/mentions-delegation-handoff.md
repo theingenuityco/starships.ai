@@ -4,96 +4,78 @@ slug: conversations/mentions-delegation-handoff
 category: conversations
 ---
 
-## Why this page exists
+## Overview
 
-Starships supports multiple ways to route work between agents:
+Starships uses three related concepts for multi-agent workflows:
 
-- **Mentions**: address agent(s) by mentioning them in the message content.
-- **Delegation**: create or continue a *child conversation* (thread) for delegated work.
-- **Handoff**: switch who should respond next (often expressed via mentions).
+- **Mentions**: structured tokens embedded in message `content`
+- **Handoff**: selecting which agent responds next **in the same conversation**
+- **Delegation**: moving work into a **child conversation** (thread)
 
-This page documents the concrete mechanics and the recommended patterns.
+This page defines each concept and provides concrete usage recipes.
 
 ## Mentions (structured tokens)
 
-### Token formats
-
-The Starships composer emits **structured mention tokens** inside message `content`:
+Mentions are stored as **structured tokens** in message `content`:
 
 - **Agent mention**: `<@a:AGENT_ID>`
 - **User mention**: `<@u:USER_ID>`
 
-Notes:
+The Starships composer produces these tokens when you pick a mention from the `@` suggestion UI. Transcripts typically render these tokens as `@Name`, while preserving the stored token form for routing/indexing.
 
-- These tokens are the **source of truth** used by the server (routing, allowlists, indexing).
-- UIs typically render them as `@AgentName` / `@UserName`, but the stored content includes the tokens.
+## Handoff (same conversation)
 
-### What mentions do
+Handoff means: the next message in a conversation is routed to a different agent.
 
-- **Agent mentions**: determine which agent(s) should execute for a given message (when applicable).
-- **User mentions**: are used for mention indexing and notifications; they must not trigger agent execution.
+### Recipe: hand off to a specific agent
 
-### Mentions in constrained contexts (channels / rooms)
-
-Some contexts are **mention-only**, meaning the server will not “fall back” to a default agent:
-
-- **Channels** (and their threads)
-- **Threads with multiple linked agents**
-- **Rooms** may additionally enforce **allowlists** for which agents/users may be mentioned
-
-In these contexts, *only explicit agent mention tokens* trigger agent execution.
-
-## Delegation: two primitives
-
-Delegation in Starships is modeled as **child-conversation delegation**:
-
-- A delegated task runs inside a **child conversation** (a thread).
-- This is typically initiated by the `call-agent` tool template (see below).
-
-## Delegation tool: `call-agent` (tool template)
-
-Starships commonly implements “delegate to another agent” via a tool template named `Call Agent` (assigned slug `call-agent`).
-
-### Current behavior (DB tool template)
-
-The current deployed tool template delegates by **agent mention tokens inside `content`** and does **not** accept an agent slug parameter.
+Send a message that includes an agent mention token:
 
 ```json
 {
-  "content": "<@a:AGENT_ID> Message to send to delegated agent",
+  "content": "<@a:AGENT_ID> Please take over and handle this."
+}
+```
+
+### Recipe: hand off to multiple agents
+
+Include multiple agent mentions in the same message:
+
+```json
+{
+  "content": "<@a:AGENT_ID_A> Summarize the situation.\n<@a:AGENT_ID_B> Propose next steps."
+}
+```
+
+## Delegation (child conversation)
+
+Delegation means: a task runs inside a **child conversation** (thread) under a parent conversation.
+
+### Delegation tool: `call-agent` (tool instance)
+
+Starships supports delegation via a tool instance commonly assigned slug `call-agent`.
+
+#### Input contract (deployed instance)
+
+```json
+{
+  "content": "<@a:AGENT_ID> Message to send in the delegated thread",
   "childConversationId": "optional existing child conversation id",
   "parentConversationId": "optional parent conversation id"
 }
 ```
 
-Runtime behavior:
+#### Behavior
 
-- If `childConversationId` is missing: create a new child conversation under the current conversation (when available).
-- Send `content` into the child conversation with `sync: true`.
-- The mentioned agent(s) in `content` are responsible for routing inside the child conversation.
-- Return the child conversation id and the latest message result.
+- If `childConversationId` is omitted, the tool creates a new child conversation (thread).
+- The tool sends `content` into the child conversation with `sync: true`.
+- Agent selection inside the child conversation is driven by the **agent mention token(s)** inside `content`.
 
-Notes:
+#### Output shape (typical)
 
-- `content` must include at least one `<@a:...>` token.
+The tool returns a small payload including:
 
-## Handoff patterns
-
-### Same conversation handoff
-
-To hand off within the same conversation:
-
-- Start the message with (or include) an agent mention token: `<@a:AGENT_ID> ...`
-- Optionally include multiple agent mention tokens when you want multiple agents to respond.
-
-### Child conversation handoff
-
-To hand off into a dedicated thread:
-
-- Use a delegation tool (such as `call-agent`) to create/continue a child conversation
-- Send a message that targets the desired agent(s) (either by slug in the current template, or by mention tokens in a token-first template)
-
-### Important limitation (agent-to-agent “automatic handoff”)
-
-By default, Starships routes based on **the user’s message content**. An agent mentioning another agent inside its *assistant output* does not automatically trigger a follow-on agent execution unless you explicitly implement that orchestration or use a delegation tool.
+- `childConversationId`
+- `lastMessage` (the most recent message in the child conversation)
+- `status` (human-readable completion status)
 

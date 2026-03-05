@@ -24,6 +24,7 @@ import {
   ConversationNotificationPrefRepository,
   DirectMessageRepository,
   getConnection,
+  MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
   ToolRepository,
@@ -1186,6 +1187,19 @@ router.post(
       const agentRepo = new AgentRepository();
       const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
       const roomConversationId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+
+      // Resolve which assistant message triggered this tool call (best-effort).
+      // Tools can use this to link results back to the calling message without ambiguity.
+      const toolCallMessageId = await (async () => {
+        try {
+          const repo = new MessageRepository();
+          const msg = await repo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
+          const id = msg && typeof (msg as any)?.id === 'string' ? String((msg as any).id).trim() : '';
+          return id || null;
+        } catch {
+          return null;
+        }
+      })();
       const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
       const cachedPerm = getCachedPermission(permCacheKey);
       // NOTE: We keep a small in-memory cache for hot tool-call loops, but permissions can be
@@ -1292,6 +1306,7 @@ router.post(
             conversationId,
             roomId: roomConversationId || undefined,
             agentId,
+            toolCallMessageId: toolCallMessageId || undefined,
           });
           const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
           const result = await executeToolBlueprint({
@@ -1372,6 +1387,7 @@ router.post(
         conversationId,
         roomId: roomConversationId || undefined,
         agentId,
+        toolCallMessageId: toolCallMessageId || undefined,
       });
       const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
 

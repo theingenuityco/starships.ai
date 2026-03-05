@@ -1,0 +1,93 @@
+import type { Client } from 'pg';
+
+/**
+ * Migration 174: Add `users.slug` for stable @mentions.
+ *
+ * - Adds `slug` column
+ * - Backfills existing users with a unique slug derived from display_name or email local-part
+ * - Enforces uniqueness + NOT NULL
+ */
+export async function up(client: Client): Promise<void> {
+  await client.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS slug VARCHAR(100);
+  `);
+
+  const getRows = <T>(result: unknown): T[] => {
+    if (Array.isArray(result)) return result as T[];
+    const anyRes = result as { rows?: unknown };
+    return Array.isArray(anyRes?.rows) ? (anyRes.rows as T[]) : [];
+  };
+
+  const slugify = (input: string): string => {
+    return String(input || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-');
+  };
+
+  const rowsRes = await client.query<{
+    id: string;
+    display_name: string | null;
+    email: string | null;
+    slug: string | null;
+  }>(`SELECT id, display_name, email, slug FROM users`);
+  const rows = getRows<{ id: string; display_name: string | null; email: string | null; slug: string | null }>(rowsRes);
+
+  const exists = async (candidate: string): Promise<boolean> => {
+    const r = await client.query<{ id: string }>(`SELECT id FROM users WHERE slug = $1 LIMIT 1`, [candidate]);
+    const any = getRows<{ id: string }>(r)?.[0];
+    return Boolean(any?.id);
+  };
+
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const id = String((r as any)?.id || '').trim();
+    if (!id) continue;
+    const existing = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
+    if (existing) continue;
+
+    const base =
+      (typeof (r as any)?.display_name === 'string' && String((r as any).display_name).trim()) ||
+      (typeof (r as any)?.email === 'string' && String((r as any).email).trim().split('@')[0]) ||
+      'user';
+    const baseSlug = slugify(base) || 'user';
+
+    let candidate = baseSlug;
+    if (await exists(candidate)) {
+      for (let counter = 2; counter < 10_000; counter++) {
+        const suffix = `-${counter}`;
+        candidate = `${baseSlug.slice(0, Math.max(1, 100 - suffix.length))}${suffix}`;
+        if (!(await exists(candidate))) break;
+      }
+    }
+
+    await client.query(`UPDATE users SET slug = $1 WHERE id = $2`, [candidate, id]);
+  }
+
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_slug_unique
+      ON users(slug);
+  `);
+
+  await client.query(`
+    ALTER TABLE users
+      ALTER COLUMN slug SET NOT NULL;
+  `);
+}
+
+export async function down(client: Client): Promise<void> {
+  await client.query(`
+    ALTER TABLE users
+      ALTER COLUMN slug DROP NOT NULL;
+  `);
+  await client.query(`
+    DROP INDEX IF EXISTS idx_users_slug_unique;
+  `);
+  await client.query(`
+    ALTER TABLE users
+      DROP COLUMN IF EXISTS slug;
+  `);
+}
+

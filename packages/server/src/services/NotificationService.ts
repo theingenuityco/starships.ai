@@ -9,11 +9,13 @@ import {
 import type { MessageModel, MentionTargetType } from '@starships/protocol';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 
-type ParsedMentions = { userIds: string[]; agentIds: string[] };
+type ParsedMentions = { userRefs: string[]; agentRefs: string[] };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NANOID_RE = /^[a-z0-9_-]{10,64}$/i;
-const isValidMentionId = (id: string): boolean => UUID_RE.test(String(id || '').trim()) || NANOID_RE.test(String(id || '').trim());
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const isValidMentionRef = (ref: string): boolean =>
+  UUID_RE.test(String(ref || '').trim()) || NANOID_RE.test(String(ref || '').trim()) || SLUG_RE.test(String(ref || '').trim());
 
 function parseMentionTokens(content: string): ParsedMentions {
   let text = typeof content === 'string' ? content : '';
@@ -22,24 +24,24 @@ function parseMentionTokens(content: string): ParsedMentions {
   if (text.length > 20_000) {
     text = text.slice(0, 20_000);
   }
-  const userIds = new Set<string>();
-  const agentIds = new Set<string>();
+  const userRefs = new Set<string>();
+  const agentRefs = new Set<string>();
 
   // Token format emitted by the TipTap composer (see plan):
-  // - users: <@u:USER_ID>
-  // - agents: <@a:AGENT_ID>
-  const userRe = /<@u:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
-  const agentRe = /<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi;
+  // - users: <@u:USER_SLUG> (legacy: <@u:USER_ID>)
+  // - agents: <@a:AGENT_SLUG> (legacy: <@a:AGENT_ID>)
+  const userRe = /<@u:([^>\s]{1,100})>/gi;
+  const agentRe = /<@a:([^>\s]{1,100})>/gi;
   let m: RegExpExecArray | null;
   while ((m = userRe.exec(text))) {
-    const id = String(m[1] || '').trim();
-    if (id && isValidMentionId(id)) userIds.add(id);
+    const ref = String(m[1] || '').trim();
+    if (ref && isValidMentionRef(ref)) userRefs.add(ref);
   }
   while ((m = agentRe.exec(text))) {
-    const id = String(m[1] || '').trim();
-    if (id && isValidMentionId(id)) agentIds.add(id);
+    const ref = String(m[1] || '').trim();
+    if (ref && isValidMentionRef(ref)) agentRefs.add(ref);
   }
-  return { userIds: Array.from(userIds), agentIds: Array.from(agentIds) };
+  return { userRefs: Array.from(userRefs), agentRefs: Array.from(agentRefs) };
 }
 
 export class NotificationService {
@@ -148,7 +150,67 @@ export class NotificationService {
       }
     }
 
-    let { userIds, agentIds } = parseMentionTokens(String((message as any).content || ''));
+    const { userRefs, agentRefs } = parseMentionTokens(String((message as any).content || ''));
+
+    // Resolve mention refs -> IDs within this starship.
+    const conn = getConnection();
+    const uniq = (xs: string[]) => Array.from(new Set((Array.isArray(xs) ? xs : []).map((x) => String(x || '').trim()).filter(Boolean)));
+    const uRefs = uniq(userRefs);
+    const aRefs = uniq(agentRefs);
+
+    const [userRows, agentRows] = await Promise.all([
+      uRefs.length > 0
+        ? conn
+            .query<{ id: string; slug: string | null }>(
+              `
+              SELECT u.id, u.slug
+                FROM users u
+               WHERE (u.id = ANY($2::text[]) OR u.slug = ANY($2::text[]))
+                 AND (
+                   u.id = (SELECT owner_id FROM starships WHERE id = $1)
+                   OR EXISTS (SELECT 1 FROM starship_members sm WHERE sm.starship_id = $1 AND sm.user_id = u.id)
+                 )
+              `,
+              [starshipId, uRefs]
+            )
+            .catch(() => [])
+        : Promise.resolve([] as Array<{ id: string; slug: string | null }>),
+      aRefs.length > 0
+        ? conn
+            .query<{ id: string; slug: string | null }>(
+              `
+              SELECT id, slug
+                FROM agents
+               WHERE starship_id = $1
+                 AND (id = ANY($2::text[]) OR slug = ANY($2::text[]))
+              `,
+              [starshipId, aRefs]
+            )
+            .catch(() => [])
+        : Promise.resolve([] as Array<{ id: string; slug: string | null }>),
+    ]);
+
+    const userIdByRef = new Map<string, string>();
+    for (const r of Array.isArray(userRows) ? userRows : []) {
+      const id = String((r as any)?.id || '').trim();
+      const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
+      if (id) {
+        userIdByRef.set(id, id);
+        if (slug) userIdByRef.set(slug, id);
+      }
+    }
+    const agentIdByRef = new Map<string, string>();
+    for (const r of Array.isArray(agentRows) ? agentRows : []) {
+      const id = String((r as any)?.id || '').trim();
+      const slug = typeof (r as any)?.slug === 'string' ? String((r as any).slug).trim() : '';
+      if (id) {
+        agentIdByRef.set(id, id);
+        if (slug) agentIdByRef.set(slug, id);
+      }
+    }
+
+    let userIds = uniq(uRefs.map((ref) => userIdByRef.get(ref) || ''));
+    let agentIds = uniq(aRefs.map((ref) => agentIdByRef.get(ref) || ''));
 
     // DMs: only allow mentions of the other participant.
     // This prevents @mention notifications (and mention indexing) from being used to target arbitrary users/agents from a DM.

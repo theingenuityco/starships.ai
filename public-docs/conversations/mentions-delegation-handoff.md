@@ -18,8 +18,13 @@ This page defines each concept and provides concrete usage recipes.
 
 Mentions are stored as **structured tokens** in message `content`:
 
-- **Agent mention**: `<@a:AGENT_ID>`
+- **Agent mention**: `<@a:AGENT_ID>` (legacy)
 - **User mention**: `<@u:USER_ID>`
+ 
+Newer clients emit slugs (legacy messages may still contain IDs):
+
+- **Agent mention**: `<@a:AGENT_SLUG>`
+- **User mention**: `<@u:USER_SLUG>`
 
 The Starships composer produces these tokens when you pick a mention from the `@` suggestion UI. Transcripts typically render these tokens as `@Name`, while preserving the stored token form for routing/indexing.
 
@@ -33,7 +38,7 @@ Send a message that includes an agent mention token:
 
 ```json
 {
-  "content": "<@a:AGENT_ID> Please take over and handle this."
+  "content": "<@a:AGENT_SLUG> Please take over and handle this."
 }
 ```
 
@@ -43,7 +48,7 @@ Include multiple agent mentions in the same message:
 
 ```json
 {
-  "content": "<@a:AGENT_ID_A> Summarize the situation.\n<@a:AGENT_ID_B> Propose next steps."
+  "content": "<@a:AGENT_SLUG_A> Summarize the situation.\n<@a:AGENT_SLUG_B> Propose next steps."
 }
 ```
 
@@ -59,7 +64,7 @@ Starships supports delegation via a tool instance commonly assigned slug `call-a
 
 ```json
 {
-  "content": "<@a:AGENT_ID> Message to send in the delegated thread",
+  "content": "<@a:AGENT_SLUG> Message to send in the delegated thread",
   "childConversationId": "optional existing child conversation id",
   "parentConversationId": "optional parent conversation id"
 }

@@ -51,7 +51,9 @@ function createAbortableSleep(signal: AbortSignal) {
 
 function chunkTextForStreaming(text: string) {
   // Split into whitespace-aware tokens so we preserve spacing/newlines, then group into small chunks.
-  const tokens = String(text).split(/(\s+)/).filter(t => t.length > 0)
+  const tokens = String(text)
+    .split(/(\s+)/)
+    .filter(t => t.length > 0)
   const parts: string[] = []
   let buf = ''
   for (const t of tokens) {
@@ -137,8 +139,7 @@ const DEMO_TIMELINE: DemoStep[] = [
         type: 'function',
         function: {
           name: 'Switching to Dean…',
-          arguments:
-            '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Drive - Project briefs" }',
+          arguments: '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Drive - Project briefs" }',
         },
       },
     ],
@@ -176,9 +177,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'dean',
     role: 'assistant',
     agentName: 'Dean',
-    toolCalls: [
-      { id: 'tc_demo_list_drive', type: 'function', function: { name: 'Listing files...', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } },
-    ],
+    toolCalls: [{ id: 'tc_demo_list_drive', type: 'function', function: { name: 'Listing files...', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } }],
     content: '',
   },
   {
@@ -197,7 +196,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'dean',
     role: 'assistant',
     agentName: 'Dean',
-    content: "✅ **Briefs** summarized.",
+    content: '✅ **Briefs** summarized.',
   },
   {
     convoId: 'main',
@@ -209,13 +208,12 @@ const DEMO_TIMELINE: DemoStep[] = [
         type: 'function',
         function: {
           name: 'Switching to Clara…',
-          arguments:
-            '{ "agent": "Clara", "task": "Email the summary to the team via Gmail", "conversationTitle": "Gmail - Team email" }',
+          arguments: '{ "agent": "Clara", "task": "Email the summary to the team via Gmail", "conversationTitle": "Gmail - Team email" }',
         },
       },
     ],
     noStream: false,
-    content: "Summary ready. Calling **Clara** to send via Gmail.",
+    content: 'Summary ready. Calling **Clara** to send via Gmail.',
   },
   {
     convoId: 'main',
@@ -242,15 +240,13 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
-    content: "Drafting and sending to the team.",
+    content: 'Drafting and sending to the team.',
   },
   {
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
-    toolCalls: [
-      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'Composing email...', arguments: '{ "to": "team@company.com", "subject": "Project Briefs Summary" }' } },
-    ],
+    toolCalls: [{ id: 'tc_demo_compose_draft', type: 'function', function: { name: 'Composing email...', arguments: '{ "to": "team@company.com", "subject": "Project Briefs Summary" }' } }],
     content: '',
   },
   {
@@ -265,13 +261,13 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
-    content: "✅ Emails sent.\n\n- **To**: team@company.com\n- **Subject**: Project Briefs Summary",
+    content: '✅ Emails sent.\n\n- **To**: team@company.com\n- **Subject**: Project Briefs Summary',
   },
   {
     convoId: 'main',
     role: 'assistant',
     agentName: 'Aria',
-    content: "✅ Summary emailed to your team!",
+    content: '✅ Summary emailed to your team!',
   },
   { convoId: 'main', role: 'user', content: 'Run this every Monday at 9am' },
   {
@@ -297,11 +293,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     messageType: 'tool_result',
     toolCallId: 'tc_demo_schedule_digest',
     noStream: true,
-    content: JSON.stringify(
-      { status: 'ok', action: 'schedule-agent', schedule: { cron: '0 9 * * MON', timezone: 'UTC' } },
-      null,
-      2
-    ),
+    content: JSON.stringify({ status: 'ok', action: 'schedule-agent', schedule: { cron: '0 9 * * MON', timezone: 'UTC' } }, null, 2),
   },
   {
     convoId: 'main',
@@ -322,7 +314,13 @@ export default function DelegationDemo() {
   const { data: deanTemplates = [] } = useAgentTemplates({ search: 'dean' })
   const deanAvatarUrl = useMemo(() => {
     const dean = deanTemplates.find(
-      t => t.slug === 'dean' || t.name === 'Dean' || String(t.slug ?? '').toLowerCase().startsWith('dean') || String(t.name ?? '').toLowerCase() === 'dean'
+      t =>
+        t.slug === 'dean' ||
+        t.name === 'Dean' ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('dean') ||
+        String(t.name ?? '').toLowerCase() === 'dean'
     )
     return dean?.avatarUrl
   }, [deanTemplates])
@@ -333,7 +331,9 @@ export default function DelegationDemo() {
       t =>
         t.slug === 'clara' ||
         t.name === 'Clara' ||
-        String(t.slug ?? '').toLowerCase().startsWith('clara') ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('clara') ||
         String(t.name ?? '').toLowerCase() === 'clara'
     )
     return clara?.avatarUrl
@@ -587,14 +587,7 @@ export default function DelegationDemo() {
   return (
     <div ref={containerRef} className="relative isolate w-full overflow-visible text-left">
       {/* Connector paths (desktop only; mobile stacks windows) */}
-      <svg
-        className="hidden md:block absolute inset-0 pointer-events-none"
-        width={svgSize.w}
-        height={svgSize.h}
-        viewBox={`0 0 ${svgSize.w} ${svgSize.h}`}
-        preserveAspectRatio="none"
-        aria-hidden
-      >
+      <svg className="hidden md:block absolute inset-0 pointer-events-none" width={svgSize.w} height={svgSize.h} viewBox={`0 0 ${svgSize.w} ${svgSize.h}`} preserveAspectRatio="none" aria-hidden>
         {paths.toDean ? <path d={paths.toDean} className={['delegation-edge', isDeanActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
         {paths.toClara ? <path d={paths.toClara} className={['delegation-edge', isClaraActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
       </svg>
@@ -620,24 +613,20 @@ export default function DelegationDemo() {
                 aria-hidden
               />
 
+              {/* Main orchestration chat uses bright chat theme styling */}
               <div
                 className={[
-                  'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                  'star-theme-light relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
                   activeDemoConvoId === 'main' ? 'border-amber-300/55' : 'border-white/20',
                 ].join(' ')}
               >
-                <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+                <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                        <AgentAvatar
-                          seed={DEMO_CONVERSATIONS.main.leftAgentSeed}
-                          imageUrl={ariaAvatarUrl}
-                          size={32}
-                          instanceId="delegation-demo-main-aria"
-                        />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-[#FFE4C4] flex items-center justify-center">
+                        <AgentAvatar seed={DEMO_CONVERSATIONS.main.leftAgentSeed} imageUrl={ariaAvatarUrl} size={32} instanceId="delegation-demo-main-aria" />
                       </div>
-                      <div className="text-sm font-medium leading-none truncate">
+                      <div className="text-sm font-medium leading-none truncate text-slate-900">
                         {DEMO_CONVERSATIONS.main.leftAgentName} - {DEMO_CONVERSATIONS.main.designation}
                       </div>
                     </div>
@@ -650,7 +639,7 @@ export default function DelegationDemo() {
                       messagesOverride={(demoByConvo.main || []) as any}
                       agentNameOverride={DEMO_CONVERSATIONS.main.leftAgentName}
                       agentAvatarUrlOverride={ariaAvatarUrl}
-                      isRespondingOverride={(respondingByConvo.main || false) || (awaitingToolsByConvo.main || false)}
+                      isRespondingOverride={respondingByConvo.main || false || awaitingToolsByConvo.main || false}
                       isAssistantStreamingOverride={respondingByConvo.main || false}
                       isAwaitingToolResultsOverride={awaitingToolsByConvo.main || false}
                       bottomPaddingPx={100}
@@ -686,24 +675,20 @@ export default function DelegationDemo() {
                   aria-hidden
                 />
 
+                {/* Dean window uses bright chat theme styling */}
                 <div
                   className={[
-                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                    'star-theme-light relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
                     activeDemoConvoId === 'dean' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+                  <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                          <AgentAvatar
-                            seed={DEMO_CONVERSATIONS.dean.leftAgentSeed}
-                            imageUrl={deanAvatarUrl}
-                            size={32}
-                            instanceId="delegation-demo-dean"
-                          />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-[#FFE4C4] flex items-center justify-center">
+                          <AgentAvatar seed={DEMO_CONVERSATIONS.dean.leftAgentSeed} imageUrl={deanAvatarUrl} size={32} instanceId="delegation-demo-dean" />
                         </div>
-                        <div className="text-sm font-medium leading-none truncate">
+                        <div className="text-sm font-medium leading-none truncate text-slate-900">
                           {DEMO_CONVERSATIONS.dean.leftAgentName} - {DEMO_CONVERSATIONS.dean.designation}
                         </div>
                       </div>
@@ -716,7 +701,7 @@ export default function DelegationDemo() {
                         messagesOverride={(demoByConvo.dean || []) as any}
                         agentNameOverride={DEMO_CONVERSATIONS.dean.leftAgentName}
                         agentAvatarUrlOverride={deanAvatarUrl}
-                        isRespondingOverride={(respondingByConvo.dean || false) || (awaitingToolsByConvo.dean || false)}
+                        isRespondingOverride={respondingByConvo.dean || false || awaitingToolsByConvo.dean || false}
                         isAssistantStreamingOverride={respondingByConvo.dean || false}
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.dean || false}
                         bottomPaddingPx={60}
@@ -751,24 +736,20 @@ export default function DelegationDemo() {
                   aria-hidden
                 />
 
+                {/* Clara window uses bright chat theme styling */}
                 <div
                   className={[
-                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                    'star-theme-light relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
                     activeDemoConvoId === 'clara' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+                  <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                          <AgentAvatar
-                            seed={DEMO_CONVERSATIONS.clara.leftAgentSeed}
-                            imageUrl={claraAvatarUrl}
-                            size={32}
-                            instanceId="delegation-demo-clara"
-                          />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-[#FFE4C4] flex items-center justify-center">
+                          <AgentAvatar seed={DEMO_CONVERSATIONS.clara.leftAgentSeed} imageUrl={claraAvatarUrl} size={32} instanceId="delegation-demo-clara" />
                         </div>
-                        <div className="text-sm font-medium leading-none truncate">
+                        <div className="text-sm font-medium leading-none truncate text-slate-900">
                           {DEMO_CONVERSATIONS.clara.leftAgentName} - {DEMO_CONVERSATIONS.clara.designation}
                         </div>
                       </div>
@@ -781,7 +762,7 @@ export default function DelegationDemo() {
                         messagesOverride={(demoByConvo.clara || []) as any}
                         agentNameOverride={DEMO_CONVERSATIONS.clara.leftAgentName}
                         agentAvatarUrlOverride={claraAvatarUrl}
-                        isRespondingOverride={(respondingByConvo.clara || false) || (awaitingToolsByConvo.clara || false)}
+                        isRespondingOverride={respondingByConvo.clara || false || awaitingToolsByConvo.clara || false}
                         isAssistantStreamingOverride={respondingByConvo.clara || false}
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.clara || false}
                         bottomPaddingPx={60}
@@ -807,13 +788,7 @@ export default function DelegationDemo() {
           inset: -14px;
           border-radius: inherit;
           /* Match the landing "video-glow" multicolor pattern, but tighter so it doesn't bleed into neighbors. */
-          background: conic-gradient(
-            from 0deg at 50% 50%,
-            rgba(99, 102, 241, 0.85),
-            rgba(217, 70, 239, 0.85),
-            rgba(245, 158, 11, 0.75),
-            rgba(99, 102, 241, 0.85)
-          );
+          background: conic-gradient(from 0deg at 50% 50%, rgba(99, 102, 241, 0.85), rgba(217, 70, 239, 0.85), rgba(245, 158, 11, 0.75), rgba(99, 102, 241, 0.85));
           filter: blur(32px);
           opacity: 1;
           pointer-events: none;
@@ -858,5 +833,3 @@ export default function DelegationDemo() {
     </div>
   )
 }
-
-

@@ -12,6 +12,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { track } from '@/lib/analytics'
 
+const authPrimaryButtonClass =
+  'relative w-full h-11 rounded-full text-sm font-semibold text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-white'
+
 /**
  * Forgot Password Form Component
  */
@@ -144,11 +147,7 @@ export function ForgotPasswordForm() {
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={forgotPassword.isPending}
-            >
+            <Button type="submit" className={authPrimaryButtonClass} disabled={forgotPassword.isPending}>
               {forgotPassword.isPending ? (
                 <>
                   <Icon name="loader-2" className="h-4 w-4 mr-2 animate-spin" />

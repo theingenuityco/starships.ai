@@ -177,8 +177,7 @@ const ARIA_TIMELINE: Step[] = [
 const SAGA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content:
-      'Write a post about "AI staff: what it is and how teams use it." Draft with SEO and save as draft.',
+    content: 'Write a post about "AI staff: what it is and how teams use it." Draft with SEO and save as draft.',
   },
   {
     role: 'assistant',
@@ -222,8 +221,7 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    content:
-      "✅ Done.\n\n 'AI Staff: What It Is' – 1,235 words (~6 min), saved as draft.\n\nAdd an FAQ, or different examples?",
+    content: "✅ Done.\n\n 'AI Staff: What It Is' – 1,235 words (~6 min), saved as draft.\n\nAdd an FAQ, or different examples?",
   },
 ]
 
@@ -274,8 +272,7 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Clara',
-    content:
-      '✅ Done.\n\n 63 unread, 14 need a reply, 30 archived, 3 drafts ready.\n\nWant me to auto-label newsletters from now on?',
+    content: '✅ Done.\n\n 63 unread, 14 need a reply, 30 archived, 3 drafts ready.\n\nWant me to auto-label newsletters from now on?',
   },
 ]
 
@@ -666,29 +663,17 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
 
   return (
     <div className="relative isolate w-full overflow-visible text-left">
-      <div className="absolute inset-0 -z-10 rounded-2xl video-glow opacity-80 pointer-events-none" aria-hidden />
-      <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-90 pointer-events-none" aria-hidden />
-
-      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
-        <div
-          className="relative w-full"
-          style={{
-            background: 'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.10) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.07) 0%, transparent 56%)',
-          }}
-        >
+      {/* Use light chat theme locally so the demo matches bright in-app conversations */}
+      <div className="star-theme-light relative z-10 mb-12 md:mb-16 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
+        <div className="relative w-full bg-background">
           <div className="h-[640px] sm:h-[620px] md:h-[680px] flex flex-col">
-            <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+            <div className="px-4 sm:px-6 py-3.5 border-b bg-[#FFF7ED] border-[#FCD9A5]">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center">
-                    <AgentAvatar
-                      seed={cfg.agentSeed}
-                      imageUrl={agentAvatarUrlOverride}
-                      size={40}
-                      instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`}
-                    />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-[#FFE4C4] flex items-center justify-center">
+                    <AgentAvatar seed={cfg.agentSeed} imageUrl={agentAvatarUrlOverride} size={40} instanceId={`hero-convo-demo-${activeConvoId}-${cfg.agentSeed ?? 'agent'}`} />
                   </div>
-                  <div className={cn('font-medium leading-none truncate', 'text-sm')}>{cfg.label}</div>
+                  <div className={cn('font-medium leading-none truncate', 'text-sm text-slate-900')}>{cfg.label}</div>
                 </div>
                 <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
                   {(Object.keys(CONVOS) as ConvoId[]).map(id => {
@@ -699,8 +684,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                         type="button"
                         onClick={() => setActiveConvoId(id)}
                         className={[
-                          'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                          active ? 'bg-primary text-primary-foreground border-primary/40' : 'bg-background/40 text-foreground/80 border-border/50 hover:bg-background/60',
+                          'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shadow-sm',
+                          active ? 'bg-slate-900 text-[#FFF7ED] border-slate-900' : 'bg-transparent text-slate-700 border-transparent hover:bg-slate-100',
                         ].join(' ')}
                       >
                         {CONVOS[id].tabName}
@@ -747,18 +732,14 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                   <div className="w-full max-w-4xl mx-auto">
                     <div className="flex justify-end">
                       <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-                        <div
-                          className="flex flex-1 flex-col gap-2 items-end w-full"
-                          onMouseEnter={() => setIsDemoChooserHovered(true)}
-                          onMouseLeave={() => setIsDemoChooserHovered(false)}
-                        >
+                        <div className="flex flex-1 flex-col gap-2 items-end w-full" onMouseEnter={() => setIsDemoChooserHovered(true)} onMouseLeave={() => setIsDemoChooserHovered(false)}>
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('iris')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-white hover:border-primary/50 [&:hover_svg]:text-white',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 0
-                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
+                                ? 'bg-primary/20 backdrop-blur-sm text-white border-primary/40 [&_svg]:text-white'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Sort my inbox"
@@ -772,9 +753,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             type="button"
                             onClick={() => handleDemoChoice('saga')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-white hover:border-primary/50 [&:hover_svg]:text-white',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 1
-                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
+                                ? 'bg-primary/20 backdrop-blur-sm text-white border-primary/40 [&_svg]:text-white'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Publish a blog post"
@@ -808,7 +789,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               )}
             </div>
 
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+            {/* Soft fade at the very bottom of the demo so it blends into the landing background,
+                but keep the chat box edge visible by making the gradient shallower and lighter. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-background/35 to-transparent" aria-hidden />
           </div>
         </div>
       </div>

@@ -33,11 +33,7 @@ export const STARSHIP_QUERY_KEYS = {
  * 2) If the user owns no starships: selected starship (if present)
  * 3) Fallback: first starship in the list
  */
-export function pickPrimaryStarshipForUser(
-  starships: StarshipModel[] | undefined | null,
-  userId: string | undefined | null,
-  selectedStarshipId?: string | null
-): StarshipModel | null {
+export function pickPrimaryStarshipForUser(starships: StarshipModel[] | undefined | null, userId: string | undefined | null, selectedStarshipId?: string | null): StarshipModel | null {
   const list = Array.isArray(starships) ? starships : []
   if (!list.length) return null
 
@@ -71,10 +67,7 @@ export function pickPrimaryStarshipForUser(
  * Order starships so user-owned starships appear first (stable order).
  * If the user owns none (or userId is missing), returns the list as-is.
  */
-export function orderStarshipsOwnedFirst(
-  starships: StarshipModel[] | undefined | null,
-  userId: string | undefined | null
-): StarshipModel[] {
+export function orderStarshipsOwnedFirst(starships: StarshipModel[] | undefined | null, userId: string | undefined | null): StarshipModel[] {
   const list = Array.isArray(starships) ? starships : []
   const uid = typeof userId === 'string' ? userId : ''
   if (!uid || list.length === 0) return list

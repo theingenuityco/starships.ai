@@ -392,11 +392,14 @@
     --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
     --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
     --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
+
+    /* Decorative stars (StarryBackground) */
+    --star-color: rgba(2, 6, 23, 0.18);
   }
 
   .dark {
-    /* Enhanced Dark Theme - Pure Black Foundation */
-    --background: 0 0% 0%; /* Pure black base */
+    /* Enhanced Dark Theme - Deep Cosmic Navy Foundation (less "black void") */
+    --background: 222 47% 6%; /* Deep navy base inspired by GitHub home */
     --foreground: 0 0% 95%;
     --card: 0 0% 6%;
     --card-foreground: 0 0% 95%;
@@ -433,6 +436,9 @@
     --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%);
     --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%);
     --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%);
+
+    /* Decorative stars (StarryBackground) */
+    --star-color: rgba(255, 255, 255, 0.95);
   }
 
   /* 
@@ -697,8 +703,8 @@
 
 /* Star Dark Theme - Matches regular dark theme - Always dark regardless of global theme */
 .star-theme-dark {
-  /* Use same values as .dark class for consistency */
-  --background: 0 0% 0% !important; /* Pure black base - matches .dark */
+  /* Use same values as .dark class for consistency, but avoid pure black "void" */
+  --background: 239 83% 14% !important; /* Approx. #060742 – bright cosmic navy */
   --foreground: 0 0% 95% !important;
   --card: 0 0% 6% !important;
   --card-foreground: 0 0% 95% !important;
@@ -735,6 +741,9 @@
   --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%) !important;
   --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%) !important;
   --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 56%) !important;
+
+  /* Decorative stars (StarryBackground) */
+  --star-color: rgba(255, 255, 255, 0.95) !important;
 
   /* Force dark background and text colors */
   background-color: hsl(var(--background)) !important;
@@ -782,6 +791,9 @@
   --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 16%);
   --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 14%);
   --app-primary-deep: color-mix(in hsl, hsl(var(--primary)), var(--app-tint) 70%);
+
+  /* Decorative stars (StarryBackground) */
+  --star-color: rgba(2, 6, 23, 0.18);
 }
 
 /*
@@ -1074,6 +1086,28 @@
   }
   to {
     transform: translateX(0);
+  }
+}
+
+/* Workflow step success animation */
+@keyframes workflow-step-success {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-workflow-step {
+  animation: workflow-step-success 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-workflow-step {
+    animation: none;
   }
 }
 

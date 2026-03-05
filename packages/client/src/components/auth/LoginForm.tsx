@@ -41,6 +41,9 @@ function getOAuthErrorMessage(errorCode: string): string {
  */
 type AuthTab = 'login' | 'register'
 
+const authPrimaryButtonClass =
+  'relative w-full h-12 rounded-full text-sm font-semibold text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-white'
+
 function isAuthTab(value: string): value is AuthTab {
   return value === 'login' || value === 'register'
 }
@@ -431,7 +434,7 @@ export function LoginForm({
                       </Alert>
                     )}
 
-                    <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                    <Button type="submit" className={authPrimaryButtonClass} disabled={isLoading}>
                       {isLoading ? (
                         <>Signing in...</>
                       ) : (
@@ -541,7 +544,7 @@ export function LoginForm({
                       </Alert>
                     )}
 
-                    <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                    <Button type="submit" className={authPrimaryButtonClass} disabled={isLoading}>
                       {isLoading ? (
                         <>Creating account...</>
                       ) : (

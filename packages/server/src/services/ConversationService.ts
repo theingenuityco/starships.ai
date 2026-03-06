@@ -2753,7 +2753,7 @@ export class ConversationService {
         // the canonical system prompt for provider-stable semantics.
         const attributionDirectory = await this.buildAttributionDirectory(messages);
         const llmMessagesCore: LlmMessage[] = await Promise.all(
-          ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
+          ConversationService.filterMessagesForLlmHistory<MessageModel>(messages).map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
             const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
@@ -3129,7 +3129,7 @@ export class ConversationService {
       // the canonical system prompt for provider-stable semantics.
       const attributionDirectory = await this.buildAttributionDirectory(messages);
       const llmMessagesCore: LlmMessage[] = await Promise.all(
-        ConversationService.filterMessagesForLlmHistory(messages).map(async (msg): Promise<LlmMessage> => {
+        ConversationService.filterMessagesForLlmHistory<MessageModel>(messages).map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
           const strippedInfo = this.stripEchoedAttributionHeadersFromContent({ role: msg.role, content });
           const contentStripped = strippedInfo.content;

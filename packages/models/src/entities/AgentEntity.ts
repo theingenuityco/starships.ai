@@ -6,7 +6,7 @@
  */
 
 import { AgentState } from '@starships/autopilot';
-import { Blueprint } from '@starships/autopilot/src/types';
+import type { Blueprint } from '@starships/autopilot';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import {

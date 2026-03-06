@@ -215,6 +215,7 @@ export class UserEntity implements UserModel {
     if (operation === 'create') {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        slug: dataRecord.slug || 'temp-user', // Repository/backfill code replaces this before persistence
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         email: dataRecord.email,
         displayName: dataRecord.displayName,

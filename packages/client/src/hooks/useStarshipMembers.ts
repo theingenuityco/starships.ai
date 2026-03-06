@@ -10,6 +10,7 @@ export type StarshipInviteRole = 'admin' | 'collaborator'
 
 export type StarshipMemberListItem = {
   userId: string
+  userSlug: string
   role: StarshipMemberRole
   createdAt: string
   email: string | null

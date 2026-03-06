@@ -56,13 +56,25 @@ export async function up(client: Client): Promise<void> {
     // -----------------------------------------------------------------------
     // Remove Starships connector actions for room agent pins (best-effort)
     // -----------------------------------------------------------------------
-    await client.query(`
-      DELETE FROM connector_template_actions a
-      USING connector_templates t
-      WHERE a.connector_template_id = t.id
-        AND t.provider = 'starships'
-        AND a.name IN ('pin-room-agent', 'unpin-room-agent', 'reorder-room-pins-agents');
-    `);
+    try {
+      // Preferred schema (post-migration 112): connector_template_actions(template_id, action_name)
+      await client.query(`
+        DELETE FROM connector_template_actions a
+        USING connector_templates t
+        WHERE a.template_id = t.id
+          AND t.provider = 'starships'
+          AND a.action_name IN ('pin-room-agent', 'unpin-room-agent', 'reorder-room-pins-agents');
+      `);
+    } catch {
+      // Back-compat (older schemas used different column names)
+      await client.query(`
+        DELETE FROM connector_template_actions a
+        USING connector_templates t
+        WHERE a.connector_template_id = t.id
+          AND t.provider = 'starships'
+          AND a.name IN ('pin-room-agent', 'unpin-room-agent', 'reorder-room-pins-agents');
+      `);
+    }
 
     // Also prune legacy/admin-visible endpoints_json on the starships connector template.
     const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);

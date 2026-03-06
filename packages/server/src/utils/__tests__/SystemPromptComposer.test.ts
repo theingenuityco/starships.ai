@@ -1,7 +1,7 @@
 import { composeCanonicalSystemPrompt } from '../SystemPromptComposer';
 
 describe('composeCanonicalSystemPrompt', () => {
-  it('renders deterministic sections and thread context', () => {
+  it('renders deterministic sections (thread context omitted)', () => {
     const out = composeCanonicalSystemPrompt({
       policyBlocks: ['POLICY_A', 'POLICY_B'],
       personaPrompt: 'PERSONA',
@@ -24,11 +24,8 @@ describe('composeCanonicalSystemPrompt', () => {
     expect(out).toContain('PERSONA');
     expect(out).toContain('<section id="world">');
     expect(out).toContain('WORLD');
-    expect(out).toContain('<section id="conversation_context">');
-    expect(out).toContain('sourceConversationId: parent_123');
-    expect(out).toContain('sourceMessageId: msg_123');
-    expect(out).toContain('sourceUserName: Alice');
-    expect(out).toContain('Hello from parent');
+    expect(out).not.toContain('<section id="conversation_context">');
+    expect(out).not.toContain('Hello from parent');
     expect(out).toContain('<section id="history_policy">');
     expect(out).toContain('Only the most recent 30 messages are included');
     expect(out).toContain('</starships_system_prompt>');

@@ -5,7 +5,7 @@
  * Orchestrates between database persistence (MessageRepository) and business logic.
  */
 
-import { MessageRepository, AttachmentRepository, ConversationParticipantRepository } from '@starships/models';
+import { MessageRepository, AttachmentRepository, ConversationParticipantRepository, UserRepository } from '@starships/models';
 import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import type { Message, MessageModel } from '@starships/protocol';
 
@@ -99,11 +99,13 @@ export class MessageService {
   private messageRepository: MessageRepository;
   private attachmentRepository: AttachmentRepository;
   private conversationParticipantRepository: ConversationParticipantRepository;
+  private userRepository: UserRepository;
 
   constructor() {
     this.messageRepository = new MessageRepository();
     this.attachmentRepository = new AttachmentRepository();
     this.conversationParticipantRepository = new ConversationParticipantRepository();
+    this.userRepository = new UserRepository();
   }
 
   // ============================================================================
@@ -121,6 +123,26 @@ export class MessageService {
       toolCallId: request.toolCallId,
     });
 
+    // Ensure user attribution fields are populated server-side.
+    // We use `userName` as the stable handle for attribution; for users this should be the user slug.
+    // (Clients should not send/override slugs.)
+    const resolvedUserIdentity = await (async (): Promise<{ userName?: string; userAvatar?: string }> => {
+      if (request.role !== 'user') return {};
+      const userId = typeof request.userId === 'string' ? request.userId.trim() : '';
+      if (!userId) return {};
+      const hasUserName = typeof request.userName === 'string' && request.userName.trim().length > 0;
+      const hasUserAvatar = typeof request.userAvatar === 'string' && request.userAvatar.trim().length > 0;
+      if (hasUserName && hasUserAvatar) return {};
+      const user = await this.userRepository.findById(userId).catch(() => null);
+      if (!user) return {};
+      const slug = typeof user.slug === 'string' ? user.slug.trim() : '';
+      const avatar = typeof user.avatar === 'string' ? user.avatar.trim() : '';
+      return {
+        ...(hasUserName ? {} : slug ? { userName: slug } : {}),
+        ...(hasUserAvatar ? {} : avatar ? { userAvatar: avatar } : {}),
+      };
+    })();
+
     // Create message with all available properties including toolCalls, toolCallId, agentId, agentName, and attachmentIds
     const message = await this.messageRepository.create({
       role: request.role,
@@ -135,6 +157,8 @@ export class MessageService {
       ...(request.userId && { userId: request.userId }),
       ...(request.userName && { userName: request.userName }),
       ...(request.userAvatar && { userAvatar: request.userAvatar }),
+      ...(resolvedUserIdentity.userName ? { userName: resolvedUserIdentity.userName } : {}),
+      ...(resolvedUserIdentity.userAvatar ? { userAvatar: resolvedUserIdentity.userAvatar } : {}),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
       ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });
@@ -178,6 +202,23 @@ export class MessageService {
       toolCallId: request.toolCallId,
     });
 
+    const resolvedUserIdentity = await (async (): Promise<{ userName?: string; userAvatar?: string }> => {
+      if (request.role !== 'user') return {};
+      const userId = typeof request.userId === 'string' ? request.userId.trim() : '';
+      if (!userId) return {};
+      const hasUserName = typeof request.userName === 'string' && request.userName.trim().length > 0;
+      const hasUserAvatar = typeof request.userAvatar === 'string' && request.userAvatar.trim().length > 0;
+      if (hasUserName && hasUserAvatar) return {};
+      const user = await this.userRepository.findById(userId).catch(() => null);
+      if (!user) return {};
+      const slug = typeof user.slug === 'string' ? user.slug.trim() : '';
+      const avatar = typeof user.avatar === 'string' ? user.avatar.trim() : '';
+      return {
+        ...(hasUserName ? {} : slug ? { userName: slug } : {}),
+        ...(hasUserAvatar ? {} : avatar ? { userAvatar: avatar } : {}),
+      };
+    })();
+
     const message = await this.messageRepository.upsertByTurnSlot({
       role: request.role,
       content: compactedContent,
@@ -193,6 +234,8 @@ export class MessageService {
       ...(request.userId && { userId: request.userId }),
       ...(request.userName && { userName: request.userName }),
       ...(request.userAvatar && { userAvatar: request.userAvatar }),
+      ...(resolvedUserIdentity.userName ? { userName: resolvedUserIdentity.userName } : {}),
+      ...(resolvedUserIdentity.userAvatar ? { userAvatar: resolvedUserIdentity.userAvatar } : {}),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
       ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });

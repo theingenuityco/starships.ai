@@ -83,19 +83,19 @@ function aggregateStreamChunks(chunks: StreamChunk[]): string {
   return agg
 }
 
-function replaceMentionTokens(args: { content: string; agentNameById: Map<string, string>; userNameById: Map<string, string> }): string {
+function replaceMentionTokens(args: { content: string; agentNameByRef: Map<string, string>; userNameByRef: Map<string, string> }): string {
   const input = String(args.content || '')
   if (!input) return ''
   // Replace tokens so markdown does not treat them as HTML tags.
   return input
     .replace(/<@a:([^>\s]+)>/g, (_m, idRaw) => {
       const id = String(idRaw || '').trim()
-      const name = id ? args.agentNameById.get(id) : null
+      const name = id ? args.agentNameByRef.get(id) : null
       return `@${name || id || 'agent'}`
     })
     .replace(/<@u:([^>\s]+)>/g, (_m, idRaw) => {
       const id = String(idRaw || '').trim()
-      const name = id ? args.userNameById.get(id) : null
+      const name = id ? args.userNameByRef.get(id) : null
       return `@${name || id || 'user'}`
     })
 }
@@ -571,22 +571,30 @@ export function ConversationMessageContent({
     const list = (membersData as any)?.members
     return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
   }, [membersData])
-  const agentNameById = useMemo(() => {
+  const agentNameByRef = useMemo(() => {
     const map = new Map<string, string>()
     const list = Array.isArray(starshipAgents) ? starshipAgents : []
     for (const a of list as any[]) {
       const id = typeof a?.id === 'string' ? String(a.id) : ''
+      const slug = typeof a?.slug === 'string' ? String(a.slug) : ''
       const name = typeof a?.name === 'string' ? String(a.name) : ''
-      if (id && name) map.set(id, name)
+      if (name) {
+        if (id) map.set(id, name)
+        if (slug) map.set(slug, name)
+      }
     }
     return map
   }, [starshipAgents])
-  const userNameById = useMemo(() => {
+  const userNameByRef = useMemo(() => {
     const map = new Map<string, string>()
     for (const u of Array.isArray(memberUsers) ? memberUsers : []) {
       const id = typeof (u as any)?.userId === 'string' ? String((u as any).userId) : ''
+      const slug = typeof (u as any)?.userSlug === 'string' ? String((u as any).userSlug) : ''
       const name = String(u.displayName || u.email || '').trim()
-      if (id && name) map.set(id, name)
+      if (name) {
+        if (id) map.set(id, name)
+        if (slug) map.set(slug, name)
+      }
     }
     return map
   }, [memberUsers])
@@ -782,8 +790,8 @@ export function ConversationMessageContent({
   }, [content, chunks, isStreaming, messageId])
 
   const fullContentRenderable = useMemo(() => {
-    return replaceMentionTokens({ content: fullContent, agentNameById, userNameById })
-  }, [fullContent, agentNameById, userNameById])
+    return replaceMentionTokens({ content: fullContent, agentNameByRef, userNameByRef })
+  }, [fullContent, agentNameByRef, userNameByRef])
 
   const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0

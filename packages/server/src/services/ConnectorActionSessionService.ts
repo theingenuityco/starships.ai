@@ -114,6 +114,18 @@ export class ConnectorActionSessionService {
 
     const decrypted = await this.connectorSecrets.getDecryptedSecrets(starshipId);
 
+    // Reserved "system" connector metadata is injected from platform secrets (instance-admin managed).
+    // These values are non-secret configuration (e.g. zone names) but are still managed centrally.
+    const systemInjectedMetadata: Record<string, unknown> = {};
+    try {
+      const webFetchZone = await this.platformSecrets.getSecret('SYSTEM_CONNECTOR_WEBFETCH_ZONE');
+      const webSearchZone = await this.platformSecrets.getSecret('SYSTEM_CONNECTOR_WEBSEARCH_ZONE');
+      if (typeof webFetchZone === 'string' && webFetchZone.trim()) systemInjectedMetadata.webFetchZone = webFetchZone.trim();
+      if (typeof webSearchZone === 'string' && webSearchZone.trim()) systemInjectedMetadata.webSearchZone = webSearchZone.trim();
+    } catch {
+      // best-effort
+    }
+
     // Preload all action catalogs for enabled templates in one query.
     const enabledTemplateIds = templates.filter((t) => t.isEnabled !== false).map((t) => t.id);
     const actionRows = await this.actionRepo.listActionRowsByTemplateIds(enabledTemplateIds);
@@ -263,6 +275,118 @@ export class ConnectorActionSessionService {
 
         connectorSessions[provider] = { headers };
         continue;
+      }
+    }
+
+    // Built-in reserved "system" connector (NOT DB-backed).
+    // This connector is injected into every runner session bundle and is enabled when
+    // the required platform secrets exist.
+    //
+    // Backend implementation details (Bright Data endpoints, etc.) are intentionally hidden
+    // behind stable action names so we can swap providers later without changing tools.
+    {
+      const provider: ConnectorProvider = 'system';
+
+      const runtimeTemplate: ConnectorTemplateRuntimeFieldsV2 = {
+        baseUrl: 'https://api.brightdata.com',
+        auth: {
+          type: 'api_key',
+          apiKeyRef: { type: 'platform_secret', key: 'SYSTEM_CONNECTOR_WEB_GATEWAY_API_KEY' },
+          injection: { style: 'header', headerName: 'Authorization', tokenPrefix: 'Bearer' },
+        },
+        endpoints: [
+          {
+            name: 'webFetch',
+            description: 'Fetch a public URL via the system web fetch gateway',
+            method: 'POST',
+            path: '/request',
+            requestStyle: 'json',
+            timeoutMs: 60000,
+            parameters: {
+              type: 'object',
+              required: ['url'],
+              properties: {
+                url: { type: 'string', description: 'Target URL to fetch (absolute http(s) URL)' },
+                method: { type: 'string', description: 'HTTP method (GET, POST, ...). Default GET.' },
+                headers: { type: 'object', description: 'Optional headers to send to the target site.' },
+                body: { description: 'Optional request body (string or JSON object). Ignored for GET/HEAD.' },
+                format: { type: 'string', enum: ['raw', 'json'], description: 'Backend response format. Default raw.' },
+                dataFormat: { type: 'string', description: 'Optional backend data_format (e.g. markdown, screenshot).' },
+                country: { type: 'string', description: 'Optional ISO country code for routing.' },
+              },
+              additionalProperties: true,
+            },
+            mapping: {
+              body: {
+                zone: '{{ String(metadata.webFetchZone ?? "") }}',
+                url: '{{ String(args.url ?? "") }}',
+                format: '{{ String(args.format ?? "raw") }}',
+                method: '{{ String(args.method ?? "GET").toUpperCase() }}',
+                country: '{{ args.country }}',
+                data_format: '{{ args.dataFormat }}',
+                headers:
+                  '{{ (() => { const h = args.headers; if (!h || typeof h !== "object" || Array.isArray(h)) return undefined; const out = {}; for (const [k, v] of Object.entries(h)) { if (!k) continue; if (v === undefined || v === null) continue; out[k] = Array.isArray(v) ? v.map((x) => String(x)).join(",") : String(v); } return out; })() }}',
+                body:
+                  '{{ (() => { const m = String(args.method ?? "GET").toUpperCase(); if (m === "GET" || m === "HEAD") return undefined; const b = args.body; if (b === undefined || b === null) return undefined; if (typeof b === "string") return b; try { return JSON.stringify(b); } catch { return String(b); } })() }}',
+              },
+            },
+          } satisfies ConnectorHttpEndpointV2,
+          {
+            name: 'webSearch',
+            description: 'Run a web search via the system search gateway',
+            method: 'POST',
+            path: '/request',
+            requestStyle: 'json',
+            timeoutMs: 45000,
+            parameters: {
+              type: 'object',
+              required: ['q'],
+              properties: {
+                q: { type: 'string', description: 'Search query' },
+                engine: { type: 'string', enum: ['google', 'bing'], description: 'Search engine (default google)' },
+                hl: { type: 'string', description: 'Language code (e.g. en)' },
+                gl: { type: 'string', description: 'Country code (e.g. us)' },
+                num: { type: 'number', description: 'Requested number of results (engine dependent)' },
+                start: { type: 'number', description: 'Result offset / page start (engine dependent)' },
+                format: { type: 'string', enum: ['raw', 'json'], description: 'Backend response format. Default json.' },
+                dataFormat: { type: 'string', description: 'Optional backend data_format (e.g. parsed_light, markdown).' },
+                country: { type: 'string', description: 'Optional ISO country code for routing.' },
+                url: { type: 'string', description: 'Optional override: full SERP URL to request (advanced)' },
+              },
+              additionalProperties: true,
+            },
+            mapping: {
+              body: {
+                zone: '{{ String(metadata.webSearchZone ?? "") }}',
+                url:
+                  '{{ (() => { const override = typeof args.url === "string" ? args.url.trim() : ""; if (override) return override; const q = String(args.q ?? "").trim(); const engine = String(args.engine ?? "google").toLowerCase(); const hl = String(args.hl ?? "en").trim(); const gl = String(args.gl ?? "us").trim(); const num = args.num; const start = args.start; if (engine === "bing") { let u = "https://www.bing.com/search?q=" + encodeURIComponent(q); if (hl) u += "&setlang=" + encodeURIComponent(hl); if (gl) u += "&cc=" + encodeURIComponent(gl); if (typeof start === "number" && Number.isFinite(start) && start > 0) u += "&first=" + encodeURIComponent(String(Math.floor(start))); return u; } let u = "https://www.google.com/search?q=" + encodeURIComponent(q); if (hl) u += "&hl=" + encodeURIComponent(hl); if (gl) u += "&gl=" + encodeURIComponent(gl); if (typeof num === "number" && Number.isFinite(num) && num > 0) u += "&num=" + encodeURIComponent(String(Math.floor(num))); if (typeof start === "number" && Number.isFinite(start) && start > 0) u += "&start=" + encodeURIComponent(String(Math.floor(start))); return u; })() }}',
+                format: '{{ String(args.format ?? "json") }}',
+                country: '{{ args.country }}',
+                data_format: '{{ args.dataFormat }}',
+              },
+            },
+          } satisfies ConnectorHttpEndpointV2,
+        ],
+        metadataSchema: {
+          type: 'object',
+          properties: {
+            webFetchZone: { type: 'string' },
+            webSearchZone: { type: 'string' },
+          },
+          additionalProperties: true,
+        },
+      };
+
+      connectorTemplates[provider] = runtimeTemplate;
+      connectorMetadata[provider] = {
+        ...(byProvider.get(provider)?.metadata ?? {}),
+        ...systemInjectedMetadata,
+      };
+
+      // Only inject auth when configured; callers will receive 401s otherwise.
+      const apiKey = await this.platformSecrets.getSecret('SYSTEM_CONNECTOR_WEB_GATEWAY_API_KEY').catch(() => undefined);
+      if (typeof apiKey === 'string' && apiKey.trim()) {
+        connectorSessions[provider] = { headers: { Authorization: `Bearer ${apiKey.trim()}` } };
       }
     }
 

@@ -164,8 +164,10 @@ General rule: prefer `connector_action` when a Starships connector action exists
 
 However, some surfaces are **HTTP-only** today (no seeded Starships connector actions), notably:
 
-- rooms CRUD + room pins
-- thread-only endpoints (children listing, linked-message, thread notification-level)
+- thread-only endpoints like:
+  - linked-message lookup
+  - children pending-approvals
+  - thread notification-level
 - message edit/delete/reactions/linking
 - DM endpoints
 

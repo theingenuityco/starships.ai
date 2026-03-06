@@ -220,6 +220,17 @@ export class StarshipDatasetRepository extends BaseRepository {
   async archive(id: string): Promise<StarshipDatasetModel | null> {
     return this.update(id, { archived: true });
   }
+
+  async delete(id: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        return this.deleteEntity('starship_datasets', id);
+      },
+      'delete',
+      'StarshipDataset',
+      id
+    );
+  }
 }
 
 export default StarshipDatasetRepository;

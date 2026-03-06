@@ -24,6 +24,7 @@ import {
   ConversationNotificationPrefRepository,
   DirectMessageRepository,
   getConnection,
+  MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
   ToolRepository,
@@ -1184,7 +1185,22 @@ router.post(
       }
 
       const agentRepo = new AgentRepository();
-      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}`;
+      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
+      const roomConversationId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+
+      // Resolve which assistant message triggered this tool call (best-effort).
+      // Tools can use this to link results back to the calling message without ambiguity.
+      const toolCallMessageId = await (async () => {
+        try {
+          const repo = new MessageRepository();
+          const msg = await repo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
+          const id = msg && typeof msg.id === 'string' ? String(msg.id).trim() : '';
+          return id || null;
+        } catch {
+          return null;
+        }
+      })();
+      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
       const cachedPerm = getCachedPermission(permCacheKey);
       // NOTE: We keep a small in-memory cache for hot tool-call loops, but permissions can be
       // changed out-of-band by the UI (e.g. "Always allow"). If we blindly trust a cached
@@ -1194,14 +1210,17 @@ router.post(
       // - Cache misses → read from DB and cache.
       // - Cache hits for 'allow' → trust (fast path).
       // - Cache hits for 'ask'/'deny' → re-check DB to pick up recent changes, then update cache.
-      let permission =
-        cachedPerm !== undefined
-          ? cachedPerm
+      const readPermission = async (): Promise<'allow' | 'ask' | 'deny' | null> => {
+        return roomConversationId
+          ? await agentRepo.getEffectiveToolPermissionBySlugInRoom(agentId, conversation.starshipId, toolSlug, roomConversationId)
           : await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+      };
+
+      let permission = cachedPerm !== undefined ? cachedPerm : await readPermission();
       if (cachedPerm === undefined) {
         setCachedPermission(permCacheKey, permission);
       } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
-        const fresh = await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        const fresh = await readPermission();
         permission = fresh;
         setCachedPermission(permCacheKey, fresh);
       }
@@ -1282,7 +1301,14 @@ router.post(
             return;
           }
 
-          const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
+          const runtimeEnv = buildAutopilotRuntimeEnv({
+            starshipId: conversation.starshipId,
+            conversationId,
+            roomId: roomConversationId || undefined,
+            authUserId,
+            agentId,
+            toolCallMessageId: toolCallMessageId || undefined,
+          });
           const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
           const result = await executeToolBlueprint({
             blueprint: toolById.blueprint,
@@ -1357,7 +1383,14 @@ router.post(
         return;
       }
 
-      const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
+      const runtimeEnv = buildAutopilotRuntimeEnv({
+        starshipId: conversation.starshipId,
+        conversationId,
+        roomId: roomConversationId || undefined,
+        authUserId,
+        agentId,
+        toolCallMessageId: toolCallMessageId || undefined,
+      });
       const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
 
       const bus = ConversationStreamBus.getInstance();
@@ -2497,9 +2530,20 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
     );
     if (!cursorValidation) return;
 
+    const searchValidation = validateData(
+      z.object({
+        q: z.string().optional(),
+      }),
+      req.query,
+      res,
+      'children search'
+    );
+    if (!searchValidation) return;
+
     const page = await conversationService.getChildConversationsPage({
       parentConversationId: conversationId,
       limit: paginationValidation.limit,
+      q: searchValidation.q,
       ...(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId
         ? { beforeUpdatedAt: cursorValidation.beforeUpdatedAt, beforeId: cursorValidation.beforeId }
         : {}),
@@ -2784,7 +2828,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
 
     // Resolve agent from either agentId or agentSlug, and verify access/ownership
     let resolvedAgentId: string | undefined;
-    if (!isInternal && bodyValidation.agentSlug) {
+    if (bodyValidation.agentSlug) {
       const agentService = new AgentService();
       const starshipAgents = await agentService.getAgentsByStarship(bodyValidation.starshipId);
       const agent = starshipAgents.find((a) => a.slug === bodyValidation.agentSlug) || null;
@@ -2798,15 +2842,17 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         return;
       }
 
-      // Verify user owns the agent's starship
-      if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agent.id, res))) {
-        return;
-      }
-
       // Verify agent belongs to the same starship as the conversation
       if (agent.starshipId !== bodyValidation.starshipId) {
         sendError(res, 'ACCESS_DENIED', 'Cannot use an agent from a different starship', 403);
         return;
+      }
+
+      // External callers: verify access/ownership
+      if (!isInternal) {
+        if (!(await verifyResourceAccess(agent.starshipId, authUserId as string, 'agent', agent.id, res))) {
+          return;
+        }
       }
 
       resolvedAgentId = agent.id;

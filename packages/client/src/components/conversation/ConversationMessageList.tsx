@@ -1357,8 +1357,8 @@ export function ConversationMessageList({
     if (!pinned) return filtered
     const pinnedId = typeof (pinned as any)?.id === 'string' ? String((pinned as any).id).trim() : ''
     if (!pinnedId) return filtered
-    const withoutPinned = filtered.filter(m => m.id !== pinnedId)
-    return [pinned, ...withoutPinned]
+    // Thread context: pinned/linked message is shown separately (not as part of the transcript).
+    return filtered.filter(m => m.id !== pinnedId)
   }, [displayMessages, pinnedFirstMessage])
 
   // Prevent a brief "channel hero" flash while messages are still hydrating on reload.

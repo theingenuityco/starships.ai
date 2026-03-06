@@ -509,11 +509,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const raw = String(message || '')
       if (!raw.trim()) return false
       // Preferred: structured agent mentions emitted by the composer.
-      if (raw.includes('<@a:')) return true
-      // Back-compat: plain-text @mentions. Mirror the server's mention token shapes loosely.
-      const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
-      const mentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
-      return mentionRe.test(legacyText)
+      return raw.includes('<@a:')
     }, [message])
 
     const requiresCreditsForDraft = useMemo(() => {
@@ -822,16 +818,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const isUserUserDm = resolvedDmForSend?.dmType === 'user_user'
 
       const resolveAgentById = (id: string): AgentModel | null => {
-        const aid = String(id || '').trim()
-        if (!aid) return null
-        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(
-          a => String(a?.id || '').trim() === aid
-        ) ?? null
+        const ref = String(id || '').trim()
+        if (!ref) return null
+        const matchRef = (a: any) => String(a?.id || '').trim() === ref || String(a?.slug || '').trim() === ref
+        const fromStarship =
+          (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(matchRef) ?? null
         if (fromStarship) return fromStarship
-        const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(a => String(a?.id || '').trim() === aid) ?? null
+        const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(matchRef) ?? null
         if (fromConvRaw && allowedAgentIdSet && !allowedAgentIdSet.has(String(fromConvRaw.id || '').trim())) return null
-        const fromConv = fromConvRaw
-        return fromConv ?? null
+        return fromConvRaw ?? null
       }
 
       // Resolve agent to send to:
@@ -863,9 +858,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           effectiveAgent = linked[0] ?? null
         }
 
-        // Prefer stable leading agent mention token (<@a:AGENT_ID>) where not locked.
+        // Prefer stable leading agent mention token (<@a:AGENT_SLUG>) where not locked.
         // NOTE: even in channel/mention-only contexts, this is how an agent is selected.
-        // Prefer stable leading agent mention token (<@a:AGENT_ID>) for mention-only threads.
+        // Prefer stable leading agent mention token (<@a:AGENT_SLUG>) for mention-only threads.
         if (!dmLockedAgent) {
           const tokenMatch = messageToSend.match(/^\s*<@a:([^>\s]+)>/)
           if (tokenMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
@@ -873,19 +868,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const matched = id ? resolveAgentById(id) : null
             if (matched) {
               effectiveAgent = matched
-            }
-          } else {
-            // Back-compat: plain-text leading @handle
-            const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-            if (mentionMatch && (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]).length : 0) > 0) {
-              const handle = mentionMatch[1]
-              const lower = handle.toLowerCase()
-              const matched =
-                (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []).find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower) ?? null
-              if (matched) {
-                effectiveAgent = matched
-                // Do NOT strip the leading mention; keep it in the message content
-              }
             }
           }
         }
@@ -921,12 +903,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         const raw = String(messageToSend || '')
         const hasUserMentionToken = raw.includes('<@u:')
-        // Mirror server mention behavior loosely:
-        // - Structured agent mention tokens: <@a:AGENT_ID>
-        // - Legacy @slug mentions (strip structured tokens first)
-        const legacyText = raw.replace(/<@[^>\n]+>/g, ' ')
-        const legacyMentionRe = /@(?:"[^"\n]{1,100}"|\[[^\]\n]{1,100}\]|all|[a-z0-9._-]{1,100})/i
-        const hasAgentMention = raw.includes('<@a:') || legacyMentionRe.test(legacyText)
+        const hasAgentMention = raw.includes('<@a:')
 
         // Mention-only contexts only run when at least one agent is mentioned.
         if (isChannelContext || isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMention, hasUserMentionToken, hasAgentMention }
@@ -1533,7 +1510,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const user = kind === 'user' ? ((item as any).user as StarshipMemberListItem | undefined) : undefined
             const label = String((item as any)?.label || agent?.name || user?.displayName || user?.email || '').trim()
             const key = `${kind}:${String((item as any)?.id || '')}`
-            const userIdForPresence = kind === 'user' ? String((user as any)?.userId || (item as any)?.id || '').trim() : ''
+            const userIdForPresence = kind === 'user' ? String((user as any)?.userId || '').trim() : ''
             const online = kind === 'user' ? isUserOnline(userIdForPresence) : true
             const fallback = (label || '?').trim().slice(0, 1).toUpperCase()
             const inRoom = (item as any)?.inRoom !== false
@@ -1649,6 +1626,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
           const uid = String((u as any)?.userId || '').trim()
           if (!uid) continue
+          const userSlug = String((u as any)?.userSlug || '').trim()
+          if (!userSlug) continue
           // Self-mentions are not allowed (do not even suggest them).
           if (me && uid === me) continue
 
@@ -1657,7 +1636,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           if (!matchesQuery(haystacks)) continue
           const inRoom = hasRoomSegregation && mentionAllowUsers ? mentionAllowUsers.has(uid) : true
           items.push({
-            id: uid,
+            id: userSlug,
             label,
             kind: 'user',
             user: u,
@@ -1674,14 +1653,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             if (dmKind !== 'agent') continue
             if (String(a?.id || '') !== String(dmId)) continue
           }
-          const id = String((a as any)?.id || '').trim()
-          if (!id) continue
+          const agentId = String((a as any)?.id || '').trim()
+          if (!agentId) continue
+          const agentSlug = String((a as any)?.slug || '').trim()
+          if (!agentSlug) continue
           const label = String(formatAgentDisplayName(a as any) || a.name || a.slug || 'Agent').trim() || 'Agent'
           const haystacks = [String(a.name || '').toLowerCase(), String(a.slug || '').toLowerCase(), label.toLowerCase()]
           if (!matchesQuery(haystacks)) continue
-          const inRoom = hasRoomSegregation && mentionAllowAgents ? mentionAllowAgents.has(id) : true
+          const inRoom = hasRoomSegregation && mentionAllowAgents ? mentionAllowAgents.has(agentId) : true
           items.push({
-            id,
+            id: agentSlug,
             label,
             kind: 'agent',
             agent: a as any,
@@ -1814,7 +1795,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     const id = (choice as any)?.id
                     const label = (choice as any)?.label
                     if (kind === 'agent') {
-                      let agent = (agentsRef.current || []).find(a => a.id === id) || null
+                      let agent = (agentsRef.current || []).find(a => a.id === id || a.slug === id) || null
                       if (!agent && label) {
                         const lower = String(label).toLowerCase()
                         agent = (agentsRef.current || []).find(a => a.name.toLowerCase() === lower || a.slug.toLowerCase() === lower) || null
@@ -1857,7 +1838,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   // Then update selected agent (agents only)
                   try {
                     if (realItem?.kind === 'agent') {
-                      const selected = (agentsRef.current || []).find(a => a.id === realItem.id) || null
+                      const selected = (agentsRef.current || []).find(a => a.id === realItem.id || a.slug === realItem.id) || null
                       if (selected && onAgentChange) onAgentChange(selected)
                     }
                   } catch {}
@@ -2168,9 +2149,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }).configure({
           // Mentions behave like normal atomic nodes (user can delete them).
           deleteTriggerWithBackspace: true,
-          // Serialize mentions into stable tokens so `editor.getText()` preserves IDs:
-          // - users: <@u:USER_ID>
-          // - agents: <@a:AGENT_ID>
+          // Serialize mentions into stable tokens so `editor.getText()` preserves stable slugs:
+          // - users: <@u:USER_SLUG>
+          // - agents: <@a:AGENT_SLUG>
           renderText: ({ options, node }: any) => {
             const id = node?.attrs?.id
             const kind = node?.attrs?.kind

@@ -63,6 +63,8 @@ const RegisterSchema = z.object({
   email: EmailSchema,
   password: PasswordSchema,
   displayName: DisplayNameSchema.optional(),
+  // Server always autogenerates user slugs; do not accept client-provided values.
+  slug: z.never().optional(),
 });
 
 const LoginSchema = z.object({

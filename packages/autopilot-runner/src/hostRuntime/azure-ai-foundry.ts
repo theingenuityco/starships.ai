@@ -302,6 +302,11 @@ const buildAnthropicPayload = async (request: LlmHostRequest, providerModelId: s
     messages: outMessages,
     max_tokens: maxTokens,
   };
+  const endUserIdRaw = (request as unknown as { endUserId?: unknown }).endUserId;
+  const endUserId = typeof endUserIdRaw === 'string' ? endUserIdRaw.trim().slice(0, 64) : '';
+  if (endUserId) {
+    payload.metadata = { user_id: endUserId };
+  }
   const hasAssistantHistory = messages.some((m) => m?.role === 'assistant');
   let thinkingBudgetTokens = computeThinkingBudgetTokens(request);
   if (hasAssistantHistory) {
@@ -815,6 +820,12 @@ export async function invokeAzureAiFoundry(
         })
       : request.messages,
   };
+
+  // Provider-side attribution (OpenAI-compatible chat/completions).
+  // Azure OpenAI schema historically supports `user`; newer OpenAI fields may not be accepted by Azure.
+  const endUserIdRaw = (request as unknown as { endUserId?: unknown }).endUserId;
+  const endUserId = typeof endUserIdRaw === 'string' ? endUserIdRaw.trim().slice(0, 64) : '';
+  if (endUserId) payload.user = endUserId;
 
   if (Array.isArray(modalities) && modalities.length > 0) {
     payload.modalities = modalities;

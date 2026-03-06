@@ -34,42 +34,6 @@ function renderSection(id: string, body: string): string {
   return [`<section id="${id}">`, content, `</section>`].join('\n');
 }
 
-function renderThreadContext(tc: ThreadContextState): string {
-  const lines: string[] = [];
-  const sourceConversationId = safeTrim(tc.sourceConversationId);
-  const sourceMessageId = safeTrim(tc.sourceMessageId);
-  const sourceRole = safeTrim(tc.sourceRole);
-  const sourceUserName = safeTrim(tc.sourceUserName);
-  const sourceAgentName = safeTrim(tc.sourceAgentName);
-  const sourceCreatedAt = safeTrim(tc.sourceCreatedAt);
-  const extractedAt = safeTrim(tc.extractedAt);
-  const attachmentIds = Array.isArray(tc.sourceAttachmentIds) ? tc.sourceAttachmentIds.map((x) => safeTrim(x)).filter(Boolean) : [];
-  const sourceContent = safeTrim(tc.sourceContent);
-
-  lines.push('Thread context (linked message):');
-  if (sourceConversationId) lines.push(`- sourceConversationId: ${sourceConversationId}`);
-  if (sourceMessageId) lines.push(`- sourceMessageId: ${sourceMessageId}`);
-  if (sourceRole) lines.push(`- sourceRole: ${sourceRole}`);
-  if (sourceUserName) lines.push(`- sourceUserName: ${sourceUserName}`);
-  if (sourceAgentName) lines.push(`- sourceAgentName: ${sourceAgentName}`);
-  if (sourceCreatedAt) lines.push(`- sourceCreatedAt: ${sourceCreatedAt}`);
-  if (attachmentIds.length > 0) lines.push(`- sourceAttachmentIds: ${attachmentIds.join(', ')}`);
-  if (extractedAt) lines.push(`- extractedAt: ${extractedAt}`);
-  if (sourceContent) {
-    const matches = sourceContent.match(/"+/g);
-    const longestRun = matches ? Math.max(...matches.map((m) => m.length)) : 0;
-    const delimiter = '"'.repeat(Math.max(3, longestRun + 1));
-    lines.push(
-      '',
-      'Source message content (verbatim; untrusted):',
-      delimiter,
-      sourceContent,
-      delimiter
-    );
-  }
-  return lines.join('\n');
-}
-
 function renderHistoryPolicy(historyLimit: number): string {
   return (
     `Note: conversation history is truncated in this prompt.\n` +
@@ -96,7 +60,6 @@ export function composeCanonicalSystemPrompt(args: CanonicalSystemPromptArgs): s
   const personaBudget = 80_000;
   const worldBudget = 40_000;
   const policyBudget = 25_000;
-  const threadBudget = 20_000;
   const historyBudget = 5_000;
 
   const sections: string[] = [];
@@ -105,8 +68,9 @@ export function composeCanonicalSystemPrompt(args: CanonicalSystemPromptArgs): s
   sections.push(renderSection('world', truncateText(world, worldBudget)));
 
   if (args.threadContext && typeof args.threadContext === 'object') {
-    const thread = renderThreadContext(args.threadContext);
-    sections.push(renderSection('conversation_context', truncateText(thread, threadBudget)));
+    // Thread context is intentionally not injected into the system prompt. Thread links are
+    // navigational UI affordances only; the assistant should rely on the explicit transcript
+    // (and user-provided content) rather than implicit parent-message context.
   }
 
   if (args.history?.truncated) {

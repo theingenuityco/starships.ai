@@ -455,43 +455,9 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
           });
         }
 
-        // 3) Persist thread context into the child conversation state so agents can see the linked message
-        // without requiring hidden `role:"system"` seed messages in history.
-        try {
-          const convRepo = new ConversationRepository();
-          const child = await convRepo.findById(linkedConversationId).catch(() => null);
-          if (child) {
-            const parentConversationId = getMessageConversationId(updatedMessage);
-            const content = String(updatedMessage.content || '')
-              .trim()
-              .slice(0, 20_000);
-            const sourceUserName = coerceStringId(updatedMessage.userName);
-            const sourceAgentName = coerceStringId(updatedMessage.agentName);
-            const createdAt = coerceStringId(updatedMessage.createdAt);
-            const attachmentIds = (Array.isArray(updatedMessage.attachmentIds) ? updatedMessage.attachmentIds : [])
-              .map((x) => String(x).trim())
-              .filter(Boolean)
-              .slice(0, 50);
-
-            await convRepo
-              .mergeState(linkedConversationId, {
-                threadContext: {
-                  sourceConversationId: parentConversationId || undefined,
-                  sourceMessageId: messageId,
-                  sourceRole: role || undefined,
-                  sourceUserName: sourceUserName || undefined,
-                  sourceAgentName: sourceAgentName || undefined,
-                  sourceCreatedAt: createdAt || undefined,
-                  sourceAttachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-                  sourceContent: content || undefined,
-                  extractedAt: new Date().toISOString(),
-                },
-              })
-              .catch(() => null);
-          }
-        } catch {
-          /* best-effort: threadContext is helpful but not required */
-        }
+        // Intentionally do NOT persist the linked message content into the child conversation state.
+        // The thread link (linkedConversationId) is sufficient for UI navigation, and the child
+        // conversation transcript should stand alone without hidden/implicit context injection.
       } catch {
         /* best-effort: do not fail linking if participant insertion fails */
       }

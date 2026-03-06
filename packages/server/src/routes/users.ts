@@ -32,6 +32,8 @@ const CreateUserSchema = z.object({
   email: EmailSchema.optional(),
   displayName: DisplayNameSchema.optional(),
   avatar: AvatarSchema.optional(),
+  // Server always autogenerates user slugs; do not accept client-provided values.
+  slug: z.never().optional(),
 });
 
 const UpdateUserSchema = z.object({

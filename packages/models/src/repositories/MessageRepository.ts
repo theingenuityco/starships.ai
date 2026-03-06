@@ -129,7 +129,14 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Message & { conversationId: string; starshipId?: string; attachmentIds?: string[] }): Promise<MessageModel> {
+  async create(
+    entity: Message & {
+      conversationId: string;
+      starshipId?: string;
+      attachmentIds?: string[];
+      metadata?: Record<string, unknown>;
+    }
+  ): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -171,6 +178,7 @@ export class MessageRepository extends BaseRepository {
           ...(entity.userAvatar ? { userAvatar: entity.userAvatar } : {}),
           ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
           ...(entity.linkedConversationId ? { linkedConversationId: entity.linkedConversationId } : {}),
+          ...(entity.metadata && typeof entity.metadata === 'object' && !Array.isArray(entity.metadata) ? { metadata: entity.metadata } : {}),
         };
 
         // Validate with all required fields present (toolCalls must be an array for validation)
@@ -204,7 +212,14 @@ export class MessageRepository extends BaseRepository {
    * - unique index on (turn_id, turn_seq)
    */
   async upsertByTurnSlot(
-    entity: Message & { conversationId: string; turnId: string; turnSeq: number; starshipId?: string; attachmentIds?: string[] }
+    entity: Message & {
+      conversationId: string;
+      turnId: string;
+      turnSeq: number;
+      starshipId?: string;
+      attachmentIds?: string[];
+      metadata?: Record<string, unknown>;
+    }
   ): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -264,6 +279,7 @@ export class MessageRepository extends BaseRepository {
           ...(entity.userAvatar ? { userAvatar: entity.userAvatar } : {}),
           ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
           ...(entity.linkedConversationId ? { linkedConversationId: entity.linkedConversationId } : {}),
+          ...(entity.metadata && typeof entity.metadata === 'object' && !Array.isArray(entity.metadata) ? { metadata: entity.metadata } : {}),
         };
 
         await MessageEntity.validate(messageData, 'create');

@@ -543,12 +543,14 @@ export class LLM extends BaseNode<LlmParams> {
       const responseFormat = this.coerceMaybeJson<Record<string, unknown>>(params.responseFormat);
 
       const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
+      const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
+      const endUserIdRaw = typeof runtime.AUTH_USER_ID === 'string' ? runtime.AUTH_USER_ID : '';
+      const endUserId = typeof endUserIdRaw === 'string' ? endUserIdRaw.trim().slice(0, 128) : '';
 
       // Log the prompt we are about to send (safe + bounded) ONLY when explicitly enabled.
       // This logs the provider request (after sanitization), with URL redaction for multimodal blocks.
       if (ENABLE_LLM_LOGGING) {
         try {
-          const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
           const conversationId = typeof runtime.CONVERSATION_ID === 'string' ? runtime.CONVERSATION_ID : undefined;
           const starshipId = typeof runtime.STARSHIP_ID === 'string' ? runtime.STARSHIP_ID : undefined;
           const agentId = typeof runtime.AGENT_ID === 'string' ? runtime.AGENT_ID : undefined;
@@ -601,6 +603,7 @@ export class LLM extends BaseNode<LlmParams> {
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: openAiMessagesForRequest,
+        ...(endUserId ? { endUserId } : {}),
         tools: Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined,
         temperature: typeof params.temperature === 'number' ? params.temperature : undefined,
         maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
@@ -815,35 +818,13 @@ export class LLM extends BaseNode<LlmParams> {
     return list.map((m) => this.convertMessageToOpenAI(m));
   }
 
-  private sanitizeOpenAIName(name: unknown): string | undefined {
-    if (typeof name !== 'string') return undefined;
-    const raw = name.trim();
-    if (!raw) return undefined;
-    // OpenAI expects <=64 chars and a restricted charset; keep it conservative for OpenRouter too.
-    const safe = raw
-      .replace(/[^a-zA-Z0-9_-]+/g, '_')
-      .replace(/_+/g, '_')
-      .slice(0, 64);
-    return safe || undefined;
-  }
-
-  private nameFromStarshipsMeta(meta: unknown): string | undefined {
-    if (!meta || typeof meta !== 'object') return undefined;
-    const m = meta as Record<string, unknown>;
-    const authorType = typeof m.authorType === 'string' ? m.authorType : '';
-    const authorId = typeof m.authorId === 'string' ? m.authorId : '';
-    if (!authorId) return undefined;
-    const safeId = this.sanitizeOpenAIName(authorId);
-    if (!safeId) return undefined;
-    const prefix = authorType === 'agent' ? 'a_' : authorType === 'user' ? 'u_' : 'x_';
-    return `${prefix}${safeId}`.slice(0, 64);
-  }
-
   private convertMessageToOpenAI(m: LlmMessage): OpenAI.Chat.ChatCompletionMessageParam {
     const role = m.role as OpenAI.Chat.ChatCompletionMessageParam['role'];
     const contentVal = m.content;
     const mRec = m as unknown as Record<string, unknown>;
-    const name = this.nameFromStarshipsMeta(m.starshipsMeta ?? mRec['starshipsMeta']);
+    // IMPORTANT:
+    // Do NOT send per-message `name` to providers. Some aggregators forward it to non-OpenAI models
+    // by rewriting message content (e.g. `{name}: {content}`), which makes attribution visible to the LLM.
 
     // OpenRouter reasoning preservation extension (only some providers accept these fields).
     // We attach them only on assistant messages, and downstream host runtimes that can't accept
@@ -919,7 +900,6 @@ export class LLM extends BaseNode<LlmParams> {
         content: getStringContent(),
         tool_calls: toolCalls,
         ...(reasoningForProvider as Record<string, unknown>),
-        ...(name ? { name } : {}),
       } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
@@ -954,14 +934,13 @@ export class LLM extends BaseNode<LlmParams> {
         role: 'assistant',
         content: getStringContent(),
         ...(reasoningForProvider as Record<string, unknown>),
-        ...(name ? { name } : {}),
       } as unknown as OpenAI.Chat.ChatCompletionAssistantMessageParam;
     }
 
     // USER MESSAGE: Support multimodal content (images, etc.)
     // If content is already an array of ContentBlocks, pass directly.
     // OpenAI SDK supports both string and ContentPart[] for user messages.
-    return { role: 'user', content: contentVal, ...(name ? { name } : {}) } as OpenAI.Chat.ChatCompletionUserMessageParam;
+    return { role: 'user', content: contentVal } as OpenAI.Chat.ChatCompletionUserMessageParam;
   }
 
   /**
@@ -1139,6 +1118,23 @@ export class LLM extends BaseNode<LlmParams> {
         if (chunk.id && !responseMetadata.id) responseMetadata.id = chunk.id;
         if (chunk.model && !responseMetadata.model) responseMetadata.model = chunk.model;
         if (chunk.created) responseMetadata.created = chunk.created;
+
+        // IMPORTANT: Some providers (including OpenAI/OpenRouter when stream_options.include_usage=true)
+        // send a final "usage-only" chunk with no choices. We must still capture usage from it.
+        if (chunk.usage) {
+          usage = this.normalizeUsage(chunk.usage);
+          // Track whether provider explicitly reported cost. If not, downstream (server) should compute cost from catalog.
+          try {
+            const u = chunk.usage as unknown as Record<string, unknown>;
+            const hasCost = typeof u.cost === 'number' && Number.isFinite(u.cost);
+            const costDetails = u.cost_details;
+            const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
+            const hasUpstream = cd ? typeof cd.upstream_inference_cost === 'number' && Number.isFinite(cd.upstream_inference_cost) : false;
+            lastUsageHadExplicitCost = hasCost || hasUpstream;
+          } catch {
+            lastUsageHadExplicitCost = false;
+          }
+        }
 
         const choice = chunk.choices[0];
         if (!choice) continue;
@@ -1435,22 +1431,6 @@ export class LLM extends BaseNode<LlmParams> {
 
         if (choice.finish_reason) {
           finishReason = choice.finish_reason;
-        }
-
-        // Extract usage if present
-        if (chunk.usage) {
-          usage = this.normalizeUsage(chunk.usage);
-          // Track whether provider explicitly reported cost. If not, downstream (server) should compute cost from catalog.
-          try {
-            const u = chunk.usage as unknown as Record<string, unknown>;
-            const hasCost = typeof u.cost === 'number' && Number.isFinite(u.cost);
-            const costDetails = u.cost_details;
-            const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
-            const hasUpstream = cd ? typeof cd.upstream_inference_cost === 'number' && Number.isFinite(cd.upstream_inference_cost) : false;
-            lastUsageHadExplicitCost = hasCost || hasUpstream;
-          } catch {
-            lastUsageHadExplicitCost = false;
-          }
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls

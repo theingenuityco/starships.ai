@@ -21,7 +21,7 @@ This page gives you a high-level map of the main node types and links to deeper 
 - **code**: runs JavaScript/TypeScript-like code with `async function main(ctx) { ... }`. See [`nodes/code`](/docs/nodes/code).
 - **await**: pauses execution and resumes later when an external event arrives. See [`nodes/await`](/docs/nodes/await).
 - **ui_action**: emits a UI hint event `{ action, payload }` to the host stream (used to drive client UI outside the message timeline).
-- **http_request**: performs raw HTTP calls via the HostRuntime (absolute `http(s)://...` URLs only). If you’re running the remote runner, you can opt-in per node with `useWebUnlocker: true` to route that request through the runner’s configured web-unlocking gateway (requires `BRIGHTDATA_API_KEY` and `BRIGHTDATA_ZONE`).
+- **http_request**: performs raw HTTP calls via the HostRuntime (absolute `http(s)://...` URLs only).
 - **connector_action**: performs connector-backed HTTP calls (base URL + auth + mapping defined by `connector_templates`). **Required** for connector-based integrations and for Starships-hosted agent/tool execution flows where the server injects auth and enforces allow/ask/deny policies.
 - **llm**: calls an LLM provider via the host; supports tools/function calling and streaming.
 - **workflow**: runs a nested blueprint.

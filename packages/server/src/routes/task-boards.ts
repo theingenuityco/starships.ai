@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { verifyResourceAccess, verifyStarshipAccess } from '@/middleware/verify-starship-access';
+import { verifyResourceAccess, verifyStarshipAccess, verifyStarshipAdminAccess } from '@/middleware/verify-starship-access';
 import { IdSchema } from '@/schemas/common';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { TaskBoardService } from '@/services/TaskBoardService';
@@ -39,11 +39,12 @@ const UserAssigneeSlugSchema = z
   .refine((s) => {
     const raw = String(s || '').trim();
     if (!raw) return false;
-    const m = raw.match(/^<@u:([^>]+)>$/i);
+    const m = raw.match(/^<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>$/i);
     const unwrapped = m ? String(m[1] || '').trim() : raw;
     const inner = unwrapped.startsWith('u:') ? unwrapped.slice(2) : unwrapped.toLowerCase().startsWith('u-') ? unwrapped.slice(2) : unwrapped;
-    return IdSchema.safeParse(inner.trim()).success;
-  }, 'user assignee slug must be u:<userId> (or <@u:userId>)');
+    const v = inner.trim();
+    return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v);
+  }, 'user assignee slug must be u:<userSlug> (or <@u:userSlug>)');
 
 const TaskAssigneeRefSchema = z
   .object({
@@ -244,11 +245,11 @@ router.patch(
 );
 
 /**
- * DELETE /api/v1/starships/:starshipId/task-boards/:boardIdOrSlug
+ * POST /api/v1/starships/:starshipId/task-boards/:boardIdOrSlug/archive
  * Archive a task board (soft-delete) by id OR slug (slug is unique per starship).
  */
-router.delete(
-  '/starships/:starshipId/task-boards/:boardIdOrSlug',
+router.post(
+  '/starships/:starshipId/task-boards/:boardIdOrSlug/archive',
   jwtAuthMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -267,6 +268,41 @@ router.delete(
       sendSuccess(res, archived, 200);
     } catch (error) {
       handleError(error, res, 'archiving task board');
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/starships/:starshipId/task-boards/:boardIdOrSlug
+ * Permanently delete a task board and all its columns/cards (hard delete).
+ *
+ * Restricted to:
+ * - starship owner
+ * - starship admin
+ * - instance admin
+ */
+router.delete(
+  '/starships/:starshipId/task-boards/:boardIdOrSlug',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = requireAuthUserId(req, res);
+      if (!userId) return;
+
+      const params = z.object({ starshipId: IdSchema, boardIdOrSlug: BoardIdOrSlugSchema }).parse(req.params);
+      if (!(await verifyStarshipAdminAccess(params.starshipId, userId, res))) return;
+
+      const details = await requireBoardAccessForStarship(params.starshipId, params.boardIdOrSlug, userId, res);
+      if (!details) return;
+
+      const ok = await service.deleteBoard(details.board.id);
+      if (!ok) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Task board not found', 404);
+        return;
+      }
+      res.status(204).send();
+    } catch (error) {
+      handleError(error, res, 'deleting task board');
     }
   }
 );
@@ -436,10 +472,10 @@ router.patch('/task-boards/:boardId', jwtAuthMiddleware, async (req: Request, re
 });
 
 /**
- * DELETE /api/v1/task-boards/:boardId
+ * POST /api/v1/task-boards/:boardId/archive
  * Archive a task board (soft-delete).
  */
-router.delete('/task-boards/:boardId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/task-boards/:boardId/archive', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
@@ -456,6 +492,39 @@ router.delete('/task-boards/:boardId', jwtAuthMiddleware, async (req: Request, r
     sendSuccess(res, archived, 200);
   } catch (error) {
     handleError(error, res, 'archiving task board');
+  }
+});
+
+/**
+ * DELETE /api/v1/task-boards/:boardId
+ * Permanently delete a task board (hard delete).
+ *
+ * Restricted to:
+ * - starship owner
+ * - starship admin
+ * - instance admin
+ */
+router.delete('/task-boards/:boardId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = requireAuthUserId(req, res);
+    if (!userId) return;
+
+    const params = z.object({ boardId: IdSchema }).parse(req.params);
+    const details = await service.getBoardDetails(params.boardId);
+    if (!details) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Task board not found', 404);
+      return;
+    }
+    if (!(await verifyStarshipAdminAccess(String(details.board.starshipId), userId, res))) return;
+
+    const ok = await service.deleteBoard(params.boardId);
+    if (!ok) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Task board not found', 404);
+      return;
+    }
+    res.status(204).send();
+  } catch (error) {
+    handleError(error, res, 'deleting task board');
   }
 });
 

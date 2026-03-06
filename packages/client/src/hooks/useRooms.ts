@@ -455,9 +455,10 @@ export function useAssignRoomTool(roomId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { toolId: string; permission?: 'allow' | 'ask' | 'deny' }) => {
+      const permission: 'allow' | 'ask' | 'deny' = args.permission ?? 'allow'
       const response: FetchResponse<ApiResponse<{ assignment: RoomToolAssignment }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/tools`, {
         toolId: args.toolId,
-        ...(args.permission ? { permission: args.permission } : {}),
+        permission,
       })
       return response.data.data?.assignment
     },

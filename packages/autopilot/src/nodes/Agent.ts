@@ -590,7 +590,7 @@ export class Agent implements NodeHandler {
           args: `{{ lastOutputOf("${argsNodeRef}") }}`,
           conversationId: `{{ String(env("CONVERSATION_ID") ?? "") }}`,
         },
-        timeout: 120000,
+        timeout: 30 * 60 * 1000,
       },
     });
 

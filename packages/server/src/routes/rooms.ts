@@ -2086,7 +2086,7 @@ router.get('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: 
   }
 });
 
-router.post('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/tools', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -2098,7 +2098,7 @@ router.post('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res:
     const body = validateData(
       z.object({
         toolId: IdSchema,
-        permission: z.enum(['allow', 'ask', 'deny']).optional(),
+        permission: z.enum(['allow', 'ask', 'deny']),
       }),
       req.body,
       res,
@@ -2133,7 +2133,7 @@ router.post('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res:
     const assignment = await roomToolsRepo.upsert({
       roomConversationId: room.conversationId,
       toolId: body.toolId,
-      permission: body.permission ?? null,
+      permission: body.permission,
     });
     sendSuccess(res, { assignment }, 200);
   } catch (error) {
@@ -2141,7 +2141,7 @@ router.post('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res:
   }
 });
 
-router.delete('/rooms/:roomId/tools/:toolId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/rooms/:roomId/tools/:toolId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'tool assignment parameter');
     if (!params) return;

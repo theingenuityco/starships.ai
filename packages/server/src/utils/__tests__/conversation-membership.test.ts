@@ -84,5 +84,12 @@ describe('resolveRoomConversationContext', () => {
     const ctx = await resolveRoomConversationContext({ conversationId: 'thread-3' });
     expect(ctx).toBeNull();
   });
+
+  it('rethrows lookup errors so membership enforcement can fail closed', async () => {
+    findByConversationIdMock.mockResolvedValue(null);
+    queryOneMock.mockRejectedValue(new Error('db unavailable'));
+
+    await expect(resolveRoomConversationContext({ conversationId: 'thread-3' })).rejects.toThrow('db unavailable');
+  });
 });
 

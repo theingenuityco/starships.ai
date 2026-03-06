@@ -187,52 +187,48 @@ export async function resolveRoomConversationContext(args: { conversationId: str
   if (!conversationId) return null;
 
   const roomRepo = new RoomRepository();
-  const room = await roomRepo.findByConversationId(conversationId).catch(() => null);
+  const room = await roomRepo.findByConversationId(conversationId);
   if (room) {
     return { isRoom: true, isRoomThread: false, roomConversationId: conversationId, room };
   }
 
   // Check parent conversation id chain (room threads can be nested multiple levels deep).
-  try {
-    const conn = getConnection();
-    const MAX_DEPTH = 50;
-    const row = await conn.queryOne<{ room_conversation_id: string; starship_id: string; is_private: boolean }>(
-      `
-      WITH RECURSIVE ancestors AS (
-        SELECT id, parent_conversation_id, 0 AS depth
-          FROM conversations
-         WHERE id = $1
-        UNION ALL
-        SELECT c.id, c.parent_conversation_id, a.depth + 1 AS depth
-          FROM conversations c
-          JOIN ancestors a ON c.id = a.parent_conversation_id
-         WHERE a.parent_conversation_id IS NOT NULL
-           AND a.depth < $2
-      )
-      SELECT r.conversation_id AS room_conversation_id,
-             r.starship_id,
-             r.is_private
-        FROM ancestors a
-        JOIN rooms r ON r.conversation_id = a.id
-       WHERE a.depth > 0
-       ORDER BY a.depth ASC
-       LIMIT 1
-      `,
-      [conversationId, MAX_DEPTH]
-    );
-    const roomConversationId = typeof row?.room_conversation_id === 'string' ? String(row.room_conversation_id).trim() : '';
-    if (!roomConversationId) return null;
-    const starshipId = typeof row?.starship_id === 'string' ? String(row.starship_id).trim() : '';
-    const isPrivate = Boolean(row?.is_private);
-    return {
-      isRoom: false,
-      isRoomThread: true,
-      roomConversationId,
-      room: starshipId ? { starshipId, isPrivate } : null,
-    };
-  } catch {
-    return null;
-  }
+  const conn = getConnection();
+  const MAX_DEPTH = 50;
+  const row = await conn.queryOne<{ room_conversation_id: string; starship_id: string; is_private: boolean }>(
+    `
+    WITH RECURSIVE ancestors AS (
+      SELECT id, parent_conversation_id, 0 AS depth
+        FROM conversations
+       WHERE id = $1
+      UNION ALL
+      SELECT c.id, c.parent_conversation_id, a.depth + 1 AS depth
+        FROM conversations c
+        JOIN ancestors a ON c.id = a.parent_conversation_id
+       WHERE a.parent_conversation_id IS NOT NULL
+         AND a.depth < $2
+    )
+    SELECT r.conversation_id AS room_conversation_id,
+           r.starship_id,
+           r.is_private
+      FROM ancestors a
+      JOIN rooms r ON r.conversation_id = a.id
+     WHERE a.depth > 0
+     ORDER BY a.depth ASC
+     LIMIT 1
+    `,
+    [conversationId, MAX_DEPTH]
+  );
+  const roomConversationId = typeof row?.room_conversation_id === 'string' ? String(row.room_conversation_id).trim() : '';
+  if (!roomConversationId) return null;
+  const starshipId = typeof row?.starship_id === 'string' ? String(row.starship_id).trim() : '';
+  const isPrivate = Boolean(row?.is_private);
+  return {
+    isRoom: false,
+    isRoomThread: true,
+    roomConversationId,
+    room: starshipId ? { starshipId, isPrivate } : null,
+  };
 }
 
 /**

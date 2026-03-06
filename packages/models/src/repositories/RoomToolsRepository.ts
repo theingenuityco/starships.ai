@@ -12,11 +12,13 @@ type DbRow = {
 };
 
 function fromDb(r: DbRow): RoomToolAssignment {
-  const p: RoomToolPermission = r.permission === 'ask' || r.permission === 'deny' || r.permission === 'allow' ? r.permission : 'allow';
+  if (r.permission !== 'allow' && r.permission !== 'ask' && r.permission !== 'deny') {
+    throw new Error('Room tool assignment is missing a valid permission');
+  }
   return {
     roomConversationId: String(r.room_conversation_id),
     toolId: String(r.tool_id),
-    permission: p,
+    permission: r.permission,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
   };
@@ -41,13 +43,15 @@ export class RoomToolsRepository extends BaseRepository {
     }, 'list', 'room_tools', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; toolId: string; permission?: RoomToolPermission | null }): Promise<RoomToolAssignment> {
+  async upsert(args: { roomConversationId: string; toolId: string; permission: RoomToolPermission }): Promise<RoomToolAssignment> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const roomConversationId = String(args.roomConversationId || '').trim();
       const toolId = String(args.toolId || '').trim();
-      const requestedPermission =
-        args.permission === 'allow' || args.permission === 'ask' || args.permission === 'deny' ? args.permission : null;
+      const requestedPermission = args.permission;
+      if (requestedPermission !== 'allow' && requestedPermission !== 'ask' && requestedPermission !== 'deny') {
+        throw new Error('Room tool permission must be explicit');
+      }
       const row = await conn.queryOne<DbRow>(
         `
         INSERT INTO room_tools (room_conversation_id, tool_id, permission, created_at, updated_at)
@@ -56,7 +60,7 @@ export class RoomToolsRepository extends BaseRepository {
         DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()
         RETURNING room_conversation_id, tool_id, permission, created_at, updated_at
         `,
-        [roomConversationId, toolId, requestedPermission ?? 'allow']
+        [roomConversationId, toolId, requestedPermission]
       );
       if (!row) throw new Error('Failed to upsert room tool assignment');
       return fromDb(row);

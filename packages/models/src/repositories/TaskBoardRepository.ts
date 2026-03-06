@@ -3,6 +3,7 @@ import { TaskBoardEntity } from '@/entities/TaskBoardEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import type { PostgresConnection } from '@/helpers/database';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -10,8 +11,8 @@ function toFiniteNumber(value: unknown, fallback: number): number {
 }
 
 export class TaskBoardRepository extends BaseRepository {
-  constructor() {
-    super('TaskBoardRepository');
+  constructor(connection?: PostgresConnection) {
+    super('TaskBoardRepository', connection);
   }
 
   async findById(id: string): Promise<TaskBoardModel | null> {
@@ -81,7 +82,8 @@ export class TaskBoardRepository extends BaseRepository {
               { fallbackBase: 'board', maxLength: 100 }
             );
 
-        const pos = typeof data.pos === 'number' && Number.isFinite(data.pos) ? data.pos : await this.computeNextPosForStarship(data.starshipId);
+        const pos =
+          typeof data.pos === 'number' && Number.isFinite(data.pos) ? data.pos : await this.computeNextPosForStarship(data.starshipId);
 
         const boardData: TaskBoardModel = {
           id: 'temp',
@@ -147,4 +149,3 @@ export class TaskBoardRepository extends BaseRepository {
 }
 
 export default TaskBoardRepository;
-

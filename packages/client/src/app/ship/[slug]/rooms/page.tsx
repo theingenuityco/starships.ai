@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { WizardStepper } from '@/components/marketplace/WizardStepper'
 import { getCurrentToken } from '@/lib/api'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
@@ -24,6 +26,14 @@ import { useAuth } from '@/hooks/useAuth'
 import type { RoomModel } from '@starships/protocol'
 
 const ROOM_NAME_MAX = 100
+
+type ImportWizardStep = 1 | 2 | 3
+type ImportWizardStepMeta = { id: ImportWizardStep; label: string; subtitle: string }
+const IMPORT_WIZARD_STEPS: ImportWizardStepMeta[] = [
+  { id: 1, label: 'Choose file', subtitle: 'Select a bundle (.zip)' },
+  { id: 2, label: 'Analyze', subtitle: 'Review changes & resolve conflicts' },
+  { id: 3, label: 'Upload', subtitle: 'Confirm & upload' },
+]
 function safeFilenameSegment(input: string): string {
   const raw = String(input || '').trim()
   const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '')
@@ -34,6 +44,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const { slug: slugParam } = useParams<{ slug: string }>()
   const slug = typeof slugParam === 'string' ? slugParam : ''
 
+  const queryClient = useQueryClient()
   const { user, isInstanceAdmin } = useAuth()
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
@@ -57,6 +68,152 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const createRoom = useCreateRoom(starshipId)
   const updateRoom = useUpdateRoom(starshipId)
   const deleteRoom = useDeleteRoom(starshipId)
+
+  // Import bundle (room + resources)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importStep, setImportStep] = useState<ImportWizardStep>(1)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isAnalyzingImport, setIsAnalyzingImport] = useState(false)
+  const [isApplyingImport, setIsApplyingImport] = useState(false)
+  const [importAnalysis, setImportAnalysis] = useState<any | null>(null)
+  const [importDecisions, setImportDecisions] = useState<any>({
+    rooms: {},
+    views: {},
+    datasets: {},
+    taskBoards: {},
+    tools: {},
+    agents: {},
+  })
+
+  const analyzeImportRoomBundle = async (): Promise<boolean> => {
+    if (!importFile || !starshipId) return false
+    setIsAnalyzingImport(true)
+    try {
+      const token = await getCurrentToken()
+      const fd = new FormData()
+      fd.append('file', importFile)
+      const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipId)}/import-room-bundle/analyze`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`Analyze failed (${res.status})`)
+      const json = await res.json()
+      const data = json?.data ?? json
+      setImportAnalysis(data)
+
+      const nextDecisions: any = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} }
+      for (const x of (data?.rooms ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.rooms[String(x.bundleHash)] = { action, targetId: x?.existing?.conversationId }
+      }
+      for (const x of (data?.views ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.views[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+      }
+      for (const x of (data?.datasets ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.datasets[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+      }
+      for (const x of (data?.taskBoards ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.taskBoards[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+      }
+      for (const x of (data?.tools ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.tools[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+      }
+      for (const x of (data?.agents ?? []) as any[]) {
+        const status = x?.status
+        const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
+        nextDecisions.agents[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+      }
+      setImportDecisions(nextDecisions)
+
+      return true
+    } catch (error) {
+      toast.error('Analyze failed', { description: getSafeErrorMessage(error) })
+      return false
+    } finally {
+      setIsAnalyzingImport(false)
+    }
+  }
+
+  const applyImportRoomBundle = async (): Promise<boolean> => {
+    if (!importFile || !starshipId || !importAnalysis) return false
+    setIsApplyingImport(true)
+    try {
+      const token = await getCurrentToken()
+      const fd = new FormData()
+      fd.append('file', importFile)
+      fd.append('decisions', JSON.stringify(importDecisions))
+      const res = await fetch(`/api/v1/starships/${encodeURIComponent(starshipId)}/import-room-bundle/apply`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`Import failed (${res.status})`)
+      const json = await res.json()
+      const data = json?.data ?? json
+      const importedRooms = Number(data?.imported?.rooms ?? 0)
+      const importedViews = Number(data?.imported?.views ?? 0)
+      const importedDatasets = Number(data?.imported?.datasets ?? 0)
+      const importedBoards = Number(data?.imported?.taskBoards ?? 0)
+      const importedAgents = Number(data?.imported?.agents ?? 0)
+      const importedTools = Number(data?.imported?.tools ?? 0)
+      const warnings = Array.isArray(data?.warnings) ? (data.warnings as unknown[]).length : 0
+
+      // Fire-and-forget invalidation; do not await (keeps modal responsive).
+      queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['tools'] })
+      queryClient.invalidateQueries({ queryKey: ['views'] })
+      queryClient.invalidateQueries({ queryKey: ['datasets'] })
+      queryClient.invalidateQueries({ queryKey: ['task-boards'] })
+      toast.success('Import complete', {
+        description: `${importedRooms} room(s), ${importedViews} view(s), ${importedDatasets} dataset(s), ${importedBoards} task board(s), ${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
+      })
+      setImportOpen(false)
+      return true
+    } catch (error) {
+      toast.error('Import failed', { description: getSafeErrorMessage(error) })
+      return false
+    } finally {
+      setIsApplyingImport(false)
+    }
+  }
+
+  const canGoNextImport = useMemo(() => {
+    if (importStep === 1) return Boolean(importFile && starshipId)
+    if (importStep === 2) return Boolean(importAnalysis && !isAnalyzingImport)
+    return false
+  }, [importAnalysis, importFile, importStep, isAnalyzingImport, starshipId])
+
+  const handleImportNext = async () => {
+    if (importStep === 1) {
+      if (!importFile || !starshipId) return
+      setImportStep(2)
+      const ok = await analyzeImportRoomBundle()
+      if (!ok) setImportStep(1)
+      return
+    }
+    if (importStep === 2) {
+      if (!importAnalysis) return
+      setImportStep(3)
+      return
+    }
+    await applyImportRoomBundle()
+  }
+
+  const handleImportBack = () => {
+    if (importStep === 2) setImportStep(1)
+    if (importStep === 3) setImportStep(2)
+  }
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState('')
@@ -134,6 +291,22 @@ export default function RoomsIndexPage(): React.JSX.Element {
               >
                 <Icon name="plus" className="h-4 w-4 mr-1.5" />
                 New room
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setImportOpen(true)
+                  setImportStep(1)
+                  setImportFile(null)
+                  setImportAnalysis(null)
+                  setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+                }}
+                disabled={!canManageRooms || !starshipId}
+                title={!canManageRooms ? 'Only the starship owner (or instance admin) can import rooms' : undefined}
+              >
+                <Icon name="upload" className="h-4 w-4 mr-1.5" />
+                Import bundle
               </Button>
             </div>
           </div>
@@ -352,6 +525,200 @@ export default function RoomsIndexPage(): React.JSX.Element {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import bundle */}
+      <Dialog
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open)
+          if (!open) {
+            setImportStep(1)
+            setImportFile(null)
+            setImportAnalysis(null)
+            setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+          }
+        }}
+      >
+        <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl h-[80vh] overflow-hidden p-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-6 space-y-6">
+              <DialogTitle>Import room bundle</DialogTitle>
+              <DialogDescription>Upload a bundle exported from Rooms → Export.</DialogDescription>
+              <div>
+                <WizardStepper currentStep={importStep} steps={IMPORT_WIZARD_STEPS} />
+              </div>
+            </DialogHeader>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              {importStep === 1 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Choose a bundle to import</div>
+                  <div className="space-y-2 max-w-xl">
+                    <Label htmlFor="room-bundle-file">Bundle (.zip)</Label>
+                    <Input
+                      id="room-bundle-file"
+                      type="file"
+                      accept=".zip,application/zip"
+                      disabled={isAnalyzingImport || isApplyingImport}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null
+                        setImportFile(f)
+                        setImportAnalysis(null)
+                        setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+                      }}
+                    />
+                  </div>
+                  {!importFile ? <div className="text-xs text-muted-foreground max-w-xl">Select a .zip file to continue.</div> : null}
+                </div>
+              ) : null}
+
+              {importStep === 2 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Choose how to resolve these conflicts</div>
+
+                  {isAnalyzingImport ? (
+                    <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <div className="text-sm font-semibold leading-tight">Analyzing…</div>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">This usually takes a few seconds.</div>
+                    </div>
+                  ) : null}
+
+                  {importAnalysis ? (
+                    <div className="space-y-6">
+                      {(
+                        [
+                          { key: 'rooms', label: 'Rooms', allowOverwrite: false },
+                          { key: 'views', label: 'Views', allowOverwrite: true },
+                          { key: 'datasets', label: 'Datasets', allowOverwrite: true },
+                          { key: 'taskBoards', label: 'Task boards', allowOverwrite: false },
+                          { key: 'tools', label: 'Tools', allowOverwrite: true },
+                          { key: 'agents', label: 'Agents', allowOverwrite: true },
+                        ] as const
+                      ).map((section) => {
+                        const items = (importAnalysis?.[section.key] ?? []) as any[]
+                        return (
+                          <div key={section.key}>
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold text-foreground">{section.label}</div>
+                              <div className="text-xs text-muted-foreground">{items.length} in bundle</div>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              {items.map((x) => {
+                                const decision = importDecisions?.[section.key]?.[x.bundleHash] ?? {
+                                  action: x.status === 'same' ? ('skip' as const) : ('copy' as const),
+                                  targetId: x.existing?.id,
+                                }
+                                const badge =
+                                  x.status === 'same'
+                                    ? { label: 'Same', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' }
+                                    : x.status === 'conflict'
+                                      ? { label: 'Conflict', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-300' }
+                                      : { label: 'New', className: 'bg-muted text-muted-foreground' }
+                                return (
+                                  <div key={x.bundleHash} className="rounded-lg border border-border/60 bg-card px-3 py-2 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', badge.className)}>{badge.label}</span>
+                                        <span className="text-sm font-medium text-foreground truncate">{x.name}</span>
+                                      </div>
+                                      {x.existing ? (
+                                        <div className="mt-1 text-xs text-muted-foreground truncate">
+                                          Existing: {x.existing.name} {x.existing.slug ? `(${x.existing.slug})` : null}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    <select
+                                      className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
+                                      disabled={isApplyingImport || section.key === 'rooms'}
+                                      value={decision.action}
+                                      onChange={(e) => {
+                                        const action = e.target.value as 'skip' | 'copy' | 'overwrite'
+                                        setImportDecisions((prev: any) => ({
+                                          ...prev,
+                                          [section.key]: {
+                                            ...(prev?.[section.key] ?? {}),
+                                            [x.bundleHash]: { action, targetId: x.existing?.id },
+                                          },
+                                        }))
+                                      }}
+                                    >
+                                      <option value="skip">Skip</option>
+                                      <option value="copy">Import copy</option>
+                                      <option value="overwrite" disabled={!section.allowOverwrite || !x.existing}>
+                                        Overwrite existing
+                                      </option>
+                                    </select>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border/60 bg-card/10 p-4">
+                      <div className="text-sm font-semibold text-foreground">No analysis yet</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Press Next to analyze this bundle.</div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {importStep === 3 ? (
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold">Ready to upload</div>
+                  <div className="rounded-lg border border-border/60 bg-card/10 p-3">
+                    <div className="text-sm font-semibold text-foreground">Press Upload to import using the decisions you selected.</div>
+                    <div className="mt-1 text-xs text-muted-foreground">This will create any new rooms/resources and apply your selected conflict resolutions.</div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="shrink-0 px-6 py-4 gap-2 flex-row justify-between sm:justify-between sm:space-x-0">
+              <div>
+                <Button type="button" variant="ghost" onClick={() => setImportOpen(false)} disabled={isAnalyzingImport || isApplyingImport}>
+                  Cancel
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {importStep > 1 ? (
+                  <Button type="button" variant="ghost" onClick={handleImportBack} disabled={isAnalyzingImport || isApplyingImport}>
+                    <Icon name="caret-left" className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                ) : null}
+
+                {importStep < 3 ? (
+                  <Button type="button" variant="primaryOutline" onClick={handleImportNext} disabled={isAnalyzingImport || isApplyingImport || !canGoNextImport} className="min-w-[120px]">
+                    Next
+                    <Icon name="caret-right" className="h-4 w-4 ml-1" />
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={handleImportNext} disabled={isAnalyzingImport || isApplyingImport || !importFile || !starshipId || !importAnalysis} className="min-w-[140px]">
+                    {isApplyingImport ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                        Uploading…
+                      </>
+                    ) : (
+                      <>
+                        Upload
+                        <Icon name="upload" className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

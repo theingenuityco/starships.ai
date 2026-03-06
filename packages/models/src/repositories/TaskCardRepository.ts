@@ -2,6 +2,7 @@ import type { TaskCardModel } from '@starships/protocol';
 import { TaskCardEntity } from '@/entities/TaskCardEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
+import type { PostgresConnection } from '@/helpers/database';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -9,8 +10,8 @@ function toFiniteNumber(value: unknown, fallback: number): number {
 }
 
 export class TaskCardRepository extends BaseRepository {
-  constructor() {
-    super('TaskCardRepository');
+  constructor(connection?: PostgresConnection) {
+    super('TaskCardRepository', connection);
   }
 
   async findById(id: string): Promise<TaskCardModel | null> {
@@ -45,9 +46,10 @@ export class TaskCardRepository extends BaseRepository {
 
   private async computeNextPosInColumn(columnId: string): Promise<number> {
     const connection = this.getConnection();
-    const row = await connection.queryOne<{ max: number | null }>(`SELECT COALESCE(MAX(pos), 0) AS max FROM task_cards WHERE column_id = $1`, [
-      columnId,
-    ]);
+    const row = await connection.queryOne<{ max: number | null }>(
+      `SELECT COALESCE(MAX(pos), 0) AS max FROM task_cards WHERE column_id = $1`,
+      [columnId]
+    );
     return toFiniteNumber(row?.max, 0) + 1;
   }
 
@@ -114,7 +116,8 @@ export class TaskCardRepository extends BaseRepository {
   async move(id: string, move: { toColumnId: string; toPos?: number }): Promise<TaskCardModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const pos = typeof move.toPos === 'number' && Number.isFinite(move.toPos) ? move.toPos : await this.computeNextPosInColumn(move.toColumnId);
+        const pos =
+          typeof move.toPos === 'number' && Number.isFinite(move.toPos) ? move.toPos : await this.computeNextPosInColumn(move.toColumnId);
         return await this.update(id, { columnId: move.toColumnId, pos });
       },
       'move',
@@ -140,4 +143,3 @@ export class TaskCardRepository extends BaseRepository {
 }
 
 export default TaskCardRepository;
-

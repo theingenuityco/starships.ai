@@ -2,6 +2,7 @@ import type { TaskColumnModel } from '@starships/protocol';
 import { TaskColumnEntity } from '@/entities/TaskColumnEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
+import type { PostgresConnection } from '@/helpers/database';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -9,8 +10,8 @@ function toFiniteNumber(value: unknown, fallback: number): number {
 }
 
 export class TaskColumnRepository extends BaseRepository {
-  constructor() {
-    super('TaskColumnRepository');
+  constructor(connection?: PostgresConnection) {
+    super('TaskColumnRepository', connection);
   }
 
   async findById(id: string): Promise<TaskColumnModel | null> {
@@ -93,13 +94,20 @@ export class TaskColumnRepository extends BaseRepository {
 
   private async computeNextPos(boardId: string): Promise<number> {
     const connection = this.getConnection();
-    const row = await connection.queryOne<{ max: number | null }>(`SELECT COALESCE(MAX(pos), 0) AS max FROM task_columns WHERE board_id = $1`, [
-      boardId,
-    ]);
+    const row = await connection.queryOne<{ max: number | null }>(
+      `SELECT COALESCE(MAX(pos), 0) AS max FROM task_columns WHERE board_id = $1`,
+      [boardId]
+    );
     return toFiniteNumber(row?.max, 0) + 1;
   }
 
-  async create(data: { boardId: string; title: string; key?: string | null; pos?: number; wipLimit?: number | null }): Promise<TaskColumnModel> {
+  async create(data: {
+    boardId: string;
+    title: string;
+    key?: string | null;
+    pos?: number;
+    wipLimit?: number | null;
+  }): Promise<TaskColumnModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -159,4 +167,3 @@ export class TaskColumnRepository extends BaseRepository {
 }
 
 export default TaskColumnRepository;
-

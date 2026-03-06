@@ -3,6 +3,7 @@ import { BaseRepository } from './BaseRepository';
 import { StarshipDatasetRowEntity } from '@/entities/StarshipDatasetRowEntity';
 import { fromDatabaseArray } from '@/helpers/serialization-helper';
 import { nanoid } from 'nanoid';
+import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = Record<string, unknown>;
 
@@ -13,17 +14,18 @@ function toFiniteInt(value: unknown, fallback: number): number {
 }
 
 export class StarshipDatasetRowRepository extends BaseRepository {
-  constructor() {
-    super('StarshipDatasetRowRepository');
+  constructor(connection?: PostgresConnection) {
+    super('StarshipDatasetRowRepository', connection);
   }
 
   async countByDataset(datasetId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const row = await connection.queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM starship_dataset_rows WHERE dataset_id = $1', [
-          datasetId,
-        ]);
+        const row = await connection.queryOne<{ count: string }>(
+          'SELECT COUNT(*)::text AS count FROM starship_dataset_rows WHERE dataset_id = $1',
+          [datasetId]
+        );
         return toFiniteInt(row?.count, 0);
       },
       'countByDataset',
@@ -32,7 +34,10 @@ export class StarshipDatasetRowRepository extends BaseRepository {
     );
   }
 
-  async listByDataset(datasetId: string, opts?: { limit?: number; offset?: number; order?: 'asc' | 'desc' }): Promise<StarshipDatasetRowModel[]> {
+  async listByDataset(
+    datasetId: string,
+    opts?: { limit?: number; offset?: number; order?: 'asc' | 'desc' }
+  ): Promise<StarshipDatasetRowModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const limit = typeof opts?.limit === 'number' ? Math.max(0, Math.min(200, Math.floor(opts.limit))) : 50;
@@ -64,7 +69,10 @@ export class StarshipDatasetRowRepository extends BaseRepository {
     );
   }
 
-  async appendMany(datasetId: string, rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }>): Promise<{ inserted: number }> {
+  async appendMany(
+    datasetId: string,
+    rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }>
+  ): Promise<{ inserted: number }> {
     return this.executeWithErrorHandling(
       async () => {
         const safe = Array.isArray(rows) ? rows : [];
@@ -153,4 +161,3 @@ export class StarshipDatasetRowRepository extends BaseRepository {
 }
 
 export default StarshipDatasetRowRepository;
-

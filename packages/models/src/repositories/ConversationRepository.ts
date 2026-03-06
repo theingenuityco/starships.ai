@@ -5,10 +5,11 @@ import { AgentEntity } from '../entities/AgentEntity';
 import { ConversationEntity } from '../entities/ConversationEntity';
 import { MessageEntity } from '../entities/MessageEntity';
 import { StarshipEntity } from '../entities/StarshipEntity';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class ConversationRepository extends BaseRepository {
-  constructor() {
-    super('ConversationRepository');
+  constructor(connection?: PostgresConnection) {
+    super('ConversationRepository', connection);
   }
 
   async findAll(): Promise<ConversationModel[]> {

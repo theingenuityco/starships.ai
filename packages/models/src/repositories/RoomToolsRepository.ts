@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import type { RoomToolAssignment } from '@starships/protocol';
+import type { PostgresConnection } from '@/helpers/database';
 
 type RoomToolPermission = 'allow' | 'ask' | 'deny';
 
@@ -25,8 +26,8 @@ function fromDb(r: DbRow): RoomToolAssignment {
 }
 
 export class RoomToolsRepository extends BaseRepository {
-  constructor() {
-    super('RoomToolsRepository');
+  constructor(connection?: PostgresConnection) {
+    super('RoomToolsRepository', connection);
   }
 
   async list(roomConversationId: string): Promise<RoomToolAssignment[]> {

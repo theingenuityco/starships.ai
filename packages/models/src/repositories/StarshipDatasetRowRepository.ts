@@ -3,6 +3,7 @@ import { BaseRepository } from './BaseRepository';
 import { StarshipDatasetRowEntity } from '@/entities/StarshipDatasetRowEntity';
 import { fromDatabaseArray } from '@/helpers/serialization-helper';
 import { nanoid } from 'nanoid';
+import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = Record<string, unknown>;
 
@@ -13,8 +14,8 @@ function toFiniteInt(value: unknown, fallback: number): number {
 }
 
 export class StarshipDatasetRowRepository extends BaseRepository {
-  constructor() {
-    super('StarshipDatasetRowRepository');
+  constructor(connection?: PostgresConnection) {
+    super('StarshipDatasetRowRepository', connection);
   }
 
   async countByDataset(datasetId: string): Promise<number> {

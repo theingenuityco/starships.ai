@@ -22,6 +22,7 @@ import {
   type ViewWidgetRow,
 } from '@/utils/viewRootWidgets';
 import type { PoolClient } from 'pg';
+import type { PostgresConnection } from '@/helpers/database';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -82,8 +83,8 @@ function normalizeRoot(input: unknown, opts?: { maxDepth?: number; maxNodes?: nu
 }
 
 export class ViewRepository extends BaseRepository {
-  constructor() {
-    super('ViewRepository');
+  constructor(connection?: PostgresConnection) {
+    super('ViewRepository', connection);
   }
 
   /**

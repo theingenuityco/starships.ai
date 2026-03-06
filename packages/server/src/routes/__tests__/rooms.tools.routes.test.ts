@@ -42,21 +42,19 @@ describe('rooms tool assignment routes', () => {
     expect(deleteLayer.route.stack).toHaveLength(3);
   });
 
-  it('defaults permission when assigning a room tool', async () => {
+  it('rejects invalid permission values when assigning a room tool', async () => {
     const postLayer = getRouteLayer('/rooms/:roomId/tools', 'post');
     const handler = postLayer.route.stack[postLayer.route.stack.length - 1].handle as (req: Request, res: Response) => Promise<void>;
     const res = createMockRes();
     const req = {
       user: { id: 'user_1234567' },
       params: { roomId: 'room_1234567' },
-      body: { toolId: 'tool_1234567' },
+      body: { toolId: 'tool_1234567', permission: 'banana' },
     } as unknown as Request;
 
     await handler(req, res as unknown as Response);
 
-    // This route should now fail later (access checks / DB), but must not reject the body
-    // solely because permission was omitted.
-    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 });
 

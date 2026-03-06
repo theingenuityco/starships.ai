@@ -40,7 +40,7 @@ export class ChannelEntity implements ChannelModel {
   @IsString()
   @IsIn(['chat'])
   @Exclude({ toPlainOnly: true })
-  channelType: 'chat' = 'chat';
+  channelType = 'chat' as const;
 
   @Expose()
   @IsOptional()

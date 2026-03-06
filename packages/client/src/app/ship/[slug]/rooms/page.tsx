@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { toast } from 'sonner'
 
 import Icon from '@/components/primitives/Icon'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
@@ -13,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { getCurrentToken } from '@/lib/api'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -37,6 +40,12 @@ function toRoomSlug(input: string): string {
 
   if (normalized.length <= ROOM_SLUG_MAX) return normalized
   return normalized.slice(0, ROOM_SLUG_MAX).replace(/-+$/g, '')
+}
+
+function safeFilenameSegment(input: string): string {
+  const raw = String(input || '').trim()
+  const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '')
+  return sanitized.length > 0 ? sanitized : 'export'
 }
 
 export default function RoomsIndexPage(): React.JSX.Element {
@@ -96,6 +105,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
     editNameLength <= ROOM_NAME_MAX
 
   const [deleteRoomTarget, setDeleteRoomTarget] = useState<RoomModel | null>(null)
+  const [exportingRoomId, setExportingRoomId] = useState<string | null>(null)
 
   const openEdit = (r: RoomModel) => {
     setEditRoomTarget(r)
@@ -185,6 +195,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
               {sorted.map((r) => {
                 const roomSlug = String(r.slug || '').trim()
                 const href = roomSlug ? `/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(roomSlug)}` : null
+                const isExporting = exportingRoomId === String(r.conversationId)
                 return (
                   <Card key={String(r.conversationId)} className={cn('border-border/60 hover:shadow-sm transition-shadow')}>
                     <CardHeader className="pb-4">
@@ -210,6 +221,52 @@ export default function RoomsIndexPage(): React.JSX.Element {
                       <div className="flex items-center gap-2">
                         {canManageRooms ? (
                           <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isExporting}
+                              onClick={async () => {
+                                const roomId = String(r.conversationId || '').trim()
+                                if (!roomId) return
+                                setExportingRoomId(roomId)
+                                try {
+                                  const token = await getCurrentToken()
+                                  const res = await fetch(`/api/v1/rooms/${encodeURIComponent(roomId)}/export-bundle`, {
+                                    method: 'GET',
+                                    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+                                  })
+
+                                  if (!res.ok) {
+                                    throw new Error(`Export failed (${res.status})`)
+                                  }
+
+                                  const blob = await res.blob()
+                                  const contentDisposition = res.headers.get('content-disposition') || ''
+                                  const filenameMatch = /filename\*?=(?:UTF-8''|")?([^\";]+)"?/i.exec(contentDisposition)
+                                  const fallbackName = `${safeFilenameSegment(`room-bundle-${roomSlug || roomId}`)}.zip`
+                                  const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : fallbackName
+
+                                  const url = window.URL.createObjectURL(blob)
+                                  const link = document.createElement('a')
+                                  link.href = url
+                                  link.download = filename
+                                  document.body.appendChild(link)
+                                  link.click()
+                                  link.remove()
+                                  window.setTimeout(() => window.URL.revokeObjectURL(url), 1500)
+
+                                  toast.success('Export ready', { description: `Downloaded ${filename}` })
+                                } catch (error) {
+                                  toast.error('Export failed', { description: getSafeErrorMessage(error) })
+                                } finally {
+                                  setExportingRoomId(prev => (prev === roomId ? null : prev))
+                                }
+                              }}
+                            >
+                              <Icon name="download" className="h-4 w-4 mr-1.5" />
+                              {isExporting ? 'Exporting…' : 'Export'}
+                            </Button>
                             <Button type="button" variant="outline" size="sm" onClick={() => openEdit(r)}>
                               <Icon name="edit" className="h-4 w-4 mr-1.5" />
                               Edit

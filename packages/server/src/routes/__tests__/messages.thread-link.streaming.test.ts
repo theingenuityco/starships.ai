@@ -161,20 +161,8 @@ describe('PUT /messages/:messageId streaming', () => {
         },
       });
 
-      expect(mergeStateMock).toHaveBeenCalledTimes(1);
-      expect(mergeStateMock).toHaveBeenCalledWith(
-        childConversationId,
-        expect.objectContaining({
-          threadContext: expect.objectContaining({
-            sourceConversationId: parentConversationId,
-            sourceMessageId: messageId,
-            sourceRole: 'user',
-            sourceUserName: 'User A',
-            sourceAttachmentIds: ['att_1234567'],
-            sourceContent: 'hello',
-          }),
-        })
-      );
+      // We intentionally do NOT persist the parent message content into the child conversation state.
+      expect(mergeStateMock).toHaveBeenCalledTimes(0);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

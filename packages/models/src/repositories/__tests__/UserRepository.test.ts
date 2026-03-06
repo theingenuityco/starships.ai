@@ -151,7 +151,13 @@ describe('UserRepository', () => {
 
       const result = await repository.create(userData);
 
-      expect(UserEntity.validate).toHaveBeenCalledWith(userData, 'create');
+      expect(UserEntity.validate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...userData,
+          slug: expect.any(String),
+        }),
+        'create'
+      );
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).toEqual(
         expect.objectContaining({
@@ -181,7 +187,13 @@ describe('UserRepository', () => {
 
       const result = await repository.create(userData);
 
-      expect(UserEntity.validate).toHaveBeenCalledWith(userData, 'create');
+      expect(UserEntity.validate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...userData,
+          slug: expect.any(String),
+        }),
+        'create'
+      );
       expect(result.email).toBe('updated@example.com');
       expect(result.displayName).toBe('Updated Name');
     });

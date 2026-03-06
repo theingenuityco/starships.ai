@@ -129,6 +129,13 @@ export class TaskBoardService {
     return this.boards.archive(boardId);
   }
 
+  /**
+   * Permanently delete a board. This will cascade-delete columns/cards in the DB.
+   */
+  async deleteBoard(boardId: string): Promise<boolean> {
+    return this.boards.delete(boardId);
+  }
+
   async createColumn(req: CreateTaskColumnRequest): Promise<TaskColumnModel> {
     const title = String(req.title || '').trim();
     if (!title) throw new ValidationError('Column title is required', 'title');
@@ -274,14 +281,14 @@ export class TaskBoardService {
     const raw = String(input || '').trim();
     if (!raw) return null;
 
-    // Accept mention token form: <@u:USER_ID>
-    const m = raw.match(/^<@u:([^>]+)>$/i);
+    // Accept mention token form: <@u:USER_SLUG>
+    const m = raw.match(/^<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>$/i);
     const unwrapped = m ? String(m[1] || '').trim() : raw;
 
-    // Accept both `u:ID` and `u-ID`
+    // Accept both `u:<slug>` and `u-<slug>`
     const s = unwrapped.startsWith('u:') ? unwrapped.slice(2) : unwrapped.toLowerCase().startsWith('u-') ? unwrapped.slice(2) : unwrapped;
-    const id = String(s || '').trim();
-    return id.length > 0 ? id : null;
+    const slug = String(s || '').trim();
+    return slug.length > 0 ? slug : null;
   }
 
   private async resolveAssigneeForBoard(
@@ -308,9 +315,32 @@ export class TaskBoardService {
         return { assigneeAgentId: agent.id, assigneeUserId: null };
       }
       if (type === 'user') {
-        const userId = this.parseUserSlugToId(slug);
-        if (!userId) throw new ValidationError('Invalid user assignee slug', 'assignee', { type, slug });
-        const ok = await this.starshipMembers.isMember(userId, starshipId);
+        const userSlug = this.parseUserSlugToId(slug);
+        if (!userSlug) throw new ValidationError('Invalid user assignee slug', 'assignee', { type, slug });
+
+        const conn = getConnection();
+        const ownerRow = await conn.queryOne<{ owner_id: string }>(`SELECT owner_id FROM starships WHERE id = $1`, [starshipId]).catch(() => null);
+        const ownerId = typeof ownerRow?.owner_id === 'string' ? String(ownerRow.owner_id).trim() : '';
+
+        const row = await conn
+          .queryOne<{ id: string }>(
+            `
+            SELECT u.id
+              FROM users u
+             WHERE u.slug = $2
+               AND (
+                 u.id = (SELECT owner_id FROM starships WHERE id = $1)
+                 OR EXISTS (SELECT 1 FROM starship_members sm WHERE sm.starship_id = $1 AND sm.user_id = u.id)
+               )
+             LIMIT 1
+            `,
+            [starshipId, userSlug]
+          )
+          .catch(() => null);
+        const userId = typeof row?.id === 'string' ? String(row.id).trim() : '';
+        if (!userId) throw new ValidationError('Assignee user not found', 'assignee', { type, slug });
+
+        const ok = Boolean(ownerId && userId === ownerId) || (await this.starshipMembers.isMember(userId, starshipId).catch(() => false));
         if (!ok) throw new ValidationError('Assignee user is not a member of this starship', 'assignee', { type, slug });
         return { assigneeAgentId: null, assigneeUserId: userId };
       }

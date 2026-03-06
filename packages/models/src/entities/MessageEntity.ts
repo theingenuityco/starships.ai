@@ -142,6 +142,15 @@ export class MessageEntity implements MessageModel {
   attachmentIds?: string[];
 
   /**
+   * Optional message metadata stored as JSONB in Postgres.
+   * Used for internal flags (e.g. hidden seed messages) and future extensibility.
+   */
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+
+  /**
    * Emoji reactions keyed by emoji (value is ordered userId list).
    *
    * NOTE: This is derived (joined/aggregated) at query time and is NOT written directly

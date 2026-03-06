@@ -102,6 +102,36 @@ export function useUpdateDataset(starshipId: string, datasetId: string) {
   })
 }
 
+export function useArchiveDataset(starshipId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (datasetIdOrSlug: string): Promise<StarshipDatasetModel> => {
+      const id = encodeURIComponent(String(datasetIdOrSlug || '').trim())
+      const response: FetchResponse<ApiResponse<StarshipDatasetDetailsResponse>> = await api.post(
+        `/api/v1/starships/${starshipId}/datasets/${id}/archive`,
+        {}
+      )
+      return response.data.data.dataset
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DATASET_QUERY_KEYS.byStarship(starshipId) })
+    },
+  })
+}
+
+export function useHardDeleteDataset(starshipId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (datasetIdOrSlug: string): Promise<void> => {
+      const id = encodeURIComponent(String(datasetIdOrSlug || '').trim())
+      await api.delete(`/api/v1/starships/${starshipId}/datasets/${id}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DATASET_QUERY_KEYS.byStarship(starshipId) })
+    },
+  })
+}
+
 export function useUpsertDatasetRows(starshipId: string, datasetId: string) {
   const queryClient = useQueryClient()
   return useMutation({

@@ -101,6 +101,17 @@ export class UserEntity implements UserModel {
   @Length(1, 255)
   id!: string;
 
+  /**
+   * Stable, human-readable handle (used by @mentions).
+   */
+  @Expose()
+  @IsString()
+  @Length(1, 100)
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+    message: 'Slug must be lower-case and contain only a-z0-9 and hyphens',
+  })
+  slug!: string;
+
   @Expose()
   @IsISO8601()
   createdAt!: string;
@@ -204,6 +215,7 @@ export class UserEntity implements UserModel {
     if (operation === 'create') {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        slug: dataRecord.slug || 'temp-user', // Repository/backfill code replaces this before persistence
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         email: dataRecord.email,
         displayName: dataRecord.displayName,

@@ -3,12 +3,28 @@ import type { EngineConfig } from '@starships/autopilot';
 import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
 import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
 
-export function buildAutopilotRuntimeEnv(args: { starshipId: string; conversationId: string; agentId: string }): Record<string, unknown> {
+export function buildAutopilotRuntimeEnv(args: {
+  starshipId: string;
+  conversationId: string;
+  /** Room id for room conversations + room threads; absent outside rooms. */
+  roomId?: string;
+  /** Authenticated user id for provider-side attribution (opaque, stable). */
+  authUserId?: string;
+  agentId: string;
+  /**
+   * Optional id of the assistant message that contains the currently executing tool call.
+   * This is resolved server-side per toolCallId and is safe to treat as per-tool-call context.
+   */
+  toolCallMessageId?: string;
+}): Record<string, unknown> {
   const env = getEnvConfig();
   return {
     STARSHIP_ID: args.starshipId,
     CONVERSATION_ID: args.conversationId,
+    ...(args.roomId ? { ROOM_ID: args.roomId } : {}),
+    ...(typeof args.authUserId === 'string' && args.authUserId.trim().length > 0 ? { AUTH_USER_ID: args.authUserId.trim() } : {}),
     AGENT_ID: args.agentId,
+    ...(args.toolCallMessageId ? { TOOL_CALL_MESSAGE_ID: args.toolCallMessageId } : {}),
     SERVER_URL: env.SERVER_URL,
   };
 }
@@ -42,16 +58,6 @@ export interface AutopilotRunnerExecuteConfig extends EngineConfig {
     baseUrl?: string;
   };
   /**
-   * Optional web-unlocking gateway configuration used by runner HostRuntime.http.
-   *
-   * This is injected by the embedding host so the runner does not need these
-   * credentials in its own environment.
-   */
-  webUnlocker?: {
-    apiKey: string;
-    zone: string;
-  };
-  /**
    * AWS runtime configuration for Bedrock.
    */
   aws: {
@@ -81,6 +87,15 @@ export async function buildAutopilotExecutionBundle(args: {
   engineConfig: AutopilotRunnerExecuteConfig;
 }> {
   const env = getEnvConfig();
+  // Ensure provider-side end-user attribution is always available to the runner/LLM node.
+  // This should be an opaque internal id (no direct PII).
+  try {
+    if (typeof args.authUserId === 'string' && args.authUserId.trim().length > 0) {
+      args.runtimeEnv = { ...args.runtimeEnv, AUTH_USER_ID: args.authUserId.trim() };
+    }
+  } catch {
+    // best-effort only
+  }
 
   const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
   const { connectorTemplates, connectorSessions, connectorMetadata } = await sessionSvc.build(args.starshipId, args.authUserId);
@@ -110,14 +125,6 @@ export async function buildAutopilotExecutionBundle(args: {
       }
     : undefined;
 
-  const webUnlocker =
-    env.BRIGHTDATA_API_KEY && env.BRIGHTDATA_ZONE
-      ? {
-          apiKey: env.BRIGHTDATA_API_KEY,
-          zone: env.BRIGHTDATA_ZONE,
-        }
-      : undefined;
-
   const aws = {
     accessKeyId: process.env.AWS_BEDROCK_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_BEDROCK_SECRET_ACCESS_KEY,
@@ -139,7 +146,6 @@ export async function buildAutopilotExecutionBundle(args: {
     connectorSessions: connectorSessions as Record<string, ConnectorSession | undefined>,
     connectorMetadata: connectorMetadata as Record<string, Record<string, unknown> | undefined>,
     llm,
-    webUnlocker,
     aws,
     azureAiFoundry,
     modelRoutes,

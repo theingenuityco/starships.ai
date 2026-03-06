@@ -3,8 +3,9 @@
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
-import { RoomThreadIndexView } from '@/components/rooms/RoomThreadIndexView'
+import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
+import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -12,8 +13,8 @@ import { useMarkConversationRead } from '@/hooks/useNotifications'
 import {
   usePinRoomDataset,
   usePinRoomTaskBoard,
-  usePinRoomTool,
   usePinRoomView,
+  useRoomTools,
   useJoinRoom,
   useRoomPins,
   useRoomParticipants,
@@ -22,29 +23,52 @@ import {
   useStarshipTaskBoards,
   useUnpinRoomDataset,
   useUnpinRoomTaskBoard,
-  useUnpinRoomTool,
   useUnpinRoomView,
+  useAssignRoomTool,
+  useUnassignRoomTool,
 } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomModel } from '@starships/protocol'
+import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipTools } from '@/hooks/useTools'
+import api from '@/lib/api'
 
 const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
 
+function sanitizeThreadTitleSnippetFromMessageContent(input: string): string {
+  const s = String(input || '')
+    .replace(/<@[^>\n]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return s
+}
+
 export default function RoomsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams<{ slug: string; roomSlug?: string; threadId?: string }>()
+  const params = useParams<{ slug: string; roomSlug?: string; conversationId?: string; threadId?: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuthContext()
 
+  const [conversationAgent, setConversationAgent] = useState<AgentModel | null>(null)
+  const [conversationDraftParentConversationId, setConversationDraftParentConversationId] = useState<string | null>(null)
+  const [conversationDraftTitle, setConversationDraftTitle] = useState<string | null>(null)
+
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
+  const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
+  const lastThreadConversationKeyRef = useRef<string | null>(null)
+  const pendingThreadStateRef = useRef<{
+    threadKey: string | null
+    threadAgent: AgentModel | null
+    pinnedFirstMessage: MessageModel | null
+    draftParentConversationId: string | null
+    draftTitle: string | null
+  } | null>(null)
 
   // Desktop side pane width (draggable resizer) - match Channels thread pane behavior
   const [resourcesPaneWidthPx, setResourcesPaneWidthPx] = useState<number>(() => {
@@ -186,9 +210,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     () => ({
       slug: params.slug as string,
       roomSlug: params.roomSlug as string | undefined,
-      threadId: params.threadId,
+      conversationId: params.conversationId as string | undefined,
+      threadId: params.threadId as string | undefined,
     }),
-    [params.slug, params.roomSlug, params.threadId]
+    [params.slug, params.roomSlug, params.conversationId, params.threadId]
   )
   const isRoomsIndexRoute = useMemo(() => {
     const raw = typeof routeParams.roomSlug === 'string' ? routeParams.roomSlug : ''
@@ -238,12 +263,11 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [routeParams.threadId])
 
-  // Back-compat: support old `?thread=` URLs by navigating to the new route.
-  const legacyThreadKey = useMemo(() => {
-    const raw = searchParams.get('thread')
-    const v = typeof raw === 'string' ? raw.trim() : ''
+  const routeConversationKey = useMemo(() => {
+    const raw = typeof routeParams.conversationId === 'string' ? routeParams.conversationId : ''
+    const v = String(raw || '').trim()
     return v.length > 0 ? v : null
-  }, [searchParams])
+  }, [routeParams.conversationId])
 
   const viewKey = useMemo(() => {
     const raw = searchParams.get('view')
@@ -257,7 +281,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
   const isResourcesPaneOpen = roomPaneKey === 'resources'
-  const paneKind = (isResourcesPaneOpen ? 'resources' : null) as 'resources' | null
+  const threadKey = routeThreadKey
+  const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : null) as 'thread' | 'resources' | null
   const isSidePaneOpen = Boolean(paneKind)
   const PANE_ANIM_MS = 300
   const PANE_OPEN_CONTENT_DELAY_MS = 120
@@ -279,7 +304,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return () => window.clearTimeout(t)
   }, [isSidePaneOpen])
 
-  const threadKey = routeThreadKey
+  const conversationKey = routeConversationKey
+  const isDraftConversationOpen = conversationKey === 'draft'
+  const conversationConversationId = useMemo(() => {
+    if (!conversationKey) return null
+    if (conversationKey === 'draft') return null
+    return conversationKey
+  }, [conversationKey])
+
   const isDraftThreadOpen = threadKey === 'draft'
   const threadConversationId = useMemo(() => {
     if (!threadKey) return null
@@ -293,16 +325,31 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
   }, [routeParams.roomSlug, routeParams.slug])
 
-  const setThreadKeyInUrl = useCallback(
-    (nextThreadKey: string | null) => {
-      if (nextThreadKey) {
-        router.push(`${roomBasePath}/thread/${encodeURIComponent(String(nextThreadKey))}`)
+  const setConversationKeyInUrl = useCallback(
+    (nextConversationKey: string | null) => {
+      // Only preserve room-relevant query params; pane/thread/view are mutually exclusive UI states.
+      const qs = ''
+      if (nextConversationKey) {
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(String(nextConversationKey))}${qs ? `?${qs}` : ''}`)
         return
       }
-      // Clear thread route entirely.
-      router.push(roomBasePath)
+      router.push(`${roomBasePath}${qs ? `?${qs}` : ''}`)
     },
     [router, roomBasePath]
+  )
+
+  const setThreadKeyInUrl = useCallback(
+    (nextThreadKey: string | null) => {
+      const parentConversationId = typeof conversationConversationId === 'string' ? conversationConversationId.trim() : ''
+      if (!parentConversationId) return
+      const qs = ''
+      if (nextThreadKey) {
+        router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}/thread/${encodeURIComponent(String(nextThreadKey))}${qs ? `?${qs}` : ''}`)
+        return
+      }
+      router.push(`${roomBasePath}/conversation/${encodeURIComponent(parentConversationId)}${qs ? `?${qs}` : ''}`)
+    },
+    [conversationConversationId, router, roomBasePath]
   )
 
   const setViewKeyInUrl = useCallback(
@@ -311,13 +358,11 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       if (nextViewKey) next.set('view', nextViewKey)
       else next.delete('view')
       next.delete('pane')
-      next.delete('thread')
       const qs = next.toString()
-      const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
+      const basePath = conversationConversationId ? `${roomBasePath}/conversation/${encodeURIComponent(String(conversationConversationId))}` : roomBasePath
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
-    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+    [conversationConversationId, roomBasePath, router, searchParams]
   )
 
   const setRoomPaneInUrl = useCallback(
@@ -326,31 +371,87 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       if (nextPaneKey) next.set('pane', nextPaneKey)
       else next.delete('pane')
       next.delete('view')
-      next.delete('thread')
       const qs = next.toString()
-      const basePath =
-        routeParams.roomSlug && String(routeParams.roomSlug).trim() ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(String(routeParams.roomSlug))}` : `/ship/${routeParams.slug}/rooms`
+      // Preserve the open conversation, but always close nested threads when switching panes.
+      const basePath = conversationConversationId ? `${roomBasePath}/conversation/${encodeURIComponent(String(conversationConversationId))}` : roomBasePath
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
-    [router, routeParams.roomSlug, routeParams.slug, searchParams]
+    [conversationConversationId, roomBasePath, router, searchParams]
   )
 
+  // Default parent for draft conversations is the active room conversation id.
   useEffect(() => {
-    if (!legacyThreadKey) return
-    if (routeThreadKey) return
-    if (!routeParams.roomSlug || !String(routeParams.roomSlug).trim()) return
-    router.replace(`${roomBasePath}/thread/${encodeURIComponent(String(legacyThreadKey))}`)
-  }, [legacyThreadKey, roomBasePath, routeParams.roomSlug, routeThreadKey, router])
+    if (!isDraftConversationOpen) return
+    if (conversationDraftParentConversationId) return
+    const parent = typeof activeConversationId === 'string' ? activeConversationId.trim() : ''
+    if (!parent) return
+    setConversationDraftParentConversationId(parent)
+    setConversationDraftTitle('New conversation')
+  }, [activeConversationId, conversationDraftParentConversationId, isDraftConversationOpen])
 
-  // Default parent for draft threads is the active room conversation id.
   useEffect(() => {
+    // When opening a draft thread via URL, default its parent to the current conversation.
     if (!isDraftThreadOpen) return
     if (threadDraftParentConversationId) return
-    const parent = typeof activeConversationId === 'string' ? activeConversationId.trim() : ''
+    const parent = typeof conversationConversationId === 'string' ? conversationConversationId.trim() : ''
     if (!parent) return
     setThreadDraftParentConversationId(parent)
     setThreadDraftTitle('New thread')
-  }, [activeConversationId, isDraftThreadOpen, threadDraftParentConversationId])
+  }, [conversationConversationId, isDraftThreadOpen, threadDraftParentConversationId])
+
+  useEffect(() => {
+    // If thread key changes via back/forward / manual URL edits, restore or clear ephemeral thread state.
+    const prev = lastThreadConversationKeyRef.current
+    if (prev !== threadKey) {
+      lastThreadConversationKeyRef.current = threadKey
+      const pending = pendingThreadStateRef.current
+      if (pending && pending.threadKey === threadKey) {
+        pendingThreadStateRef.current = null
+        setThreadPinnedFirstMessage(pending.pinnedFirstMessage)
+        setThreadAgent(pending.threadAgent)
+        setThreadDraftParentConversationId(pending.draftParentConversationId)
+        setThreadDraftTitle(pending.draftTitle)
+      } else {
+        setThreadPinnedFirstMessage(null)
+        setThreadAgent(null)
+        setThreadDraftParentConversationId(null)
+        setThreadDraftTitle(null)
+      }
+    }
+  }, [threadKey])
+
+  useEffect(() => {
+    // Refresh-safe pin hydration for nested threads:
+    // derive pinned first message by asking the parent conversation for the linking message.
+    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
+    if (!threadId) return
+    if (isDraftThreadOpen) return
+    if (threadPinnedFirstMessage) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
+        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
+        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
+        if (!parentId) return
+
+        const pinnedResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/linked-message`, {
+          params: { linkedConversationId: threadId },
+        })
+        const payload = (pinnedResp as any)?.data?.data ?? (pinnedResp as any)?.data ?? null
+        const pinned = (payload as any)?.message ?? null
+        if (cancelled) return
+        if (pinned) setThreadPinnedFirstMessage(pinned as any)
+      } catch {
+        // ignore (best-effort hydration)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isDraftThreadOpen, threadConversationId, threadPinnedFirstMessage])
 
   // If slug is present but doesn't match a room, show a not-found UI (hard cutover; no redirects).
   const isInvalidRoomSlug = Boolean(routeParams.roomSlug && !roomsLoading && !activeRoom)
@@ -361,6 +462,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const roomParticipants = useRoomParticipants(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
 
   const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
+  const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: datasets = [] } = useStarshipDatasets(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -372,14 +474,27 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return Boolean(uid && ownerId && String(uid) === String(ownerId))
   }, [starshipData, user?.id])
 
+  const starshipOwnerId = useMemo(() => {
+    const ownerId = (starshipData as any)?.ownerId
+    return typeof ownerId === 'string' && ownerId.trim() ? ownerId.trim() : null
+  }, [starshipData])
+
+  const hasAnyResources = useMemo(() => {
+    const v = pinsData?.views?.length ?? 0
+    const d = pinsData?.datasets?.length ?? 0
+    const b = pinsData?.taskBoards?.length ?? 0
+    const t = roomToolsData?.items?.length ?? 0
+    return v + d + b + t > 0
+  }, [pinsData?.datasets?.length, pinsData?.taskBoards?.length, pinsData?.views?.length, roomToolsData?.items?.length])
+
   const pinView = usePinRoomView(activeConversationId || '', starshipData?.id ?? '')
   const unpinView = useUnpinRoomView(activeConversationId || '')
   const pinDataset = usePinRoomDataset(activeConversationId || '')
   const unpinDataset = useUnpinRoomDataset(activeConversationId || '')
   const pinBoard = usePinRoomTaskBoard(activeConversationId || '')
   const unpinBoard = useUnpinRoomTaskBoard(activeConversationId || '')
-  const pinTool = usePinRoomTool(activeConversationId || '')
-  const unpinTool = useUnpinRoomTool(activeConversationId || '')
+  const assignTool = useAssignRoomTool(activeConversationId || '')
+  const unassignTool = useUnassignRoomTool(activeConversationId || '')
 
   const viewLabelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -471,18 +586,48 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const handleThreadCreated = useCallback(
     (cid: string) => {
-      setThreadDraftParentConversationId(null)
-      setThreadDraftTitle(null)
-      setThreadKeyInUrl(String(cid))
+      // Persist pinned message across draft -> real thread transition.
+      const nextThreadKey = String(cid)
+      pendingThreadStateRef.current = {
+        threadKey: nextThreadKey,
+        threadAgent: threadAgent ?? null,
+        pinnedFirstMessage: threadPinnedFirstMessage ?? null,
+        draftParentConversationId: null,
+        draftTitle: null,
+      }
+      setThreadKeyInUrl(nextThreadKey)
     },
-    [setThreadKeyInUrl]
+    [setThreadKeyInUrl, threadAgent, threadPinnedFirstMessage]
   )
 
   const handleCloseThread = useCallback(() => {
+    setThreadPinnedFirstMessage(null)
     setThreadDraftParentConversationId(null)
     setThreadDraftTitle(null)
+    pendingThreadStateRef.current = {
+      threadKey: null,
+      threadAgent: null,
+      pinnedFirstMessage: null,
+      draftParentConversationId: null,
+      draftTitle: null,
+    }
     setThreadKeyInUrl(null)
   }, [setThreadKeyInUrl])
+
+  const handleConversationCreated = useCallback(
+    (cid: string) => {
+      setConversationDraftParentConversationId(null)
+      setConversationDraftTitle(null)
+      setConversationKeyInUrl(String(cid))
+    },
+    [setConversationKeyInUrl]
+  )
+
+  const handleCloseConversation = useCallback(() => {
+    setConversationDraftParentConversationId(null)
+    setConversationDraftTitle(null)
+    setConversationKeyInUrl(null)
+  }, [setConversationKeyInUrl])
 
   const onOpenPinnedView = useCallback(
     (viewId: string) => {
@@ -566,27 +711,65 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       }}
     >
       <div className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}>
-        {activeConversationId && threadKey ? (
+        {activeConversationId && conversationKey ? (
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
-            conversationId={threadConversationId}
+            conversationId={conversationConversationId}
             roomConversationId={activeConversationId}
-            draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-            draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-            selectedAgent={threadAgent}
-            onAgentChange={setThreadAgent}
-            onThreadCreated={handleThreadCreated}
-            onClose={handleCloseThread}
+            draftParentConversationId={isDraftConversationOpen ? conversationDraftParentConversationId : null}
+            draftTitle={isDraftConversationOpen ? conversationDraftTitle : null}
+            selectedAgent={conversationAgent}
+            onAgentChange={setConversationAgent}
+            onThreadCreated={handleConversationCreated}
+            onClose={handleCloseConversation}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
             allowedAgentIds={roomParticipants.data?.agentIds ?? []}
             contentWidth="constrained"
+            enableMessageThreads={true}
+            onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
+              const nextThreadKey = conversationId ? String(conversationId) : 'draft'
+              const nextPinned = linkedMessage ?? null
+              const nextAgent = nextThreadKey === threadKey ? (threadAgent ?? null) : null
+
+              pendingThreadStateRef.current = {
+                threadKey: nextThreadKey,
+                threadAgent: nextAgent,
+                pinnedFirstMessage: nextPinned,
+                draftParentConversationId: null,
+                draftTitle: null,
+              }
+
+              setThreadAgent(nextAgent)
+              setThreadPinnedFirstMessage(nextPinned)
+
+              if (conversationId) {
+                setThreadKeyInUrl(conversationId)
+                return
+              }
+
+              const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
+              setThreadDraftParentConversationId(parent || conversationConversationId || null)
+              const rawInput = String((linkedMessage as any)?.content ?? '')
+              const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput)
+              const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
+              const title = snippet ? snippet : 'New thread'
+              setThreadDraftTitle(title)
+              pendingThreadStateRef.current = {
+                threadKey: 'draft',
+                threadAgent: nextAgent,
+                pinnedFirstMessage: nextPinned,
+                draftParentConversationId: parent || conversationConversationId || null,
+                draftTitle: title,
+              }
+              setThreadKeyInUrl('draft')
+            }}
             titlePrefix={
               <button
                 type="button"
                 className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-                onClick={handleCloseThread}
+                onClick={handleCloseConversation}
                 aria-label="Back to room"
                 title="Back to room"
               >
@@ -601,16 +784,33 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             }
             mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
             titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+            rightSlot={
+              <div className="flex items-center gap-2">
+                <RoomParticipantsButton
+                  starshipId={starshipData.id}
+                  roomConversationId={activeConversationId}
+                  roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                  starshipOwnerId={starshipOwnerId}
+                />
+                {canManagePins || hasAnyResources ? (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
+                    <Icon name="pin" className="h-4 w-4 mr-1" />
+                    Resources
+                  </Button>
+                ) : null}
+              </div>
+            }
             hideCloseButton={true}
             className="h-full"
           />
         ) : activeConversationId ? (
-          <RoomThreadIndexView
+          <RoomConversationIndexView
             starshipId={starshipData.id}
             roomConversationId={activeConversationId}
             roomSlug={activeRoom?.slug ?? null}
             roomName={activeRoom?.name ?? null}
             roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+            starshipOwnerId={starshipOwnerId}
             starshipSlug={routeParams.slug}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
@@ -618,7 +818,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             pinnedViews={pinsData?.views ?? null}
             pinnedDatasets={pinsData?.datasets ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}
-            pinnedTools={pinsData?.tools ?? null}
+            assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
             viewLabelById={viewLabelById}
             datasetLabelById={datasetLabelById}
             taskBoardLabelById={taskBoardLabelById}
@@ -637,20 +837,23 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
             onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
             onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
-            onPinTool={toolId => pinTool.mutate({ toolId })}
-            onUnpinTool={toolId => unpinTool.mutate(toolId)}
-            onCreateDraftThread={() => {
-              setThreadKeyInUrl('draft')
+            onAssignTool={toolId => assignTool.mutate({ toolId })}
+            onUnassignTool={toolId => unassignTool.mutate(toolId)}
+            onCreateDraftConversation={() => {
+              setConversationKeyInUrl('draft')
             }}
-            onThreadConversationStarted={({ conversationId, selectedAgent }) => {
-              setThreadAgent(selectedAgent ?? null)
-              setThreadKeyInUrl(String(conversationId))
+            onConversationStarted={({ conversationId, selectedAgent }) => {
+              setConversationAgent(selectedAgent ?? null)
+              setConversationKeyInUrl(String(conversationId))
+            }}
+            onOpenConversation={(conversationId) => {
+              setConversationKeyInUrl(String(conversationId))
             }}
           />
         ) : null}
       </div>
 
-      {/* Resources split pane (desktop/tablet) - match Channels thread pane behavior */}
+      {/* Right side pane (desktop/tablet): thread or resources */}
       <>
         <div
           className={`hidden md:block h-full flex-shrink-0 ${isResizingResourcesPane ? '' : 'transition-all duration-300 ease-in-out'}`}
@@ -684,7 +887,26 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
           <div className="h-full pl-[1px]">
             {isSidePaneMounted ? (
-              paneKind === 'resources' ? (
+              paneKind === 'thread' ? (
+                <ThreadPane
+                  starshipId={starshipData.id}
+                  starshipSlug={routeParams.slug}
+                  conversationId={threadConversationId}
+                  roomConversationId={activeConversationId}
+                  pinnedFirstMessage={threadPinnedFirstMessage}
+                  draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+                  draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+                  selectedAgent={threadAgent}
+                  onAgentChange={setThreadAgent}
+                  onThreadCreated={handleThreadCreated}
+                  onClose={handleCloseThread}
+                  allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+                  allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+                  allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+                  contentWidth="constrained"
+                  className="w-full min-w-0"
+                />
+              ) : paneKind === 'resources' ? (
                 <RoomResourcesPane
                   starshipId={starshipData.id}
                   starshipSlug={routeParams.slug}
@@ -694,7 +916,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   pinnedViews={pinsData?.views ?? null}
                   pinnedDatasets={pinsData?.datasets ?? null}
                   pinnedTaskBoards={pinsData?.taskBoards ?? null}
-                  pinnedTools={pinsData?.tools ?? null}
+                  assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
                   viewLabelById={viewLabelById}
                   datasetLabelById={datasetLabelById}
                   taskBoardLabelById={taskBoardLabelById}
@@ -712,19 +934,19 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
                   onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
                   onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
-                  onPinTool={toolId => pinTool.mutate({ toolId })}
-                  onUnpinTool={toolId => unpinTool.mutate(toolId)}
+                  onAssignTool={toolId => assignTool.mutate({ toolId })}
+                  onUnassignTool={toolId => unassignTool.mutate(toolId)}
                   onClose={() => setRoomPaneInUrl(null)}
                 />
               ) : null
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
             )}
           </div>
         </aside>
       </>
 
-      {/* Resources full-screen overlay (mobile) */}
+      {/* Right side pane overlay (mobile) */}
       <aside
         className={cn('md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden', isSidePaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
         style={{
@@ -734,7 +956,26 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
         aria-hidden={!isSidePaneOpen}
       >
         {isSidePaneMounted ? (
-          paneKind === 'resources' ? (
+          paneKind === 'thread' ? (
+            <ThreadPane
+              starshipId={starshipData.id}
+              starshipSlug={routeParams.slug}
+              conversationId={threadConversationId}
+              roomConversationId={activeConversationId}
+              pinnedFirstMessage={threadPinnedFirstMessage}
+              draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+              draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
+              selectedAgent={threadAgent}
+              onAgentChange={setThreadAgent}
+              onThreadCreated={handleThreadCreated}
+              onClose={handleCloseThread}
+              allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
+              allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
+              allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+              contentWidth="constrained"
+              className="h-full w-full"
+            />
+          ) : paneKind === 'resources' ? (
             <RoomResourcesPane
               starshipId={starshipData.id}
               starshipSlug={routeParams.slug}
@@ -744,7 +985,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               pinnedViews={pinsData?.views ?? null}
               pinnedDatasets={pinsData?.datasets ?? null}
               pinnedTaskBoards={pinsData?.taskBoards ?? null}
-              pinnedTools={pinsData?.tools ?? null}
+              assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
               viewLabelById={viewLabelById}
               datasetLabelById={datasetLabelById}
               taskBoardLabelById={taskBoardLabelById}
@@ -762,13 +1003,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
               onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
               onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
-              onPinTool={toolId => pinTool.mutate({ toolId })}
-              onUnpinTool={toolId => unpinTool.mutate(toolId)}
+              onAssignTool={toolId => assignTool.mutate({ toolId })}
+              onUnassignTool={toolId => unassignTool.mutate(toolId)}
               onClose={() => setRoomPaneInUrl(null)}
             />
           ) : null
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading resources…</div>
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
         )}
       </aside>
 

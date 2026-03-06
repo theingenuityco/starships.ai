@@ -54,6 +54,7 @@ const agent = new Agent(
     runtimeEnv: {
       AGENT_ID: '<agent-id>',
       CONVERSATION_ID: '<conversation-id>',
+      // ROOM_ID: '<room-conversation-id>' (only for room conversations + room threads)
       // SERVER_URL: 'https://<your-starships-host>' (if your starships connector template uses it)
     },
   }

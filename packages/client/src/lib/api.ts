@@ -625,7 +625,7 @@ export const taskBoardAPI = {
   },
 
   archiveBoard: async (boardId: string): Promise<TaskBoardModel> => {
-    const res = await api.delete(`/api/v1/task-boards/${boardId}`)
+    const res = await api.post(`/api/v1/task-boards/${boardId}/archive`, {})
     return extractResponseData<TaskBoardModel>(res as FetchResponse<ApiResponse<TaskBoardModel>>)
   },
 

@@ -4,6 +4,7 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
 
 - **How connectors work**
   - **Connector templates** (`connector_templates` in the DB) define what connectors exist and how they behave at runtime via root runtime fields (`base_url`, `auth_json`, `endpoints_json`, etc.).
+    - Exception: the reserved **`system`** connector is **built-in (hard-coded)** and not DB-backed.
   - **Connector instances** (`connectors` in the DB) record whether a given starship has a given connector connected/disconnected, plus non-secret metadata.
   - **Secrets are split by scope**
     - **Platform secrets** (`platform_secrets`): instance-wide encrypted secrets (OAuth client IDs/secrets, bot tokens). Only instance admins can manage these.
@@ -18,6 +19,9 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
   - **Starships (internal)**
     - Use `connector_action` with `connector: "starships"` to call internal Starships API endpoints defined in the template.
     - This connector uses a platform JWT generated for the current user+starship at runtime (no stored access token).
+  - **System (reserved)**
+    - Use `connector_action` with `connector: "system"` to call platform-native actions (e.g. `webFetch`, `webSearch`).
+    - Docs: `./system.md`
 
 - **Designing connector‑aware tools**
   - Use `connector_action` with `connector` + `action`; let the runtime handle base URLs, mapping, and auth.

@@ -1,8 +1,8 @@
 import { Response } from 'express';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
-import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { sendError } from '@/utils/responseHelpers';
+import { getConnection } from '@starships/models';
 
 /**
  * Verifies that a user has collaborator access to a starship:
@@ -72,6 +72,50 @@ export async function verifyStarshipOwnerAccess(starshipId: string, userId: stri
     sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'not_owner' });
     return false;
   }
+  return true;
+}
+
+/**
+ * Verifies that a user has "admin" access to a starship for destructive operations:
+ * - owner OR
+ * - instance admin OR
+ * - starship member with role=admin
+ */
+export async function verifyStarshipAdminAccess(starshipId: string, userId: string, res: Response): Promise<boolean> {
+  const starshipService = new StarshipService();
+  const userService = new UserService();
+
+  const starship = await starshipService.getStarship(starshipId);
+  const user = await userService.getUserById(userId);
+
+  if (!starship) {
+    sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { resource: 'starship', id: starshipId });
+    return false;
+  }
+  if (!user) {
+    sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'user_not_found' });
+    return false;
+  }
+
+  if (String(starship.ownerId) === String(userId) || Boolean((user as any)?.isInstanceAdmin)) {
+    return true;
+  }
+
+  const conn = getConnection();
+  const row = await conn.queryOne<{ role: string | null }>(
+    `SELECT role
+       FROM starship_members
+      WHERE starship_id = $1
+        AND user_id = $2
+      LIMIT 1`,
+    [starshipId, userId]
+  );
+  const isAdminMember = String(row?.role || '').trim() === 'admin';
+  if (!isAdminMember) {
+    sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'not_admin' });
+    return false;
+  }
+
   return true;
 }
 

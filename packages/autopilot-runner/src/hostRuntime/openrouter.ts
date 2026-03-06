@@ -171,10 +171,27 @@ export async function invokeOpenRouter(
   const isImageRequest = (Array.isArray(modalities) && modalities.includes('image')) || hasImageInMessages;
   const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
 
+  const resolveProviderEndUserId = (): string => {
+    const raw = (request as unknown as { endUserId?: unknown }).endUserId;
+    const id = typeof raw === 'string' ? raw.trim() : '';
+    // Provider-side identifiers should be short + opaque.
+    // OpenAI docs: max length 64 for safety_identifier.
+    return id ? id.slice(0, 64) : '';
+  };
+  const endUserId = resolveProviderEndUserId();
+
   const baseRequest: Record<string, unknown> = {
     model: providerModelId, // Use mapped ID
     messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
   };
+
+  // Provider-side attribution (not part of prompt text).
+  // OpenAI Chat Completions: prefer safety_identifier + prompt_cache_key; include `user` for compatibility.
+  if (endUserId) {
+    baseRequest.safety_identifier = endUserId;
+    baseRequest.prompt_cache_key = endUserId;
+    baseRequest.user = endUserId;
+  }
 
   // OpenRouter usage accounting (required for reliable cost reporting, especially BYOK).
   // Docs: include usage in final response / last SSE message.

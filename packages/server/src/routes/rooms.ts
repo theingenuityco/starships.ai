@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { ConversationService } from '@/services/ConversationService';
+import { ImportExportService } from '@/services/ImportExportService';
 import { UIActionService } from '@/services/UIActionService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
@@ -27,28 +28,30 @@ import {
   getConnection,
 } from '@starships/models';
 import type { MessageModel, RoomModel } from '@starships/protocol';
-import { StarshipService } from '@/services/StarshipService';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 import { MessageService } from '@/services/MessageService';
 import { WalletService } from '@/services/WalletService';
 import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import archiver from 'archiver';
 import crypto from 'crypto';
 import { rateLimiters } from '@/middleware/rateLimiter';
 
 const router: Router = Router();
 
-const RoomSlugSchema = z
-  .string()
-  .min(1)
-  .max(100)
-  .refine((s) => s === s.trim(), 'slug must not have leading/trailing whitespace')
-  .refine((s) => s === s.toLowerCase(), 'slug must be lowercase')
-  .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
-
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
+
+function safeFilenameSegment(input: string): string {
+  const raw = String(input || '').trim();
+  const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
+  return sanitized.length > 0 ? sanitized : 'export';
+}
+
+function isoCompactTimestamp(): string {
+  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+}
 
 async function resolveRoomAccessArgs(args: { roomConversationId: string }): Promise<{
   room: RoomModel | null;
@@ -251,85 +254,94 @@ router.post(
   jwtAuthMiddleware,
   rateLimiters.apiAuthenticated,
   async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
-    if (!params) return;
-
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
-
-    // Policy: for public rooms, any room participant may approve/deny invite requests.
-    // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
-    if (access.room.isPrivate) {
-      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
-    }
-
-    const conn = getConnection();
-    let threadConversationId = '';
-    let approvalMessageId = '';
-    let requestedByUserId: string | null = null;
-    let invitedUserIds: string[] = [];
-    let invitedAgentIds: string[] = [];
-    await conn.query('BEGIN');
     try {
-      const approval = await conn.queryOne<{
-        id: string;
-        status: string;
-        requested_by_user_id: string | null;
-        conversation_id: string;
-        message_id: string;
-      }>(
-        `
+      const params = validateData(
+        z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }),
+        req.params,
+        res,
+        'invite approval parameter'
+      );
+      if (!params) return;
+
+      const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+      if (!access) return;
+
+      // Policy: for public rooms, any room participant may approve/deny invite requests.
+      // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
+      if (access.room.isPrivate) {
+        if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+      }
+
+      const conn = getConnection();
+      let threadConversationId = '';
+      let approvalMessageId = '';
+      let requestedByUserId: string | null = null;
+      let invitedUserIds: string[] = [];
+      let invitedAgentIds: string[] = [];
+      await conn.query('BEGIN');
+      try {
+        const approval = await conn.queryOne<{
+          id: string;
+          status: string;
+          requested_by_user_id: string | null;
+          conversation_id: string;
+          message_id: string;
+        }>(
+          `
         SELECT id, status, requested_by_user_id, conversation_id, message_id
         FROM room_invite_approvals
         WHERE id = $1 AND room_conversation_id = $2
         FOR UPDATE
         `,
-        [params.approvalId, access.room.conversationId]
-      );
-      if (!approval) {
-        await conn.query('ROLLBACK');
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
-        return;
-      }
-      if (String(approval.status) !== 'pending') {
-        await conn.query('ROLLBACK');
-        sendSuccess(res, { status: String(approval.status) }, 200);
-        return;
-      }
-      threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
-      approvalMessageId = approval.message_id ? String(approval.message_id) : '';
-      requestedByUserId = approval.requested_by_user_id ? String(approval.requested_by_user_id) : null;
-
-      const targets = await conn.query<{ target_type: 'user' | 'agent'; target_id: string }>(
-        `SELECT target_type, target_id FROM room_invite_approval_targets WHERE approval_id = $1`,
-        [params.approvalId]
-      );
-      invitedUserIds = targets
-        .filter((t) => t.target_type === 'user')
-        .map((t) => String(t.target_id || '').trim())
-        .filter(Boolean);
-      invitedAgentIds = targets
-        .filter((t) => t.target_type === 'agent')
-        .map((t) => String(t.target_id || '').trim())
-        .filter(Boolean);
-
-      // "Invited by" should reflect the requester (message author) even if someone else approves.
-      const createdBy = approval.requested_by_user_id ? String(approval.requested_by_user_id) : access.authUserId;
-      const participantRepo = new ConversationParticipantRepository();
-      for (const t of targets) {
-        const type = t.target_type === 'user' ? 'user' : 'agent';
-        const id = String(t.target_id || '').trim();
-        if (!id) continue;
-        if (type === 'user') {
-          await participantRepo.addUserParticipant({ conversationId: access.room.conversationId, userId: id, role: 'member', createdBy }).catch(() => null);
-        } else {
-          await participantRepo.addAgentParticipant({ conversationId: access.room.conversationId, agentId: id, createdBy }).catch(() => null);
+          [params.approvalId, access.room.conversationId]
+        );
+        if (!approval) {
+          await conn.query('ROLLBACK');
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
+          return;
         }
-      }
+        if (String(approval.status) !== 'pending') {
+          await conn.query('ROLLBACK');
+          sendSuccess(res, { status: String(approval.status) }, 200);
+          return;
+        }
+        threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
+        approvalMessageId = approval.message_id ? String(approval.message_id) : '';
+        requestedByUserId = approval.requested_by_user_id ? String(approval.requested_by_user_id) : null;
 
-      await conn.query(
-        `
+        const targets = await conn.query<{ target_type: 'user' | 'agent'; target_id: string }>(
+          `SELECT target_type, target_id FROM room_invite_approval_targets WHERE approval_id = $1`,
+          [params.approvalId]
+        );
+        invitedUserIds = targets
+          .filter((t) => t.target_type === 'user')
+          .map((t) => String(t.target_id || '').trim())
+          .filter(Boolean);
+        invitedAgentIds = targets
+          .filter((t) => t.target_type === 'agent')
+          .map((t) => String(t.target_id || '').trim())
+          .filter(Boolean);
+
+        // "Invited by" should reflect the requester (message author) even if someone else approves.
+        const createdBy = approval.requested_by_user_id ? String(approval.requested_by_user_id) : access.authUserId;
+        const participantRepo = new ConversationParticipantRepository();
+        for (const t of targets) {
+          const type = t.target_type === 'user' ? 'user' : 'agent';
+          const id = String(t.target_id || '').trim();
+          if (!id) continue;
+          if (type === 'user') {
+            await participantRepo
+              .addUserParticipant({ conversationId: access.room.conversationId, userId: id, role: 'member', createdBy })
+              .catch(() => null);
+          } else {
+            await participantRepo
+              .addAgentParticipant({ conversationId: access.room.conversationId, agentId: id, createdBy })
+              .catch(() => null);
+          }
+        }
+
+        await conn.query(
+          `
         UPDATE room_invite_approvals
            SET status = 'approved',
                resolved_at = NOW(),
@@ -337,163 +349,175 @@ router.post(
                updated_at = NOW()
          WHERE id = $1
         `,
-        [params.approvalId, access.authUserId]
-      );
+          [params.approvalId, access.authUserId]
+        );
 
-      await conn.query('COMMIT');
-    } catch (e) {
-      await conn.query('ROLLBACK');
-      throw e;
-    }
+        await conn.query('COMMIT');
+      } catch (e) {
+        await conn.query('ROLLBACK');
+        throw e;
+      }
 
-    try {
-      const ui = new UIActionService();
-      await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
-        approvalId: params.approvalId,
-        roomConversationId: access.room.conversationId,
-        conversationId: threadConversationId || null,
-      });
-    } catch {
-      // best-effort only
-    }
-
-    // After approval:
-    // - If users were added, notify them (inbox + SSE).
-    // - If an agent was added, trigger the agent turn for the original message.
-    void (async () => {
       try {
-        const sid = String(access.room.starshipId || '').trim();
-        const conversationId = String(threadConversationId || '').trim();
-        const messageId = String(approvalMessageId || '').trim();
-        if (!sid || !conversationId || !messageId) return;
-
-        // 1) Notify invited users
-        if (invitedUserIds.length > 0) {
-          const notifRepo = new NotificationRepository();
-          const bus = NotificationStreamBus.getInstance();
-          for (const uid of invitedUserIds) {
-            // Don't notify the approver about their own action.
-            if (uid && uid === access.authUserId) continue;
-            const created = await notifRepo
-              .createOrIgnoreByUserTypeMessage({
-                starshipId: sid,
-                userId: uid,
-                type: 'channel',
-                conversationId,
-                messageId,
-              })
-              .catch(() => ({ created: false as const }));
-            if (!created.created || !created.notification) continue;
-            try {
-              await bus.publish(sid, uid, { type: 'notification.append', data: { notification: created.notification } });
-              const unread = await notifRepo.getUnreadCounts({ starshipId: sid, userId: uid });
-              await bus.publish(sid, uid, { type: 'notification.state', data: { unread } });
-            } catch {
-              // best-effort only
-            }
-          }
-        }
-
-        // 2) Trigger agent once the agent is now a room participant
-        const messageService = new MessageService();
-        const msg = (await messageService.getMessage(messageId).catch(() => null)) as MessageModel | null;
-        if (!msg) return;
-        if (String(msg.role || '') !== 'user') return;
-
-        const content = String(msg.content || '');
-        const attachmentIds = Array.isArray(msg.attachmentIds) ? msg.attachmentIds : undefined;
-
-        const conversationService = new ConversationService();
-        // Prefer mention-driven routing (can include multiple agents); otherwise fall back to a single explicit agentId.
-        const allAgents = await new AgentRepository().findByStarship(sid).catch(() => []);
-        const starshipAgentIdSet = new Set(allAgents.map((a) => String(a?.id || '').trim()).filter(Boolean));
-        const mentionedAgentIds = Array.from(new Set((content.match(/<@a:([a-z0-9_-]{10,64}|[0-9a-f-]{36})>/gi) || [])
-          .map((t) => String(t).replace(/^<@a:|>$/g, '').trim())
-          .filter((id) => starshipAgentIdSet.has(id))));
-        const hasMentionTargets = mentionedAgentIds.length > 0;
-        const explicitAgentId = hasMentionTargets
-          ? null
-          : invitedAgentIds.find((id) => starshipAgentIdSet.has(String(id || '').trim())) || null;
-
-        const willTrigger = await conversationService
-          .willTriggerAgentExecution({ conversationId, content, agentId: explicitAgentId })
-          .catch(() => false);
-        if (!willTrigger) return;
-
-        // Billing + concurrency guard (mirrors POST /conversations/:id/messages behavior at a high level).
-        const starship = await conversationService.getConversationStarship(conversationId).catch(() => null);
-        if (!starship) return;
-
-        const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
-        const walletService = new WalletService();
-        const wallet = await walletService.getByStarshipId(starship.id).catch(() => null);
-        if (!wallet) return;
-        const currentCredits = Number(wallet.balance) || 0;
-        if (currentCredits < requiredCredits) return;
-
-        const leaseService = new StarshipTurnLeaseService();
-        let turnLeaseId: string | undefined;
-        try {
-          turnLeaseId = await leaseService.acquire({
-            starshipId: starship.id,
-            conversationId,
-            maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
-          });
-        } catch {
-          return;
-        }
-
-        const conversationRepo = new ConversationRepository();
-        const turnGuardId = crypto.randomUUID();
-        const turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId).catch(() => false);
-        if (!turnGuardAcquired) {
-          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-          return;
-        }
-
-        try {
-          const billingService = new BillingService();
-          await billingService.debitForUserMessage({
-            walletId: wallet.id,
-            starshipId: starship.id,
-            conversationId,
-            messageId,
-          });
-        } catch {
-          await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
-          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-          return;
-        }
-
-        try {
-          await conversationService.addConversationMessage(
-            {
-              conversationId,
-              role: 'user',
-              content,
-              messageType: msg.messageType || 'user_input',
-              ...(explicitAgentId ? { agentId: explicitAgentId } : null),
-              ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : null),
-            },
-            requestedByUserId ? { authContext: { userId: requestedByUserId } } : undefined,
-            { preCreatedUserMessage: msg, turnLeaseId, turnGuardId }
-          );
-        } catch {
-          // Best-effort: if it fails post-debit, we don't retry automatically.
-          // Turn guard state cleanup is handled by ConversationService on completion; but if it fails early,
-          // attempt to release lease and clear turnActive.
-          await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
-          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-        }
+        const ui = new UIActionService();
+        await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
+          approvalId: params.approvalId,
+          roomConversationId: access.room.conversationId,
+          conversationId: threadConversationId || null,
+        });
       } catch {
         // best-effort only
       }
-    })();
 
-    sendSuccess(res, { status: 'approved' }, 200);
-  } catch (error) {
-    handleError(error, res, 'approving room invite');
-  }
+      // After approval:
+      // - If users were added, notify them (inbox + SSE).
+      // - If an agent was added, trigger the agent turn for the original message.
+      void (async () => {
+        try {
+          const sid = String(access.room.starshipId || '').trim();
+          const conversationId = String(threadConversationId || '').trim();
+          const messageId = String(approvalMessageId || '').trim();
+          if (!sid || !conversationId || !messageId) return;
+
+          // 1) Notify invited users
+          if (invitedUserIds.length > 0) {
+            const notifRepo = new NotificationRepository();
+            const bus = NotificationStreamBus.getInstance();
+            for (const uid of invitedUserIds) {
+              // Don't notify the approver about their own action.
+              if (uid && uid === access.authUserId) continue;
+              const created = await notifRepo
+                .createOrIgnoreByUserTypeMessage({
+                  starshipId: sid,
+                  userId: uid,
+                  type: 'channel',
+                  conversationId,
+                  messageId,
+                })
+                .catch(() => ({ created: false as const }));
+              if (!created.created || !created.notification) continue;
+              try {
+                await bus.publish(sid, uid, { type: 'notification.append', data: { notification: created.notification } });
+                const unread = await notifRepo.getUnreadCounts({ starshipId: sid, userId: uid });
+                await bus.publish(sid, uid, { type: 'notification.state', data: { unread } });
+              } catch {
+                // best-effort only
+              }
+            }
+          }
+
+          // 2) Trigger agent once the agent is now a room participant
+          const messageService = new MessageService();
+          const msg = (await messageService.getMessage(messageId).catch(() => null)) as MessageModel | null;
+          if (!msg) return;
+          if (String(msg.role || '') !== 'user') return;
+
+          const content = String(msg.content || '');
+          const attachmentIds = Array.isArray(msg.attachmentIds) ? msg.attachmentIds : undefined;
+
+          const conversationService = new ConversationService();
+          // Prefer mention-driven routing (can include multiple agents); otherwise fall back to a single explicit agentId.
+          const allAgents = await new AgentRepository().findByStarship(sid).catch(() => []);
+          const starshipAgentIdSet = new Set(allAgents.map((a) => String(a?.id || '').trim()).filter(Boolean));
+          const agentIdBySlug = new Map<string, string>();
+          for (const a of Array.isArray(allAgents) ? allAgents : []) {
+            const id = String(a?.id || '').trim();
+            const slug = String(a?.slug || '').trim();
+            if (slug && id) agentIdBySlug.set(slug, id);
+          }
+
+          const mentionedAgentIds = Array.from(
+            new Set(
+              (Array.from(content.matchAll(/<@a:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi)) || [])
+                .map((m) => String(m?.[1] || '').trim())
+                .map((slug) => (slug ? agentIdBySlug.get(slug) || '' : ''))
+                .filter((id) => Boolean(id) && starshipAgentIdSet.has(id))
+            )
+          );
+          const hasMentionTargets = mentionedAgentIds.length > 0;
+          const explicitAgentId = hasMentionTargets
+            ? null
+            : invitedAgentIds.find((id) => starshipAgentIdSet.has(String(id || '').trim())) || null;
+
+          const willTrigger = await conversationService
+            .willTriggerAgentExecution({ conversationId, content, agentId: explicitAgentId })
+            .catch(() => false);
+          if (!willTrigger) return;
+
+          // Billing + concurrency guard (mirrors POST /conversations/:id/messages behavior at a high level).
+          const starship = await conversationService.getConversationStarship(conversationId).catch(() => null);
+          if (!starship) return;
+
+          const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
+          const walletService = new WalletService();
+          const wallet = await walletService.getByStarshipId(starship.id).catch(() => null);
+          if (!wallet) return;
+          const currentCredits = Number(wallet.balance) || 0;
+          if (currentCredits < requiredCredits) return;
+
+          const leaseService = new StarshipTurnLeaseService();
+          let turnLeaseId: string | undefined;
+          try {
+            turnLeaseId = await leaseService.acquire({
+              starshipId: starship.id,
+              conversationId,
+              maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
+            });
+          } catch {
+            return;
+          }
+
+          const conversationRepo = new ConversationRepository();
+          const turnGuardId = crypto.randomUUID();
+          const turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId).catch(() => false);
+          if (!turnGuardAcquired) {
+            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+            return;
+          }
+
+          try {
+            const billingService = new BillingService();
+            await billingService.debitForUserMessage({
+              walletId: wallet.id,
+              starshipId: starship.id,
+              conversationId,
+              messageId,
+            });
+          } catch {
+            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+            return;
+          }
+
+          try {
+            await conversationService.addConversationMessage(
+              {
+                conversationId,
+                role: 'user',
+                content,
+                messageType: msg.messageType || 'user_input',
+                ...(explicitAgentId ? { agentId: explicitAgentId } : null),
+                ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : null),
+              },
+              requestedByUserId ? { authContext: { userId: requestedByUserId } } : undefined,
+              { preCreatedUserMessage: msg, turnLeaseId, turnGuardId }
+            );
+          } catch {
+            // Best-effort: if it fails post-debit, we don't retry automatically.
+            // Turn guard state cleanup is handled by ConversationService on completion; but if it fails early,
+            // attempt to release lease and clear turnActive.
+            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
+            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
+          }
+        } catch {
+          // best-effort only
+        }
+      })();
+
+      sendSuccess(res, { status: 'approved' }, 200);
+    } catch (error) {
+      handleError(error, res, 'approving room invite');
+    }
   }
 );
 
@@ -505,46 +529,51 @@ router.post(
   jwtAuthMiddleware,
   rateLimiters.apiAuthenticated,
   async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }), req.params, res, 'invite approval parameter');
-    if (!params) return;
-
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
-
-    // Policy: for public rooms, any room participant may approve/deny invite requests.
-    // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
-    if (access.room.isPrivate) {
-      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
-    }
-
-    const conn = getConnection();
-    let threadConversationId = '';
-    await conn.query('BEGIN');
     try {
-      const approval = await conn.queryOne<{ id: string; status: string; conversation_id: string; message_id: string }>(
-        `
+      const params = validateData(
+        z.object({ roomId: IdSchema, approvalId: InviteApprovalIdSchema }),
+        req.params,
+        res,
+        'invite approval parameter'
+      );
+      if (!params) return;
+
+      const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+      if (!access) return;
+
+      // Policy: for public rooms, any room participant may approve/deny invite requests.
+      // For private rooms, invite approvals are restricted to the starship owner/instance-admin.
+      if (access.room.isPrivate) {
+        if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+      }
+
+      const conn = getConnection();
+      let threadConversationId = '';
+      await conn.query('BEGIN');
+      try {
+        const approval = await conn.queryOne<{ id: string; status: string; conversation_id: string; message_id: string }>(
+          `
         SELECT id, status, conversation_id, message_id
         FROM room_invite_approvals
         WHERE id = $1 AND room_conversation_id = $2
         FOR UPDATE
         `,
-        [params.approvalId, access.room.conversationId]
-      );
-      if (!approval) {
-        await conn.query('ROLLBACK');
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
-        return;
-      }
-      if (String(approval.status) !== 'pending') {
-        await conn.query('ROLLBACK');
-        sendSuccess(res, { status: String(approval.status) }, 200);
-        return;
-      }
+          [params.approvalId, access.room.conversationId]
+        );
+        if (!approval) {
+          await conn.query('ROLLBACK');
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Invite approval not found', 404, { approvalId: params.approvalId });
+          return;
+        }
+        if (String(approval.status) !== 'pending') {
+          await conn.query('ROLLBACK');
+          sendSuccess(res, { status: String(approval.status) }, 200);
+          return;
+        }
 
-      threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
-      await conn.query(
-        `
+        threadConversationId = approval.conversation_id ? String(approval.conversation_id) : '';
+        await conn.query(
+          `
         UPDATE room_invite_approvals
            SET status = 'denied',
                resolved_at = NOW(),
@@ -552,29 +581,29 @@ router.post(
                updated_at = NOW()
          WHERE id = $1
         `,
-        [params.approvalId, access.authUserId]
-      );
-      await conn.query('COMMIT');
-    } catch (e) {
-      await conn.query('ROLLBACK');
-      throw e;
-    }
+          [params.approvalId, access.authUserId]
+        );
+        await conn.query('COMMIT');
+      } catch (e) {
+        await conn.query('ROLLBACK');
+        throw e;
+      }
 
-    try {
-      const ui = new UIActionService();
-      await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
-        approvalId: params.approvalId,
-        roomConversationId: access.room.conversationId,
-        conversationId: threadConversationId || null,
-      });
-    } catch {
-      // best-effort only
-    }
+      try {
+        const ui = new UIActionService();
+        await ui.publishAction(threadConversationId || access.room.conversationId, 'room_invite_approval_resolved', {
+          approvalId: params.approvalId,
+          roomConversationId: access.room.conversationId,
+          conversationId: threadConversationId || null,
+        });
+      } catch {
+        // best-effort only
+      }
 
-    sendSuccess(res, { status: 'denied' }, 200);
-  } catch (error) {
-    handleError(error, res, 'denying room invite');
-  }
+      sendSuccess(res, { status: 'denied' }, 200);
+    } catch (error) {
+      handleError(error, res, 'denying room invite');
+    }
   }
 );
 
@@ -685,48 +714,53 @@ router.post('/rooms/:roomId/join', jwtAuthMiddleware, rateLimiters.apiAuthentica
  *
  * Leave a public room by removing the conversation_participants row for the current user.
  */
-router.post('/rooms/:roomId/leave', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
+router.post(
+  '/rooms/:roomId/leave',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+      if (!params) return;
 
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
 
-    const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!conversationStarshipId) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
-      return;
-    }
-    if (String(room.starshipId) !== String(conversationStarshipId)) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
+      const { room, conversationStarshipId } = await resolveRoomAccessArgs({ roomConversationId: params.roomId });
+      if (!room) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+        return;
+      }
+      if (!conversationStarshipId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId: params.roomId });
+        return;
+      }
+      if (String(room.starshipId) !== String(conversationStarshipId)) {
+        sendError(res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: params.roomId });
+        return;
+      }
+      if (!(await verifyStarshipAccess(conversationStarshipId, authUserId, res))) return;
 
-    if (room.isPrivate) {
-      sendError(res, 'ACCESS_DENIED', 'Cannot leave a private room', 403, { roomId: params.roomId });
-      return;
-    }
+      if (room.isPrivate) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot leave a private room', 403, { roomId: params.roomId });
+        return;
+      }
 
-    const conn = getConnection();
-    const result = await conn.queryWithResult(
-      `DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`,
-      [params.roomId, authUserId]
-    );
-    const removed = (result.rowCount ?? 0) > 0;
-    sendSuccess(res, { left: true, removed }, 200);
-  } catch (error) {
-    handleError(error, res, 'leaving room');
+      const conn = getConnection();
+      const result = await conn.queryWithResult(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2`, [
+        params.roomId,
+        authUserId,
+      ]);
+      const removed = (result.rowCount ?? 0) > 0;
+      sendSuccess(res, { left: true, removed }, 200);
+    } catch (error) {
+      handleError(error, res, 'leaving room');
+    }
   }
-});
+);
 
 /**
  * GET /rooms/:roomId/participants
@@ -734,25 +768,30 @@ router.post('/rooms/:roomId/leave', jwtAuthMiddleware, rateLimiters.apiAuthentic
  * Returns user + agent participant ids for the room conversation.
  * Requires the caller to be a room participant.
  */
-router.get('/rooms/:roomId/participants', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
+router.get(
+  '/rooms/:roomId/participants',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+      if (!params) return;
 
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
+      const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+      if (!access) return;
 
-    const participantRepo = new ConversationParticipantRepository();
-    const [userIds, agentIds] = await Promise.all([
-      participantRepo.listUserIdsByConversation(access.room.conversationId).catch(() => []),
-      participantRepo.listAgentIdsByConversation(access.room.conversationId).catch(() => []),
-    ]);
+      const participantRepo = new ConversationParticipantRepository();
+      const [userIds, agentIds] = await Promise.all([
+        participantRepo.listUserIdsByConversation(access.room.conversationId).catch(() => []),
+        participantRepo.listAgentIdsByConversation(access.room.conversationId).catch(() => []),
+      ]);
 
-    sendSuccess(res, { userIds, agentIds }, 200);
-  } catch (error) {
-    handleError(error, res, 'listing room participants');
+      sendSuccess(res, { userIds, agentIds }, 200);
+    } catch (error) {
+      handleError(error, res, 'listing room participants');
+    }
   }
-});
+);
 
 /**
  * POST /rooms/:roomId/agents
@@ -760,50 +799,55 @@ router.get('/rooms/:roomId/participants', jwtAuthMiddleware, rateLimiters.apiAut
  * Adds an agent participant to the room (agent allowlist).
  * MVP policy: starship owner/instance-admin only.
  */
-router.post('/rooms/:roomId/agents', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
+router.post(
+  '/rooms/:roomId/agents',
+  jwtAuthMiddleware,
+  rateLimiters.apiAuthenticated,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+      if (!params) return;
 
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
+      const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+      if (!access) return;
 
-    // Private rooms: only starship owner/admin can manage the agent allowlist (MVP).
-    // Public rooms: any participant can add allowlisted agents (Slack-like "invite on mention").
-    if (access.room.isPrivate) {
-      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
-    }
+      // Private rooms: only starship owner/admin can manage the agent allowlist (MVP).
+      // Public rooms: any participant can add allowlisted agents (Slack-like "invite on mention").
+      if (access.room.isPrivate) {
+        if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+      }
 
-    const body = validateData(z.object({ agentId: IdSchema }), req.body, res, 'room agent add');
-    if (!body) return;
+      const body = validateData(z.object({ agentId: IdSchema }), req.body, res, 'room agent add');
+      if (!body) return;
 
-    const agentRepo = new AgentRepository();
-    const agent = await agentRepo.findById(body.agentId);
-    if (!agent) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
-      return;
-    }
-    if (String(agent.starshipId) !== String(access.room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent must belong to the same starship as the room', 400, {
+      const agentRepo = new AgentRepository();
+      const agent = await agentRepo.findById(body.agentId);
+      if (!agent) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: body.agentId });
+        return;
+      }
+      if (String(agent.starshipId) !== String(access.room.starshipId)) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent must belong to the same starship as the room', 400, {
+          agentId: body.agentId,
+          roomStarshipId: access.room.starshipId,
+          agentStarshipId: agent.starshipId,
+        });
+        return;
+      }
+
+      const participantRepo = new ConversationParticipantRepository();
+      const result = await participantRepo.addAgentParticipant({
+        conversationId: access.room.conversationId,
         agentId: body.agentId,
-        roomStarshipId: access.room.starshipId,
-        agentStarshipId: agent.starshipId,
+        createdBy: access.authUserId,
       });
-      return;
+
+      sendSuccess(res, { created: result.created }, 200);
+    } catch (error) {
+      handleError(error, res, 'adding room agent');
     }
-
-    const participantRepo = new ConversationParticipantRepository();
-    const result = await participantRepo.addAgentParticipant({
-      conversationId: access.room.conversationId,
-      agentId: body.agentId,
-      createdBy: access.authUserId,
-    });
-
-    sendSuccess(res, { created: result.created }, 200);
-  } catch (error) {
-    handleError(error, res, 'adding room agent');
   }
-});
+);
 
 /**
  * DELETE /rooms/:roomId/agents/:agentId
@@ -816,28 +860,29 @@ router.delete(
   jwtAuthMiddleware,
   rateLimiters.apiAuthenticated,
   async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema, agentId: IdSchema }), req.params, res, 'room agent remove');
-    if (!params) return;
+    try {
+      const params = validateData(z.object({ roomId: IdSchema, agentId: IdSchema }), req.params, res, 'room agent remove');
+      if (!params) return;
 
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
+      const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+      if (!access) return;
 
-    if (access.room.isPrivate) {
-      if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+      if (access.room.isPrivate) {
+        if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+      }
+
+      const conn = getConnection();
+      const result = await conn.queryWithResult(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2`, [
+        access.room.conversationId,
+        params.agentId,
+      ]);
+      const removed = (result.rowCount ?? 0) > 0;
+      sendSuccess(res, { removed }, 200);
+    } catch (error) {
+      handleError(error, res, 'removing room agent');
     }
-
-    const conn = getConnection();
-    const result = await conn.queryWithResult(
-      `DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2`,
-      [access.room.conversationId, params.agentId]
-    );
-    const removed = (result.rowCount ?? 0) > 0;
-    sendSuccess(res, { removed }, 200);
-  } catch (error) {
-    handleError(error, res, 'removing room agent');
   }
-});
+);
 
 /**
  * GET /starships/:starshipId/rooms
@@ -932,7 +977,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
 
     const body = validateData(
       z.object({
-        slug: RoomSlugSchema,
         name: z
           .string()
           .min(1)
@@ -962,7 +1006,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
       const room = await roomRepo.create({
         conversationId: conversation.id,
         starshipId: params.starshipId,
-        slug: body.slug,
         name: body.name,
         isPrivate: Boolean(body.isPrivate),
         topic: body.topic ?? null,
@@ -1040,6 +1083,120 @@ router.get('/rooms/:roomId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, a
     sendSuccess(res, { room }, 200);
   } catch (error) {
     handleError(error, res, 'fetching room');
+  }
+});
+
+/**
+ * GET /rooms/:roomId/export-bundle
+ *
+ * Export a room and its resources as a zip bundle.
+ * Owner / instance-admin only.
+ */
+router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const roomRepo = new RoomRepository();
+    const room = await roomRepo.findByConversationId(params.roomId);
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+
+    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+
+    const svc = new ImportExportService();
+    const bundle = await svc.exportRoomBundle(params.roomId);
+
+    const fromStarshipSlug =
+      typeof bundle.room.metadata?.fromStarshipSlug === 'string' ? bundle.room.metadata.fromStarshipSlug : 'starship';
+    const fromRoomSlug = typeof bundle.room.metadata?.fromSlug === 'string' ? bundle.room.metadata.fromSlug : room.slug || room.conversationId;
+    const baseName = safeFilenameSegment(`room-bundle-${fromStarshipSlug}-${fromRoomSlug}-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      throw err;
+    });
+    archive.pipe(res);
+
+    const appendContainers = <K extends string>(
+      items: Array<{ metadata?: { fromSlug?: unknown; fromStarshipSlug?: unknown } }>,
+      dir: string,
+      fallbackPrefix: string,
+      kind: K
+    ): Array<{ kind: K; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> => {
+      const usedNames = new Set<string>();
+      const entries: Array<{ kind: K; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        const slug = typeof item.metadata?.fromSlug === 'string' ? item.metadata.fromSlug : `${fallbackPrefix}-${i + 1}`;
+        const base = safeFilenameSegment(slug);
+        let outName = base;
+        let n = 2;
+        while (usedNames.has(outName)) {
+          outName = `${base}-${n}`;
+          n += 1;
+        }
+        usedNames.add(outName);
+        const file = `${dir}/${outName}.json`;
+        entries.push({
+          kind,
+          fromSlug: item.metadata?.fromSlug,
+          fromStarshipSlug: item.metadata?.fromStarshipSlug,
+          file,
+        });
+        archive.append(JSON.stringify(item, null, 2), { name: file });
+      }
+
+      return entries;
+    };
+
+    const roomEntries = appendContainers([bundle.room], 'rooms', 'room', 'room');
+    const agentEntries = appendContainers(bundle.agents, 'agents', 'agent', 'agent');
+    const viewEntries = appendContainers(bundle.views, 'views', 'view', 'view');
+    const datasetEntries = appendContainers(bundle.datasets, 'datasets', 'dataset', 'dataset');
+    const taskBoardEntries = appendContainers(bundle.taskBoards, 'task-boards', 'task-board', 'task_board');
+    const toolEntries = appendContainers(bundle.tools, 'tools', 'tool', 'tool');
+
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        rooms: roomEntries,
+        agents: agentEntries,
+        views: viewEntries,
+        datasets: datasetEntries,
+        taskBoards: taskBoardEntries,
+        tools: toolEntries,
+      },
+    };
+
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+    await archive.finalize();
+  } catch (error) {
+    if (res.headersSent) {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+      console.error('[ROOMS] Error exporting room bundle after headers sent:', error);
+      return;
+    }
+    handleError(error, res, 'exporting room bundle');
   }
 });
 
@@ -1426,16 +1583,14 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
-    const toolsRepo = new RoomToolsRepository();
 
-    const [views, datasets, taskBoards, tools] = await Promise.all([
+    const [views, datasets, taskBoards] = await Promise.all([
       viewsRepo.list(access.room.conversationId),
       datasetsRepo.list(access.room.conversationId),
       boardsRepo.list(access.room.conversationId),
-      toolsRepo.list(access.room.conversationId),
     ]);
 
-    sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
+    sendSuccess(res, { views, datasets, taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
   }
@@ -1445,7 +1600,7 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
 // Pinned resource "view" endpoints (return resolved resource objects in pin order)
 // ---------------------------------------------------------------------------
 
-router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1462,7 +1617,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       }),
       req.query,
       res,
-      'pinned resources query'
+      'room resources query'
     );
     if (!query) return;
 
@@ -1535,6 +1690,70 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
     ]);
 
     const conn = getConnection();
+
+    const [userParticipantRows, agentParticipantRows] = await Promise.all([
+      conn.query<{
+        user_id: string;
+        role: 'member' | 'admin' | null;
+        display_name: string | null;
+        avatar: string | null;
+      }>(
+        `SELECT cp.user_id,
+                cp.role,
+                u.display_name,
+                COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+           FROM conversation_participants cp
+           JOIN users u ON u.id = cp.user_id
+           LEFT JOIN LATERAL (
+             SELECT (profile_data->>'avatar') as oauth_avatar
+               FROM oauth_accounts
+              WHERE user_id = u.id
+              ORDER BY updated_at DESC
+              LIMIT 1
+           ) oa ON true
+          WHERE cp.conversation_id = $1
+            AND cp.user_id IS NOT NULL
+          ORDER BY COALESCE(u.display_name, ''), u.id`,
+        [access.room.conversationId]
+      ),
+      conn.query<{
+        id: string;
+        slug: string;
+        name: string;
+      }>(
+        `SELECT a.id, a.slug, a.name
+           FROM conversation_participants cp
+           JOIN agents a ON a.id = cp.agent_id
+          WHERE cp.conversation_id = $1
+            AND cp.agent_id IS NOT NULL
+          ORDER BY a.name`,
+        [access.room.conversationId]
+      ),
+    ]);
+
+    const participants = {
+      users: userParticipantRows
+        .map((r) => {
+          const id = String(r.user_id || '').trim();
+          if (!id) return null;
+          return {
+            id,
+            slug: `u:${id}`,
+            displayName: r.display_name ?? null,
+            avatar: r.avatar ?? null,
+            role: r.role ?? null,
+          };
+        })
+        .filter(Boolean),
+      agents: agentParticipantRows
+        .map((r) => {
+          const id = String(r.id || '').trim();
+          const slug = String(r.slug || '').trim();
+          if (!id || !slug) return null;
+          return { id, slug, name: String(r.name ?? '') };
+        })
+        .filter(Boolean),
+    };
 
     const viewIds = viewPins.map((p) => String(p.viewId)).filter(Boolean);
     const datasetIds = datasetPins.map((p) => String(p.datasetId)).filter(Boolean);
@@ -1716,7 +1935,7 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
         const r = toolsById.get(String(pin.toolId));
         if (!r) return null;
         return {
-          pin,
+          assignment: pin,
           tool: {
             id: String(r.id),
             name: String(r.name),
@@ -1743,9 +1962,9 @@ router.get('/rooms/:roomId/pins/resources', jwtAuthMiddleware, async (req: Reque
       }
     }
 
-    sendSuccess(res, { views, datasets, taskBoards, tools }, 200);
+    sendSuccess(res, { views, datasets, taskBoards, tools, participants }, 200);
   } catch (error) {
-    handleError(error, res, 'listing pinned resources');
+    handleError(error, res, 'listing room resources');
   }
 });
 
@@ -1926,7 +2145,7 @@ router.get('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Req
   }
 });
 
-router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1935,8 +2154,8 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
     if (!access) return;
 
     const toolsRepo = new RoomToolsRepository();
-    const pins = await toolsRepo.list(access.room.conversationId);
-    const ids = pins.map((p) => String(p.toolId)).filter(Boolean);
+    const assignments = await toolsRepo.list(access.room.conversationId);
+    const ids = assignments.map((p) => String(p.toolId)).filter(Boolean);
 
     if (ids.length === 0) {
       sendSuccess(res, { items: [] }, 200);
@@ -1959,12 +2178,12 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
       [ids, access.conversationStarshipId]
     );
     const byId = new Map(rows.map((r) => [String(r.id), r]));
-    const items = pins
-      .map((pin) => {
-        const r = byId.get(String(pin.toolId));
+    const items = assignments
+      .map((assignment) => {
+        const r = byId.get(String(assignment.toolId));
         if (!r) return null;
         return {
-          pin,
+          assignment,
           tool: {
             id: String(r.id),
             name: String(r.name),
@@ -1979,11 +2198,11 @@ router.get('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, 
 
     sendSuccess(res, { items }, 200);
   } catch (error) {
-    handleError(error, res, 'listing pinned tools');
+    handleError(error, res, 'listing room tools');
   }
 });
 
-router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/tools', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -1992,7 +2211,15 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    const body = validateData(z.object({ toolId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin tool');
+    const body = validateData(
+      z.object({
+        toolId: IdSchema,
+        permission: z.enum(['allow', 'ask', 'deny']),
+      }),
+      req.body,
+      res,
+      'assign tool'
+    );
     if (!body) return;
 
     const roomRepo = new RoomRepository();
@@ -2010,7 +2237,7 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       return;
     }
     if (String(tool.starshipId) !== String(room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Pinned tool must belong to the same starship as the room', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Assigned tool must belong to the same starship as the room', 400, {
         toolId: body.toolId,
         roomStarshipId: room.starshipId,
         toolStarshipId: tool.starshipId,
@@ -2018,22 +2245,21 @@ router.post('/rooms/:roomId/pins/tools', jwtAuthMiddleware, async (req: Request,
       return;
     }
 
-    const pinnedRepo = new RoomToolsRepository();
-    const pin = await pinnedRepo.upsert({
+    const roomToolsRepo = new RoomToolsRepository();
+    const assignment = await roomToolsRepo.upsert({
       roomConversationId: room.conversationId,
       toolId: body.toolId,
-      position: body.position ?? null,
-      createdBy: authUserId,
+      permission: body.permission,
     });
-    sendSuccess(res, { pin }, 200);
+    sendSuccess(res, { assignment }, 200);
   } catch (error) {
-    handleError(error, res, 'pinning tool');
+    handleError(error, res, 'assigning tool');
   }
 });
 
-router.delete('/rooms/:roomId/pins/tools/:toolId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/rooms/:roomId/tools/:toolId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'pin parameter');
+    const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'tool assignment parameter');
     if (!params) return;
     const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
@@ -2048,11 +2274,11 @@ router.delete('/rooms/:roomId/pins/tools/:toolId', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomToolsRepository();
-    const removed = await pinnedRepo.remove(room.conversationId, params.toolId);
+    const roomToolsRepo = new RoomToolsRepository();
+    const removed = await roomToolsRepo.remove(room.conversationId, params.toolId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
-    handleError(error, res, 'unpinning tool');
+    handleError(error, res, 'unassigning tool');
   }
 });
 
@@ -2504,80 +2730,6 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     sendSuccess(res, { taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'reordering pinned task boards');
-  }
-});
-
-router.post('/rooms/:roomId/pins/tools/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const body = validateData(z.object({ toolIds: z.array(IdSchema) }), req.body, res, 'reorder pinned tools');
-    if (!body) return;
-
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const pinnedRepo = new RoomToolsRepository();
-    const existing = await pinnedRepo.list(room.conversationId);
-    const existingIds = existing.map((p: { toolId: string }) => String(p.toolId));
-    const nextIds = body.toolIds.map((x) => String(x));
-
-    const uniq = new Set(nextIds);
-    if (uniq.size !== nextIds.length) {
-      sendError(res, 'VALIDATION_ERROR', 'Duplicate toolIds in reorder list', 400);
-      return;
-    }
-    if (existingIds.length !== nextIds.length || existingIds.some((id: string) => !uniq.has(id))) {
-      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned tools', 400, {
-        pinnedCount: existingIds.length,
-        providedCount: nextIds.length,
-      });
-      return;
-    }
-
-    const conn = getConnection();
-    const caseTemp = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${-(idx + 1)}`).join(' ');
-    const caseFinal = nextIds.map((_, idx) => `WHEN $${idx + 2} THEN ${idx}`).join(' ');
-    const inList = nextIds.map((_, idx) => `$${idx + 2}`).join(', ');
-    const args = [room.conversationId, ...nextIds];
-
-    await conn.query('BEGIN');
-    try {
-      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tools:${room.conversationId}`]);
-      await conn.query(
-        `UPDATE room_tools
-            SET position = CASE tool_id ${caseTemp} ELSE position END
-          WHERE room_conversation_id = $1
-            AND tool_id IN (${inList})`,
-        args
-      );
-      await conn.query(
-        `UPDATE room_tools
-            SET position = CASE tool_id ${caseFinal} ELSE position END
-          WHERE room_conversation_id = $1
-            AND tool_id IN (${inList})`,
-        args
-      );
-      await conn.query('COMMIT');
-    } catch (e) {
-      await conn.query('ROLLBACK');
-      throw e;
-    }
-
-    const tools = await pinnedRepo.list(room.conversationId);
-    sendSuccess(res, { tools }, 200);
-  } catch (error) {
-    handleError(error, res, 'reordering pinned tools');
   }
 });
 

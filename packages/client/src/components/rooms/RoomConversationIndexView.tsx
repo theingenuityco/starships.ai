@@ -5,30 +5,32 @@ import { ConversationSummaryBar } from '@/components/conversation/ConversationSu
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
+import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedTool, RoomPinnedView } from '@starships/protocol'
+import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 
-export function RoomThreadIndexView(props: {
+export function RoomConversationIndexView(props: {
   starshipId: string
   roomConversationId: string
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  starshipOwnerId?: string | null
   starshipSlug?: string | null
-  /** Optional allowlists to scope @mention and agent selection within room threads. */
+  /** Optional allowlists to scope @mention and agent selection within room conversations. */
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
   allowedAgentIds?: string[] | null
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
-  pinnedTools?: RoomPinnedTool[] | null
+  assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
@@ -47,15 +49,16 @@ export function RoomThreadIndexView(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
-  onPinTool?: (toolId: string) => void
-  onUnpinTool?: (toolId: string) => void
-  /** Open a draft thread (no persistence until first message). */
-  onCreateDraftThread?: () => void
+  onAssignTool?: (toolId: string) => void
+  onUnassignTool?: (toolId: string) => void
+  /** Open a draft conversation (no persistence until first message). */
+  onCreateDraftConversation?: () => void
   /**
-   * Called when the user starts a brand-new thread conversation from the room starter composer.
-   * The returned `conversationId` is the newly created child conversation (thread).
+   * Called when the user starts a brand-new conversation from the room starter composer.
+   * The returned `conversationId` is the newly created child conversation.
    */
-  onThreadConversationStarted?: (args: { conversationId: string; selectedAgent: AgentModel | null }) => void
+  onConversationStarted?: (args: { conversationId: string; selectedAgent: AgentModel | null }) => void
+  onOpenConversation?: (conversationId: string) => void
 }) {
   const router = useRouter()
   const params = useParams()
@@ -83,25 +86,25 @@ export function RoomThreadIndexView(props: {
     return slug || 'Room'
   }, [props.roomName, props.roomSlug])
 
-  const onCreateThread = () => {
-    if (props.onCreateDraftThread) {
-      props.onCreateDraftThread()
+  const onCreateConversation = () => {
+    if (props.onCreateDraftConversation) {
+      props.onCreateDraftConversation()
       return
     }
     if (!effectiveStarshipSlug) return
     const roomSlug = String(props.roomSlug || '').trim()
     if (roomSlug) {
-      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}/thread/draft`)
+      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}/conversation/draft`)
       return
     }
-    router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.roomConversationId)}?thread=draft`)
+    router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.roomConversationId)}?conversation=draft`)
   }
 
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedTools = (props.pinnedTools || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const hasAnyResources = pinnedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
+  const assignedTools = (props.assignedTools || []).slice()
+  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
 
   const openPinnedView = (viewId: string) => {
     const id = String(viewId || '').trim()
@@ -132,15 +135,10 @@ export function RoomThreadIndexView(props: {
     router.push(href)
   }
 
-  const openThreadConversation = (threadConversationId: string) => {
-    const cid = String(threadConversationId || '').trim()
+  const openConversation = (conversationId: string) => {
+    const cid = String(conversationId || '').trim()
     if (!cid) return
-    if (!effectiveStarshipSlug) return
-    const roomSlug = String(props.roomSlug || '').trim()
-    const base = roomSlug
-      ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(roomSlug)}`
-      : `/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms`
-    router.push(`${base}/thread/${encodeURIComponent(cid)}`)
+    props.onOpenConversation?.(cid)
   }
 
   return (
@@ -162,6 +160,12 @@ export function RoomThreadIndexView(props: {
         fallbackTitle={label}
         rightSlot={
           <div className="flex items-center gap-2">
+            <RoomParticipantsButton
+              starshipId={props.starshipId}
+              roomConversationId={props.roomConversationId}
+              roomIsPrivate={Boolean(props.roomIsPrivate)}
+              starshipOwnerId={props.starshipOwnerId ?? null}
+            />
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
@@ -177,7 +181,7 @@ export function RoomThreadIndexView(props: {
         <div className="w-full max-w-4xl mx-auto h-full flex">
           <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
-              <h1 className="text-3xl font-normal text-foreground">Start a new thread</h1>
+              <h1 className="text-3xl font-normal text-foreground">Start a new conversation</h1>
             </div>
 
             <ConversationMessageInput
@@ -189,14 +193,14 @@ export function RoomThreadIndexView(props: {
               roomConversationId={props.roomConversationId}
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
-              newConversationTitleOverride="New thread"
+              newConversationTitleOverride="New conversation"
               allowedMentionUserIds={props.allowedMentionUserIds ?? undefined}
               allowedMentionAgentIds={props.allowedMentionAgentIds ?? undefined}
               allowedAgentIds={props.allowedAgentIds ?? undefined}
               onConversationStart={conversationId => {
                 const cid = String(conversationId || '').trim()
                 if (!cid) return
-                props.onThreadConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
+                props.onConversationStarted?.({ conversationId: cid, selectedAgent: starterSelectedAgent })
               }}
             />
 
@@ -261,9 +265,9 @@ export function RoomThreadIndexView(props: {
               {starterTab === 'suggestions' ? (
                 <div className="flex items-center justify-center gap-2 flex-wrap">
                   {[
-                    'Suggest 5 thread ideas for this room.',
+                    'Suggest 5 conversation ideas for this room.',
                     'Summarize the key topics we should discuss here.',
-                    'Draft a concise thread title and first message.',
+                    'Draft a concise conversation title and first message.',
                     'What are the most important datasets/views to start with?',
                   ].map(s => (
                     <button
@@ -297,14 +301,14 @@ export function RoomThreadIndexView(props: {
                             const id = String(c?.id || '').trim()
                             if (!id) return null
                             const titleRaw = String(c?.title || '').trim()
-                            const title = titleRaw || 'Untitled thread'
+                            const title = titleRaw || 'Untitled conversation'
                             const when = c?.updatedAt || c?.createdAt
                             const whenText = when ? formatDistanceToNow(new Date(when), { addSuffix: false }) : ''
                             return (
                               <button
-                                key={`thread:${id}`}
+                                key={`conversation:${id}`}
                                 type="button"
-                                onClick={() => openThreadConversation(id)}
+                                onClick={() => openConversation(id)}
                                 className={cn(
                                   'group w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors',
                                   'hover:bg-muted/50',
@@ -318,7 +322,7 @@ export function RoomThreadIndexView(props: {
                           })}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground text-center">No threads yet.</div>
+                      <div className="text-xs text-muted-foreground text-center">No conversations yet.</div>
                     )
                   ) : null}
                 </div>
@@ -415,10 +419,10 @@ export function RoomThreadIndexView(props: {
               ) : null}
 
               {starterTab === 'tools' ? (
-                pinnedTools.length > 0 ? (
+                assignedTools.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedTools.map(p => {
-                      const id = String(p.toolId)
+                    {assignedTools.map(a => {
+                      const id = String(a.toolId)
                       const name = props.toolLabelById?.get(id) || `Tool ${id.slice(0, 8)}`
                       return (
                         <Button key={`starter:tool:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedTool(id)}>
@@ -430,7 +434,7 @@ export function RoomThreadIndexView(props: {
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
-                    No pinned tools in this room.
+                    No assigned tools in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}
@@ -450,3 +454,4 @@ export function RoomThreadIndexView(props: {
     </div>
   )
 }
+

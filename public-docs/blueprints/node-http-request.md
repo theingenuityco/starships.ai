@@ -13,7 +13,6 @@ Specification (authoritative)
   - bodyFromBinaryKey?: string (optional) — if set, uses `input?.[0]?.binary[key]` bytes as the raw request body
   - responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64' (optional)
   - binaryKey?: string (optional; default `"data"`) — where to store binary responses when `responseType: "arrayBuffer"`
-  - useWebUnlocker?: boolean (optional; default false) — when true, the host runtime may route the request through a web-unlocking gateway instead of direct server-side fetch (host-dependent). Use this for public web pages/APIs that frequently block automation (e.g. repeated 403/429/503, bot checks) where a normal server fetch is unreliable.
   - timeout?: number (ms; default 30000)
   - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, responseType
 
@@ -69,32 +68,9 @@ Error behavior
 - Network/timeouts => throws `Error("HTTP request failed: METHOD URL -> <reason>")`
 - Timeout uses AbortController; default 30000ms.
 
-### Web-unlocking routing (runner)
+### Web unlocking / scraping
 
-When running via `@starships/autopilot-runner`, `useWebUnlocker: true` is a first-class knob on `http_request` to route that single request through the runner’s configured web-unlocking gateway.
-
-When to set `useWebUnlocker: true`:
-
-- When the target is **public web content** that often blocks datacenter/server traffic (common signals: frequent `403`, `429`, `503`, bot-check pages, CAPTCHA pages, intermittent `502`/gateway errors).
-- When you want **higher success rate** and more “browser-like” access characteristics without changing the blueprint shape (still returns `{ status, headers, body, url }`).
-- When scraping/searching is part of a tool/workflow and you need **stability over raw speed/cost**.
-
-When NOT to set it:
-
-- When you’re calling your own internal services, VPC resources, or anything that should stay on private networks.
-- When the request/response is binary (use `responseType: "arrayBuffer"` or `"base64"`) or you’re uploading binary/FormData bodies.
-- When the target is a well-behaved API that already works reliably with normal server-side fetch.
-
-Runner env required (only when `useWebUnlocker: true`):
-
-- `BRIGHTDATA_API_KEY`
-- `BRIGHTDATA_ZONE`
-
-Runner behavior and limitations when `useWebUnlocker: true`:
-
-- Blocks `localhost` / `.localhost` and private/loopback IP literal hosts.
-- Not supported with `responseType: "arrayBuffer"` or `responseType: "base64"`.
-- Not supported with binary/FormData request bodies.
+If you need higher-reliability access to public web content (anti-bot/CAPTCHA/403/429), use the reserved `system` connector actions (e.g. `system.webFetch`, `system.webSearch`) via the `connector_action` node. This keeps web-unlocking credentials out of blueprints and executes the request inside the runner.
 
 Validation rules
 

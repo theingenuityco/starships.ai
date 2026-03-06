@@ -91,8 +91,9 @@ export class UserService {
       hashedPassword = await bcrypt.hash(request.password, 10);
     }
 
-    // Transform CreateUserRequest to UserModel format with required fields
-    const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'> = {
+    // Transform CreateUserRequest to UserModel format with required fields.
+    // NOTE: `slug` is server-generated in the repository layer; callers must not provide it.
+    const userData: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> = {
       email: request.email,
       displayName: request.displayName,
       avatar: request.avatar,

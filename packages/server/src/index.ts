@@ -162,6 +162,16 @@ app.use(
 // Create HTTP server
 const httpServer = createServer(app);
 
+// -----------------------------------------------------------------------------
+// Server timeouts
+// -----------------------------------------------------------------------------
+// We support long-running agent/tool executions (e.g. server-tools tool calls).
+// Node's default request timeout (often 5 minutes) can prematurely kill these.
+//
+// Note: upstream proxies/load balancers may still enforce stricter limits.
+// httpServer.requestTimeout = 35 * 60 * 1000; // 35 minutes (>= 30m tool-call timeout + buffer)
+// httpServer.setTimeout(0); // disable inactive socket timeout
+
 // Start server
 httpServer.listen(PORT, async () => {
   try {

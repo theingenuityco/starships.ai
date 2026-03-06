@@ -42,14 +42,14 @@ describe('rooms tool assignment routes', () => {
     expect(deleteLayer.route.stack).toHaveLength(3);
   });
 
-  it('requires an explicit permission when assigning a room tool', async () => {
+  it('rejects invalid permission values when assigning a room tool', async () => {
     const postLayer = getRouteLayer('/rooms/:roomId/tools', 'post');
     const handler = postLayer.route.stack[postLayer.route.stack.length - 1].handle as (req: Request, res: Response) => Promise<void>;
     const res = createMockRes();
     const req = {
       user: { id: 'user_1234567' },
       params: { roomId: 'room_1234567' },
-      body: { toolId: 'tool_1234567' },
+      body: { toolId: 'tool_1234567', permission: 'banana' },
     } as unknown as Request;
 
     await handler(req, res as unknown as Response);

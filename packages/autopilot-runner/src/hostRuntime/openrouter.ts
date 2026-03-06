@@ -18,6 +18,66 @@ export async function invokeOpenRouter(
   options: InvokeOpenRouterOptions = {}
 ): Promise<AsyncIterable<unknown>> {
   const llmConfig = options.llm;
+  const isAnthropicModel = typeof providerModelId === 'string' && providerModelId.startsWith('anthropic/');
+
+  // OpenRouter/OpenAI Chat Completions expects messages without provider-specific
+  // reasoning metadata. Some providers (and OpenRouter normalization) can return
+  // additional per-message fields like `reasoning_details`; if we echo these back
+  // in subsequent requests, OpenRouter/proxies may translate them into Anthropic
+  // `thinking` blocks with `signature`, which Anthropic validates and can reject.
+  //
+  // We keep "thinking enabled" via top-level `reasoning`, but we strip:
+  // - message.reasoning / message.reasoning_details
+  // - any content blocks of type "thinking"
+  // - any "signature" fields inside content blocks (defensive)
+  const sanitizeMessagesForProvider = (): OpenAI.Chat.ChatCompletionMessageParam[] => {
+    const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+    const sanitizeContent = (content: unknown): unknown => {
+      if (typeof content === 'string') return content;
+      if (!Array.isArray(content)) return content;
+      const parts: unknown[] = [];
+      for (const part of content as unknown[]) {
+        if (!part || typeof part !== 'object') {
+          parts.push(part);
+          continue;
+        }
+        const p = part as Record<string, unknown>;
+        const type = typeof p.type === 'string' ? p.type : undefined;
+        if (type === 'thinking') {
+          // Never replay thinking blocks through OpenRouter's OpenAI-compatible endpoint.
+          continue;
+        }
+        const out: Record<string, unknown> = { ...p };
+        if ('signature' in out) delete out.signature;
+        if (out.thinking && typeof out.thinking === 'object') {
+          const t = out.thinking as Record<string, unknown>;
+          if ('signature' in t) {
+            const nt = { ...t };
+            delete nt.signature;
+            out.thinking = nt;
+          }
+        }
+        parts.push(out);
+      }
+      return parts;
+    };
+
+    return msgs
+      .map((m) => {
+        if (!m || typeof m !== 'object') return undefined;
+        const msg = m as Record<string, unknown>;
+        if (typeof msg.role !== 'string') return undefined;
+        const out: Record<string, unknown> = { ...msg };
+        if ('reasoning' in out) delete out.reasoning;
+        if ('reasoning_details' in out) delete out.reasoning_details;
+        if ('reasoningDetails' in out) delete out.reasoningDetails;
+        if ('content' in out) out.content = sanitizeContent(out.content);
+        return out as unknown as OpenAI.Chat.ChatCompletionMessageParam;
+      })
+      .filter((x): x is OpenAI.Chat.ChatCompletionMessageParam => !!x);
+  };
+
+  const sanitizedMessages = sanitizeMessagesForProvider();
 
   // Prefer host-provided LLM configuration; fall back to process.env for
   // backwards compatibility when running the runner standalone.
@@ -182,7 +242,7 @@ export async function invokeOpenRouter(
 
   const baseRequest: Record<string, unknown> = {
     model: providerModelId, // Use mapped ID
-    messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
+    messages: sanitizedMessages,
   };
 
   // Provider-side attribution (not part of prompt text).
@@ -250,8 +310,70 @@ export async function invokeOpenRouter(
   if (typeof request.presencePenalty === 'number') {
     baseRequest.presence_penalty = request.presencePenalty;
   }
-  if (request.reasoning && typeof request.reasoning === 'object') {
-    baseRequest.reasoning = request.reasoning;
+  // OpenRouter normalizes reasoning/thinking across providers via the `reasoning` object.
+  // For Anthropic models, OpenRouter expects `reasoning.max_tokens` (Anthropic-style),
+  // not `reasoning.effort` (OpenAI-style). Passing `enabled/effort` for Anthropic can
+  // lead OpenRouter/proxy translation to produce invalid Anthropic thinking blocks.
+  //
+  // Strategy:
+  // - Non-Anthropic: pass through `request.reasoning` as-is.
+  // - Anthropic: map { enabled/effort } -> { max_tokens } and keep exclude if present.
+  const normalizeReasoningForOpenRouter = (): Record<string, unknown> | undefined => {
+    const raw = request.reasoning;
+    if (!raw || typeof raw !== 'object') return undefined;
+    const r = raw as Record<string, unknown>;
+
+    const exclude = typeof r.exclude === 'boolean' ? r.exclude : undefined;
+    if (!isAnthropicModel) {
+      // For non-Anthropic models, we rely on OpenRouter to interpret effort/max_tokens.
+      return r;
+    }
+
+    // Anthropic-style: use max_tokens.
+    const explicitMax = typeof r.max_tokens === 'number' ? r.max_tokens : typeof r.maxTokens === 'number' ? r.maxTokens : undefined;
+    if (typeof explicitMax === 'number' && Number.isFinite(explicitMax)) {
+      const out: Record<string, unknown> = { max_tokens: explicitMax };
+      if (typeof exclude === 'boolean') out.exclude = exclude;
+      return out;
+    }
+
+    // Derive a safe default budget from requested output tokens (if provided).
+    // Anthropic manual thinking budgets are typically >= 1024; OpenRouter docs allow
+    // specifying any max_tokens, but too-low values can lead to provider rejection.
+    const maxOut = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? request.maxTokens : 8000;
+
+    // Map effort/enabled into a budget; if no effort provided but enabled true, assume "medium".
+    const effortRaw = typeof r.effort === 'string' ? r.effort.toLowerCase() : undefined;
+    const enabled = typeof r.enabled === 'boolean' ? r.enabled : undefined;
+    const effort =
+      effortRaw ??
+      (enabled === true ? 'medium' : undefined);
+
+    const pct =
+      effort === 'none'
+        ? 0
+        : effort === 'minimal'
+          ? 0.1
+          : effort === 'low'
+            ? 0.2
+            : effort === 'high'
+              ? 0.8
+              : effort === 'xhigh'
+                ? 0.95
+                : 0.5; // medium/default
+
+    // Keep within a reasonable bound and >= 1024 when enabled.
+    const derived = Math.floor(maxOut * pct);
+    const budget = derived <= 0 ? 0 : Math.max(1024, Math.min(derived, 12000));
+
+    const out: Record<string, unknown> = { max_tokens: budget };
+    if (typeof exclude === 'boolean') out.exclude = exclude;
+    return out;
+  };
+
+  const normalizedReasoning = normalizeReasoningForOpenRouter();
+  if (normalizedReasoning) {
+    baseRequest.reasoning = normalizedReasoning;
   }
 
   // Convert ToolParams[] into provider-native tool definitions for OpenAI/OpenRouter.

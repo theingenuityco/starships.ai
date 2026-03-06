@@ -93,13 +93,20 @@ export class TaskColumnRepository extends BaseRepository {
 
   private async computeNextPos(boardId: string): Promise<number> {
     const connection = this.getConnection();
-    const row = await connection.queryOne<{ max: number | null }>(`SELECT COALESCE(MAX(pos), 0) AS max FROM task_columns WHERE board_id = $1`, [
-      boardId,
-    ]);
+    const row = await connection.queryOne<{ max: number | null }>(
+      `SELECT COALESCE(MAX(pos), 0) AS max FROM task_columns WHERE board_id = $1`,
+      [boardId]
+    );
     return toFiniteNumber(row?.max, 0) + 1;
   }
 
-  async create(data: { boardId: string; title: string; key?: string | null; pos?: number; wipLimit?: number | null }): Promise<TaskColumnModel> {
+  async create(data: {
+    boardId: string;
+    title: string;
+    key?: string | null;
+    pos?: number;
+    wipLimit?: number | null;
+  }): Promise<TaskColumnModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -159,4 +166,3 @@ export class TaskColumnRepository extends BaseRepository {
 }
 
 export default TaskColumnRepository;
-

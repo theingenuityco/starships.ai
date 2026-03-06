@@ -81,7 +81,8 @@ export class TaskBoardRepository extends BaseRepository {
               { fallbackBase: 'board', maxLength: 100 }
             );
 
-        const pos = typeof data.pos === 'number' && Number.isFinite(data.pos) ? data.pos : await this.computeNextPosForStarship(data.starshipId);
+        const pos =
+          typeof data.pos === 'number' && Number.isFinite(data.pos) ? data.pos : await this.computeNextPosForStarship(data.starshipId);
 
         const boardData: TaskBoardModel = {
           id: 'temp',
@@ -147,4 +148,3 @@ export class TaskBoardRepository extends BaseRepository {
 }
 
 export default TaskBoardRepository;
-

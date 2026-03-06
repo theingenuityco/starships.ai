@@ -56,11 +56,16 @@ export class UserRepository extends BaseRepository {
           : typeof entity.email === 'string' && entity.email.trim().length > 0
             ? entity.email.trim().split('@')[0] || 'user'
             : 'user';
-      const slug =
-        await generateUniqueSlugRandomSuffix(generateSlug(baseForSlug) || 'user', async (candidate) => {
-          const row = await connection.queryOne<{ id: string }>('SELECT id FROM users WHERE slug = $1 LIMIT 1', [candidate]).catch(() => null);
+      const slug = await generateUniqueSlugRandomSuffix(
+        generateSlug(baseForSlug) || 'user',
+        async (candidate) => {
+          const row = await connection
+            .queryOne<{ id: string }>('SELECT id FROM users WHERE slug = $1 LIMIT 1', [candidate])
+            .catch(() => null);
           return Boolean(row?.id);
-        }, { fallbackBase: 'user', maxLength: 100, alwaysSuffix: true });
+        },
+        { fallbackBase: 'user', maxLength: 100, alwaysSuffix: true }
+      );
 
       // Validate using Entity
       await UserEntity.validate({ ...entity, slug }, 'create');

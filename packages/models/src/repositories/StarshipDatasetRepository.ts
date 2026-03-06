@@ -234,4 +234,3 @@ export class StarshipDatasetRepository extends BaseRepository {
 }
 
 export default StarshipDatasetRepository;
-

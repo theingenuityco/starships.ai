@@ -71,9 +71,7 @@ export class StarshipMemberRepository extends BaseRepository {
     );
   }
 
-  async listByStarshipWithUsers(
-    starshipId: string
-  ): Promise<
+  async listByStarshipWithUsers(starshipId: string): Promise<
     Array<{
       starshipId: string;
       userId: string;
@@ -175,4 +173,3 @@ export class StarshipMemberRepository extends BaseRepository {
     );
   }
 }
-

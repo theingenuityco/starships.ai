@@ -24,24 +24,6 @@ import { useAuth } from '@/hooks/useAuth'
 import type { RoomModel } from '@starships/protocol'
 
 const ROOM_NAME_MAX = 100
-const ROOM_SLUG_MAX = 100
-
-function toRoomSlug(input: string): string {
-  const s = String(input || '')
-    .trim()
-    .toLowerCase()
-  if (!s) return ''
-
-  const normalized = s
-    .replace(/[\s._]+/g, '-')
-    .replace(/[^a-z0-9-]+/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-  if (normalized.length <= ROOM_SLUG_MAX) return normalized
-  return normalized.slice(0, ROOM_SLUG_MAX).replace(/-+$/g, '')
-}
-
 function safeFilenameSegment(input: string): string {
   const raw = String(input || '').trim()
   const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '')
@@ -80,16 +62,13 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const [createName, setCreateName] = useState('')
   const [createPrivate, setCreatePrivate] = useState(false)
   const [createTopic, setCreateTopic] = useState('')
-
-  const createSlug = useMemo(() => toRoomSlug(createName), [createName])
   const createNameLength = createName.length
   const canCreate =
     canManageRooms &&
     !createRoom.isPending &&
     createName.trim().length > 0 &&
     createName === createName.trim() &&
-    createNameLength <= ROOM_NAME_MAX &&
-    createSlug.length > 0
+    createNameLength <= ROOM_NAME_MAX
 
   const [editRoomTarget, setEditRoomTarget] = useState<RoomModel | null>(null)
   const [editName, setEditName] = useState('')
@@ -318,7 +297,6 @@ export default function RoomsIndexPage(): React.JSX.Element {
               e.stopPropagation()
               if (!canCreate) return
               await createRoom.mutateAsync({
-                slug: createSlug,
                 name: createName,
                 isPrivate: createPrivate,
                 topic: createTopic.trim().length > 0 ? createTopic.trim() : null,
@@ -343,13 +321,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                 </p>
                 {createName !== createName.trim() ? <p className="text-xs text-destructive">Name must not have leading/trailing whitespace.</p> : null}
                 {createNameLength > ROOM_NAME_MAX ? <p className="text-xs text-destructive">Name must be {ROOM_NAME_MAX} characters or fewer.</p> : null}
-                {createName.trim().length > 0 && createSlug.length === 0 ? <p className="text-xs text-destructive">Name must include at least one letter or number.</p> : null}
               </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="room-slug">Slug</Label>
-              <Input id="room-slug" value={createSlug || '-'} readOnly disabled />
             </div>
 
             <div className="space-y-1">

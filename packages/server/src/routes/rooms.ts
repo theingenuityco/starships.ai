@@ -40,14 +40,6 @@ import { rateLimiters } from '@/middleware/rateLimiter';
 
 const router: Router = Router();
 
-const RoomSlugSchema = z
-  .string()
-  .min(1)
-  .max(100)
-  .refine((s) => s === s.trim(), 'slug must not have leading/trailing whitespace')
-  .refine((s) => s === s.toLowerCase(), 'slug must be lowercase')
-  .refine((s) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s), 'slug must be lowercase alphanumeric with hyphens');
-
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
 
@@ -985,7 +977,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
 
     const body = validateData(
       z.object({
-        slug: RoomSlugSchema,
         name: z
           .string()
           .min(1)
@@ -1015,7 +1006,6 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
       const room = await roomRepo.create({
         conversationId: conversation.id,
         starshipId: params.starshipId,
-        slug: body.slug,
         name: body.name,
         isPrivate: Boolean(body.isPrivate),
         topic: body.topic ?? null,

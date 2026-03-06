@@ -273,7 +273,6 @@ export class ImportExportService {
 
     const payload: RoomExportPayloadV1 = {
       room: {
-        slug: room.slug,
         name: room.name,
         isPrivate: room.isPrivate,
         topic: room.topic ?? null,

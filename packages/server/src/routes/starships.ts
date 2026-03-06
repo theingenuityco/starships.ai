@@ -1452,8 +1452,21 @@ router.post(
           .trim()
           .toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
-        const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-        if (hash) existingToolsByHash.set(hash, t);
+        const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+        if (storedHash) existingToolsByHash.set(storedHash, t);
+        // Also index a freshly computed hash to remain robust if the hashing algorithm evolves.
+        const computedHash = computeToolContentHash({
+          name: t.name,
+          description: t.description,
+          parameters: (t as any).parameters,
+          blueprint: (t as any).blueprint,
+          transforms: (t as any).transforms,
+          mutations: (t as any).mutations,
+          condition: (t as any).condition,
+          isEnabled: (t as any).isEnabled,
+          status: (t as any).status,
+        });
+        existingToolsByHash.set(computedHash, t);
       }
 
       const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -1472,29 +1485,27 @@ router.post(
           .trim()
           .toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
-        const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
-        if (hash) existingAgentsByHash.set(hash, a);
-        // Lazy backfill for older rows: compute if missing.
-        if (!hash) {
-          const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
-          const computed = computeAgentContentHash({
-            name: a.name,
-            role: a.role,
-            description: a.description,
-            model: a.model,
-            temperature: a.temperature,
-            maxTokens: a.maxTokens,
-            timeout: a.timeout,
-            reasoning: (a as unknown as { reasoning?: unknown }).reasoning,
-            systemPrompt: a.systemPrompt,
-            state: a.state,
-            blueprint: a.blueprint,
-            category: a.category,
-            previewPrompts: a.previewPrompts,
-            assignedToolSlugs: slugs,
-          });
-          existingAgentsByHash.set(computed, a);
-        }
+        const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
+        if (storedHash) existingAgentsByHash.set(storedHash, a);
+        // Always index the freshly computed hash too (contentHash may be stale from older versions).
+        const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
+        const computed = computeAgentContentHash({
+          name: a.name,
+          role: a.role,
+          description: a.description,
+          model: a.model,
+          temperature: a.temperature,
+          maxTokens: a.maxTokens,
+          timeout: a.timeout,
+          reasoning: (a as unknown as { reasoning?: unknown }).reasoning,
+          systemPrompt: a.systemPrompt,
+          state: a.state,
+          blueprint: a.blueprint,
+          category: a.category,
+          previewPrompts: a.previewPrompts,
+          assignedToolSlugs: slugs,
+        });
+        existingAgentsByHash.set(computed, a);
       }
 
       const toolsAnalysis: Array<{
@@ -2059,8 +2070,20 @@ router.post(
       for (const t of existingTools) {
         const nameKey = String(t.name || '').trim().toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
-        const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-        if (hash) existingToolsByHash.set(hash, t);
+        const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+        if (storedHash) existingToolsByHash.set(storedHash, t);
+        const computedHash = computeToolContentHash({
+          name: t.name,
+          description: t.description,
+          parameters: (t as any).parameters,
+          blueprint: (t as any).blueprint,
+          transforms: (t as any).transforms,
+          mutations: (t as any).mutations,
+          condition: (t as any).condition,
+          isEnabled: (t as any).isEnabled,
+          status: (t as any).status,
+        });
+        existingToolsByHash.set(computedHash, t);
       }
 
       const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -2076,28 +2099,26 @@ router.post(
       for (const a of existingAgents) {
         const nameKey = String(a.name || '').trim().toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
-        const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
-        if (hash) existingAgentsByHash.set(hash, a);
-        if (!hash) {
-          const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
-          const computed = computeAgentContentHash({
-            name: a.name,
-            role: a.role,
-            description: a.description,
-            model: a.model,
-            temperature: a.temperature,
-            maxTokens: a.maxTokens,
-            timeout: a.timeout,
-            reasoning: (a as unknown as { reasoning?: unknown }).reasoning,
-            systemPrompt: a.systemPrompt,
-            state: a.state,
-            blueprint: a.blueprint,
-            category: a.category,
-            previewPrompts: a.previewPrompts,
-            assignedToolSlugs: slugs,
-          });
-          existingAgentsByHash.set(computed, a);
-        }
+        const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
+        if (storedHash) existingAgentsByHash.set(storedHash, a);
+        const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
+        const computed = computeAgentContentHash({
+          name: a.name,
+          role: a.role,
+          description: a.description,
+          model: a.model,
+          temperature: a.temperature,
+          maxTokens: a.maxTokens,
+          timeout: a.timeout,
+          reasoning: (a as unknown as { reasoning?: unknown }).reasoning,
+          systemPrompt: a.systemPrompt,
+          state: a.state,
+          blueprint: a.blueprint,
+          category: a.category,
+          previewPrompts: a.previewPrompts,
+          assignedToolSlugs: slugs,
+        });
+        existingAgentsByHash.set(computed, a);
       }
 
       // Existing views/datasets/task boards/rooms (conflicts by hash + name where feasible).

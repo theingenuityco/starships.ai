@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { ConversationService } from '@/services/ConversationService';
+import { ImportExportService } from '@/services/ImportExportService';
 import { UIActionService } from '@/services/UIActionService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
@@ -33,6 +34,7 @@ import { WalletService } from '@/services/WalletService';
 import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import archiver from 'archiver';
 import crypto from 'crypto';
 import { rateLimiters } from '@/middleware/rateLimiter';
 
@@ -48,6 +50,16 @@ const RoomSlugSchema = z
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
+
+function safeFilenameSegment(input: string): string {
+  const raw = String(input || '').trim();
+  const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
+  return sanitized.length > 0 ? sanitized : 'export';
+}
+
+function isoCompactTimestamp(): string {
+  return new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+}
 
 async function resolveRoomAccessArgs(args: { roomConversationId: string }): Promise<{
   room: RoomModel | null;
@@ -1081,6 +1093,120 @@ router.get('/rooms/:roomId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, a
     sendSuccess(res, { room }, 200);
   } catch (error) {
     handleError(error, res, 'fetching room');
+  }
+});
+
+/**
+ * GET /rooms/:roomId/export-bundle
+ *
+ * Export a room and its resources as a zip bundle.
+ * Owner / instance-admin only.
+ */
+router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const roomRepo = new RoomRepository();
+    const room = await roomRepo.findByConversationId(params.roomId);
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+
+    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+
+    const svc = new ImportExportService();
+    const bundle = await svc.exportRoomBundle(params.roomId);
+
+    const fromStarshipSlug =
+      typeof bundle.room.metadata?.fromStarshipSlug === 'string' ? bundle.room.metadata.fromStarshipSlug : 'starship';
+    const fromRoomSlug = typeof bundle.room.metadata?.fromSlug === 'string' ? bundle.room.metadata.fromSlug : room.slug || room.conversationId;
+    const baseName = safeFilenameSegment(`room-bundle-${fromStarshipSlug}-${fromRoomSlug}-${isoCompactTimestamp()}`);
+    const filename = `${baseName}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => {
+      throw err;
+    });
+    archive.pipe(res);
+
+    const appendContainers = <K extends string>(
+      items: Array<{ metadata?: { fromSlug?: unknown; fromStarshipSlug?: unknown } }>,
+      dir: string,
+      fallbackPrefix: string,
+      kind: K
+    ): Array<{ kind: K; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> => {
+      const usedNames = new Set<string>();
+      const entries: Array<{ kind: K; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
+
+      for (let i = 0; i < items.length; i += 1) {
+        const item = items[i];
+        const slug = typeof item.metadata?.fromSlug === 'string' ? item.metadata.fromSlug : `${fallbackPrefix}-${i + 1}`;
+        const base = safeFilenameSegment(slug);
+        let outName = base;
+        let n = 2;
+        while (usedNames.has(outName)) {
+          outName = `${base}-${n}`;
+          n += 1;
+        }
+        usedNames.add(outName);
+        const file = `${dir}/${outName}.json`;
+        entries.push({
+          kind,
+          fromSlug: item.metadata?.fromSlug,
+          fromStarshipSlug: item.metadata?.fromStarshipSlug,
+          file,
+        });
+        archive.append(JSON.stringify(item, null, 2), { name: file });
+      }
+
+      return entries;
+    };
+
+    const roomEntries = appendContainers([bundle.room], 'rooms', 'room', 'room');
+    const agentEntries = appendContainers(bundle.agents, 'agents', 'agent', 'agent');
+    const viewEntries = appendContainers(bundle.views, 'views', 'view', 'view');
+    const datasetEntries = appendContainers(bundle.datasets, 'datasets', 'dataset', 'dataset');
+    const taskBoardEntries = appendContainers(bundle.taskBoards, 'task-boards', 'task-board', 'task_board');
+    const toolEntries = appendContainers(bundle.tools, 'tools', 'tool', 'tool');
+
+    const manifest = {
+      schemaVersion: '1',
+      kind: 'bundle',
+      exportedAt: new Date().toISOString(),
+      entities: {
+        rooms: roomEntries,
+        agents: agentEntries,
+        views: viewEntries,
+        datasets: datasetEntries,
+        taskBoards: taskBoardEntries,
+        tools: toolEntries,
+      },
+    };
+
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+    await archive.finalize();
+  } catch (error) {
+    if (res.headersSent) {
+      try {
+        res.end();
+      } catch {
+        // ignore
+      }
+      console.error('[ROOMS] Error exporting room bundle after headers sent:', error);
+      return;
+    }
+    handleError(error, res, 'exporting room bundle');
   }
 });
 

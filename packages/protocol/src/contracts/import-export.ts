@@ -1,8 +1,12 @@
-import type { AgentModel, CreateAgentRequest } from '../domains/agent';
+import type { AgentModel, AgentToolPermission, CreateAgentRequest } from '../domains/agent';
 import type { ConnectorEndpointV2, CreateConnectorTemplateRequest } from '../domains/connector';
 import type { ToolModel, CreateToolRequest } from '../domains/tool';
+import type { CreateViewRequest } from '../domains/view';
+import type { CreateTaskBoardRequest, TaskCardModel, TaskColumnModel } from '../domains/task-board';
+import type { Room } from '../domains/room';
+import type { CreateStarshipDatasetRequest, StarshipDatasetRowModel } from '../domains/dataset';
 
-export type ImportExportKind = 'agent' | 'tool' | 'connector_template';
+export type ImportExportKind = 'agent' | 'tool' | 'connector_template' | 'room' | 'view' | 'dataset' | 'task_board';
 
 /**
  * Shared container/envelope for importing/exporting resources as JSON.
@@ -26,7 +30,19 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
     app?: string;
     version?: string;
   };
-  payload: K extends 'agent' ? AgentExportPayloadV1 : K extends 'tool' ? ToolExportPayloadV1 : ConnectorTemplateExportPayloadV1;
+  payload: K extends 'agent'
+    ? AgentExportPayloadV1
+    : K extends 'tool'
+      ? ToolExportPayloadV1
+      : K extends 'room'
+        ? RoomExportPayloadV1
+        : K extends 'view'
+          ? ViewExportPayloadV1
+          : K extends 'dataset'
+            ? DatasetExportPayloadV1
+            : K extends 'task_board'
+              ? TaskBoardExportPayloadV1
+              : ConnectorTemplateExportPayloadV1;
 }
 
 /**
@@ -55,6 +71,43 @@ export interface ToolExportPayloadV1 {
   tool: Partial<Omit<CreateToolRequest, 'configuration'>> & {
     name: string;
   };
+}
+
+export interface RoomExportPayloadV1 {
+  room: Room;
+  viewPins?: Array<{ viewSlug: string; position: number }>;
+  datasetPins?: Array<{ datasetSlug: string; position: number }>;
+  taskBoardPins?: Array<{ taskBoardSlug: string; position: number }>;
+  toolAssignments?: Array<{ toolSlug: string; permission: AgentToolPermission }>;
+  agentParticipantSlugs?: string[];
+}
+
+export interface ViewExportPayloadV1 {
+  view: Omit<CreateViewRequest, 'starshipId'> & {
+    name: string;
+  };
+}
+
+export interface DatasetExportPayloadV1 {
+  dataset: Omit<CreateStarshipDatasetRequest, 'starshipId'> & {
+    name: string;
+  };
+  rows?: Array<Pick<StarshipDatasetRowModel, 'rowKey' | 'data'>>;
+}
+
+export interface TaskBoardExportPayloadV1 {
+  taskBoard: Omit<CreateTaskBoardRequest, 'starshipId' | 'columns'> & {
+    name: string;
+  };
+  columns?: Array<Pick<TaskColumnModel, 'title' | 'key' | 'pos' | 'wipLimit'>>;
+  cards?: Array<
+    Pick<TaskCardModel, 'title' | 'description' | 'pos' | 'priority' | 'archived'> & {
+      columnKey?: string | null;
+      columnTitle: string;
+      assigneeAgentSlug?: string | null;
+      assigneeUserSlug?: string | null;
+    }
+  >;
 }
 
 /**

@@ -199,8 +199,8 @@ export async function down(client: DbClient): Promise<void> {
         .map((e) => [String(e.name), e] as [string, Endpoint])
     );
     const prev = byName.get("get-room-pinned-resources");
-    if (prev && typeof (prev as any).path === "string") {
-      (prev as any).path = "/rooms/{roomId}/pins/resources";
+    if (prev && typeof prev.path === "string") {
+      prev.path = "/rooms/{roomId}/pins/resources";
     }
 
     await client.query(`UPDATE connector_templates SET endpoints_json = $1::jsonb, updated_at = NOW() WHERE id = $2;`, [

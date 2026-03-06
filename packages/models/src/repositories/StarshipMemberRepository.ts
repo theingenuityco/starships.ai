@@ -20,7 +20,8 @@ export class StarshipMemberRepository extends BaseRepository {
           [starshipId, userId]
         );
         const role = typeof row?.role === 'string' ? row.role : null;
-        return role === 'admin' || role === 'collaborator' ? (role as any) : null;
+        if (role === 'admin' || role === 'collaborator') return role;
+        return null;
       },
       'getRole',
       'starship_members'

@@ -204,7 +204,7 @@ export async function up(client: DbClient): Promise<void> {
     // ---- Keep legacy endpoints_json in sync (best-effort) ----
     const keep: Endpoint[] = [];
     for (const e of legacyEndpoints) {
-      const name = String((e as any)?.name || '').trim();
+      const name = typeof e.name === 'string' ? e.name.trim() : '';
       if (!name) continue;
       if ((REMOVE_ACTIONS as readonly string[]).includes(name)) continue;
       keep.push(e);

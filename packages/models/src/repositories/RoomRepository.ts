@@ -3,10 +3,11 @@ import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Room, RoomModel } from '@starships/protocol';
 import { RoomEntity } from '@/entities/RoomEntity';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class RoomRepository extends BaseRepository {
-  constructor() {
-    super('RoomRepository');
+  constructor(connection?: PostgresConnection) {
+    super('RoomRepository', connection);
   }
 
   async findBySlug(slug: string, starshipId: string): Promise<RoomModel | null> {
@@ -98,4 +99,3 @@ export class RoomRepository extends BaseRepository {
     );
   }
 }
-

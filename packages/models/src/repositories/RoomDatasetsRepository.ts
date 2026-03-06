@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository';
 import type { RoomPinnedDataset } from '@starships/protocol';
+import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = {
   room_conversation_id: string;
@@ -21,8 +22,8 @@ function fromDb(r: DbRow): RoomPinnedDataset {
 }
 
 export class RoomDatasetsRepository extends BaseRepository {
-  constructor() {
-    super('RoomDatasetsRepository');
+  constructor(connection?: PostgresConnection) {
+    super('RoomDatasetsRepository', connection);
   }
 
   async list(roomConversationId: string): Promise<RoomPinnedDataset[]> {

@@ -1,10 +1,11 @@
 import { ConversationParticipantEntity, type ConversationParticipantRole } from '@/entities/ConversationParticipantEntity';
 import { fromDatabaseArray } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { PostgresConnection } from '@/helpers/database';
 
 export class ConversationParticipantRepository extends BaseRepository {
-  constructor() {
-    super('ConversationParticipantRepository');
+  constructor(connection?: PostgresConnection) {
+    super('ConversationParticipantRepository', connection);
   }
 
   async isUserParticipant(userId: string, conversationId: string): Promise<boolean> {

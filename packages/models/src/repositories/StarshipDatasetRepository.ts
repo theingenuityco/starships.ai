@@ -5,12 +5,13 @@ import { NotFoundError } from '@starships/errors';
 import { nanoid } from 'nanoid';
 import { fromDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = Record<string, unknown>;
 
 export class StarshipDatasetRepository extends BaseRepository {
-  constructor() {
-    super('StarshipDatasetRepository');
+  constructor(connection?: PostgresConnection) {
+    super('StarshipDatasetRepository', connection);
   }
 
   async findById(id: string): Promise<StarshipDatasetModel | null> {
@@ -234,4 +235,3 @@ export class StarshipDatasetRepository extends BaseRepository {
 }
 
 export default StarshipDatasetRepository;
-

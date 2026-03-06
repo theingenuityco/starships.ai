@@ -34,22 +34,6 @@ async function listSchemasForTable(client: Client, tableName: string): Promise<s
   return rows.map((r) => String(r.schema)).filter(Boolean);
 }
 
-async function listSchemasForIndex(client: Client, indexName: string): Promise<string[]> {
-  const res = await client.query<{ schema: string }>(
-    `
-    SELECT n.nspname AS schema
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE c.relname = $1
-       AND c.relkind = 'i'
-     ORDER BY (n.nspname = 'public') DESC, n.nspname ASC
-    `,
-    [indexName]
-  );
-  const rows = getRows<{ schema: string }>(res);
-  return rows.map((r) => String(r.schema)).filter(Boolean);
-}
-
 /**
  * Migration 175: Repair room pin join tables + room tool assignments table.
  *
@@ -315,7 +299,8 @@ export async function up(client: Client): Promise<void> {
   }
 }
 
-export async function down(_client: Client): Promise<void> {
+export async function down(client: Client): Promise<void> {
   // No-op: this migration is a best-effort repair for drifted installations.
+  void client;
 }
 

@@ -26,7 +26,8 @@ function makeQueryRows(conn: MigrationConn) {
 async function withMigrationConn(conn: MigrationConn, fn: (c: MigrationConn) => Promise<void>): Promise<void> {
   if (typeof conn.transaction === 'function') {
     await conn.transaction(async (tx) => {
-      await fn({ query: tx.query });
+      // IMPORTANT: don't pass an unbound method reference; pg's Client#query relies on `this`.
+      await fn({ query: (text, params) => tx.query(text, params) });
     });
     return;
   }

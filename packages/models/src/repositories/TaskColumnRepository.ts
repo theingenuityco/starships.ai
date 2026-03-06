@@ -2,6 +2,7 @@ import type { TaskColumnModel } from '@starships/protocol';
 import { TaskColumnEntity } from '@/entities/TaskColumnEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
+import type { PostgresConnection } from '@/helpers/database';
 
 function toFiniteNumber(value: unknown, fallback: number): number {
   const n = typeof value === 'number' ? value : Number(value);
@@ -9,8 +10,8 @@ function toFiniteNumber(value: unknown, fallback: number): number {
 }
 
 export class TaskColumnRepository extends BaseRepository {
-  constructor() {
-    super('TaskColumnRepository');
+  constructor(connection?: PostgresConnection) {
+    super('TaskColumnRepository', connection);
   }
 
   async findById(id: string): Promise<TaskColumnModel | null> {

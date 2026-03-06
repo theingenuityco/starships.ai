@@ -172,7 +172,7 @@ export async function invokeOpenRouter(
   const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
 
   const resolveProviderEndUserId = (): string => {
-    const raw = typeof (request as unknown as { endUserId?: unknown }).endUserId === 'string' ? (request as any).endUserId : '';
+    const raw = (request as unknown as { endUserId?: unknown }).endUserId;
     const id = typeof raw === 'string' ? raw.trim() : '';
     // Provider-side identifiers should be short + opaque.
     // OpenAI docs: max length 64 for safety_identifier.

@@ -292,9 +292,8 @@ export function useDenyRoomInviteApproval(roomConversationId: string) {
 export function useCreateRoom(starshipId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { slug: string; name: string; isPrivate?: boolean; topic?: string | null }) => {
+    mutationFn: async (args: { name: string; isPrivate?: boolean; topic?: string | null }) => {
       const response: FetchResponse<ApiResponse<{ room: RoomModel; conversationId: string }>> = await api.post(`/api/v1/starships/${starshipId}/rooms`, {
-        slug: args.slug,
         name: args.name,
         isPrivate: args.isPrivate,
         topic: args.topic ?? null,

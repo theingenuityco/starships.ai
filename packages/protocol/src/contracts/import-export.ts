@@ -74,7 +74,7 @@ export interface ToolExportPayloadV1 {
 }
 
 export interface RoomExportPayloadV1 {
-  room: Room;
+  room: Omit<Room, 'slug'>;
   viewPins?: Array<{ viewSlug: string; position: number }>;
   datasetPins?: Array<{ datasetSlug: string; position: number }>;
   taskBoardPins?: Array<{ taskBoardSlug: string; position: number }>;

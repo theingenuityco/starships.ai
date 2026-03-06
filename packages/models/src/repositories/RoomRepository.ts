@@ -2,10 +2,27 @@ import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Room, RoomModel } from '@starships/protocol';
 import { RoomEntity } from '@/entities/RoomEntity';
+import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 
 export class RoomRepository extends BaseRepository {
   constructor() {
     super('RoomRepository');
+  }
+
+  async findBySlug(slug: string, starshipId: string): Promise<RoomModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM rooms WHERE slug = $1 AND starship_id = $2', [
+          slug,
+          starshipId,
+        ]);
+        return row ? fromDatabase(RoomEntity, row) : null;
+      },
+      'findBySlug',
+      'Room',
+      slug
+    );
   }
 
   async findByConversationId(conversationId: string): Promise<RoomModel | null> {
@@ -36,14 +53,22 @@ export class RoomRepository extends BaseRepository {
     );
   }
 
-  async create(args: Room & { conversationId: string; starshipId: string }): Promise<RoomModel> {
+  async create(args: Omit<Room, 'slug'> & { slug?: string; conversationId: string; starshipId: string }): Promise<RoomModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
+        const slug =
+          typeof args.slug === 'string' && args.slug.trim().length > 0
+            ? String(args.slug).trim()
+            : await generateUniqueSlugIncremental(
+                String(args.name || 'room'),
+                async (candidate: string) => Boolean(await this.findBySlug(candidate, args.starshipId)),
+                { fallbackBase: 'room', maxLength: 100 }
+              );
         const data = {
           conversationId: args.conversationId,
           starshipId: args.starshipId,
-          slug: args.slug,
+          slug,
           name: args.name,
           isPrivate: Boolean(args.isPrivate),
           ...(args.topic !== undefined ? { topic: args.topic } : {}),

@@ -2142,10 +2142,13 @@ router.post(
       }
 
       const existingRooms = await roomRepo.listByStarship(starshipId);
+      const existingRoomsByHash = new Map<string, (typeof existingRooms)[number]>();
       const existingRoomsByName = new Map<string, (typeof existingRooms)[number]>();
       for (const r of existingRooms) {
         const nameKey = String(r.name || '').trim().toLowerCase();
         if (nameKey) existingRoomsByName.set(nameKey, r);
+        const h = computeBundleHash({ name: r.name, isPrivate: r.isPrivate, topic: r.topic ?? null });
+        existingRoomsByHash.set(h, r);
       }
 
       const toolsAnalysis: Array<{
@@ -2406,17 +2409,17 @@ router.post(
         const roomPayload = payload?.room ?? {};
         const name = String(roomPayload?.name || '').trim();
         const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+        const existingByHash = existingRoomsByHash.get(bundleHash);
         const existingByName = name ? existingRoomsByName.get(name.toLowerCase()) : undefined;
-        const status: 'new' | 'same' | 'conflict' = existingByName ? 'conflict' : 'new';
+        const existing = existingByHash ?? existingByName;
+        const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
         roomsAnalysis.push({
           kind: 'room',
           file: r.file,
           name: name || '(unnamed room)',
           bundleHash,
           status,
-          existing: existingByName
-            ? { conversationId: existingByName.conversationId, name: existingByName.name, slug: existingByName.slug }
-            : undefined,
+          existing: existing ? { conversationId: existing.conversationId, name: existing.name, slug: existing.slug } : undefined,
         });
       }
 

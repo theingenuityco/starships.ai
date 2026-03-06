@@ -168,7 +168,13 @@ export default function RoomsIndexPage(): React.JSX.Element {
       const importedTools = Number(data?.imported?.tools ?? 0)
       const warnings = Array.isArray(data?.warnings) ? (data.warnings as unknown[]).length : 0
 
-      await queryClient.invalidateQueries()
+      // Fire-and-forget invalidation; do not await (keeps modal responsive).
+      queryClient.invalidateQueries({ queryKey: ['rooms'] })
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['tools'] })
+      queryClient.invalidateQueries({ queryKey: ['views'] })
+      queryClient.invalidateQueries({ queryKey: ['datasets'] })
+      queryClient.invalidateQueries({ queryKey: ['task-boards'] })
       toast.success('Import complete', {
         description: `${importedRooms} room(s), ${importedViews} view(s), ${importedDatasets} dataset(s), ${importedBoards} task board(s), ${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
       })

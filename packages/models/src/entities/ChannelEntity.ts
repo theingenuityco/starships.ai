@@ -5,7 +5,7 @@
  */
 
 import type { ChannelModel } from '@starships/protocol';
-import { Expose } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { IsBoolean, IsISO8601, IsIn, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 export class ChannelEntity implements ChannelModel {
@@ -39,7 +39,8 @@ export class ChannelEntity implements ChannelModel {
   @Expose()
   @IsString()
   @IsIn(['chat'])
-  channelType!: 'chat';
+  @Exclude({ toPlainOnly: true })
+  channelType: 'chat' = 'chat';
 
   @Expose()
   @IsOptional()

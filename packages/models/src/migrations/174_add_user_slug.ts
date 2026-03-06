@@ -42,20 +42,6 @@ export async function up(client: Client): Promise<void> {
     return out;
   };
 
-  const generateUniqueSlugRandomSuffix = async (baseSlug: string, maxLength = 100, maxAttempts = 100): Promise<string> => {
-    const base = slugify(baseSlug) || 'user';
-    const effectiveBase = base.slice(0, Math.max(1, Math.min(maxLength, base.length)));
-    for (let attempts = 0; attempts < maxAttempts; attempts++) {
-      const rand = generateRandomSuffix();
-      const suffix = `-${rand}`;
-      const candidate = `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
-      if (!(await exists(candidate))) return candidate;
-    }
-    const ts = Date.now().toString(36);
-    const suffix = `-${ts}`;
-    return `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
-  };
-
   const rowsRes = await client.query<{
     id: string;
     display_name: string | null;
@@ -63,11 +49,29 @@ export async function up(client: Client): Promise<void> {
     slug: string | null;
   }>(`SELECT id, display_name, email, slug FROM users`);
   const rows = getRows<{ id: string; display_name: string | null; email: string | null; slug: string | null }>(rowsRes);
+  const existingSlugs = new Set(
+    rows
+      .map((row) => (typeof row.slug === 'string' ? row.slug.trim() : ''))
+      .filter((slug): slug is string => Boolean(slug))
+  );
 
-  const exists = async (candidate: string): Promise<boolean> => {
-    const r = await client.query<{ id: string }>(`SELECT id FROM users WHERE slug = $1 LIMIT 1`, [candidate]);
-    const any = getRows<{ id: string }>(r)?.[0];
-    return Boolean(any?.id);
+  const generateUniqueSlugRandomSuffix = async (baseSlug: string, maxLength = 100, maxAttempts = 100): Promise<string> => {
+    const base = slugify(baseSlug) || 'user';
+    const effectiveBase = base.slice(0, Math.max(1, Math.min(maxLength, base.length)));
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+      const rand = generateRandomSuffix();
+      const suffix = `-${rand}`;
+      const candidate = `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+      if (!existingSlugs.has(candidate)) {
+        existingSlugs.add(candidate);
+        return candidate;
+      }
+    }
+    const ts = Date.now().toString(36);
+    const suffix = `-${ts}`;
+    const candidate = `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+    existingSlugs.add(candidate);
+    return candidate;
   };
 
   for (const r of Array.isArray(rows) ? rows : []) {

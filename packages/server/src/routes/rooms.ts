@@ -42,6 +42,21 @@ const router: Router = Router();
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
+const RoomToolPermissionSchema = z
+  .preprocess((value) => {
+    if (value == null) return undefined;
+    if (typeof value === 'boolean') return value ? 'allow' : 'deny';
+    if (typeof value !== 'string') return value;
+    const raw = value.trim().toLowerCase();
+    if (!raw) return undefined;
+    // Be forgiving for common synonyms coming from UI/LLM/tooling.
+    if (raw === 'ask-first' || raw === 'ask_first' || raw === 'askfirst' || raw === 'prompt' || raw === 'confirm') return 'ask';
+    if (raw === 'enabled' || raw === 'enable' || raw === 'on' || raw === 'true') return 'allow';
+    if (raw === 'disabled' || raw === 'disable' || raw === 'off' || raw === 'false') return 'deny';
+    return raw;
+  }, z.enum(['allow', 'ask', 'deny']))
+  .optional()
+  .default('allow');
 
 function safeFilenameSegment(input: string): string {
   const raw = String(input || '').trim();
@@ -2214,7 +2229,7 @@ router.post('/rooms/:roomId/tools', jwtAuthMiddleware, rateLimiters.apiAuthentic
     const body = validateData(
       z.object({
         toolId: IdSchema,
-        permission: z.enum(['allow', 'ask', 'deny']),
+        permission: RoomToolPermissionSchema,
       }),
       req.body,
       res,

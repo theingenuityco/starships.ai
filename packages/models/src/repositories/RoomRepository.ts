@@ -98,4 +98,3 @@ export class RoomRepository extends BaseRepository {
     );
   }
 }
-

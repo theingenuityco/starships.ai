@@ -19,7 +19,14 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
 import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
-import { AgentRepository, PostgresConnection, ToolRepository, computeAgentContentHash, computeToolContentHash, getConnection } from '@starships/models';
+import {
+  AgentRepository,
+  PostgresConnection,
+  ToolRepository,
+  computeAgentContentHash,
+  computeToolContentHash,
+  getConnection,
+} from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
@@ -1171,7 +1178,12 @@ router.post(
             importedTools.push(result.tool);
             const fromSlug = containerParsed.data.metadata?.fromSlug;
             const createdSlug = result.tool?.slug;
-            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+            if (
+              typeof fromSlug === 'string' &&
+              fromSlug.trim().length > 0 &&
+              typeof createdSlug === 'string' &&
+              createdSlug.trim().length > 0
+            ) {
               toolSlugMap.set(fromSlug, createdSlug);
             }
           }
@@ -1301,7 +1313,9 @@ router.post(
       const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
       const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
       for (const t of existingTools) {
-        const nameKey = String(t.name || '').trim().toLowerCase();
+        const nameKey = String(t.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
         const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
         if (hash) existingToolsByHash.set(hash, t);
@@ -1319,7 +1333,9 @@ router.post(
       const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
       const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
       for (const a of existingAgents) {
-        const nameKey = String(a.name || '').trim().toLowerCase();
+        const nameKey = String(a.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
         const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
         if (hash) existingAgentsByHash.set(hash, a);
@@ -1584,10 +1600,12 @@ router.post(
         const toolsByHash = new Map<string, (typeof existingTools)[number]>();
         const toolsByName = new Map<string, (typeof existingTools)[number]>();
         const indexTool = (t: (typeof existingTools)[number]) => {
-          const nameKey = String(t.name || '').trim().toLowerCase();
+          const nameKey = String(t.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) toolsByName.set(nameKey, t);
-        const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-        if (hash) toolsByHash.set(hash, t);
+          const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+          if (hash) toolsByHash.set(hash, t);
         };
         for (const t of existingTools) indexTool(t);
 
@@ -1629,7 +1647,9 @@ router.post(
           });
 
           const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-          const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
+          const toolNameKey = String(toolPayload?.name || '')
+            .trim()
+            .toLowerCase();
 
           const existingByHash = toolsByHash.get(bundleHash);
           const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
@@ -1657,8 +1677,7 @@ router.post(
               mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
               condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
               isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
-              status:
-                toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
+              status: toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
             };
             const updated = await toolRepo.update(targetId, updateReq);
             if (updated) {
@@ -1676,7 +1695,12 @@ router.post(
             importedTools.push(result.tool);
             indexTool(result.tool);
             const createdSlug = result.tool?.slug;
-            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && typeof createdSlug === 'string' && createdSlug.trim().length > 0) {
+            if (
+              typeof fromSlug === 'string' &&
+              fromSlug.trim().length > 0 &&
+              typeof createdSlug === 'string' &&
+              createdSlug.trim().length > 0
+            ) {
               toolSlugMap.set(fromSlug, createdSlug);
             }
           }
@@ -1687,7 +1711,9 @@ router.post(
         const agentsByHash = new Map<string, (typeof existingAgents)[number]>();
         const agentsByName = new Map<string, (typeof existingAgents)[number]>();
         const indexAgent = (a: (typeof existingAgents)[number]) => {
-          const nameKey = String(a.name || '').trim().toLowerCase();
+          const nameKey = String(a.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) agentsByName.set(nameKey, a);
           const hash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
           if (hash) agentsByHash.set(hash, a);
@@ -1743,7 +1769,9 @@ router.post(
           });
 
           const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
-          const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
+          const agentNameKey = String(agentPayload?.name || '')
+            .trim()
+            .toLowerCase();
 
           const existingByHash = agentsByHash.get(bundleHash);
           const existingByName = agentNameKey ? agentsByName.get(agentNameKey) : undefined;

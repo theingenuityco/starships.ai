@@ -47,12 +47,24 @@ export interface DataTableProps {
   data?: Array<Record<string, unknown>>
   title?: string
   description?: string
+  query?: string
+  onQueryChange?: (next: string) => void
+  serverSideSearch?: boolean
   pageSize?: number
   striped?: boolean
   className?: string
   onRowClick?: (payload: { row: Record<string, unknown>; rowIndex: number }) => void
   excelLike?: boolean
   outerBorder?: boolean
+  showToolbar?: boolean
+  showSearch?: boolean
+  showColumnsMenu?: boolean
+  showExportCsv?: boolean
+  showTitle?: boolean
+  showDescription?: boolean
+  showRowCount?: boolean
+  hiddenColumnKeys?: Set<string>
+  onHiddenColumnKeysChange?: (next: Set<string>) => void
   editable?: boolean
   primaryKey?: string | null
   onCommitRows?: (payload: { rows: Array<Record<string, unknown>>; meta: RowsCommitMeta }) => Promise<void> | void
@@ -105,20 +117,32 @@ export function DataTable({
   data,
   title,
   description,
+  query: queryProp,
+  onQueryChange,
+  serverSideSearch = false,
   pageSize = 10,
   striped = true,
   className,
   onRowClick,
   excelLike = false,
   outerBorder = true,
+  showToolbar = true,
+  showSearch = true,
+  showColumnsMenu = true,
+  showExportCsv = true,
+  showTitle = true,
+  showDescription = true,
+  showRowCount = true,
+  hiddenColumnKeys: hiddenColumnKeysProp,
+  onHiddenColumnKeysChange,
   editable = false,
   primaryKey = null,
   onCommitRows,
 }: DataTableProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1)
-  const [query, setQuery] = useState('')
+  const [queryState, setQueryState] = useState('')
   const [sort, setSort] = useState<SortState>(null)
-  const [hiddenColumnKeys, setHiddenColumnKeys] = useState<Set<string>>(() => new Set())
+  const [hiddenColumnKeysState, setHiddenColumnKeysState] = useState<Set<string>>(() => new Set())
   const [draftData, setDraftData] = useState<Array<Record<string, unknown>>>(() => (Array.isArray(data) ? data : []))
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -129,6 +153,24 @@ export function DataTable({
 
   const safeColumns: DataColumn[] = Array.isArray(columns) ? columns : []
   const safeData: Array<Record<string, unknown>> = draftData
+  const query = queryProp ?? queryState
+  const setQuery = (next: string) => {
+    if (queryProp !== undefined) onQueryChange?.(next)
+    else setQueryState(next)
+  }
+  const hiddenColumnKeys = hiddenColumnKeysProp ?? hiddenColumnKeysState
+
+  const setHiddenColumnKeys = (next: Set<string>) => {
+    if (hiddenColumnKeysProp) onHiddenColumnKeysChange?.(next)
+    else setHiddenColumnKeysState(next)
+  }
+
+  const updateHiddenColumnKeys = (updater: (prev: Set<string>) => Set<string>) => {
+    setHiddenColumnKeys(updater(hiddenColumnKeys))
+  }
+
+  const pkKey = typeof primaryKey === 'string' ? primaryKey.trim() : ''
+  const showPkGutter = Boolean(excelLike && pkKey)
 
   useEffect(() => {
     setDraftData(Array.isArray(data) ? data : [])
@@ -136,23 +178,23 @@ export function DataTable({
 
   const visibleColumns = useMemo(() => {
     const hidden = hiddenColumnKeys
-    const cols = safeColumns.filter((c) => !hidden.has(c.key))
-    return cols.length > 0 ? cols : safeColumns
-  }, [hiddenColumnKeys, safeColumns])
+    const base = safeColumns.filter((c) => !hidden.has(c.key))
+    const cols = base.length > 0 ? base : safeColumns
+    if (!showPkGutter) return cols
+    return cols.filter((c) => c.key !== pkKey)
+  }, [hiddenColumnKeys, pkKey, safeColumns, showPkGutter])
 
   useEffect(() => {
     // If columns change, keep hidden state valid.
     const colKeys = new Set(safeColumns.map((c) => c.key))
-    setHiddenColumnKeys((prev) => {
-      if (prev.size === 0) return prev
-      const next = new Set<string>()
-      for (const k of prev) if (colKeys.has(k)) next.add(k)
-      return next
-    })
+    if (hiddenColumnKeys.size === 0) return
+    const next = new Set<string>()
+    for (const k of hiddenColumnKeys) if (colKeys.has(k)) next.add(k)
+    if (next.size !== hiddenColumnKeys.size) setHiddenColumnKeys(next)
   }, [safeColumns])
 
   const filteredAndSorted = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = (serverSideSearch ? '' : query).trim().toLowerCase()
     const cols = visibleColumns
     let out = safeData
 
@@ -214,7 +256,7 @@ export function DataTable({
         const order = (k: string) => (k === 'number' ? 0 : k === 'date' ? 1 : 2)
         return dir * (order(av.kind) - order(bv.kind))
       })
-  }, [query, safeColumns, safeData, sort, visibleColumns])
+  }, [query, safeColumns, safeData, serverSideSearch, sort, visibleColumns])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -244,6 +286,18 @@ export function DataTable({
   const canExport = safeColumns.length > 0 && safeData.length > 0
   const rowClickable = typeof onRowClick === 'function'
   const canEdit = Boolean(excelLike && editable && primaryKey && String(primaryKey).trim().length > 0 && typeof onCommitRows === 'function')
+  const canSearch = safeColumns.length > 0
+  const shouldShowTitle = Boolean(showTitle && title)
+  const shouldShowDescription = Boolean(showDescription && description)
+  const shouldShowRowCount = Boolean(showRowCount && safeColumns.length > 0)
+  const shouldShowColumnsMenu = Boolean(showColumnsMenu && safeColumns.length > 0)
+  const shouldShowExport = Boolean(showExportCsv && canExport)
+  const shouldShowSearch = Boolean(showSearch && canSearch)
+  const shouldShowHeaderRow = Boolean(shouldShowTitle || shouldShowDescription || shouldShowRowCount || shouldShowColumnsMenu || shouldShowExport)
+  const onlySearchToolbar = Boolean(shouldShowSearch && !shouldShowHeaderRow)
+  const shouldRenderToolbar = Boolean(
+    showToolbar && (shouldShowTitle || shouldShowDescription || shouldShowRowCount || shouldShowColumnsMenu || shouldShowExport || shouldShowSearch)
+  )
 
   const selectionRange = useMemo(() => {
     if (!selection) return null
@@ -563,105 +617,107 @@ export function DataTable({
 
   return (
     <div className={cn('w-full max-w-none flex flex-col min-h-0', className)}>
-      <div className="flex flex-col min-h-0 gap-4">
-        {(title || description || canExport || safeColumns.length > 0) && (
-          <div className="flex flex-col gap-2 shrink-0">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                {title && <h3 className="text-sm font-medium truncate">{title}</h3>}
-                {description && <div className="text-xs text-muted-foreground truncate">{description}</div>}
-                {safeColumns.length > 0 && (
-                  <div className="text-[11px] text-muted-foreground mt-1">
-                    {query.trim() || hiddenColumnKeys.size > 0 ? (
-                      <span>
-                        Showing {filteredRows.toLocaleString()} of {totalRows.toLocaleString()} rows
-                      </span>
-                    ) : (
-                      <span>{totalRows.toLocaleString()} rows</span>
-                    )}
-                  </div>
-                )}
+      <div className={cn('flex flex-col min-h-0', onlySearchToolbar ? 'gap-0' : 'gap-4')}>
+        {shouldRenderToolbar && (
+          <div className={cn('flex flex-col shrink-0', onlySearchToolbar ? 'gap-0' : 'gap-2')}>
+            {shouldShowHeaderRow && (
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {shouldShowTitle && <h3 className="text-sm font-medium truncate">{title}</h3>}
+                  {shouldShowDescription && <div className="text-xs text-muted-foreground truncate">{description}</div>}
+                  {shouldShowRowCount && (
+                    <div className="text-[11px] text-muted-foreground mt-1">
+                      {query.trim() || hiddenColumnKeys.size > 0 ? (
+                        <span>
+                          Showing {filteredRows.toLocaleString()} of {totalRows.toLocaleString()} rows
+                        </span>
+                      ) : (
+                        <span>{totalRows.toLocaleString()} rows</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {shouldShowColumnsMenu && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="shrink-0" aria-label="Table columns">
+                          <Icon name="list" className="w-3.5 h-3.5 mr-1.5" />
+                          Columns
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[220px]">
+                        <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {safeColumns.map((c) => {
+                          const checked = !hiddenColumnKeys.has(c.key)
+                          return (
+                            <DropdownMenuCheckboxItem
+                              key={c.key}
+                              checked={checked}
+                              onCheckedChange={(next) => {
+                                updateHiddenColumnKeys((prev) => {
+                                  const p = new Set(prev)
+                                  const shouldShow = Boolean(next)
+                                  if (shouldShow) p.delete(c.key)
+                                  else p.add(c.key)
+                                  // Never allow "hide everything" — if all are hidden, reset.
+                                  if (p.size >= safeColumns.length) return new Set()
+                                  return p
+                                })
+                              }}
+                            >
+                              <span className="truncate">{c.label}</span>
+                            </DropdownMenuCheckboxItem>
+                          )
+                        })}
+                        <DropdownMenuSeparator />
+                        <button
+                          type="button"
+                          className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+                          onClick={() => setHiddenColumnKeys(new Set())}
+                        >
+                          Reset columns
+                        </button>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                  {shouldShowExport && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleExportCsv}
+                          aria-label="Export table as CSV"
+                          className="shrink-0"
+                        >
+                          <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
+                          Export CSV
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download as CSV</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
+            )}
 
-              <div className="flex items-center gap-2 shrink-0">
-                {safeColumns.length > 0 && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="shrink-0" aria-label="Table columns">
-                        <Icon name="list" className="w-3.5 h-3.5 mr-1.5" />
-                        Columns
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-[220px]">
-                      <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {safeColumns.map((c) => {
-                        const checked = !hiddenColumnKeys.has(c.key)
-                        return (
-                          <DropdownMenuCheckboxItem
-                            key={c.key}
-                            checked={checked}
-                            onCheckedChange={(next) => {
-                              setHiddenColumnKeys((prev) => {
-                                const p = new Set(prev)
-                                const shouldShow = Boolean(next)
-                                if (shouldShow) p.delete(c.key)
-                                else p.add(c.key)
-                                // Never allow "hide everything" — if all are hidden, reset.
-                                if (p.size >= safeColumns.length) return new Set()
-                                return p
-                              })
-                            }}
-                          >
-                            <span className="truncate">{c.label}</span>
-                          </DropdownMenuCheckboxItem>
-                        )
-                      })}
-                      <DropdownMenuSeparator />
-                      <button
-                        type="button"
-                        className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
-                        onClick={() => setHiddenColumnKeys(new Set())}
-                      >
-                        Reset columns
-                      </button>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-                {canExport && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExportCsv}
-                        aria-label="Export table as CSV"
-                        className="shrink-0"
-                      >
-                        <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
-                        Export CSV
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Download as CSV</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            </div>
-
-            {safeColumns.length > 0 && (
-              <div className="flex items-center gap-2">
+            {shouldShowSearch && (
+              <div className={cn('flex items-center', onlySearchToolbar ? 'gap-1 border-b border-border/60' : 'gap-2')}>
                 <div className="relative flex-1 min-w-0">
                   <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search rows…"
-                    className="h-9 pl-9"
+                    className={cn('h-9 pl-9 rounded-none', onlySearchToolbar && 'border-0')}
                   />
                 </div>
                 {query.trim() && (
-                  <Button variant="outline" size="sm" onClick={() => setQuery('')} className="shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setQuery('')} className="shrink-0 rounded-none">
                     Clear
                   </Button>
                 )}
@@ -792,15 +848,15 @@ export function DataTable({
           }}
         >
           <table className="w-full min-w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-card backdrop-blur supports-[backdrop-filter]:bg-card/90">
+            <thead className="sticky top-0 z-[1] bg-muted backdrop-blur supports-[backdrop-filter]:bg-muted/90 text-xs">
               <tr>
-                {excelLike && (
+                {showPkGutter && (
                   <th
                     scope="col"
-                    className="sticky left-0 z-20 border-b border-r px-2 py-2.5 whitespace-nowrap font-medium text-muted-foreground bg-card"
-                    aria-label="Row numbers"
+                    className="sticky left-0 z-[2] border-b border-r px-2 py-1.5 whitespace-nowrap font-medium text-muted-foreground/80 bg-muted"
+                    aria-label={pkKey}
                   >
-                    #
+                    <span className="truncate">{pkKey}</span>
                   </th>
                 )}
                 {visibleColumns.map((column) => {
@@ -812,7 +868,7 @@ export function DataTable({
                       key={column.key}
                       scope="col"
                       className={cn(
-                        'border-b px-4 py-2.5 whitespace-nowrap font-medium text-muted-foreground',
+                        'border-b px-3 py-1.5 whitespace-nowrap font-medium text-muted-foreground/80',
                         isNumeric ? 'text-right' : 'text-left'
                       )}
                     >
@@ -855,7 +911,7 @@ export function DataTable({
               {visibleRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={Math.max(1, visibleColumns.length) + (excelLike ? 1 : 0)}
+                    colSpan={Math.max(1, visibleColumns.length) + (showPkGutter ? 1 : 0)}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
                     {query.trim() ? 'No matching rows' : 'No data available'}
@@ -881,9 +937,9 @@ export function DataTable({
                         : undefined
                     }
                   >
-                    {excelLike && (
-                      <td className="sticky left-0 z-10 border-r px-2 py-2.5 text-right tabular-nums text-muted-foreground bg-card">
-                        {pageStart + tableRowIndex + 1}
+                    {showPkGutter && (
+                      <td className="sticky left-0 z-[1] border-r px-2 py-1.5 text-left tabular-nums text-muted-foreground/80 bg-muted/60 text-xs">
+                        <span className="block max-w-[14rem] truncate">{String((row as any)?.[pkKey] ?? '')}</span>
                       </td>
                     )}
                     {visibleColumns.map((column, colIndex) => {

@@ -131,6 +131,46 @@ Notes:
 }
 ```
 
-Limitations:
+Args:
 
-- The server supports `expand=refs` for row listing, but the Starships connector action currently maps only `limit` and `offset`. If you need `expand=refs`, use the HTTP API directly.
+- `limit` (optional): max rows to return (0–200)
+- `offset` (optional): offset (0+) for pagination
+- `expandRefs` (optional): when `true`, maps to `expand=refs` for reference label hydration
+- `search` (optional): substring search across `rowKey` and row values (case-insensitive)
+- `filters` (optional): JSON string (either an object map or array of filter objects)
+
+Example: list rows with `search` + `filters`
+
+```json
+{
+  "nodes": [
+    { "ref": "start", "type": "start", "name": "Start", "description": "", "parameters": {} },
+    {
+      "ref": "rows",
+      "type": "connector_action",
+      "name": "List rows (filtered)",
+      "description": "",
+      "parameters": {
+        "connector": "starships",
+        "action": "list-dataset-rows",
+        "failOnNon2xx": true,
+        "args": {
+          "starshipId": "{{ env('STARSHIP_ID') }}",
+          "datasetSlug": "leads",
+          "limit": 50,
+          "offset": 0,
+          "expandRefs": true,
+          "search": "acme",
+          "filters": "[{\"column\":\"status\",\"op\":\"eq\",\"value\":\"new\"},{\"column\":\"score\",\"op\":\"gte\",\"value\":80}]"
+        }
+      }
+    },
+    { "ref": "end", "type": "end", "name": "End", "description": "", "parameters": { "output": "{{ lastOutputOf('rows').body.data }}" } }
+  ],
+  "edges": [
+    { "ref": "e1", "from": "start", "to": "rows" },
+    { "ref": "e2", "from": "rows", "to": "end" }
+  ],
+  "metadata": {}
+}
+```

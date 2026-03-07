@@ -18,6 +18,12 @@ export const getDatasetRowsTool: ToolParams = {
       limit: { type: 'number', description: 'Max rows to return (0-200)' },
       offset: { type: 'number', description: 'Offset (0+) for pagination' },
       expandRefs: { type: 'boolean', description: 'If true, expands refs (expand=refs) to hydrate reference values' },
+      search: { type: 'string', description: 'Search across row values (case-insensitive substring match)' },
+      filters: {
+        type: 'string',
+        description:
+          'Row filters as JSON (array of filter objects or object map). Example: [{"column":"status","op":"eq","value":"new"}] or {"status":"new"}',
+      },
     },
     required: [],
   },
@@ -48,6 +54,8 @@ export const getDatasetRowsTool: ToolParams = {
               const offset = input.offset == null ? undefined : Math.max(0, Math.floor(Number(input.offset)));
               if (offset !== undefined && !Number.isFinite(offset)) throw new Error('offset must be a number');
               const expandRefs = input.expandRefs === true;
+              const search = typeof input.search === 'string' ? input.search.trim() : '';
+              const filters = input.filters;
 
               const out = { starshipId: String(starshipId).trim() };
               if (datasetSlug) out.datasetSlug = datasetSlug;
@@ -55,6 +63,8 @@ export const getDatasetRowsTool: ToolParams = {
               if (limit !== undefined) out.limit = limit;
               if (offset !== undefined) out.offset = offset;
               if (expandRefs) out.expandRefs = true;
+              if (search) out.search = search;
+              if (filters !== undefined && filters !== null && String(filters).trim().length > 0) out.filters = filters;
               return out;
             }
           `,
@@ -114,7 +124,8 @@ export const getDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   slug: getDatasetRowsTool.slug,
   version: '1.0.0',
   category: 'data',
-  exampleUsage: '{ "datasetSlug": "leads", "limit": 50, "offset": 0, "expandRefs": true }',
+  exampleUsage:
+    '{ "datasetSlug": "leads", "limit": 50, "offset": 0, "expandRefs": true, "search": "acme", "filters": "[{\\"column\\":\\"status\\",\\"op\\":\\"eq\\",\\"value\\":\\"new\\"}]" }',
   requiresApiKey: false,
   configurationFields: [],
 };

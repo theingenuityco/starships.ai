@@ -83,7 +83,7 @@ export async function up(client: DbClient): Promise<void> {
     // Best-effort: also sync legacy endpoints_json for admin visibility.
     const nextLegacy = legacyEndpoints.map((e) => {
       if (!e || typeof e !== 'object') return e;
-      if (String((e as any).name || '') !== 'list-dataset-rows') return e;
+      if (String(e.name || '') !== 'list-dataset-rows') return e;
       return {
         ...e,
         parameters,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import Icon from '@/components/primitives/Icon'
@@ -14,13 +14,22 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { DataTable } from '@/components/widgets/DataTable'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
+import { useDataset, useDatasetRows, useDeleteDatasetRow, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
 import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
 
 const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
@@ -43,6 +52,9 @@ const COLUMN_FORMATS: Array<{ value: StarshipDatasetColumnFormat; label: string 
   { value: 'datetime', label: 'Datetime' },
   { value: 'percentage', label: 'Percentage' },
 ]
+
+const SELECT_NONE_VALUE = '__none__'
+const SELECT_INFER_VALUE = '__infer__'
 
 function normalizeEnumOptions(text: string): string[] {
   const raw = String(text || '')
@@ -107,18 +119,39 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const slug = typeof params.slug === 'string' ? params.slug : ''
   const datasetId = typeof params.datasetId === 'string' ? params.datasetId : ''
 
-  const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
+  const { data: starship, isLoading: starshipLoading, isError: starshipError } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
 
   const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
   const updateDataset = useUpdateDataset(starshipId, datasetId)
   const { data: datasets = [] } = useStarshipDatasets(starshipId, Boolean(starshipId))
   const upsertRows = useUpsertDatasetRows(starshipId, datasetId)
+  const deleteRow = useDeleteDatasetRow(starshipId, datasetId)
 
-  const [limit, setLimit] = useState(50)
+  const [limit, setLimit] = useState(100)
   const [offset, setOffset] = useState(0)
+  const [hiddenColumnKeys, setHiddenColumnKeys] = useState<Set<string>>(() => new Set())
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
 
-  const { data: rowsPage, isLoading: rowsLoading } = useDatasetRows(starshipId, datasetId, limit, offset, Boolean(starshipId && datasetId))
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQuery(query.trim()), 250)
+    return () => window.clearTimeout(t)
+  }, [query])
+
+  // When search changes, jump back to the first page.
+  useEffect(() => {
+    setOffset(0)
+  }, [debouncedQuery])
+
+  const { data: rowsPage, isLoading: rowsLoading } = useDatasetRows(
+    starshipId,
+    datasetId,
+    limit,
+    offset,
+    debouncedQuery || undefined,
+    Boolean(starshipId && datasetId)
+  )
 
   const [schemaOpen, setSchemaOpen] = useState(false)
   const [schemaTab, setSchemaTab] = useState<'guided' | 'json'>('guided')
@@ -187,6 +220,21 @@ export default function DatasetViewerPage(): React.JSX.Element {
   }, [rowsPage?.data])
 
   const primaryKey = typeof dataset?.primaryKey === 'string' ? dataset.primaryKey.trim() : ''
+  const isResolving = starshipLoading || Boolean(slug && !starshipId && !starshipError) || datasetLoading || rowsLoading
+
+  const handleExportCsv = () => {
+    try {
+      const table = adaptDataTable(tableColumns as any, data as any)
+      const baseName = sanitizeFilename(dataset?.name || 'dataset')
+      const filename = `${baseName}-${Date.now()}.csv`
+      downloadTableAsCsv(table, filename)
+      toast.success('Table exported')
+    } catch {
+      toast.error('Export failed')
+    }
+  }
+
+  const canExport = (tableColumns?.length ?? 0) > 0 && (data?.length ?? 0) > 0
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
@@ -199,15 +247,28 @@ export default function DatasetViewerPage(): React.JSX.Element {
                   <MobileNavToggleButton className="mx-2" />
                 </span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                  <div className="flex items-baseline gap-2 min-w-0 w-full">
+                  <div className="flex items-center gap-2 min-w-0 w-full">
+                    <button
+                      type="button"
+                      className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                      onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/datasets`)}
+                      aria-label="Back to datasets"
+                      title="Back to datasets"
+                    >
+                      <Icon name="arrow-left" className="h-4 w-4" />
+                    </button>
                     <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                       <Icon name="database" weight="bold" className="h-4 w-4" />
                     </span>
                     <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                      {dataset?.name || 'Dataset'}
+                      <span className="inline-flex items-center whitespace-nowrap text-foreground">
+                        <span>Datasets</span>
+                        <span className="mx-1 text-muted-foreground">/</span>
+                      </span>
+                      {dataset?.name || 'Untitled'}
                     </h3>
                   </div>
-                  <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                  <div className="min-w-0 text-xs leading-snug text-muted-foreground">
                     <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
                       {dataset?.description || '—'}
                     </span>
@@ -217,10 +278,6 @@ export default function DatasetViewerPage(): React.JSX.Element {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/datasets`)}>
-                <Icon name="chevron-left" className="h-4 w-4 mr-1.5" />
-                Back
-              </Button>
               <Button variant="outline" size="sm" onClick={openSchemaEditor} disabled={!dataset || updateDataset.isPending}>
                 <Icon name="settings" className="h-4 w-4 mr-1.5" />
                 Schema
@@ -228,84 +285,204 @@ export default function DatasetViewerPage(): React.JSX.Element {
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
-        <div className="w-full bg-transparent max-w-6xl mx-auto min-h-full flex flex-col gap-4">
-          {datasetLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-7 w-56" />
-              <Skeleton className="h-4 w-80" />
-              <div className="h-64 rounded-xl border border-border/60 bg-card animate-pulse" />
+        <div className="border-t border-border/60">
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1 min-w-0">
+              <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search rows…"
+                className="h-9 pl-9 rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+              />
             </div>
-          ) : !dataset ? (
-            <Card className="border-border/60 p-6">
-              <div className="text-sm text-muted-foreground">Dataset not found.</div>
-            </Card>
-          ) : (
-            <>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="text-xs text-muted-foreground">
-                  Showing {Math.min(total, offset + 1)}–{Math.min(total, offset + limit)} of {total}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setOffset(o => Math.max(0, o - limit))} disabled={!canPrev}>
-                    <Icon name="chevron-left" className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setOffset(o => o + limit)} disabled={!canNext}>
-                    <Icon name="chevron-right" className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setLimit(50)
-                      setOffset(0)
-                    }}
-                    className={cn('ml-1')}
-                  >
-                    Reset
-                  </Button>
-                </div>
+
+            <div className="flex items-center gap-1 pr-1">
+              <div className="hidden md:block text-[11px] leading-none text-muted-foreground px-1">
+                {isResolving
+                  ? '—'
+                  : `Showing ${Math.min(total, offset + 1)}–${Math.min(total, offset + limit)} of ${total}`}
               </div>
 
-              {!primaryKey && (
-                <div className="text-xs text-muted-foreground">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-none"
+                    aria-label="Columns"
+                    disabled={datasetLoading || !dataset}
+                  >
+                    <Icon name="list" className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[220px]">
+                  <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {(tableColumns ?? []).filter((c) => c.key !== primaryKey).map((c) => {
+                    const checked = !hiddenColumnKeys.has(c.key)
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={c.key}
+                        checked={checked}
+                        onCheckedChange={(next) => {
+                          setHiddenColumnKeys((prev) => {
+                            const p = new Set(prev)
+                            const shouldShow = Boolean(next)
+                            if (shouldShow) p.delete(c.key)
+                            else p.add(c.key)
+                            if (p.size >= (tableColumns?.length ?? 0)) return new Set()
+                            return p
+                          })
+                        }}
+                      >
+                        <span className="truncate">{c.label}</span>
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+                  <DropdownMenuSeparator />
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+                    onClick={() => setHiddenColumnKeys(new Set())}
+                  >
+                    Reset columns
+                  </button>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={handleExportCsv}
+                disabled={!canExport}
+                aria-label="Export CSV"
+              >
+                <Icon name="download" className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => setOffset((o) => Math.max(0, o - limit))}
+                disabled={!canPrev}
+                aria-label="Previous page"
+              >
+                <Icon name="chevron-left" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => setOffset((o) => o + limit)}
+                disabled={!canNext}
+                aria-label="Next page"
+              >
+                <Icon name="chevron-right" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => {
+                  setLimit(100)
+                  setOffset(0)
+                }}
+                disabled={offset === 0 && limit === 100}
+                aria-label="Reset pagination"
+              >
+                <Icon name="rotate-ccw" className="h-4 w-4" />
+              </Button>
+
+              {query.trim() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuery('')}
+                  className="shrink-0 rounded-none h-9 border-y-0"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="w-full bg-transparent min-h-0 flex flex-col">
+          {Boolean(starshipId) && !datasetLoading && !dataset ? (
+            <div className="px-4 pt-4 pb-4">
+              <Card className="border-border/60 p-6">
+                <div className="text-sm text-muted-foreground">Dataset not found.</div>
+              </Card>
+            </div>
+          ) : (
+            <>
+              {Boolean(dataset) && !datasetLoading && !primaryKey && (
+                <div className="px-4 pt-4 pb-3 text-xs text-muted-foreground shrink-0">
                   Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
                 </div>
               )}
 
-              <DataTable
-                title={dataset.name}
-                description={dataset.slug}
-                columns={tableColumns as any}
-                data={data as any}
-                pageSize={0}
-                striped={true}
-                excelLike={true}
-                editable={Boolean(primaryKey)}
-                primaryKey={primaryKey || null}
-                onCommitRows={async ({ rows }) => {
-                  if (!primaryKey) {
-                    throw new Error('Dataset primaryKey is required to edit rows')
-                  }
-                  const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
-                  if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
-                    const first = (resp as any).errors[0]
-                    const msg = first?.message ? String(first.message) : 'Row validation failed'
-                    const col = first?.column ? String(first.column) : ''
-                    throw new Error(col ? `${col}: ${msg}` : msg)
-                  }
-                }}
-                className={rowsLoading ? 'opacity-70 pointer-events-none' : undefined}
-              />
+              <div className="flex-1 min-h-0">
+                <DataTable
+                  columns={tableColumns as any}
+                  data={data as any}
+                  query={query}
+                  onQueryChange={setQuery}
+                  serverSideSearch={true}
+                  loading={isResolving}
+                  pageSize={0}
+                  striped={true}
+                  excelLike={true}
+                  outerBorder={false}
+                  showToolbar={false}
+                  showColumnsMenu={false}
+                  showExportCsv={false}
+                  showTitle={false}
+                  showDescription={false}
+                  showRowCount={false}
+                  hiddenColumnKeys={hiddenColumnKeys}
+                  onHiddenColumnKeysChange={setHiddenColumnKeys}
+                  editable={Boolean(primaryKey)}
+                  primaryKey={primaryKey || null}
+                  onDeleteRow={async ({ rowKey }) => {
+                    if (deleteRow.isPending) return
+                    const ok = window.confirm(`Remove row "${rowKey}"? This cannot be undone.`)
+                    if (!ok) return
+                    try {
+                      await deleteRow.mutateAsync(rowKey)
+                      toast.success('Row removed')
+                    } catch (e) {
+                      toast.error('Failed to remove row', { description: getSafeErrorMessage(e) })
+                    }
+                  }}
+                  onCommitRows={async ({ rows }) => {
+                    if (!primaryKey) {
+                      throw new Error('Dataset primaryKey is required to edit rows')
+                    }
+                    const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
+                    if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
+                      const first = (resp as any).errors[0]
+                      const msg = first?.message ? String(first.message) : 'Row validation failed'
+                      const col = first?.column ? String(first.column) : ''
+                      throw new Error(col ? `${col}: ${msg}` : msg)
+                    }
+                  }}
+                  className={cn('h-full', rowsLoading ? 'opacity-70 pointer-events-none' : undefined)}
+                />
+              </div>
             </>
           )}
         </div>
       </div>
 
       <Dialog open={schemaOpen} onOpenChange={setSchemaOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit dataset schema</DialogTitle>
             <DialogDescription>
@@ -322,12 +499,15 @@ export default function DatasetViewerPage(): React.JSX.Element {
               </div>
               <div className="space-y-2">
                 <div className="text-sm font-medium">Primary key helper</div>
-                <Select value={primaryKeyText} onValueChange={(v) => setPrimaryKeyText(v)}>
+                <Select
+                  value={primaryKeyText}
+                  onValueChange={(v) => setPrimaryKeyText(v === SELECT_NONE_VALUE ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select from columns" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">(none)</SelectItem>
+                    <SelectItem value={SELECT_NONE_VALUE}>(none)</SelectItem>
                     {(schemaTab === 'json' ? [] : columnsDraft)
                       .map((c) => String(c?.name || '').trim())
                       .filter(Boolean)
@@ -408,12 +588,17 @@ export default function DatasetViewerPage(): React.JSX.Element {
                               </div>
                               <div className="space-y-1">
                                 <div className="text-[11px] text-muted-foreground">Format (optional)</div>
-                                <Select value={formatVal ?? ''} onValueChange={(v) => setCol({ format: (v ? (v as any) : undefined) as any })}>
+                                <Select
+                                  value={formatVal ?? ''}
+                                  onValueChange={(v) =>
+                                    setCol({ format: v === SELECT_NONE_VALUE ? undefined : (v as any) })
+                                  }
+                                >
                                   <SelectTrigger>
                                     <SelectValue placeholder="(none)" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">(none)</SelectItem>
+                                    <SelectItem value={SELECT_NONE_VALUE}>(none)</SelectItem>
                                     {COLUMN_FORMATS.map((f) => (
                                       <SelectItem key={f.value} value={f.value}>
                                         {f.label}
@@ -555,13 +740,17 @@ export default function DatasetViewerPage(): React.JSX.Element {
                                 <div className="text-[11px] text-muted-foreground">Result type (optional)</div>
                                 <Select
                                   value={String((col as any)?.formula?.resultType || '')}
-                                  onValueChange={(v) => setCol({ formula: { ...(col as any).formula, resultType: v || undefined } } as any)}
+                                  onValueChange={(v) =>
+                                    setCol({
+                                      formula: { ...(col as any).formula, resultType: v === SELECT_INFER_VALUE ? undefined : v || undefined },
+                                    } as any)
+                                  }
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="(infer)" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">(infer)</SelectItem>
+                                    <SelectItem value={SELECT_INFER_VALUE}>(infer)</SelectItem>
                                     {['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum'].map((t) => (
                                       <SelectItem key={t} value={t}>
                                         {t}

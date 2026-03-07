@@ -102,6 +102,7 @@ export { TaskColumnRepository } from './repositories/TaskColumnRepository';
 export { TaskCardRepository } from './repositories/TaskCardRepository';
 export { StarshipDatasetRepository } from './repositories/StarshipDatasetRepository';
 export { StarshipDatasetRowRepository } from './repositories/StarshipDatasetRowRepository';
+export type { DatasetRowFilter, DatasetRowFilterOp } from './repositories/StarshipDatasetRowRepository';
 export { AutopilotAwaitRepository } from './repositories/AutopilotAwaitRepository';
 export { AutopilotAwaitFiringRepository } from './repositories/AutopilotAwaitFiringRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';

@@ -13,6 +13,171 @@ function toFiniteInt(value: unknown, fallback: number): number {
   return Math.floor(n);
 }
 
+export type DatasetRowFilterOp =
+  | 'eq'
+  | 'neq'
+  | 'contains'
+  | 'startsWith'
+  | 'endsWith'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'in'
+  | 'isNull'
+  | 'isNotNull';
+
+export type DatasetRowFilter = {
+  /**
+   * Column name (dataset schema column name) OR 'rowKey' to target the row_key column.
+   */
+  column: string;
+  op?: DatasetRowFilterOp;
+  value?: unknown;
+  /**
+   * Optional type hint from dataset schema to enable safer comparisons.
+   */
+  type?: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'enum' | 'reference' | 'formula';
+};
+
+function buildDatasetRowsWhereClause(args: {
+  datasetId: string;
+  search?: string | null;
+  filters?: DatasetRowFilter[] | null;
+}): { whereSql: string; params: unknown[] } {
+  const datasetId = String(args.datasetId || '').trim();
+  const params: unknown[] = [datasetId];
+  const clauses: string[] = ['dataset_id = $1'];
+  let i = 2;
+
+  const search = typeof args.search === 'string' ? args.search.trim() : '';
+  if (search) {
+    const like = `%${search}%`;
+    params.push(like);
+    const p = `$${i++}`;
+    // Search row_key + top-level json scalar values.
+    clauses.push(`(row_key ILIKE ${p} OR EXISTS (SELECT 1 FROM jsonb_each_text(data_json) kv WHERE kv.value ILIKE ${p}))`);
+  }
+
+  const filters = Array.isArray(args.filters) ? args.filters : [];
+  for (const f of filters) {
+    if (!f || typeof f !== 'object') continue;
+    const column = typeof f.column === 'string' ? f.column.trim() : '';
+    if (!column) continue;
+    const op: DatasetRowFilterOp = (f.op as DatasetRowFilterOp) || 'eq';
+    const type = f.type;
+
+    const isRowKey = column === 'rowKey' || column === '__rowKey' || column === '_rowKey';
+
+    const keyParam = isRowKey ? null : `$${i++}`;
+    if (!isRowKey) params.push(column);
+
+    const jsonTextExpr = isRowKey ? 'row_key' : `(data_json ->> ${keyParam})`;
+
+    if (op === 'isNull') {
+      clauses.push(`(${jsonTextExpr} IS NULL)`);
+      continue;
+    }
+    if (op === 'isNotNull') {
+      clauses.push(`(${jsonTextExpr} IS NOT NULL)`);
+      continue;
+    }
+
+    if (op === 'in') {
+      const raw = f.value;
+      const arr = Array.isArray(raw) ? raw : [];
+      const items = arr
+        .map((v) => (v === null || v === undefined ? '' : String(v)))
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (items.length === 0) continue;
+      const pArr = `$${i++}`;
+      params.push(items);
+      clauses.push(`(${jsonTextExpr} = ANY(${pArr}::text[]))`);
+      continue;
+    }
+
+    const rawVal = f.value;
+    const valStr = rawVal === null || rawVal === undefined ? '' : String(rawVal);
+    const trimmed = valStr.trim();
+    if (!trimmed) continue;
+
+    // Comparison helpers
+    const addTextParam = (): string => {
+      const p = `$${i++}`;
+      params.push(trimmed);
+      return p;
+    };
+    const addLikeParam = (): string => {
+      const p = `$${i++}`;
+      params.push(`%${trimmed}%`);
+      return p;
+    };
+
+    // Type-aware comparisons (best-effort)
+    if (op === 'gt' || op === 'gte' || op === 'lt' || op === 'lte') {
+      const cmp = op === 'gt' ? '>' : op === 'gte' ? '>=' : op === 'lt' ? '<' : '<=';
+
+      if (type === 'number') {
+        const p = `$${i++}`;
+        const n = Number(trimmed);
+        if (!Number.isFinite(n)) continue;
+        params.push(n);
+        // Guard cast with a simple numeric regex to avoid runtime errors.
+        clauses.push(`(${jsonTextExpr} ~ '^-?\\\\d+(\\\\.\\\\d+)?$' AND (${jsonTextExpr})::double precision ${cmp} ${p}::double precision)`);
+        continue;
+      }
+
+      if (type === 'date') {
+        const p = addTextParam();
+        clauses.push(`(${jsonTextExpr} ~ '^\\\\d{4}-\\\\d{2}-\\\\d{2}$' AND (${jsonTextExpr})::date ${cmp} ${p}::date)`);
+        continue;
+      }
+
+      if (type === 'datetime') {
+        const p = addTextParam();
+        clauses.push(`(${jsonTextExpr} ~ '^\\\\d{4}-\\\\d{2}-\\\\d{2}T' AND (${jsonTextExpr})::timestamptz ${cmp} ${p}::timestamptz)`);
+        continue;
+      }
+
+      // Fallback: lexical compare
+      const p = addTextParam();
+      clauses.push(`(${jsonTextExpr} ${cmp} ${p})`);
+      continue;
+    }
+
+    if (op === 'contains') {
+      const p = addLikeParam();
+      clauses.push(`(${jsonTextExpr} ILIKE ${p})`);
+      continue;
+    }
+    if (op === 'startsWith') {
+      const p = `$${i++}`;
+      params.push(`${trimmed}%`);
+      clauses.push(`(${jsonTextExpr} ILIKE ${p})`);
+      continue;
+    }
+    if (op === 'endsWith') {
+      const p = `$${i++}`;
+      params.push(`%${trimmed}`);
+      clauses.push(`(${jsonTextExpr} ILIKE ${p})`);
+      continue;
+    }
+
+    if (op === 'neq') {
+      const p = addTextParam();
+      clauses.push(`(COALESCE(${jsonTextExpr}, '') <> ${p})`);
+      continue;
+    }
+
+    // eq (default)
+    const p = addTextParam();
+    clauses.push(`(${jsonTextExpr} = ${p})`);
+  }
+
+  return { whereSql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
+}
+
 export class StarshipDatasetRowRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
     super('StarshipDatasetRowRepository', connection);
@@ -21,14 +186,29 @@ export class StarshipDatasetRowRepository extends BaseRepository {
   async countByDataset(datasetId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
+        const { whereSql, params } = buildDatasetRowsWhereClause({ datasetId });
         const connection = this.getConnection();
-        const row = await connection.queryOne<{ count: string }>(
-          'SELECT COUNT(*)::text AS count FROM starship_dataset_rows WHERE dataset_id = $1',
-          [datasetId]
-        );
+        const row = await connection.queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM starship_dataset_rows ${whereSql}`, params);
         return toFiniteInt(row?.count, 0);
       },
       'countByDataset',
+      'StarshipDatasetRow',
+      datasetId
+    );
+  }
+
+  async countByDatasetWithQuery(
+    datasetId: string,
+    opts?: { search?: string | null; filters?: DatasetRowFilter[] | null }
+  ): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { whereSql, params } = buildDatasetRowsWhereClause({ datasetId, search: opts?.search ?? null, filters: opts?.filters ?? null });
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM starship_dataset_rows ${whereSql}`, params);
+        return toFiniteInt(row?.count, 0);
+      },
+      'countByDatasetWithQuery',
       'StarshipDatasetRow',
       datasetId
     );
@@ -44,6 +224,11 @@ export class StarshipDatasetRowRepository extends BaseRepository {
         const offset = typeof opts?.offset === 'number' ? Math.max(0, Math.floor(opts.offset)) : 0;
         const order = opts?.order === 'asc' ? 'ASC' : 'DESC';
 
+        const { whereSql, params } = buildDatasetRowsWhereClause({ datasetId });
+        params.push(limit, offset);
+        const pLimit = `$${params.length - 1}`;
+        const pOffset = `$${params.length}`;
+
         const connection = this.getConnection();
         const records = await connection.query<DbRow>(
           `
@@ -55,15 +240,55 @@ export class StarshipDatasetRowRepository extends BaseRepository {
               created_at,
               updated_at
             FROM starship_dataset_rows
-            WHERE dataset_id = $1
+            ${whereSql}
             ORDER BY created_at ${order}, id ${order}
-            LIMIT $2 OFFSET $3
+            LIMIT ${pLimit} OFFSET ${pOffset}
           `,
-          [datasetId, limit, offset]
+          params
         );
         return fromDatabaseArray(StarshipDatasetRowEntity, records);
       },
       'listByDataset',
+      'StarshipDatasetRow',
+      datasetId
+    );
+  }
+
+  async listByDatasetWithQuery(
+    datasetId: string,
+    opts?: { limit?: number; offset?: number; order?: 'asc' | 'desc'; search?: string | null; filters?: DatasetRowFilter[] | null }
+  ): Promise<StarshipDatasetRowModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const limit = typeof opts?.limit === 'number' ? Math.max(0, Math.min(200, Math.floor(opts.limit))) : 50;
+        const offset = typeof opts?.offset === 'number' ? Math.max(0, Math.floor(opts.offset)) : 0;
+        const order = opts?.order === 'asc' ? 'ASC' : 'DESC';
+
+        const { whereSql, params } = buildDatasetRowsWhereClause({ datasetId, search: opts?.search ?? null, filters: opts?.filters ?? null });
+        params.push(limit, offset);
+        const pLimit = `$${params.length - 1}`;
+        const pOffset = `$${params.length}`;
+
+        const connection = this.getConnection();
+        const records = await connection.query<DbRow>(
+          `
+            SELECT
+              id,
+              dataset_id,
+              row_key,
+              data_json AS data,
+              created_at,
+              updated_at
+            FROM starship_dataset_rows
+            ${whereSql}
+            ORDER BY created_at ${order}, id ${order}
+            LIMIT ${pLimit} OFFSET ${pOffset}
+          `,
+          params
+        );
+        return fromDatabaseArray(StarshipDatasetRowEntity, records);
+      },
+      'listByDatasetWithQuery',
       'StarshipDatasetRow',
       datasetId
     );

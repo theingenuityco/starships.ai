@@ -15,6 +15,7 @@ import {
   StarshipDatasetRowRepository,
   getConnection,
 } from '@starships/models';
+import type { DatasetRowFilter } from '@starships/models';
 import type {
   CreateStarshipDatasetRequest,
   StarshipDatasetColumn,
@@ -517,6 +518,10 @@ const ListDatasetsQuerySchema = z.object({
 const ListRowsQuerySchema = z.object({
   limit: z.coerce.number().int().min(0).max(200).optional(),
   offset: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
+  search: z.string().trim().max(2000).optional(),
+  q: z.string().trim().max(2000).optional(),
+  filters: z.string().trim().max(50_000).optional(),
+  filter: z.string().trim().max(50_000).optional(),
 });
 
 const UpsertRowsSchema = z
@@ -869,6 +874,21 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
       .filter(Boolean)
       .includes('refs');
 
+    const searchRaw =
+      typeof (q as any).search === 'string'
+        ? String((q as any).search)
+        : typeof (q as any).q === 'string'
+          ? String((q as any).q)
+          : '';
+    const search = searchRaw.trim().length > 0 ? searchRaw.trim() : null;
+
+    const filtersRaw =
+      typeof (q as any).filters === 'string'
+        ? String((q as any).filters)
+        : typeof (q as any).filter === 'string'
+          ? String((q as any).filter)
+          : '';
+
     const datasetRepo = new StarshipDatasetRepository();
     const rowRepo = new StarshipDatasetRowRepository();
     const required = await requireDatasetInStarship({
@@ -880,8 +900,69 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
     if (!required) return;
 
     const datasetId = required.dataset.id;
-    const total = await rowRepo.countByDataset(datasetId);
-    const rows = await rowRepo.listByDataset(datasetId, { limit, offset, order: 'desc' });
+
+    // Parse filters (best-effort). Supported shapes:
+    // - filters=[{"column":"status","op":"eq","value":"new"}]
+    // - filters={"status":"new","score":92}  (object implies eq)
+    let filters: DatasetRowFilter[] | null = null;
+    if (filtersRaw && filtersRaw.trim()) {
+      const raw = filtersRaw.trim();
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        const out: DatasetRowFilter[] = [];
+        const cols = (required.dataset.columns ?? []) as StarshipDatasetColumn[];
+        const colByName = new Map<string, StarshipDatasetColumn>();
+        for (const c of cols) {
+          const n = String((c as any)?.name || '').trim();
+          if (n) colByName.set(n, c);
+        }
+        const primaryKey = typeof required.dataset.primaryKey === 'string' ? required.dataset.primaryKey.trim() : '';
+
+        const pushFilter = (f: DatasetRowFilter) => {
+          const column = String(f.column || '').trim();
+          if (!column) return;
+          // Map dataset primaryKey to rowKey for more efficient lookups.
+          if (primaryKey && column === primaryKey) {
+            out.push({ ...f, column: 'rowKey' });
+            return;
+          }
+          // If column exists in schema, attach type hint to improve comparisons.
+          const schemaCol = colByName.get(column);
+          const t = schemaCol?.type;
+          out.push({ ...f, ...(t ? { type: t as any } : null) });
+        };
+
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+            const rec = item as Record<string, unknown>;
+            const column = typeof rec.column === 'string' ? rec.column : '';
+            const op = typeof rec.op === 'string' ? rec.op : undefined;
+            const value = rec.value;
+            pushFilter({
+              column,
+              ...(op ? { op: op as any } : null),
+              ...(Object.prototype.hasOwnProperty.call(rec, 'value') ? { value } : null),
+            });
+          }
+        } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+            pushFilter({ column: k, op: 'eq', value: v });
+          }
+        } else {
+          sendError(res, 'VALIDATION_ERROR', 'filters must be a JSON array or object', 400);
+          return;
+        }
+
+        filters = out;
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'filters must be valid JSON', 400);
+        return;
+      }
+    }
+
+    const total = await rowRepo.countByDatasetWithQuery(datasetId, { search, filters });
+    const rows = await rowRepo.listByDatasetWithQuery(datasetId, { limit, offset, order: 'desc', search, filters });
 
     const projector = new DatasetRowProjector();
     const projected = await projector.project({

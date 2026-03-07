@@ -939,7 +939,11 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
             const column = typeof rec.column === 'string' ? rec.column : '';
             const op = typeof rec.op === 'string' ? rec.op : undefined;
             const value = rec.value;
-            pushFilter({ column, ...(op ? { op: op as any } : null), ...(rec.hasOwnProperty('value') ? { value } : null) });
+            pushFilter({
+              column,
+              ...(op ? { op: op as any } : null),
+              ...(Object.prototype.hasOwnProperty.call(rec, 'value') ? { value } : null),
+            });
           }
         } else if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {

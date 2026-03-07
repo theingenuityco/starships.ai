@@ -156,3 +156,18 @@ export function useUpsertDatasetRows(starshipId: string, datasetId: string) {
   })
 }
 
+export function useDeleteDatasetRow(starshipId: string, datasetId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (rowKey: string): Promise<void> => {
+      const rk = encodeURIComponent(String(rowKey || '').trim())
+      if (!rk) return
+      await api.delete(`/api/v1/starships/${starshipId}/datasets/${datasetId}/rows/${rk}`)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: DATASET_QUERY_KEYS.byId(starshipId, datasetId) })
+      queryClient.invalidateQueries({ queryKey: [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows'] as const })
+    },
+  })
+}
+

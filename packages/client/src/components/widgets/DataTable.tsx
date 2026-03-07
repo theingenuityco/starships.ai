@@ -68,6 +68,7 @@ export interface DataTableProps {
   editable?: boolean
   primaryKey?: string | null
   onCommitRows?: (payload: { rows: Array<Record<string, unknown>>; meta: RowsCommitMeta }) => Promise<void> | void
+  onDeleteRow?: (payload: { rowKey: string; row: Record<string, unknown> }) => Promise<void> | void
 }
 
 type SortState = { key: string; dir: 'asc' | 'desc' } | null
@@ -138,6 +139,7 @@ export function DataTable({
   editable = false,
   primaryKey = null,
   onCommitRows,
+  onDeleteRow,
 }: DataTableProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1)
   const [queryState, setQueryState] = useState('')
@@ -171,6 +173,7 @@ export function DataTable({
 
   const pkKey = typeof primaryKey === 'string' ? primaryKey.trim() : ''
   const showPkGutter = Boolean(excelLike && pkKey)
+  const canDeleteRows = Boolean(showPkGutter && typeof onDeleteRow === 'function')
 
   useEffect(() => {
     setDraftData(Array.isArray(data) ? data : [])
@@ -939,7 +942,32 @@ export function DataTable({
                   >
                     {showPkGutter && (
                       <td className="sticky left-0 z-[1] border-r px-2 py-1.5 text-left tabular-nums text-muted-foreground/80 bg-muted/60 text-xs">
-                        <span className="block max-w-[14rem] truncate">{String((row as any)?.[pkKey] ?? '')}</span>
+                        <div className="group flex items-center gap-1 min-w-0">
+                          <span className="block max-w-[14rem] truncate min-w-0 flex-1">
+                            {String((row as any)?.[pkKey] ?? '')}
+                          </span>
+                          {canDeleteRows && String((row as any)?.[pkKey] ?? '').trim() ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-6 w-6 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-accent/60"
+                                  aria-label="Remove row"
+                                  onClick={async (e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    const rowKey = String((row as any)?.[pkKey] ?? '').trim()
+                                    if (!rowKey) return
+                                    await onDeleteRow?.({ rowKey, row })
+                                  }}
+                                >
+                                  <Icon name="trash" className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Remove row</TooltipContent>
+                            </Tooltip>
+                          ) : null}
+                        </div>
                       </td>
                     )}
                     {visibleColumns.map((column, colIndex) => {

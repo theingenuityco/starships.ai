@@ -524,6 +524,8 @@ const ListRowsQuerySchema = z.object({
   filter: z.string().trim().max(50_000).optional(),
 });
 
+const RowKeySchema = z.string().trim().min(1).max(500);
+
 const UpsertRowsSchema = z
   .object({
     rows: z.array(z.record(z.string(), z.unknown())).min(1),
@@ -982,6 +984,50 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
     handleError(error, res, 'list dataset rows');
   }
 });
+
+/**
+ * DELETE /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/rows/:rowKey
+ * Delete a single dataset row by row_key (primary key value).
+ */
+router.delete(
+  '/starships/:starshipId/datasets/:datasetIdOrSlug/rows/:rowKey',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = requireAuthUserId(req, res);
+      if (!userId) return;
+
+      const params = validateData(
+        z.object({ starshipId: IdSchema, datasetIdOrSlug: DatasetIdOrSlugSchema, rowKey: RowKeySchema }),
+        req.params,
+        res,
+        'dataset row delete params'
+      );
+      if (!params) return;
+      if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
+
+      const datasetRepo = new StarshipDatasetRepository();
+      const rowRepo = new StarshipDatasetRowRepository();
+      const required = await requireDatasetInStarship({
+        datasetIdOrSlug: params.datasetIdOrSlug,
+        starshipId: params.starshipId,
+        datasetRepo,
+        res,
+      });
+      if (!required) return;
+
+      const result = await rowRepo.deleteByDatasetAndRowKey(required.dataset.id, params.rowKey);
+      if (!result.deleted) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Row not found', 404, { rowKey: params.rowKey });
+        return;
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      handleError(error, res, 'delete dataset row');
+    }
+  }
+);
 
 /**
  * POST /api/v1/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert

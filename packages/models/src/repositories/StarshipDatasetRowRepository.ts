@@ -383,6 +383,30 @@ export class StarshipDatasetRowRepository extends BaseRepository {
       datasetId
     );
   }
+
+  async deleteByDatasetAndRowKey(datasetId: string, rowKey: string): Promise<{ deleted: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const dsId = String(datasetId || '').trim();
+        const rk = String(rowKey || '').trim();
+        if (!dsId) throw new Error('datasetId is required');
+        if (!rk) return { deleted: false };
+
+        const connection = this.getConnection();
+        const res = await connection.queryWithResult(
+          `
+            DELETE FROM starship_dataset_rows
+            WHERE dataset_id = $1 AND row_key = $2
+          `,
+          [dsId, rk]
+        );
+        return { deleted: (res.rowCount ?? 0) > 0 };
+      },
+      'deleteByDatasetAndRowKey',
+      'StarshipDatasetRow',
+      datasetId
+    );
+  }
 }
 
 export default StarshipDatasetRowRepository;

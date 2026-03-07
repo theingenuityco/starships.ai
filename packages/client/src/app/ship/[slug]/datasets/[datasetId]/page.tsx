@@ -29,7 +29,7 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
+import { useDataset, useDatasetRows, useDeleteDatasetRow, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
 import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
 
 const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
@@ -126,6 +126,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const updateDataset = useUpdateDataset(starshipId, datasetId)
   const { data: datasets = [] } = useStarshipDatasets(starshipId, Boolean(starshipId))
   const upsertRows = useUpsertDatasetRows(starshipId, datasetId)
+  const deleteRow = useDeleteDatasetRow(starshipId, datasetId)
 
   const [limit, setLimit] = useState(100)
   const [offset, setOffset] = useState(0)
@@ -444,6 +445,17 @@ export default function DatasetViewerPage(): React.JSX.Element {
                   onHiddenColumnKeysChange={setHiddenColumnKeys}
                   editable={Boolean(primaryKey)}
                   primaryKey={primaryKey || null}
+                  onDeleteRow={async ({ rowKey }) => {
+                    if (deleteRow.isPending) return
+                    const ok = window.confirm(`Remove row "${rowKey}"? This cannot be undone.`)
+                    if (!ok) return
+                    try {
+                      await deleteRow.mutateAsync(rowKey)
+                      toast.success('Row removed')
+                    } catch (e) {
+                      toast.error('Failed to remove row', { description: getSafeErrorMessage(e) })
+                    }
+                  }}
                   onCommitRows={async ({ rows }) => {
                     if (!primaryKey) {
                       throw new Error('Dataset primaryKey is required to edit rows')

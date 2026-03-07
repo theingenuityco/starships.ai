@@ -121,6 +121,25 @@ Query params:
 - `limit` (optional): integer \(0–200\), default 50
 - `offset` (optional): integer \(0+\), default 0
 - `expand` (optional): comma-separated list; `refs` enables reference label hydration
+- `search` (optional): string; case-insensitive substring match across `row_key` and top-level row values
+- `filters` (optional): JSON string (either an object map or array of filter objects)
+
+Examples:
+
+- Search only:
+  - `search=acme`
+- Filter object map (implies `eq`):
+  - `filters={"status":"new","owner":"alice"}`
+- Filter array (explicit operators):
+  - `filters=[{"column":"status","op":"eq","value":"new"},{"column":"score","op":"gte","value":80}]`
+
+Notes:
+
+- `filters` must be **URL-encoded** when used as a query param.
+- For advanced filter operators, each entry can include:
+  - `column`: column name (or `rowKey` to target the dataset primary key / row_key)
+  - `op`: `eq | neq | contains | startsWith | endsWith | gt | gte | lt | lte | in | isNull | isNotNull`
+  - `value`: operator value (string/number/bool/array depending on `op`)
 
 Response body (`data`):
 

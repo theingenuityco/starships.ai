@@ -50,6 +50,7 @@ export interface DataTableProps {
   query?: string
   onQueryChange?: (next: string) => void
   serverSideSearch?: boolean
+  loading?: boolean
   pageSize?: number
   striped?: boolean
   className?: string
@@ -121,6 +122,7 @@ export function DataTable({
   query: queryProp,
   onQueryChange,
   serverSideSearch = false,
+  loading = false,
   pageSize = 10,
   striped = true,
   className,
@@ -917,7 +919,7 @@ export function DataTable({
                     colSpan={Math.max(1, visibleColumns.length) + (showPkGutter ? 1 : 0)}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
-                    {query.trim() ? 'No matching rows' : 'No data available'}
+                    {loading ? 'Loading…' : query.trim() ? 'No matching rows' : 'No data available'}
                   </td>
                 </tr>
               ) : (

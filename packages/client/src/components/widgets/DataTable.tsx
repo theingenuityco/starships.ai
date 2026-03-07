@@ -52,6 +52,7 @@ export interface DataTableProps {
   className?: string
   onRowClick?: (payload: { row: Record<string, unknown>; rowIndex: number }) => void
   excelLike?: boolean
+  outerBorder?: boolean
   editable?: boolean
   primaryKey?: string | null
   onCommitRows?: (payload: { rows: Array<Record<string, unknown>>; meta: RowsCommitMeta }) => Promise<void> | void
@@ -109,6 +110,7 @@ export function DataTable({
   className,
   onRowClick,
   excelLike = false,
+  outerBorder = true,
   editable = false,
   primaryKey = null,
   onCommitRows,
@@ -560,10 +562,10 @@ export function DataTable({
   }
 
   return (
-    <div className={cn('w-full max-w-none', className)}>
-      <div className="space-y-4">
+    <div className={cn('w-full max-w-none flex flex-col min-h-0', className)}>
+      <div className="flex flex-col min-h-0 gap-4">
         {(title || description || canExport || safeColumns.length > 0) && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 shrink-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 {title && <h3 className="text-sm font-medium truncate">{title}</h3>}
@@ -672,7 +674,8 @@ export function DataTable({
           ref={rootRef}
           tabIndex={excelLike ? 0 : -1}
           className={cn(
-            'w-full max-w-none rounded-md border overflow-auto outline-none',
+            'w-full max-w-none overflow-auto outline-none flex-1 min-h-0 bg-card',
+            outerBorder ? 'rounded-md border' : 'rounded-none border-0',
             excelLike && 'focus-visible:ring-2 focus-visible:ring-ring'
           )}
           onKeyDown={(e) => {
@@ -789,12 +792,12 @@ export function DataTable({
           }}
         >
           <table className="w-full min-w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/50">
+            <thead className="sticky top-0 z-10 bg-card backdrop-blur supports-[backdrop-filter]:bg-card/90">
               <tr>
                 {excelLike && (
                   <th
                     scope="col"
-                    className="sticky left-0 z-20 border-b border-r px-2 py-2.5 whitespace-nowrap font-medium text-muted-foreground bg-muted/60"
+                    className="sticky left-0 z-20 border-b border-r px-2 py-2.5 whitespace-nowrap font-medium text-muted-foreground bg-card"
                     aria-label="Row numbers"
                   >
                     #
@@ -879,7 +882,7 @@ export function DataTable({
                     }
                   >
                     {excelLike && (
-                      <td className="sticky left-0 z-10 border-r px-2 py-2.5 text-right tabular-nums text-muted-foreground bg-background/60">
+                      <td className="sticky left-0 z-10 border-r px-2 py-2.5 text-right tabular-nums text-muted-foreground bg-card">
                         {pageStart + tableRowIndex + 1}
                       </td>
                     )}

@@ -230,75 +230,84 @@ export default function DatasetViewerPage(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
-        <div className="w-full bg-transparent max-w-6xl mx-auto min-h-full flex flex-col gap-4">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="w-full bg-transparent min-h-0 flex flex-col">
           {datasetLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-7 w-56" />
-              <Skeleton className="h-4 w-80" />
-              <div className="h-64 rounded-xl border border-border/60 bg-card animate-pulse" />
+            <div className="px-4 pt-4 pb-4">
+              <div className="space-y-3">
+                <Skeleton className="h-7 w-56" />
+                <Skeleton className="h-4 w-80" />
+                <div className="h-64 rounded-xl border border-border/60 bg-card animate-pulse" />
+              </div>
             </div>
           ) : !dataset ? (
-            <Card className="border-border/60 p-6">
-              <div className="text-sm text-muted-foreground">Dataset not found.</div>
-            </Card>
+            <div className="px-4 pt-4 pb-4">
+              <Card className="border-border/60 p-6">
+                <div className="text-sm text-muted-foreground">Dataset not found.</div>
+              </Card>
+            </div>
           ) : (
             <>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="text-xs text-muted-foreground">
-                  Showing {Math.min(total, offset + 1)}–{Math.min(total, offset + limit)} of {total}
+              <div className="px-4 pt-4 pb-3 flex flex-col gap-3 shrink-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shrink-0">
+                  <div className="text-xs text-muted-foreground">
+                    Showing {Math.min(total, offset + 1)}–{Math.min(total, offset + limit)} of {total}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setOffset((o) => Math.max(0, o - limit))} disabled={!canPrev}>
+                      <Icon name="chevron-left" className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setOffset((o) => o + limit)} disabled={!canNext}>
+                      <Icon name="chevron-right" className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setLimit(50)
+                        setOffset(0)
+                      }}
+                      className={cn('ml-1')}
+                    >
+                      Reset
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setOffset(o => Math.max(0, o - limit))} disabled={!canPrev}>
-                    <Icon name="chevron-left" className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setOffset(o => o + limit)} disabled={!canNext}>
-                    <Icon name="chevron-right" className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setLimit(50)
-                      setOffset(0)
-                    }}
-                    className={cn('ml-1')}
-                  >
-                    Reset
-                  </Button>
-                </div>
+
+                {!primaryKey && (
+                  <div className="text-xs text-muted-foreground shrink-0">
+                    Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
+                  </div>
+                )}
               </div>
 
-              {!primaryKey && (
-                <div className="text-xs text-muted-foreground">
-                  Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
-                </div>
-              )}
-
-              <DataTable
-                title={dataset.name}
-                description={dataset.slug}
-                columns={tableColumns as any}
-                data={data as any}
-                pageSize={0}
-                striped={true}
-                excelLike={true}
-                editable={Boolean(primaryKey)}
-                primaryKey={primaryKey || null}
-                onCommitRows={async ({ rows }) => {
-                  if (!primaryKey) {
-                    throw new Error('Dataset primaryKey is required to edit rows')
-                  }
-                  const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
-                  if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
-                    const first = (resp as any).errors[0]
-                    const msg = first?.message ? String(first.message) : 'Row validation failed'
-                    const col = first?.column ? String(first.column) : ''
-                    throw new Error(col ? `${col}: ${msg}` : msg)
-                  }
-                }}
-                className={rowsLoading ? 'opacity-70 pointer-events-none' : undefined}
-              />
+              <div className="flex-1 min-h-0">
+                <DataTable
+                  title={dataset.name}
+                  description={dataset.slug}
+                  columns={tableColumns as any}
+                  data={data as any}
+                  pageSize={0}
+                  striped={true}
+                  excelLike={true}
+                  outerBorder={false}
+                  editable={Boolean(primaryKey)}
+                  primaryKey={primaryKey || null}
+                  onCommitRows={async ({ rows }) => {
+                    if (!primaryKey) {
+                      throw new Error('Dataset primaryKey is required to edit rows')
+                    }
+                    const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
+                    if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
+                      const first = (resp as any).errors[0]
+                      const msg = first?.message ? String(first.message) : 'Row validation failed'
+                      const col = first?.column ? String(first.column) : ''
+                      throw new Error(col ? `${col}: ${msg}` : msg)
+                    }
+                  }}
+                  className={cn('h-full', rowsLoading ? 'opacity-70 pointer-events-none' : undefined)}
+                />
+              </div>
             </>
           )}
         </div>

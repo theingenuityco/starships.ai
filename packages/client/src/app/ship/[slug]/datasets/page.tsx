@@ -47,6 +47,9 @@ const COLUMN_FORMATS: Array<{ value: StarshipDatasetColumnFormat; label: string 
   { value: 'percentage', label: 'Percentage' },
 ]
 
+const SELECT_NONE_VALUE = '__none__'
+const SELECT_INFER_VALUE = '__infer__'
+
 function normalizeEnumOptions(text: string): string[] {
   const raw = String(text || '')
   const parts = raw
@@ -204,7 +207,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                     </span>
                     <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Datasets</h3>
                   </div>
-                  <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
+                  <div className="min-w-0 text-xs leading-snug text-muted-foreground">
                     <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
                       Starship-scoped datasets usable by agents and humans.
                     </span>
@@ -435,13 +438,13 @@ export default function TablesIndexPage(): React.JSX.Element {
                                   <div className="text-[11px] text-muted-foreground">Format (optional)</div>
                                   <Select
                                     value={formatVal ?? ''}
-                                    onValueChange={(v) => setCol({ format: (v ? (v as any) : undefined) as any })}
+                                    onValueChange={(v) => setCol({ format: v === SELECT_NONE_VALUE ? undefined : (v as any) })}
                                   >
                                     <SelectTrigger>
                                       <SelectValue placeholder="(none)" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="">(none)</SelectItem>
+                                      <SelectItem value={SELECT_NONE_VALUE}>(none)</SelectItem>
                                       {COLUMN_FORMATS.map((f) => (
                                         <SelectItem key={f.value} value={f.value}>
                                           {f.label}
@@ -598,14 +601,16 @@ export default function TablesIndexPage(): React.JSX.Element {
                                     <Select
                                       value={String((col as any)?.formula?.resultType || '')}
                                       onValueChange={(v) =>
-                                        setCol({ formula: { ...(col as any).formula, resultType: v || undefined } } as any)
+                                        setCol({
+                                          formula: { ...(col as any).formula, resultType: v === SELECT_INFER_VALUE ? undefined : v || undefined },
+                                        } as any)
                                       }
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="(infer)" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="">(infer)</SelectItem>
+                                        <SelectItem value={SELECT_INFER_VALUE}>(infer)</SelectItem>
                                         {['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum'].map((t) => (
                                           <SelectItem key={t} value={t}>
                                             {t}

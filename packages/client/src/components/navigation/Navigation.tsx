@@ -311,12 +311,6 @@ export function Navigation(props: NavigationProps) {
               icon: 'users',
               isActive: isMembersRoute,
             },
-            {
-              href: `/ship/${starshipSlug}/datasets`,
-              label: 'Datasets',
-              icon: 'database',
-              isActive: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
-            },
           ]
         : []),
       ...(isAuthenticated && starshipSlug && canManageConnectors

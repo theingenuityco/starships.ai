@@ -119,7 +119,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const slug = typeof params.slug === 'string' ? params.slug : ''
   const datasetId = typeof params.datasetId === 'string' ? params.datasetId : ''
 
-  const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
+  const { data: starship, isLoading: starshipLoading, isError: starshipError } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
 
   const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
@@ -220,6 +220,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   }, [rowsPage?.data])
 
   const primaryKey = typeof dataset?.primaryKey === 'string' ? dataset.primaryKey.trim() : ''
+  const isResolving = starshipLoading || Boolean(slug && !starshipId && !starshipError) || datasetLoading || rowsLoading
 
   const handleExportCsv = () => {
     try {
@@ -285,132 +286,135 @@ export default function DatasetViewerPage(): React.JSX.Element {
           </div>
         </div>
 
-        {!datasetLoading && dataset ? (
-          <div className="border-t border-border/60">
-            <div className="flex items-center gap-1">
-              <div className="relative flex-1 min-w-0">
-                <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search rows…"
-                  className="h-9 pl-9 rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
-                />
+        <div className="border-t border-border/60">
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1 min-w-0">
+              <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search rows…"
+                className="h-9 pl-9 rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 pr-1">
+              <div className="hidden md:block text-[11px] leading-none text-muted-foreground px-1">
+                {isResolving
+                  ? '—'
+                  : `Showing ${Math.min(total, offset + 1)}–${Math.min(total, offset + limit)} of ${total}`}
               </div>
 
-              <div className="flex items-center gap-1 pr-1">
-                <div className="hidden md:block text-[11px] leading-none text-muted-foreground px-1">
-                  Showing {Math.min(total, offset + 1)}–{Math.min(total, offset + limit)} of {total}
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-none" aria-label="Columns">
-                      <Icon name="list" className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[220px]">
-                    <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {(tableColumns ?? []).filter((c) => c.key !== primaryKey).map((c) => {
-                      const checked = !hiddenColumnKeys.has(c.key)
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={c.key}
-                          checked={checked}
-                          onCheckedChange={(next) => {
-                            setHiddenColumnKeys((prev) => {
-                              const p = new Set(prev)
-                              const shouldShow = Boolean(next)
-                              if (shouldShow) p.delete(c.key)
-                              else p.add(c.key)
-                              if (p.size >= (tableColumns?.length ?? 0)) return new Set()
-                              return p
-                            })
-                          }}
-                        >
-                          <span className="truncate">{c.label}</span>
-                        </DropdownMenuCheckboxItem>
-                      )
-                    })}
-                    <DropdownMenuSeparator />
-                    <button
-                      type="button"
-                      className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
-                      onClick={() => setHiddenColumnKeys(new Set())}
-                    >
-                      Reset columns
-                    </button>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none"
-                  onClick={handleExportCsv}
-                  disabled={!canExport}
-                  aria-label="Export CSV"
-                >
-                  <Icon name="download" className="h-4 w-4" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none"
-                  onClick={() => setOffset((o) => Math.max(0, o - limit))}
-                  disabled={!canPrev}
-                  aria-label="Previous page"
-                >
-                  <Icon name="chevron-left" className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none"
-                  onClick={() => setOffset((o) => o + limit)}
-                  disabled={!canNext}
-                  aria-label="Next page"
-                >
-                  <Icon name="chevron-right" className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-none"
-                  onClick={() => {
-                    setLimit(100)
-                    setOffset(0)
-                  }}
-                  disabled={offset === 0 && limit === 100}
-                  aria-label="Reset pagination"
-                >
-                  <Icon name="rotate-ccw" className="h-4 w-4" />
-                </Button>
-
-                {query.trim() && (
-                  <Button variant="outline" size="sm" onClick={() => setQuery('')} className="shrink-0 rounded-none h-9 border-y-0">
-                    Clear
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-none"
+                    aria-label="Columns"
+                    disabled={datasetLoading || !dataset}
+                  >
+                    <Icon name="list" className="h-4 w-4" />
                   </Button>
-                )}
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[220px]">
+                  <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {(tableColumns ?? []).filter((c) => c.key !== primaryKey).map((c) => {
+                    const checked = !hiddenColumnKeys.has(c.key)
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={c.key}
+                        checked={checked}
+                        onCheckedChange={(next) => {
+                          setHiddenColumnKeys((prev) => {
+                            const p = new Set(prev)
+                            const shouldShow = Boolean(next)
+                            if (shouldShow) p.delete(c.key)
+                            else p.add(c.key)
+                            if (p.size >= (tableColumns?.length ?? 0)) return new Set()
+                            return p
+                          })
+                        }}
+                      >
+                        <span className="truncate">{c.label}</span>
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+                  <DropdownMenuSeparator />
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+                    onClick={() => setHiddenColumnKeys(new Set())}
+                  >
+                    Reset columns
+                  </button>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={handleExportCsv}
+                disabled={!canExport}
+                aria-label="Export CSV"
+              >
+                <Icon name="download" className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => setOffset((o) => Math.max(0, o - limit))}
+                disabled={!canPrev}
+                aria-label="Previous page"
+              >
+                <Icon name="chevron-left" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => setOffset((o) => o + limit)}
+                disabled={!canNext}
+                aria-label="Next page"
+              >
+                <Icon name="chevron-right" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-none"
+                onClick={() => {
+                  setLimit(100)
+                  setOffset(0)
+                }}
+                disabled={offset === 0 && limit === 100}
+                aria-label="Reset pagination"
+              >
+                <Icon name="rotate-ccw" className="h-4 w-4" />
+              </Button>
+
+              {query.trim() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuery('')}
+                  className="shrink-0 rounded-none h-9 border-y-0"
+                >
+                  Clear
+                </Button>
+              )}
             </div>
           </div>
-        ) : null}
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="w-full bg-transparent min-h-0 flex flex-col">
-          {datasetLoading ? (
-            <div className="px-4 pt-4 pb-4">
-              <div className="space-y-3">
-                <Skeleton className="h-7 w-56" />
-                <Skeleton className="h-4 w-80" />
-                <div className="h-64 rounded-xl border border-border/60 bg-card animate-pulse" />
-              </div>
-            </div>
-          ) : !dataset ? (
+          {Boolean(starshipId) && !datasetLoading && !dataset ? (
             <div className="px-4 pt-4 pb-4">
               <Card className="border-border/60 p-6">
                 <div className="text-sm text-muted-foreground">Dataset not found.</div>
@@ -418,7 +422,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
             </div>
           ) : (
             <>
-              {!primaryKey && (
+              {Boolean(dataset) && !datasetLoading && !primaryKey && (
                 <div className="px-4 pt-4 pb-3 text-xs text-muted-foreground shrink-0">
                   Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
                 </div>
@@ -431,6 +435,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
                   query={query}
                   onQueryChange={setQuery}
                   serverSideSearch={true}
+                  loading={isResolving}
                   pageSize={0}
                   striped={true}
                   excelLike={true}

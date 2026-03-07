@@ -1,13 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 
 import Icon from '@/components/primitives/Icon'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -81,6 +80,26 @@ export default function TablesIndexPage(): React.JSX.Element {
     const list = Array.isArray(datasets) ? datasets : []
     return list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
   }, [datasets])
+
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const SEARCH_DEBOUNCE_MS = 250
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(searchText.trim()), SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(handle)
+  }, [SEARCH_DEBOUNCE_MS, searchText])
+
+  const filteredSorted = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter((d) => {
+      const name = String((d as any)?.name ?? '').toLowerCase()
+      const slug = String((d as any)?.slug ?? '').toLowerCase()
+      const desc = String((d as any)?.description ?? '').toLowerCase()
+      return name.includes(q) || slug.includes(q) || desc.includes(q)
+    })
+  }, [debouncedSearch, sorted])
 
   const createDataset = useCreateDataset(starshipId)
   const canCreate = Boolean(starshipId) && !createDataset.isPending
@@ -190,6 +209,50 @@ export default function TablesIndexPage(): React.JSX.Element {
     }
   }
 
+  const renderCenteredState = (message: string, opts?: { showCreate?: boolean }) => {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 gap-3">
+        <p className="text-sm text-muted-foreground text-center">{message}</p>
+        {opts?.showCreate ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-8 text-primary hover:text-primary"
+            onClick={() => setOpen(true)}
+            disabled={!canCreate}
+          >
+            <Icon name="plus" className="h-4 w-4 mr-1.5" />
+            New dataset
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  const renderDatasetRowSkeleton = (key: string) => {
+    return (
+      <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+              <Skeleton className="h-10 w-10 rounded-lg" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-52 max-w-[70%]" />
+                <Skeleton className="h-3.5 w-16" />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Skeleton className="h-3 w-48 max-w-[80%]" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -215,95 +278,127 @@ export default function TablesIndexPage(): React.JSX.Element {
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={!canCreate}>
-                <Icon name="plus" className="h-4 w-4 mr-1.5" />
-                New dataset
-              </Button>
-            </div>
           </div>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
-        <div className="w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col gap-4">
-          {starshipLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            </div>
-          ) : !starshipId ? (
-            <div className="flex items-center justify-center py-10">
-              <p className="text-sm text-muted-foreground">No starship selected.</p>
-            </div>
-          ) : datasetsLoading ? (
-            <div className="grid grid-cols-1 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-28 rounded-xl border border-border/60 bg-card animate-pulse" />
-              ))}
-            </div>
-          ) : sorted.length === 0 ? (
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="text-base">No datasets yet</CardTitle>
-                <CardDescription>Create a dataset to store and share tabular data in this starship.</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 flex flex-col sm:flex-row gap-2">
-                <Button onClick={() => setOpen(true)} disabled={!canCreate} variant="outline">
+        <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
+          <div className="pt-4 pb-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-primary hover:text-primary"
+                  onClick={() => setOpen(true)}
+                  disabled={!canCreate}
+                >
                   <Icon name="plus" className="h-4 w-4 mr-1.5" />
                   New dataset
                 </Button>
-              </CardContent>
-            </Card>
+              </div>
+
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                  <Input
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Search datasets"
+                    className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
+                    aria-label="Search datasets"
+                    disabled={!starshipId || datasetsLoading}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {starshipLoading ? (
+            renderCenteredState('Loading…')
+          ) : !starshipId ? (
+            renderCenteredState('No starship selected.')
+          ) : datasetsLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderDatasetRowSkeleton(`dataset-skel-${i}`))}</div>
+          ) : filteredSorted.length === 0 ? (
+            renderCenteredState(
+              debouncedSearch.trim() ? `No datasets match “${debouncedSearch.trim()}”.` : 'No datasets yet.',
+              { showCreate: true }
+            )
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {sorted.map(d => {
+            <div className="space-y-2">
+              {filteredSorted.map((d) => {
                 const href = `/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(d.id)}`
                 return (
-                  <Card key={d.id} className={cn('border-border/60 hover:shadow-sm transition-shadow group')}>
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-base flex items-center justify-between gap-2">
-                        <Link href={href} className="truncate hover:underline underline-offset-2">
-                          {d.name}
+                  <div
+                    key={d.id}
+                    className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}
+                  >
+                    <div className={cn('min-w-0 flex-1')} aria-label={String(d.name || 'Dataset')}>
+                      <div className="flex items-start gap-3">
+                        <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-border/50 bg-muted/10 overflow-hidden">
+                            <Icon name="database" className="h-5 w-5 text-muted-foreground" />
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link
+                              href={href}
+                              className={cn('block max-w-full truncate text-left text-sm font-medium text-foreground hover:underline underline-offset-2')}
+                            >
+                              {d.name || 'Untitled'}
+                            </Link>
+                            <code className="text-[11px] font-mono text-muted-foreground truncate">{String((d as any)?.slug ?? '')}</code>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            <span className="truncate">{d.description || '—'}</span>
+                            <span aria-hidden="true">·</span>
+                            <span className="tabular-nums">{d.columns?.length ?? 0} columns</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 self-center">
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                      >
+                        <Link href={href} className="inline-flex items-center gap-1.5">
+                          <Icon name="arrow-right" className="h-4 w-4" />
+                          Open
                         </Link>
-                        <code className="text-[11px] font-mono text-muted-foreground">{d.slug}</code>
-                      </CardTitle>
-                      <CardDescription className="text-sm">{d.description || '—'}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0 flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">{d.columns?.length ?? 0} columns</div>
-                      <div className="flex items-center gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                              aria-label="Dataset actions"
-                            >
-                              <Icon name="dots-vertical" className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-44">
-                            <DropdownMenuItem
-                              onClick={() => router.push(href)}
-                              className="flex items-center gap-2 cursor-pointer"
-                            >
-                              <Icon name="arrow-right" className="h-4 w-4" />
-                              Open
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setDeleteMode('archive')
-                                setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
-                              }}
-                              className="flex items-center gap-2 cursor-pointer"
-                            >
-                              <Icon name="archive" className="h-4 w-4" />
-                              Archive
-                            </DropdownMenuItem>
+                      </Button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                            aria-label="More options"
+                          >
+                            <Icon name="dots-vertical" className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setDeleteMode('archive')
+                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
+                            }}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <Icon name="archive" className="h-4 w-4" />
+                            Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             disabled={!canHardDelete}
                             onClick={() => {
@@ -315,18 +410,10 @@ export default function TablesIndexPage(): React.JSX.Element {
                             <Icon name="trash" className="h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={href}>
-                            Open
-                            <Icon name="chevron-right" className="h-4 w-4 ml-1.5" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -343,7 +430,7 @@ export default function TablesIndexPage(): React.JSX.Element {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create dataset</DialogTitle>
             <DialogDescription>Define columns now. You can append/upsert rows later.</DialogDescription>

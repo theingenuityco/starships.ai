@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
@@ -18,6 +17,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
+import { RoomSidebarList } from '@/components/rooms/RoomSidebarList'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -157,7 +157,7 @@ export function Navigation(props: NavigationProps) {
       }
       // If we're in a specific conversation, don't carry the conversationId across starships.
       // It may not exist / be accessible in the destination starship.
-      if (p.includes('/conversations/') || p.includes('/channels/') || p.includes('/rooms/') || p.includes('/dm/')) {
+      if (p.includes('/conversations/') || p.includes('/rooms/')) {
         return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
@@ -485,18 +485,12 @@ export function Navigation(props: NavigationProps) {
               </div>
             </div>
 
-            {/* Channels + Direct messages */}
+            {/* Rooms */}
             {isAuthenticated && starshipSlug && starshipData?.id && (
               <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col pl-2 pr-1.5' : 'hidden'}>
                 {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
                 <div className="flex-1 min-h-0 overflow-hidden pb-2">
-                  <ConversationList
-                    starshipId={starshipData.id}
-                    starshipSlug={activeStarshipSlug || undefined}
-                    compact={true}
-                    onNavigate={handleConversationSelect}
-                    onConversationSelect={handleConversationSelect}
-                  />
+                  <RoomSidebarList starshipId={String(starshipData.id)} starshipSlug={activeStarshipSlug || ''} onNavigate={isMobile && onClose ? onClose : undefined} />
                 </div>
               </div>
             )}

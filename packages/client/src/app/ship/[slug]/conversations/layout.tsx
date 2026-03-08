@@ -1,257 +1,51 @@
 'use client'
 
-import { ConversationInterface } from '@/components/conversation/ConversationInterface'
-import { ThreadPane } from '@/components/conversation/ThreadPane'
-import { useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import api from '@/lib/api'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useMarkConversationRead } from '@/hooks/useNotifications'
-import type { AgentModel, MessageModel } from '@starships/protocol'
+import type { RoomModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
-import { useStarshipAgents } from '@/hooks/useAgents'
-import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import api from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-function sanitizeThreadTitleSnippetFromMessageContent(input: string, maps?: { agentLabelById?: Map<string, string>; userLabelById?: Map<string, string> }): string {
-  // Thread titles are plain text snippets. Do not carry mention tokens into the title:
-  // - Avoid decoding `<@a:...>` / `<@u:...>` to names in the header/nav.
-  // - Avoid accidental notifications/UX confusion from `@mentions` in titles.
-  const agentLabelById = maps?.agentLabelById
-  const userLabelById = maps?.userLabelById
-
-  const s = String(input || '')
-    // Convert structured mention tokens into plain-text @Name (no tokens).
-    .replace(/<@a:([^>\s]+)>/gi, (_m, idRaw) => {
-      const id = String(idRaw || '').trim()
-      const label = id && agentLabelById ? agentLabelById.get(id) : null
-      return `@${label || 'Agent'}`
-    })
-    .replace(/<@u:([^>\s]+)>/gi, (_m, idRaw) => {
-      const id = String(idRaw || '').trim()
-      const label = id && userLabelById ? userLabelById.get(id) : null
-      return `@${label || 'User'}`
-    })
-    .replace(/<@[^>\n]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  return s
+type RoomContextResponse = {
+  conversationId: string
+  roomConversationId: string | null
+  isRoom: boolean
+  isRoomThread: boolean
 }
 
+/**
+ * Legacy `/conversations` route.
+ *
+ * Channels + DMs were removed and conversations are now room-scoped.
+ * This layout remains as a redirector for deep links that still target:
+ * - `/ship/:slug/conversations` (redirect to Lobby room)
+ * - `/ship/:slug/conversations/:conversationId` (redirect to the owning room route)
+ *
+ * Note: `children` is intentionally ignored; the canonical UI is rendered under `/rooms`.
+ */
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
-  const params = useParams()
+  void children
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
-  const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
-  const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
-  const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
-  const lastThreadConversationIdRef = useRef<string | null>(null)
-  const pendingThreadStateRef = useRef<{
-    threadKey: string | null
-    threadAgent: AgentModel | null
-    pinnedFirstMessage: MessageModel | null
-    draftParentConversationId: string | null
-    draftTitle: string | null
-  } | null>(null)
+  const params = useParams<{ slug: string; conversationId?: string }>()
 
-  // Desktop thread pane width (draggable resizer)
-  const THREAD_PANE_WIDTH_STORAGE_KEY = 'starships.threadPaneWidthPx'
-  const [threadPaneWidthPx, setThreadPaneWidthPx] = useState<number>(() => {
-    if (typeof window === 'undefined') return 600
-    const w = window.innerWidth
-    // Slightly wider by default; clamped to keep the main column usable.
-    if (w >= 1536) return 720
-    if (w >= 1280) return 660
-    if (w >= 1024) return 600
-    return 480
-  })
-  const [isResizingThreadPane, setIsResizingThreadPane] = useState<boolean>(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
-  const resizeCleanupRef = useRef<null | (() => void)>(null)
-  const resizeRafRef = useRef<number | null>(null)
-  const pendingThreadPaneWidthPxRef = useRef<number | null>(null)
+  const slug = typeof params.slug === 'string' ? params.slug : ''
+  const conversationId = typeof params.conversationId === 'string' ? params.conversationId : null
 
-  const clampThreadPaneWidthPx = useCallback((w: number) => {
-    const min = 320
-    // Keep at least ~360px for the main conversation column.
-    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
-    const max = Math.min(900, Math.max(min, viewportW - 360))
-    const next = Math.round(w)
-    return Math.max(min, Math.min(max, next))
-  }, [])
+  const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
+  const starshipId = starship?.id ? String(starship.id) : ''
+  const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipId, Boolean(starshipId))
+  const rooms = (roomsData?.rooms || []) as RoomModel[]
 
-  useEffect(() => {
-    // Initialize from localStorage (or sensible defaults per breakpoint).
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(THREAD_PANE_WIDTH_STORAGE_KEY) : null
-      const parsed = raw ? Number(raw) : NaN
-      const hasStored = Number.isFinite(parsed) && parsed > 0
-      const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
-      const defaultWidth = viewportW >= 1536 ? 720 : viewportW >= 1280 ? 660 : viewportW >= 1024 ? 600 : 480
-      setThreadPaneWidthPx(clampThreadPaneWidthPx(hasStored ? parsed : defaultWidth))
-    } catch {
-      // ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return
-      window.localStorage.setItem(THREAD_PANE_WIDTH_STORAGE_KEY, String(threadPaneWidthPx))
-    } catch {
-      // ignore
-    }
-  }, [threadPaneWidthPx])
-
-  useEffect(() => {
-    // Clamp on viewport resize so the handle can't push content offscreen.
-    if (typeof window === 'undefined') return
-    const onResize = () => setThreadPaneWidthPx(prev => clampThreadPaneWidthPx(prev))
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [clampThreadPaneWidthPx])
-
-  useEffect(() => {
-    // Safety: if the user navigates away mid-drag, ensure we clean up listeners and restore user-select.
-    return () => {
-      try {
-        resizeCleanupRef.current?.()
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [])
-
-  const handleThreadResizePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.button !== 0) return
-      if (typeof window === 'undefined') return
-
-      // If somehow still resizing, cleanup first.
-      resizeCleanupRef.current?.()
-
-      const startX = e.clientX
-      const startWidth = threadPaneWidthPx
-      setIsResizingThreadPane(true)
-
-      const prevUserSelect = document.body.style.userSelect
-      document.body.style.userSelect = 'none'
-
-      resizeStateRef.current = { startX, startWidth, prevUserSelect }
-
-      const applyWidth = (w: number) => {
-        try {
-          rootRef.current?.style.setProperty('--thread-pane-width', `${w}px`)
-        } catch {
-          // ignore
-        }
-      }
-
-      const onMove = (ev: PointerEvent) => {
-        const state = resizeStateRef.current
-        if (!state) return
-        // Pane is on the right; moving pointer right shrinks the pane.
-        const dx = ev.clientX - state.startX
-        const next = clampThreadPaneWidthPx(state.startWidth - dx)
-        pendingThreadPaneWidthPxRef.current = next
-        if (resizeRafRef.current != null) return
-        resizeRafRef.current = window.requestAnimationFrame(() => {
-          resizeRafRef.current = null
-          const w = pendingThreadPaneWidthPxRef.current
-          if (typeof w === 'number') applyWidth(w)
-        })
-      }
-
-      const cleanup = () => {
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', onUp)
-        if (resizeRafRef.current != null) {
-          window.cancelAnimationFrame(resizeRafRef.current)
-          resizeRafRef.current = null
-        }
-        const state = resizeStateRef.current
-        if (state) {
-          document.body.style.userSelect = state.prevUserSelect
-        }
-        resizeStateRef.current = null
-        resizeCleanupRef.current = null
-        const finalW = pendingThreadPaneWidthPxRef.current
-        pendingThreadPaneWidthPxRef.current = null
-        if (typeof finalW === 'number') {
-          applyWidth(finalW)
-          setThreadPaneWidthPx(finalW)
-        }
-        setIsResizingThreadPane(false)
-      }
-
-      const onUp = () => cleanup()
-
-      resizeCleanupRef.current = cleanup
-      window.addEventListener('pointermove', onMove)
-      window.addEventListener('pointerup', onUp)
-    },
-    [clampThreadPaneWidthPx, threadPaneWidthPx]
-  )
-
-  // Memoize params to prevent unnecessary rerenders
-  const routeParams = useMemo(
-    () => ({
-      slug: params.slug as string,
-      conversationId: params.conversationId as string | undefined,
-    }),
-    [params.slug, params.conversationId, searchParams]
-  )
-
-  const { data: starshipData } = useStarshipBySlug(routeParams.slug)
-  const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipData?.id ?? '', Boolean(starshipData?.id))
-
-  const agentLabelById = useMemo(() => {
-    const m = new Map<string, string>()
-    const list = Array.isArray(agentsData) ? (agentsData as any[]) : []
-    for (const a of list) {
-      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
-      const slug = typeof (a as any)?.slug === 'string' ? String((a as any).slug).trim() : ''
-      if (!id) continue
-      const label = formatAgentDisplayName(a as any)
-      const out = String(label || '').trim() || String((a as any)?.name || (a as any)?.slug || 'Agent')
-      m.set(id, out)
-      if (slug) m.set(slug, out)
-    }
-    return m
-  }, [agentsData])
-
-  const userLabelById = useMemo(() => {
-    const m = new Map<string, string>()
-    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
-    for (const it of list) {
-      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
-      const slug = typeof it?.userSlug === 'string' ? String(it.userSlug).trim() : ''
-      if (!id) continue
-      const label = String(it?.displayName || it?.email || '').trim()
-      if (!label) continue
-      m.set(id, label)
-      if (slug) m.set(slug, label)
-    }
-    return m
-  }, [membersAndInvites])
-
-  const markRead = useMarkConversationRead()
-  useEffect(() => {
-    const cid = typeof routeParams.conversationId === 'string' ? routeParams.conversationId : ''
-    if (!cid) return
-    void markRead.mutateAsync(cid).catch(() => undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeParams.conversationId])
+  const defaultRoomSlug = useMemo(() => {
+    const norm = (s: unknown) => String(s || '').trim().toLowerCase()
+    const lobby = rooms.find(r => norm(r.slug) === 'lobby')
+    const lobbySlug = lobby?.slug ? String(lobby.slug).trim() : ''
+    if (lobbySlug) return lobbySlug
+    const first = rooms.length > 0 ? String((rooms[0] as any)?.slug || '').trim() : ''
+    return first || null
+  }, [rooms])
 
   const threadKey = useMemo(() => {
     const raw = searchParams.get('thread')
@@ -259,535 +53,96 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return v.length > 0 ? v : null
   }, [searchParams])
 
-  const isDraftThreadOpen = threadKey === 'draft'
-  const threadConversationId = useMemo(() => {
-    if (!threadKey) return null
-    if (threadKey === 'draft') return null
-    return threadKey
-  }, [threadKey])
-
-  const isThreadPaneOpen = Boolean(threadKey)
-  const THREAD_PANE_ANIM_MS = 300
-  const THREAD_PANE_OPEN_CONTENT_DELAY_MS = 120
-  const [isThreadPaneMounted, setIsThreadPaneMounted] = useState<boolean>(isThreadPaneOpen)
-  const openMountTimerRef = useRef<number | null>(null)
+  const lastResolvedForIdRef = useRef<string | null>(null)
+  const [roomCtx, setRoomCtx] = useState<RoomContextResponse | null>(null)
+  const [roomCtxError, setRoomCtxError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isThreadPaneOpen) {
-      // Let the pane animate open immediately; mount heavy content shortly after.
-      if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
-      openMountTimerRef.current = window.setTimeout(() => setIsThreadPaneMounted(true), THREAD_PANE_OPEN_CONTENT_DELAY_MS)
-      return () => {
-        if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
-        openMountTimerRef.current = null
-      }
+    setRoomCtx(null)
+    setRoomCtxError(null)
+    lastResolvedForIdRef.current = null
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!slug) return
+    if (!starshipId) return
+    if (roomsLoading) return
+
+    // No specific conversation: go to the default room.
+    if (!conversationId) {
+      if (!defaultRoomSlug) return
+      router.replace(`/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(defaultRoomSlug)}`)
+      return
     }
-    if (openMountTimerRef.current != null) window.clearTimeout(openMountTimerRef.current)
-    openMountTimerRef.current = null
-    const t = window.setTimeout(() => setIsThreadPaneMounted(false), THREAD_PANE_ANIM_MS)
-    return () => window.clearTimeout(t)
-  }, [isThreadPaneOpen])
 
-  useEffect(() => {
-    const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
-    if (!cid) return
-    void markRead.mutateAsync(cid).catch(() => undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadConversationId])
-
-  const setThreadConversationIdInUrl = useCallback(
-    (conversationId: string | null) => {
-      const next = new URLSearchParams(searchParams.toString())
-      if (conversationId) next.set('thread', conversationId)
-      else next.delete('thread')
-      const qs = next.toString()
-      // Preserve the current route (including /conversations/:conversationId) and other query params.
-      const basePath = routeParams.conversationId ? `/ship/${routeParams.slug}/conversations/${routeParams.conversationId}` : `/ship/${routeParams.slug}`
-      router.push(qs ? `${basePath}?${qs}` : basePath)
-    },
-    [router, routeParams.conversationId, routeParams.slug, searchParams]
-  )
-
-  useEffect(() => {
-    // If thread id changes via back/forward / manual URL edits, clear per-thread ephemeral state.
-    const prev = lastThreadConversationIdRef.current
-    if (prev !== threadKey) {
-      lastThreadConversationIdRef.current = threadKey
-      const pending = pendingThreadStateRef.current
-      if (pending && pending.threadKey === threadKey) {
-        pendingThreadStateRef.current = null
-        setThreadPinnedFirstMessage(pending.pinnedFirstMessage)
-        setThreadAgent(pending.threadAgent)
-        setThreadDraftParentConversationId(pending.draftParentConversationId)
-        setThreadDraftTitle(pending.draftTitle)
-      } else {
-        setThreadPinnedFirstMessage(null)
-        setThreadAgent(null)
-        setThreadDraftParentConversationId(null)
-        setThreadDraftTitle(null)
-      }
-    }
-  }, [threadKey])
-
-  useEffect(() => {
-    // Refresh-safe pin hydration (see ChannelsLayout for rationale).
-    const threadId = typeof threadConversationId === 'string' ? threadConversationId.trim() : ''
-    if (!threadId) return
-    if (isDraftThreadOpen) return
-    if (threadPinnedFirstMessage) return
+    // Resolve room context once per conversationId.
+    if (lastResolvedForIdRef.current === conversationId) return
+    lastResolvedForIdRef.current = conversationId
 
     let cancelled = false
     ;(async () => {
       try {
-        const convoResp = await api.get(`/api/v1/conversations/${encodeURIComponent(threadId)}`)
-        const convo = (convoResp as any)?.data?.data ?? (convoResp as any)?.data ?? null
-        const parentId = typeof convo?.parentConversationId === 'string' ? convo.parentConversationId.trim() : ''
-        if (!parentId) return
-
-        const pinnedResp = await api.get(`/api/v1/conversations/${encodeURIComponent(parentId)}/linked-message`, {
-          params: { linkedConversationId: threadId },
-        })
-        const payload = (pinnedResp as any)?.data?.data ?? (pinnedResp as any)?.data ?? null
-        const pinned = (payload as any)?.message ?? null
+        const res = await api.get(`/api/v1/conversations/${encodeURIComponent(conversationId)}/room-context`)
+        const data = (res as any)?.data?.data ?? (res as any)?.data
+        const parsed: RoomContextResponse | null =
+          data && typeof data === 'object'
+            ? {
+                conversationId: String((data as any).conversationId || conversationId),
+                roomConversationId: (data as any).roomConversationId ? String((data as any).roomConversationId) : null,
+                isRoom: Boolean((data as any).isRoom),
+                isRoomThread: Boolean((data as any).isRoomThread),
+              }
+            : null
         if (cancelled) return
-        if (pinned) setThreadPinnedFirstMessage(pinned as any)
-      } catch {
-        // ignore (best-effort hydration)
+        setRoomCtx(parsed)
+      } catch (e: any) {
+        if (cancelled) return
+        setRoomCtxError(String(e?.message || e))
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [threadConversationId, isDraftThreadOpen, threadPinnedFirstMessage])
+  }, [conversationId, defaultRoomSlug, roomsLoading, router, slug, starshipId])
 
-  const handleThreadCreated = useCallback(
-    (cid: string) => {
-      // Persist the "pinned first message" across the draft -> real thread transition.
-      // Otherwise, when the `thread` query param updates from `draft` -> `<cid>`, the
-      // `threadKey` effect will clear the pinned message and it disappears.
-      const nextThreadKey = String(cid)
-      pendingThreadStateRef.current = {
-        threadKey: nextThreadKey,
-        threadAgent: threadAgent ?? null,
-        pinnedFirstMessage: threadPinnedFirstMessage ?? null,
-        draftParentConversationId: null,
-        draftTitle: null,
+  useEffect(() => {
+    if (!slug) return
+    if (!conversationId) return
+    if (!roomCtx) return
+
+    const roomConversationId = roomCtx.roomConversationId ? String(roomCtx.roomConversationId).trim() : ''
+    if (!roomConversationId) {
+      // Fallback: if a conversation isn't under a room, route to the default room.
+      if (defaultRoomSlug) {
+        router.replace(`/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(defaultRoomSlug)}`)
       }
-      setThreadConversationIdInUrl(nextThreadKey)
-    },
-    [setThreadConversationIdInUrl, threadAgent, threadPinnedFirstMessage]
-  )
-
-  const handleCloseThread = useCallback(() => {
-    setThreadPinnedFirstMessage(null)
-    setThreadAgent(null)
-    setThreadDraftParentConversationId(null)
-    setThreadDraftTitle(null)
-    pendingThreadStateRef.current = {
-      threadKey: null,
-      threadAgent: null,
-      pinnedFirstMessage: null,
-      draftParentConversationId: null,
-      draftTitle: null,
-    }
-    setThreadConversationIdInUrl(null)
-  }, [setThreadConversationIdInUrl])
-
-  // When opening a draft thread purely via URL (e.g. forum "New thread"), default parent to the current conversation.
-  useEffect(() => {
-    if (!isDraftThreadOpen) return
-    if (threadDraftParentConversationId) return
-    const parent = typeof routeParams.conversationId === 'string' ? routeParams.conversationId.trim() : ''
-    if (!parent) return
-    setThreadDraftParentConversationId(parent)
-    setThreadDraftTitle('New thread')
-  }, [isDraftThreadOpen, routeParams.conversationId, threadDraftParentConversationId])
-
-  const isDraftDm = useMemo(() => {
-    const dm = searchParams.get('dm')
-    return dm === 'draft'
-  }, [searchParams])
-
-  const agentFromUrl = useMemo(() => {
-    const raw = searchParams.get('agent')
-    const v = typeof raw === 'string' ? raw.trim() : ''
-    return v.length > 0 ? v : null
-  }, [searchParams])
-
-  // DM landing: `?agent=<slug|id>` should open a DM with that agent (existing if present, otherwise draft).
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (routeParams.conversationId) return
-    if (!agentFromUrl) return
-    if (agentsLoading || directMessagesLoading) return
-
-    const agents = Array.isArray(agentsData) ? (agentsData as any[]) : []
-    const agent =
-      agents.find(
-        a =>
-          String((a as any)?.slug || '')
-            .trim()
-            .toLowerCase() === agentFromUrl.toLowerCase()
-      ) ??
-      agents.find(a => String((a as any)?.id || '').trim() === agentFromUrl) ??
-      null
-    if (!agent?.id) return
-
-    const list = ((directMessagesData as any)?.directMessages || []) as DirectMessageListItem[]
-    const existingCid =
-      list
-        .map((item: any) => (item as any)?.dm)
-        .filter((dm: any) => dm && dm.dmType === 'user_agent')
-        .find((dm: any) => String(dm.agentId || '') === String(agent.id))?.conversationId ?? null
-
-    const peerKey = String((agent as any)?.slug || '').trim() || `a:${String(agent.id)}`
-    // Canonical DM route is `/dm/<peerKey>` (agent slug when available, else `a:<agentId>`).
-    router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
-  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, starshipData?.id])
-
-  // Back-compat: if the user is on `/conversations/:id` and that id is a DM conversation, redirect to `/dm/<peerKey>`.
-  useEffect(() => {
-    if (!starshipData?.id) return
-    const cid = typeof routeParams.conversationId === 'string' ? routeParams.conversationId.trim() : ''
-    if (!cid) return
-    if (directMessagesLoading || agentsLoading) return
-
-    const list = ((directMessagesData as any)?.directMessages || []) as DirectMessageListItem[]
-    const match = list.find(it => String((it as any)?.dm?.conversationId || '') === cid) ?? null
-    if (!match) return
-
-    const dm: any = (match as any)?.dm
-    const dmType = String(dm?.dmType || '')
-    if (dmType === 'user_agent') {
-      const agent = (match as any)?.agent
-      const agentSlug = String(agent?.slug || '').trim()
-      const agentId = String(dm?.agentId || '').trim()
-      const peerKey = agentSlug || (agentId ? `a:${agentId}` : '')
-      if (!peerKey) return
-      router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
       return
     }
-    if (dmType === 'user_user') {
-      const peerUserId = String((match as any)?.peerUser?.id || '').trim()
-      if (!peerUserId) return
-      router.replace(`/ship/${routeParams.slug}/dm/${encodeURIComponent(`u-${peerUserId}`)}`)
+
+    const match = rooms.find(r => String((r as any)?.conversationId || '').trim() === roomConversationId) ?? null
+    const roomSlug = match?.slug ? String(match.slug).trim() : ''
+    if (!roomSlug) {
+      // If rooms list isn't ready or doesn't include the room, fall back to the rooms index.
+      router.replace(`/ship/${encodeURIComponent(slug)}/rooms`)
       return
     }
-  }, [agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, starshipData?.id])
 
-  const pickAutoChannelSlug = useMemo(() => {
-    const channels = channelsData?.channels ?? []
-    const lobby = channels.find(
-      (ch: any) =>
-        String(ch?.slug || '')
-          .trim()
-          .toLowerCase() === 'lobby'
-    )
-    const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
-    if (lobbySlug) return lobbySlug
-
-    const firstSlug = channels.length > 0 ? String((channels[0] as any)?.slug || '') : ''
-    return firstSlug || null
-  }, [channelsData?.channels])
-
-  const channelSlugForCurrentConversationId = useMemo(() => {
-    const cid = typeof routeParams.conversationId === 'string' ? String(routeParams.conversationId) : ''
-    if (!cid) return null
-    const channels = channelsData?.channels ?? []
-    const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
-    const slug = match?.slug ? String(match.slug) : ''
-    return slug || null
-  }, [channelsData?.channels, routeParams.conversationId])
-
-  const roomSlugForCurrentConversationId = useMemo(() => {
-    const cid = typeof routeParams.conversationId === 'string' ? String(routeParams.conversationId) : ''
-    if (!cid) return null
-    const rooms = roomsData?.rooms ?? []
-    const match = rooms.find((r: any) => String(r?.conversationId || '') === cid) ?? null
-    const slug = match?.slug ? String(match.slug) : ''
-    return slug || null
-  }, [roomsData?.rooms, routeParams.conversationId])
-
-  const hasAutoNavigatedRef = useRef(false)
-  useEffect(() => {
-    if (hasAutoNavigatedRef.current) return
-    if (!starshipData?.id) return
-    if (routeParams.conversationId) return
-    if (isDraftDm) return
-    // If `agent` is present, DM landing logic will handle navigation.
-    if (agentFromUrl) return
-
-    // Always open the default channel (lobby), falling back to first channel.
-    if (channelsLoading) return
-    if (pickAutoChannelSlug) {
-      hasAutoNavigatedRef.current = true
-      // When redirecting to a channel, only carry channel-relevant query params.
-      const next = new URLSearchParams()
-      const thread = (searchParams.get('thread') || '').trim()
-      if (thread) next.set('thread', thread)
-      const qs = next.toString()
-      router.replace(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`)
+    const base = `/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(roomSlug)}`
+    if (roomCtx.isRoom) {
+      router.replace(base)
       return
     }
-    // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
-    hasAutoNavigatedRef.current = true
-    router.replace('/explore')
-  }, [agentFromUrl, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
+    if (threadKey) {
+      router.replace(`${base}/conversation/${encodeURIComponent(conversationId)}/thread/${encodeURIComponent(threadKey)}`)
+      return
+    }
+    router.replace(`${base}/conversation/${encodeURIComponent(conversationId)}`)
+  }, [conversationId, defaultRoomSlug, roomCtx, rooms, router, slug, threadKey])
 
-  // If the user is on /conversations/:id but that id is a room-backed conversation, redirect to /rooms/:roomSlug.
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (roomsLoading) return
-    if (!routeParams.conversationId) return
-    if (!roomSlugForCurrentConversationId) return
-    const next = new URLSearchParams()
-    const thread = (searchParams.get('thread') || '').trim()
-    if (thread) next.set('thread', thread)
-    const qs = next.toString()
-    router.replace(
-      qs
-        ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlugForCurrentConversationId)}?${qs}`
-        : `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlugForCurrentConversationId)}`
-    )
-  }, [roomSlugForCurrentConversationId, roomsLoading, routeParams.conversationId, routeParams.slug, router, searchParams, starshipData?.id])
-
-  // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
-  useEffect(() => {
-    if (!starshipData?.id) return
-    if (channelsLoading) return
-    if (!routeParams.conversationId) return
-    if (!channelSlugForCurrentConversationId) return
-    // When redirecting to a channel, only carry channel-relevant query params.
-    const next = new URLSearchParams()
-    const thread = (searchParams.get('thread') || '').trim()
-    if (thread) next.set('thread', thread)
-    const qs = next.toString()
-    router.replace(
-      qs
-        ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}?${qs}`
-        : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}`
-    )
-  }, [channelSlugForCurrentConversationId, channelsLoading, routeParams.conversationId, routeParams.slug, router, searchParams, starshipData?.id])
-
-  // Handle conversation change from ConversationInterface
-  // Must be called before any early returns to satisfy React Hooks rules
-  const handleConversationChange = useCallback(
-    (newConversationId: string | null) => {
-      // If we're transitioning out of a "draft DM" view, capture the DM target before we clear query params.
-      const dm = (searchParams.get('dm') || '').trim()
-      const dmType = (searchParams.get('dmType') || '').trim()
-      const draftAgentId = (searchParams.get('agentId') || '').trim()
-      const draftPeerUserId = (searchParams.get('peerUserId') || '').trim()
-
-      // If we're transitioning out of a "draft DM" view, drop the draft-only query params.
-      const sp = new URLSearchParams(searchParams.toString())
-      sp.delete('dm')
-      sp.delete('dmType')
-      sp.delete('agentId')
-      sp.delete('peerUserId')
-      sp.delete('peerLabel')
-      sp.delete('peerAvatar')
-      if (newConversationId) {
-        // Canonicalize DMs to `/dm/<peerKey>` even if they were opened via legacy `/conversations` draft params.
-        if (dm === 'draft' && dmType === 'user_agent' && draftAgentId) {
-          const agents = Array.isArray(agentsData) ? (agentsData as any[]) : []
-          const a = agents.find(x => String((x as any)?.id || '').trim() === draftAgentId) ?? null
-          const agentSlug = String((a as any)?.slug || '').trim()
-          const peerKey = agentSlug || `a:${draftAgentId}`
-          router.push(`/ship/${routeParams.slug}/dm/${encodeURIComponent(peerKey)}`)
-          return
-        }
-        if (dm === 'draft' && dmType === 'user_user' && draftPeerUserId) {
-          router.push(`/ship/${routeParams.slug}/dm/${encodeURIComponent(`u-${draftPeerUserId}`)}`)
-          return
-        }
-
-        const cid = String(newConversationId)
-        const rooms = roomsData?.rooms ?? []
-        const roomMatch = rooms.find((r: any) => String(r?.conversationId || '') === cid) ?? null
-        const roomSlug = roomMatch?.slug ? String(roomMatch.slug) : ''
-        if (roomSlug) {
-          const next = new URLSearchParams()
-          const thread = (sp.get('thread') || '').trim()
-          if (thread) next.set('thread', thread)
-          const qs = next.toString()
-          router.push(qs ? `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlug)}?${qs}` : `/ship/${routeParams.slug}/rooms/${encodeURIComponent(roomSlug)}`)
-          return
-        }
-        const channels = channelsData?.channels ?? []
-        const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
-        const channelSlug = match?.slug ? String(match.slug) : ''
-        if (channelSlug) {
-          // When routing into channels, only carry channel-relevant query params.
-          const next = new URLSearchParams()
-          const thread = (sp.get('thread') || '').trim()
-          if (thread) next.set('thread', thread)
-          const qs = next.toString()
-          router.push(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}`)
-          return
-        }
-        const qs = sp.toString()
-        router.push(qs ? `/ship/${routeParams.slug}/conversations/${cid}?${qs}` : `/ship/${routeParams.slug}/conversations/${cid}`)
-      } else {
-        const qs = sp.toString()
-        router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
-      }
-    },
-    [agentsData, channelsData?.channels, roomsData?.rooms, router, routeParams.slug, searchParams]
-  )
-
-  if (!starshipData) {
-    return null // Layout handles loading/error states
-  }
-
-  // IMPORTANT: do not add hooks below conditional early-returns (starshipData loading, onboarding, etc.).
-  // A plain object avoids violating Rules of Hooks when starshipData appears/disappears between renders.
-  const threadPaneSharedProps = {
-    starshipId: starshipData.id,
-    starshipSlug: routeParams.slug,
-    conversationId: threadConversationId,
-    pinnedFirstMessage: threadPinnedFirstMessage,
-    draftParentConversationId: isDraftThreadOpen ? threadDraftParentConversationId : null,
-    draftTitle: isDraftThreadOpen ? threadDraftTitle : null,
-    selectedAgent: threadAgent,
-    onAgentChange: setThreadAgent,
-    onThreadCreated: handleThreadCreated,
-    onClose: handleCloseThread,
-  } as const
-
-  return (
-    <div
-      ref={rootRef}
-      className="relative h-full w-full flex flex-col md:flex-row min-w-0 overflow-x-hidden"
-      style={{
-        ['--thread-pane-width' as any]: `${threadPaneWidthPx}px`,
-      }}
-    >
-      <div
-        className={cn('flex-1 min-w-0 h-full', isThreadPaneOpen && 'hidden md:block')}
-        style={{
-          ['--conversation-right-gutter' as any]: isThreadPaneOpen ? '16px' : '52px',
-        }}
-      >
-        <ConversationInterface
-          starshipId={starshipData.id}
-          conversationId={routeParams.conversationId || null}
-          onConversationChange={handleConversationChange}
-          onOpenThread={({ conversationId, defaultAgent, linkedMessage, parentConversationId }) => {
-            const nextThreadKey = conversationId ? String(conversationId) : 'draft'
-            const nextPinned = linkedMessage ?? null
-
-            // Preserve the existing selection ONLY when re-opening the same thread; otherwise reset.
-            const nextAgent = nextThreadKey === threadKey ? (threadAgent ?? defaultAgent ?? null) : (defaultAgent ?? null)
-
-            pendingThreadStateRef.current = {
-              threadKey: nextThreadKey,
-              threadAgent: nextAgent,
-              pinnedFirstMessage: nextPinned,
-              draftParentConversationId: null,
-              draftTitle: null,
-            }
-
-            setThreadAgent(nextAgent)
-            setThreadPinnedFirstMessage(nextPinned)
-
-            // If we already have a thread conversation id, open it via URL param.
-            if (conversationId) {
-              setThreadConversationIdInUrl(conversationId)
-              return
-            }
-
-            // Draft thread opening (no conversationId yet): open the pane without persisting anything.
-            // The thread conversation (and link to the parent message) is created on the first reply.
-            const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
-            setThreadDraftParentConversationId(parent || null)
-            const rawInput = String((linkedMessage as any)?.content ?? '')
-            const raw = sanitizeThreadTitleSnippetFromMessageContent(rawInput, { agentLabelById, userLabelById })
-            const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
-            const title = snippet ? snippet : 'New thread'
-            setThreadDraftTitle(title)
-            pendingThreadStateRef.current = {
-              threadKey: 'draft',
-              threadAgent: nextAgent,
-              pinnedFirstMessage: nextPinned,
-              draftParentConversationId: parent || null,
-              draftTitle: title,
-            }
-            setThreadConversationIdInUrl('draft')
-          }}
-          initialAgentId={undefined}
-          starshipSlug={routeParams.slug}
-        />
-      </div>
-
-      {/* Thread split pane (desktop/tablet) */}
-      <>
-        {/* Spacer (in flow): animates the main column width smoothly. */}
-        <div
-          className={`hidden md:block h-full flex-shrink-0 ${isResizingThreadPane ? '' : 'transition-all duration-300 ease-in-out'}`}
-          style={{
-            width: isThreadPaneOpen ? 'var(--thread-pane-width)' : 0,
-            willChange: 'width',
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Thread pane (overlay): slide using transform for smoothness. */}
-        <aside
-          className={`hidden md:block absolute inset-y-0 right-0 bg-background min-w-0 overflow-hidden ${isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-          style={{
-            width: 'var(--thread-pane-width)',
-            transform: isThreadPaneOpen ? 'translateX(0px)' : 'translateX(var(--thread-pane-width))',
-            transition: isResizingThreadPane ? 'none' : 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease-out',
-            willChange: 'transform, opacity',
-            contain: 'layout style paint',
-          }}
-          aria-hidden={!isThreadPaneOpen}
-        >
-          {/* Divider + resize hit-area */}
-          <div className="absolute inset-y-0 left-0 w-[1px] bg-border" aria-hidden="true" />
-          {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
-          <div
-            className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize thread pane"
-            onPointerDown={handleThreadResizePointerDown}
-            title="Drag to resize"
-          />
-
-          <div className="h-full pl-[1px]">
-            {isThreadPaneMounted ? (
-              <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
-            )}
-          </div>
-        </aside>
-      </>
-
-      {/* Thread full-screen overlay (mobile) */}
-      <aside
-        className={cn(
-          'md:hidden absolute inset-0 z-[30] bg-background min-w-0 overflow-hidden',
-          isThreadPaneOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        )}
-        style={{
-          transition: 'opacity 200ms ease-out',
-          willChange: 'opacity',
-        }}
-        aria-hidden={!isThreadPaneOpen}
-      >
-        {isThreadPaneMounted ? (
-          <ThreadPane {...threadPaneSharedProps} className="h-full w-full" />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">Loading thread…</div>
-        )}
-      </aside>
-
-      {/* Hide children since ConversationInterface now handles everything */}
-      <div style={{ display: 'none' }}>{children}</div>
-    </div>
-  )
+  // Render nothing; this route is a redirector.
+  // If resolution fails, still render nothing (user will remain on this route).
+  void roomCtxError
+  return null
 }
+

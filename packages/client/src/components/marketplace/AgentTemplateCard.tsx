@@ -195,11 +195,11 @@ function AgentTemplateCardImpl({
       }
       onDeploy?.(template)
 
-      // Marketplace UX: after deploy, take the user to the agent's chat. Refetch agents so DM page finds the new agent.
+      // Marketplace UX: after deploy, take the user to the Lobby room with the agent preselected.
       if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
         if (agentId) {
           await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
-          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/rooms/lobby?agentId=${encodeURIComponent(String(agentId))}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
         }

@@ -102,12 +102,11 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         }
       }
 
-      // Marketplace UX: after deploy, take the user to the agent's chat.
-      // Refetch agents for this starship so the DM page finds the new agent when it mounts (avoids bounce to lobby).
+      // Marketplace UX: after deploy, take the user to the Lobby room with the agent preselected.
       if ((pathname?.startsWith('/explore') || pathname?.startsWith('/marketplace')) && starshipSlugOrId) {
         if (agentId) {
           await queryClient.refetchQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(targetStarship.id) })
-          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm/${encodeURIComponent(`a:${agentId}`)}`)
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/rooms/lobby?agentId=${encodeURIComponent(String(agentId))}`)
         } else {
           router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
         }
@@ -126,7 +125,11 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
           size="sm"
           className="h-9 gap-2 rounded-lg px-3 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={() =>
-            router.push(deployedAgent?.id ? `/ship/${encodeURIComponent(primaryStarship.slug)}/dm/${encodeURIComponent(`a:${deployedAgent.id}`)}` : `/ship/${encodeURIComponent(primaryStarship.slug)}`)
+            router.push(
+              deployedAgent?.id
+                ? `/ship/${encodeURIComponent(primaryStarship.slug)}/rooms/lobby?agentId=${encodeURIComponent(String(deployedAgent.id))}`
+                : `/ship/${encodeURIComponent(primaryStarship.slug)}`
+            )
           }
         >
           <Icon name="message-square" className="h-4 w-4" />

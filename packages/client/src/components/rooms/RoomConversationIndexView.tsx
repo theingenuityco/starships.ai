@@ -9,11 +9,12 @@ import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButto
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
-import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useRef, useState } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export function RoomConversationIndexView(props: {
   starshipId: string
@@ -62,10 +63,30 @@ export function RoomConversationIndexView(props: {
 }) {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
   const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
+
+  // Optional deep-link support: preselect an agent in the room starter composer.
+  // Used as a replacement for the removed `/dm/...` routes.
+  const preselectAgentId = useMemo(() => {
+    const raw = searchParams.get('agentId')
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v.length > 0 ? v : null
+  }, [searchParams])
+  const { data: starshipAgents = [] } = useStarshipAgents(props.starshipId ?? '', Boolean(props.starshipId))
+  useEffect(() => {
+    if (!preselectAgentId) return
+    if (!Array.isArray(starshipAgents) || starshipAgents.length === 0) return
+    const match =
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.id || '').trim() === preselectAgentId) ??
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.slug || '').trim() === preselectAgentId) ??
+      null
+    if (!match) return
+    setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
+  }, [preselectAgentId, starshipAgents])
 
   const starterBadgeClass = (active: boolean) =>
     cn(

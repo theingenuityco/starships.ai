@@ -1,5 +1,5 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
-import { ensureDefaultChannelForStarship } from '@/utils/default-channel';
+import { ensureLobbyRoomForStarship } from '@/utils/default-room';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, ToolTemplateRepository, UserRepository } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
@@ -118,14 +118,14 @@ export class StarshipService {
       });
     }
 
-    // Ensure every starship has a default public channel (e.g. #lobby).
-    // This must succeed; otherwise the starship isn't usable in the channels UI.
+    // Ensure every starship has a default public room (e.g. #lobby).
+    // This must succeed; otherwise the starship isn't usable in the rooms-first UI.
     try {
-      await ensureDefaultChannelForStarship({ starshipId: starship.id, createdByUserId: data.ownerId });
+      await ensureLobbyRoomForStarship({ starshipId: starship.id, createdByUserId: data.ownerId });
     } catch (err) {
-      logger.error('[StarshipService] Failed to create default channel for starship; rolling back', {
+      logger.error('[StarshipService] Failed to create default room for starship; rolling back', {
         starshipId: starship.id,
-        operation: 'create_default_channel',
+        operation: 'create_default_room',
         error: err instanceof Error ? err.message : String(err),
       });
       try {

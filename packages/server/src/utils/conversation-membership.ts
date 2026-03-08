@@ -1,21 +1,13 @@
 import type { Request, Response } from 'express';
 import { sendError } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import { StarshipService } from '@/services/StarshipService';
-import { ChannelRepository, ConversationParticipantRepository, DirectMessageRepository, RoomRepository, getConnection } from '@starships/models';
+import { ConversationParticipantRepository, RoomRepository, getConnection } from '@starships/models';
 
 /**
- * Enforce private channel membership (conversation-backed channels).
+ * Enforce private channel membership (deprecated).
  *
- * Starship collaborators can see starship resources, but private channels are more restrictive:
- * - instance admin can always access
- * - starship owner can access (ONLY when the channel belongs to that starship)
- * - otherwise require a row in `conversation_participants` (user participant)
- *
- * IMPORTANT:
- * Always pass the conversation's authoritative starshipId. This prevents authorization
- * bypasses if a channel row is ever inconsistent (e.g. conversationId pointing at a
- * different starship than the conversation itself).
+ * Channels are removed; this is kept as a no-op to avoid breaking call sites
+ * that still invoke it as part of generic conversation access checks.
  */
 export async function enforcePrivateChannelMembership(args: {
   conversationId: string;
@@ -24,46 +16,7 @@ export async function enforcePrivateChannelMembership(args: {
   req: Request;
   res: Response;
 }): Promise<boolean> {
-  try {
-    const channelRepo = new ChannelRepository();
-    const channel = await channelRepo.findByConversationId(args.conversationId).catch(() => null);
-    if (!channel || !channel.isPrivate) return true;
-
-    // Fail closed if the channel row does not match the conversation's starship.
-    if (String(channel.starshipId) !== String(args.conversationStarshipId)) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-        resource: 'channel',
-        conversationId: args.conversationId,
-        reason: 'starship_mismatch',
-      });
-      return false;
-    }
-
-    // Instance admin bypass
-    if (isInstanceAdmin(args.req.user)) return true;
-
-    // Starship owner bypass (only for this starship)
-    const starshipService = new StarshipService();
-    const starship = await starshipService.getStarship(channel.starshipId).catch(() => null);
-    if (starship && String(starship.ownerId) === String(args.userId)) return true;
-
-    const participantRepo = new ConversationParticipantRepository();
-    const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
-    if (okParticipant) return true;
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-      resource: 'channel',
-      conversationId: args.conversationId,
-    });
-    return false;
-  } catch {
-    // Best-effort: if we cannot evaluate channel membership, fail closed for safety.
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-      resource: 'channel',
-      conversationId: args.conversationId,
-      reason: 'membership_check_failed',
-    });
-    return false;
-  }
+  return true;
 }
 
 /**
@@ -100,10 +53,6 @@ export async function enforcePrivateRoomMembership(args: {
 
     if (isInstanceAdmin(args.req.user)) return true;
 
-    const starshipService = new StarshipService();
-    const starship = await starshipService.getStarship(room.starshipId).catch(() => null);
-    if (starship && String(starship.ownerId) === String(args.userId)) return true;
-
     const participantRepo = new ConversationParticipantRepository();
     const okParticipant = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (okParticipant) return true;
@@ -123,11 +72,11 @@ export async function enforcePrivateRoomMembership(args: {
 }
 
 /**
- * Enforce direct message membership (conversation-backed DMs).
+ * Enforce explicit conversation membership when a conversation has user participants.
  *
- * Starship collaborators can see starship resources, but DMs are always restricted:
- * - instance admin can always access
- * - otherwise require a row in `conversation_participants` (user participant)
+ * This replaces DM gating after removing the `direct_messages` surface:
+ * - If a conversation has no user participants, treat it as starship-visible (subject to outer starship access checks).
+ * - If it has at least one user participant row, require the requester to be a participant (instance admin bypass).
  */
 export async function enforceDirectMessageMembership(args: {
   conversationId: string;
@@ -136,9 +85,21 @@ export async function enforceDirectMessageMembership(args: {
   res: Response;
 }): Promise<boolean> {
   try {
-    const dmRepo = new DirectMessageRepository();
-    const dm = await dmRepo.findByConversationId(args.conversationId).catch(() => null);
-    if (!dm) return true;
+    const conn = getConnection();
+    const row = await conn.queryOne<{ has_users: boolean }>(
+      `
+      SELECT EXISTS (
+        SELECT 1
+          FROM conversation_participants cp
+         WHERE cp.conversation_id = $1
+           AND cp.user_id IS NOT NULL
+         LIMIT 1
+      ) AS has_users
+      `,
+      [args.conversationId]
+    );
+    const hasUserParticipants = Boolean(row?.has_users);
+    if (!hasUserParticipants) return true;
 
     // Instance admin bypass
     if (isInstanceAdmin(args.req.user)) return true;
@@ -146,17 +107,17 @@ export async function enforceDirectMessageMembership(args: {
     const participantRepo = new ConversationParticipantRepository();
     const ok = await participantRepo.isUserParticipant(args.userId, args.conversationId);
     if (!ok) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
-        resource: 'direct_message',
+      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this conversation', 403, {
+        resource: 'conversation',
         conversationId: args.conversationId,
       });
       return false;
     }
     return true;
   } catch {
-    // Best-effort: if we cannot evaluate DM membership, fail closed for safety.
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
-      resource: 'direct_message',
+    // Best-effort: if we cannot evaluate membership, fail closed for safety.
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this conversation', 403, {
+      resource: 'conversation',
       conversationId: args.conversationId,
       reason: 'membership_check_failed',
     });

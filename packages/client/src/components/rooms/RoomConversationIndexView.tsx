@@ -8,11 +8,9 @@ import type { ConversationMessageInputRef } from '@/components/conversation/Conv
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
-import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -38,6 +36,7 @@ export function RoomConversationIndexView(props: {
   toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
   canManagePins?: boolean | null
+  onOpenHistoryPane?: () => void
   onOpenResourcesPane?: () => void
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
@@ -67,7 +66,7 @@ export function RoomConversationIndexView(props: {
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
 
   // Optional deep-link support: preselect an agent in the room starter composer.
   // Used as a replacement for the removed `/dm/...` routes.
@@ -97,8 +96,6 @@ export function RoomConversationIndexView(props: {
         : 'border border-border/60 bg-background/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground',
       'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
     )
-
-  const history = useChildConversationsPaged(props.roomConversationId ?? null, { enabled: starterTab === 'history', limit: 25 })
 
   const label = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -156,12 +153,6 @@ export function RoomConversationIndexView(props: {
     router.push(href)
   }
 
-  const openConversation = (conversationId: string) => {
-    const cid = String(conversationId || '').trim()
-    if (!cid) return
-    props.onOpenConversation?.(cid)
-  }
-
   return (
     <div className="flex flex-col h-full min-h-0">
       <ConversationSummaryBar
@@ -190,6 +181,9 @@ export function RoomConversationIndexView(props: {
               buttonRef={participantsButtonRef}
               className="sr-only"
             />
+            <Button type="button" size="icon" variant="outline" aria-label="History" title="History" onClick={() => props.onOpenHistoryPane?.()}>
+              <Icon name="clock" className="h-4 w-4" />
+            </Button>
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
@@ -227,131 +221,41 @@ export function RoomConversationIndexView(props: {
               }}
             />
 
-            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
-              <button
-                type="button"
-                onClick={() => setStarterTab('suggestions')}
-                className={starterBadgeClass(starterTab === 'suggestions')}
-                role="tab"
-                aria-selected={starterTab === 'suggestions'}
-              >
-                Suggestions
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('history')}
-                className={starterBadgeClass(starterTab === 'history')}
-                role="tab"
-                aria-selected={starterTab === 'history'}
-              >
-                History
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('datasets')}
-                className={starterBadgeClass(starterTab === 'datasets')}
-                role="tab"
-                aria-selected={starterTab === 'datasets'}
-              >
-                Datasets
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('views')}
-                className={starterBadgeClass(starterTab === 'views')}
-                role="tab"
-                aria-selected={starterTab === 'views'}
-              >
-                Views
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('tasks')}
-                className={starterBadgeClass(starterTab === 'tasks')}
-                role="tab"
-                aria-selected={starterTab === 'tasks'}
-              >
-                Tasks
-              </button>
-              <button
-                type="button"
-                onClick={() => setStarterTab('tools')}
-                className={starterBadgeClass(starterTab === 'tools')}
-                role="tab"
-                aria-selected={starterTab === 'tools'}
-              >
-                Tools
-              </button>
-            </div>
+              <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
+                <button type="button" onClick={() => setStarterTab('suggestions')} className={starterBadgeClass(starterTab === 'suggestions')} role="tab" aria-selected={starterTab === 'suggestions'}>
+                  Suggestions
+                </button>
+                <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
+                  Datasets
+                </button>
+                <button type="button" onClick={() => setStarterTab('views')} className={starterBadgeClass(starterTab === 'views')} role="tab" aria-selected={starterTab === 'views'}>
+                  Views
+                </button>
+                <button type="button" onClick={() => setStarterTab('tasks')} className={starterBadgeClass(starterTab === 'tasks')} role="tab" aria-selected={starterTab === 'tasks'}>
+                  Tasks
+                </button>
+                <button type="button" onClick={() => setStarterTab('tools')} className={starterBadgeClass(starterTab === 'tools')} role="tab" aria-selected={starterTab === 'tools'}>
+                  Tools
+                </button>
+              </div>
 
-            <div className="mt-4">
-              {starterTab === 'suggestions' ? (
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  {[
-                    'Suggest 5 conversation ideas for this room.',
-                    'Summarize the key topics we should discuss here.',
-                    'Draft a concise conversation title and first message.',
-                    'What are the most important datasets/views to start with?',
-                  ].map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)}
-                      className={starterBadgeClass(false)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="mt-4">
+                {starterTab === 'suggestions' ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {[
+                      'Suggest 5 conversation ideas for this room.',
+                      'Summarize the key topics we should discuss here.',
+                      'Draft a concise conversation title and first message.',
+                      'What are the most important datasets/views to start with?',
+                    ].map(s => (
+                      <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
-              {starterTab === 'history' ? (
-                <div className="mx-auto w-full max-w-2xl">
-                  {history.isLoading ? <div className="text-xs text-muted-foreground text-center">Loading…</div> : null}
-
-                  {!history.isLoading ? (
-                    history.conversations.length > 0 ? (
-                      <div className="space-y-1">
-                        {history.conversations
-                          .slice()
-                          .sort((a: any, b: any) => {
-                            const at = Date.parse(String(a?.updatedAt || a?.createdAt || '')) || 0
-                            const bt = Date.parse(String(b?.updatedAt || b?.createdAt || '')) || 0
-                            return bt - at
-                          })
-                          .slice(0, 6)
-                          .map((c: any) => {
-                            const id = String(c?.id || '').trim()
-                            if (!id) return null
-                            const titleRaw = String(c?.title || '').trim()
-                            const title = titleRaw || 'Untitled conversation'
-                            const when = c?.updatedAt || c?.createdAt
-                            const whenText = when ? formatDistanceToNow(new Date(when), { addSuffix: false }) : ''
-                            return (
-                              <button
-                                key={`conversation:${id}`}
-                                type="button"
-                                onClick={() => openConversation(id)}
-                                className={cn(
-                                  'group w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors',
-                                  'hover:bg-muted/50',
-                                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
-                                )}
-                              >
-                                <span className="min-w-0 text-xs font-medium truncate text-muted-foreground group-hover:text-foreground">{title}</span>
-                                {whenText ? <span className="text-[10px] text-muted-foreground flex-shrink-0">{whenText}</span> : null}
-                              </button>
-                            )
-                          })}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground text-center">No conversations yet.</div>
-                    )
-                  ) : null}
-                </div>
-              ) : null}
-
-              {starterTab === 'datasets' ? (
+                {starterTab === 'datasets' ? (
                 pinnedDatasets.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
                     {pinnedDatasets.map(p => {
@@ -477,4 +381,3 @@ export function RoomConversationIndexView(props: {
     </div>
   )
 }
-

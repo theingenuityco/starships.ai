@@ -4,6 +4,7 @@ import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
+import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import Icon from '@/components/primitives/Icon'
@@ -281,8 +282,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return v.length > 0 ? v : null
   }, [searchParams])
   const isResourcesPaneOpen = roomPaneKey === 'resources'
+  const isHistoryPaneOpen = roomPaneKey === 'history'
   const threadKey = routeThreadKey
-  const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : null) as 'thread' | 'resources' | null
+  const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : isHistoryPaneOpen ? 'history' : null) as 'thread' | 'resources' | 'history' | null
   const isSidePaneOpen = Boolean(paneKind)
   const PANE_ANIM_MS = 300
   const PANE_OPEN_CONTENT_DELAY_MS = 120
@@ -827,6 +829,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             toolSlugById={toolSlugById}
             onOpenPinnedView={onOpenPinnedView}
             canManagePins={canManagePins}
+            onOpenHistoryPane={() => setRoomPaneInUrl('history')}
             onOpenResourcesPane={() => setRoomPaneInUrl('resources')}
             availableViews={availableViews}
             availableDatasets={availableDatasets}
@@ -939,9 +942,22 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   onUnassignTool={toolId => unassignTool.mutate(toolId)}
                   onClose={() => setRoomPaneInUrl(null)}
                 />
+              ) : paneKind === 'history' ? (
+                <RoomHistoryPane
+                  starshipId={starshipData.id}
+                  roomConversationId={activeConversationId || ''}
+                  roomSlug={activeRoom?.slug ?? null}
+                  roomName={activeRoom?.name ?? null}
+                  onOpenConversation={conversationId => {
+                    setConversationKeyInUrl(String(conversationId))
+                  }}
+                  onClose={() => setRoomPaneInUrl(null)}
+                />
               ) : null
             ) : (
-              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
+              <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+                {paneKind === 'thread' ? 'Loading thread…' : paneKind === 'history' ? 'Loading history…' : 'Loading resources…'}
+              </div>
             )}
           </div>
         </aside>
@@ -1008,9 +1024,22 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               onUnassignTool={toolId => unassignTool.mutate(toolId)}
               onClose={() => setRoomPaneInUrl(null)}
             />
+          ) : paneKind === 'history' ? (
+            <RoomHistoryPane
+              starshipId={starshipData.id}
+              roomConversationId={activeConversationId || ''}
+              roomSlug={activeRoom?.slug ?? null}
+              roomName={activeRoom?.name ?? null}
+              onOpenConversation={conversationId => {
+                setConversationKeyInUrl(String(conversationId))
+              }}
+              onClose={() => setRoomPaneInUrl(null)}
+            />
           ) : null
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">{paneKind === 'thread' ? 'Loading thread…' : 'Loading resources…'}</div>
+          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+            {paneKind === 'thread' ? 'Loading thread…' : paneKind === 'history' ? 'Loading history…' : 'Loading resources…'}
+          </div>
         )}
       </aside>
 

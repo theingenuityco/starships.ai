@@ -59,7 +59,6 @@ export function ThreadPane(props: {
   /** Optional allowlists to scope @mention and agent selection (e.g. rooms). */
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
-  allowedAgentIds?: string[] | null
 }) {
   const {
     starshipId,
@@ -86,7 +85,6 @@ export function ThreadPane(props: {
     className,
     allowedMentionUserIds,
     allowedMentionAgentIds,
-    allowedAgentIds,
   } = props
   const { userId, userName, userEmail, userAvatar } = useAuth()
   const inputContainerRef = useRef<HTMLDivElement>(null)
@@ -350,7 +348,6 @@ export function ThreadPane(props: {
               starshipSlug={starshipSlug}
               allowedMentionUserIds={allowedMentionUserIds ?? undefined}
               allowedMentionAgentIds={allowedMentionAgentIds ?? undefined}
-              allowedAgentIds={allowedAgentIds ?? undefined}
             />
           </div>
         </div>

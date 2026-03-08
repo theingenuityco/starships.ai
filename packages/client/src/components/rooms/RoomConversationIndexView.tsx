@@ -27,7 +27,6 @@ export function RoomConversationIndexView(props: {
   /** Optional allowlists to scope @mention and agent selection within room conversations. */
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
-  allowedAgentIds?: string[] | null
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
@@ -217,7 +216,6 @@ export function RoomConversationIndexView(props: {
               newConversationTitleOverride="New conversation"
               allowedMentionUserIds={props.allowedMentionUserIds ?? undefined}
               allowedMentionAgentIds={props.allowedMentionAgentIds ?? undefined}
-              allowedAgentIds={props.allowedAgentIds ?? undefined}
               onConversationStart={conversationId => {
                 const cid = String(conversationId || '').trim()
                 if (!cid) return

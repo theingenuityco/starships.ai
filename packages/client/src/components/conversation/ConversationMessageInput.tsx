@@ -98,8 +98,6 @@ interface ConversationMessageInputProps {
   allowedMentionUserIds?: string[] | null
   /** Optional allowlists to scope @mention suggestions (agents). */
   allowedMentionAgentIds?: string[] | null
-  /** Optional allowlists to scope execution agent selection. */
-  allowedAgentIds?: string[] | null
 }
 
 export interface ConversationMessageInputRef {
@@ -135,7 +133,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipSlug,
       allowedMentionUserIds,
       allowedMentionAgentIds,
-      allowedAgentIds,
     },
     ref
   ) => {
@@ -259,28 +256,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const allowedMentionUserIdSet = allowedMentionSetsFromConversation?.userIdSet ?? allowedMentionUserIdSetFromRoom
     const allowedMentionAgentIdSet = allowedMentionSetsFromConversation?.agentIdSet ?? allowedMentionAgentIdSetFromRoom
 
-    const allowedAgentIdSet = useMemo(() => {
-      if (allowedAgentIds === undefined) return null
-      const raw = Array.isArray(allowedAgentIds) ? allowedAgentIds : []
-      return new Set(raw.map(x => String(x || '').trim()).filter(Boolean))
-    }, [allowedAgentIds])
-
     const starshipAgentsForExecution = useMemo(() => {
-      const list = Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
-      const allow = allowedAgentIdSet
-      if (allow === null) return list
-      return list.filter(a => allow.has(String((a as any)?.id || '').trim()))
-    }, [allowedAgentIdSet, starshipAgents])
-
-    // If the current selection becomes disallowed (e.g. room allowlist changes), clear it.
-    useEffect(() => {
-      const allow = allowedAgentIdSet
-      const id = String((selectedAgent as any)?.id || '').trim()
-      if (allow === null || !id) return
-      if (!allow.has(id)) {
-        onAgentChange?.(null)
-      }
-    }, [allowedAgentIdSet, onAgentChange, selectedAgent])
+      return Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : []
+    }, [starshipAgents])
     const mentionAvatarAttachmentIds = useMemo(() => {
       return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
         .map(a => (a as any)?.avatarAttachmentId as string | undefined)
@@ -688,7 +666,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(matchRef) ?? null
         if (fromStarship) return fromStarship
         const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(matchRef) ?? null
-        if (fromConvRaw && allowedAgentIdSet && !allowedAgentIdSet.has(String(fromConvRaw.id || '').trim())) return null
         return fromConvRaw ?? null
       }
 

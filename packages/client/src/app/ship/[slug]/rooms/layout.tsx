@@ -725,7 +725,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onClose={handleCloseConversation}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
-            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+            // Do not hard-block agent selection to room participants; server will create invite approvals as needed.
             contentWidth="constrained"
             enableMessageThreads={true}
             onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
@@ -814,7 +814,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             starshipSlug={routeParams.slug}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
-            allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+            // Do not hard-block agent selection to room participants; server will create invite approvals as needed.
             pinnedViews={pinsData?.views ?? null}
             pinnedDatasets={pinsData?.datasets ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}
@@ -902,7 +902,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   onClose={handleCloseThread}
                   allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
                   allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
-                  allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+                  // Do not hard-block agent selection to room participants; server will create invite approvals as needed.
                   contentWidth="constrained"
                   className="w-full min-w-0"
                 />
@@ -971,7 +971,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               onClose={handleCloseThread}
               allowedMentionUserIds={roomParticipants.data?.userIds ?? []}
               allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
-              allowedAgentIds={roomParticipants.data?.agentIds ?? []}
+              // Do not hard-block agent selection to room participants; server will create invite approvals as needed.
               contentWidth="constrained"
               className="h-full w-full"
             />

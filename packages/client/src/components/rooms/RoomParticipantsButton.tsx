@@ -210,7 +210,7 @@ export function RoomParticipantsButton(props: {
                 </div>
               </div>
 
-              <TabsContent value="humans" className="mt-0">
+              <TabsContent value="humans" className="mt-3">
                 <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-1">
                   {membersAndInvites.isLoading || roomParticipants.isLoading ? (
                     <div className="py-10 text-sm text-muted-foreground text-center">Loading…</div>
@@ -273,7 +273,7 @@ export function RoomParticipantsButton(props: {
                 </div>
               </TabsContent>
 
-              <TabsContent value="agents" className="mt-0">
+              <TabsContent value="agents" className="mt-3">
                 <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-1">
                   {starshipAgents.isLoading || roomParticipants.isLoading ? (
                     <div className="py-10 text-sm text-muted-foreground text-center">Loading…</div>

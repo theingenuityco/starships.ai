@@ -2149,9 +2149,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (!id) return
       try {
         const guard = activeSseGuards.get(id)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'901fe2'},body:JSON.stringify({sessionId:'901fe2',runId:'pre',hypothesisId:'C',location:'useConversations.ts:useConversationStreamed:stop',message:'stop() called for conversation stream',data:{conversationId:id,hadGuard:Boolean(guard),activeGuardsSize:activeSseGuards.size},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion agent log
         guard?.abort()
         // `makeSSEAsyncIterable`'s cleanup will also delete the guard; best-effort delete here too.
         activeSseGuards.delete(id)

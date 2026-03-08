@@ -247,36 +247,6 @@ function LinkedConversationCard({
     return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
   }, [isLinkedConversationBusy, linkedTurnStatus])
 
-  // #region agent log
-  useEffect(() => {
-    const cid = typeof linkedConversationId === 'string' ? linkedConversationId : ''
-    if (!cid) return
-    const turnActiveFromMsgs = Boolean((participantsPreview as any)?.turnActive)
-    const detailTurnActive = Boolean((conversation as any)?.state && typeof (conversation as any).state === 'object' && ((conversation as any).state as any).turnActive === true)
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
-      body: JSON.stringify({
-        sessionId: '901fe2',
-        runId: 'pre',
-        hypothesisId: 'I',
-        location: 'ConversationMessageList.tsx:LinkedConversationCard:isOngoing',
-        message: 'Thread card ongoing inputs',
-        data: {
-          linkedConversationId: cid,
-          isLoadingConversation,
-          isLoadingParticipantsPreview,
-          turnActiveFromMsgs,
-          detailTurnActive,
-          linkedTurnStatus,
-          computedIsOngoing: isOngoing,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [conversation, isLoadingConversation, isLoadingParticipantsPreview, isOngoing, linkedConversationId, linkedTurnStatus, participantsPreview])
-  // #endregion agent log
-
   type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
   const participantItems = useMemo<ParticipantItem[]>(() => {
@@ -1288,15 +1258,6 @@ export function ConversationMessageList({
 
         // Preserve a stable, intuitive ordering: use the tool-call order (not completion order).
         const orderedFromToolCalls: string[] = []
-        const debugToolCallMap: Array<{
-          toolName: string
-          tcKey: string
-          hasResult: boolean
-          childIdFound: boolean
-          childConversationId?: string
-          argsHasChildConversationId?: boolean
-          argsHasConversationId?: boolean
-        }> = []
         for (const tc of toolCalls) {
           if (!isCallAgentTool(tc)) continue
           const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
@@ -1306,31 +1267,6 @@ export function ConversationMessageList({
           if (!tr) continue
           const childId = extractChildConversationIdFromToolResult(tr)
           if (childId) orderedFromToolCalls.push(childId)
-
-          // #region agent log
-          try {
-            let argsHasChildConversationId = false
-            let argsHasConversationId = false
-            try {
-              const rawArgs = (tc as any)?.function?.arguments
-              const parsedArgs = tryParseJson(rawArgs)
-              if (parsedArgs && typeof parsedArgs === 'object') {
-                argsHasChildConversationId = Boolean((parsedArgs as any).childConversationId)
-                argsHasConversationId = Boolean((parsedArgs as any).conversationId)
-              }
-            } catch {}
-
-            debugToolCallMap.push({
-              toolName: String((tc as any)?.function?.name ?? ''),
-              tcKey: key,
-              hasResult: Boolean(tr),
-              childIdFound: Boolean(childId),
-              childConversationId: childId || undefined,
-              argsHasChildConversationId,
-              argsHasConversationId,
-            })
-          } catch {}
-          // #endregion agent log
         }
 
         const uniqOrderedFromToolCalls = Array.from(new Set(orderedFromToolCalls.filter(Boolean)))
@@ -1357,74 +1293,6 @@ export function ConversationMessageList({
 
         // Remove the call-agent tool call row once we can show the thread card.
         const filteredToolCalls = toolCalls.filter(tc => !isCallAgentTool(tc))
-
-        // #region agent log
-        try {
-          const debugResults = results.slice(0, 8).map(r => {
-            const rid = r?.toolCallId ?? r?.call_id ?? r?.id
-            const key = rid != null ? String(rid).trim() : ''
-            return {
-              messageId: String(r?.id ?? ''),
-              messageType: String(r?.messageType ?? ''),
-              hasToolCallId: Boolean(r?.toolCallId),
-              hasCallId: Boolean(r?.call_id),
-              key,
-            }
-          })
-
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
-            body: JSON.stringify({
-              sessionId: '901fe2',
-              runId: 'post2',
-              hypothesisId: 'K',
-              location: 'ConversationMessageList.tsx:applyDelegationThreadCardTransform',
-              message: 'Call-agent mapping detail',
-              data: {
-                messageId: String((msg as any)?.id ?? ''),
-                existingLinkedIds,
-                observedLinkedIds,
-                toolCallsCount: toolCalls.length,
-                callAgentCount,
-                resultsCount: results.length,
-                debugResults,
-                debugToolCallMap,
-                uniqOrderedFromToolCalls,
-                partialLinkedConversationIds,
-                hasFullToolResultMapping,
-                finalLinkedConversationIds: linkedConversationIds,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-        } catch {}
-        // #endregion agent log
-
-        // #region agent log
-        try {
-          const toolCallNames = toolCalls.map(tc => String((tc as any)?.function?.name ?? '')).filter(Boolean)
-          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
-            body: JSON.stringify({
-              sessionId: '901fe2',
-              runId: 'pre',
-              hypothesisId: 'J',
-              location: 'ConversationMessageList.tsx:applyDelegationThreadCardTransform',
-              message: 'Delegation ordering computed',
-              data: {
-                messageId: String((msg as any)?.id ?? ''),
-                toolCallNames,
-                orderedFromToolCalls,
-                uniqOrderedFromToolCalls,
-                finalLinkedConversationIds: linkedConversationIds,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-        } catch {}
-        // #endregion agent log
 
         return {
           ...msg,

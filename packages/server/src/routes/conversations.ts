@@ -18,11 +18,9 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
-  ChannelRepository,
   ConversationRepository,
   ConversationParticipantRepository,
   ConversationNotificationPrefRepository,
-  DirectMessageRepository,
   getConnection,
   MessageRepository,
   StarshipMemberRepository,
@@ -2211,6 +2209,59 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
 });
 
 /**
+ * GET /conversations/:conversationId/room-context
+ *
+ * Resolve whether a conversation belongs to a room, and if so which room conversation id.
+ * Used by the client to build canonical room routes for arbitrary conversationIds.
+ */
+router.get('/conversations/:conversationId/room-context', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!params) return;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(params.conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: params.conversationId });
+      return;
+    }
+
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', params.conversationId, res))) return;
+    if (!(await enforceDirectMessageMembership({ conversationId: params.conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId: params.conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+
+    const ctx = await resolveRoomConversationContext({ conversationId: params.conversationId }).catch(() => null);
+    sendSuccess(
+      res,
+      {
+        conversationId: params.conversationId,
+        roomConversationId: ctx?.roomConversationId ?? null,
+        isRoom: ctx?.isRoom ?? false,
+        isRoomThread: ctx?.isRoomThread ?? false,
+      },
+      200
+    );
+  } catch (error) {
+    handleError(error, res, 'fetching room context');
+  }
+});
+
+/**
  * GET /conversations/:conversationId/notification-level
  *
  * Thread-only: returns current user's notification level preference for a thread.
@@ -2239,25 +2290,33 @@ router.get('/conversations/:conversationId/notification-level', jwtAuthMiddlewar
       return;
     }
     if (!parentConversationId) {
-      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for thread conversations', 400, {
         conversationId: params.conversationId,
       });
       return;
     }
 
-    const channelRepo = new ChannelRepository();
-    const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
-    if (!parentChannel) {
-      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+    // Parent must exist and belong to the same starship (defense-in-depth).
+    const parentRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [parentConversationId]);
+    const parentStarshipId = parentRow?.starship_id ? String(parentRow.starship_id) : '';
+    if (!parentStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Parent conversation not found', 404, { parentConversationId });
+      return;
+    }
+    if (String(parentStarshipId) !== String(starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Parent conversation does not belong to the same starship', 400, {
         conversationId: params.conversationId,
         parentConversationId,
+        starshipId,
+        parentStarshipId,
       });
       return;
     }
 
     if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+    if (!(await enforceDirectMessageMembership({ conversationId: parentConversationId, userId: authUserId, req, res }))) return;
     if (
-      !(await enforcePrivateChannelMembership({
+      !(await enforceRoomParticipantMembershipForConversation({
         conversationId: parentConversationId,
         conversationStarshipId: starshipId,
         userId: authUserId,
@@ -2306,25 +2365,32 @@ router.put('/conversations/:conversationId/notification-level', jwtAuthMiddlewar
       return;
     }
     if (!parentConversationId) {
-      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for thread conversations', 400, {
         conversationId: params.conversationId,
       });
       return;
     }
 
-    const channelRepo = new ChannelRepository();
-    const parentChannel = await channelRepo.findByConversationId(parentConversationId).catch(() => null);
-    if (!parentChannel) {
-      sendError(res, 'VALIDATION_ERROR', 'notification-level is only supported for threads under channels', 400, {
+    const parentRow = await conn.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [parentConversationId]);
+    const parentStarshipId = parentRow?.starship_id ? String(parentRow.starship_id) : '';
+    if (!parentStarshipId) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Parent conversation not found', 404, { parentConversationId });
+      return;
+    }
+    if (String(parentStarshipId) !== String(starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Parent conversation does not belong to the same starship', 400, {
         conversationId: params.conversationId,
         parentConversationId,
+        starshipId,
+        parentStarshipId,
       });
       return;
     }
 
     if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
+    if (!(await enforceDirectMessageMembership({ conversationId: parentConversationId, userId: authUserId, req, res }))) return;
     if (
-      !(await enforcePrivateChannelMembership({
+      !(await enforceRoomParticipantMembershipForConversation({
         conversationId: parentConversationId,
         conversationStarshipId: starshipId,
         userId: authUserId,
@@ -2544,6 +2610,8 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
       parentConversationId: conversationId,
       limit: paginationValidation.limit,
       q: searchValidation.q,
+      userId: authUserId,
+      allowRestricted: isInstanceAdmin(req.user),
       ...(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId
         ? { beforeUpdatedAt: cursorValidation.beforeUpdatedAt, beforeId: cursorValidation.beforeId }
         : {}),
@@ -2858,14 +2926,14 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       resolvedAgentId = agent.id;
     }
 
-    // No-stray enforcement:
-    // - Child conversations (parentConversationId set) are allowed as nested threads.
-    // - Top-level conversations must be either a DM (agent provided) or a Channel (via channels API).
+    // No-stray enforcement (rooms-first):
+    // - Child conversations (parentConversationId set) are allowed as nested threads (under rooms).
+    // - Top-level conversations are reserved for room containers (created via the rooms API).
     const parentConversationId = bodyValidation.parentConversationId;
-    const effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
-    if (!isInternal && !parentConversationId && !effectiveAgentId) {
-      sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created as a channel or a direct message', 400, {
-        hint: 'Use POST /starships/:starshipId/channels or POST /starships/:starshipId/direct-messages',
+    let effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
+    if (!isInternal && !parentConversationId) {
+      sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created under a room', 400, {
+        hint: 'Provide parentConversationId (room conversation id). Use the Rooms UI / POST /starships/:starshipId/rooms to create a room.',
       });
       return;
     }
@@ -2915,7 +2983,18 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       )
         return;
 
-      // If the parent is a room, restrict the thread's agent (if any) to the room's agent allowlist.
+      // If the parent is a room and an agent is provided:
+      // - If allowed, link it on the new child conversation.
+      // - If NOT allowed, do not fail creation; simply omit the linked agent.
+      //
+      // Rationale:
+      // The message-send endpoint (`POST /conversations/:id/messages`) already supports the Slack-like
+      // "invite approval" flow: when a user selects/mentions an agent that isn't a room participant,
+      // the server will sanitize execution and create a `room_invite_approval` instead of rejecting.
+      //
+      // Creating a child conversation should not hard-fail in that case; the first message will drive
+      // the approval workflow and (on approval) the agent can be added to the room and the original
+      // message can trigger the agent turn.
       if (effectiveAgentId) {
         const ctx = await resolveRoomConversationContext({ conversationId: parentConversationId });
         if (ctx?.isRoom) {
@@ -2923,58 +3002,13 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
           const allowedAgentIds = await participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []);
           const allow = new Set((allowedAgentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
           if (!allow.has(String(effectiveAgentId))) {
-            sendError(res, 'VALIDATION_ERROR', 'Agent is not allowed in this room', 400, {
-              roomConversationId: ctx.roomConversationId,
-              agentId: effectiveAgentId,
-            });
-            return;
+            effectiveAgentId = undefined;
           }
         }
       }
     }
 
-    // For external callers creating top-level agent chats, create/reuse a DM instead of a raw conversation.
-    if (!isInternal && !parentConversationId && effectiveAgentId && authUserId) {
-      const dmRepo = new DirectMessageRepository();
-      const existingDm = await dmRepo.findUserAgentDm(bodyValidation.starshipId, authUserId, effectiveAgentId).catch(() => null);
-      if (existingDm) {
-        const existingConversation = await conversationService.getConversationById(existingDm.conversationId);
-        if (existingConversation) {
-          sendSuccess(res, existingConversation, 200);
-          return;
-        }
-      }
-
-      const conversation = await conversationService.createConversation({
-        title: bodyValidation.title || 'New Conversation',
-        status: 'active',
-        starshipId: bodyValidation.starshipId,
-        agentId: effectiveAgentId,
-        parentConversationId,
-      });
-
-      await dmRepo
-        .create({
-          conversationId: conversation.id,
-          starshipId: bodyValidation.starshipId,
-          dmType: 'user_agent',
-          userId: authUserId,
-          agentId: effectiveAgentId,
-          createdAt: conversation.createdAt,
-          updatedAt: conversation.updatedAt ?? conversation.createdAt,
-        })
-        .catch(() => null);
-
-      const participantRepo = new ConversationParticipantRepository();
-      await participantRepo
-        .addUserParticipant({ conversationId: conversation.id, userId: authUserId, role: null, createdBy: authUserId })
-        .catch(() => null);
-
-      sendSuccess(res, conversation, 201);
-      return;
-    }
-
-    // Otherwise, fall back to raw conversation creation (internal/scheduled or nested).
+    // Create the conversation (internal/scheduled or nested).
     const conversation = await conversationService.createConversation({
       title: bodyValidation.title || 'New Conversation',
       status: 'active',
@@ -3133,28 +3167,6 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       }))
     ) {
       return;
-    }
-
-    // Prevent deleting the starship's default channel conversation.
-    // Stored at the starship level to make the invariant explicit.
-    try {
-      const conn = getConnection();
-      const row = await conn.queryOne<{ default_channel_conversation_id: string | null }>(
-        `SELECT default_channel_conversation_id
-           FROM starships
-          WHERE id = $1`,
-        [conversation.starshipId]
-      );
-      const defaultId = row?.default_channel_conversation_id ? String(row.default_channel_conversation_id) : '';
-      if (defaultId && defaultId === conversationId) {
-        sendError(res, 'ACCESS_DENIED', 'Cannot delete the default channel for a starship', 403, {
-          conversationId,
-          starshipId: conversation.starshipId,
-        });
-        return;
-      }
-    } catch {
-      // Pre-migration compatibility: if the column doesn't exist yet, do not block.
     }
 
     const deleted = await conversationService.deleteConversation(conversationId);

@@ -16,12 +16,10 @@ import type {
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
 import {
-  ChannelRepository,
   ConversationRepository,
   AgentRepository,
   TurnRepository,
   LlmModelRepository,
-  DirectMessageRepository,
   UserRepository,
   getConnection,
 } from '@starships/models';
@@ -1205,6 +1203,10 @@ export class ConversationService {
     beforeUpdatedAt?: string;
     beforeId?: string;
     q?: string;
+    /** Optional user to enforce per-child membership filtering. */
+    userId?: string;
+    /** When true, bypasses membership filtering (e.g. instance admin). */
+    allowRestricted?: boolean;
   }): Promise<{
     conversations: Array<ConversationModel & { agents: AgentModel[] }>;
     hasMoreBefore: boolean;
@@ -1230,6 +1232,9 @@ export class ConversationService {
     const escapeLike = (s: string): string => s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
     const qLike = rawQ ? `%${escapeLike(rawQ)}%` : null;
 
+    const authUserId = typeof args.userId === 'string' ? args.userId.trim() : '';
+    const allowRestricted = Boolean(args.allowRestricted) || !authUserId;
+
     const convRows = await conn.query<Record<string, unknown>>(
       useCursor
         ? `
@@ -1238,23 +1243,57 @@ export class ConversationService {
           WHERE parent_conversation_id = $1
             AND ($2::text IS NULL OR title ILIKE $2::text ESCAPE '\\')
             AND (
-              updated_at < $3::timestamptz
-              OR (updated_at = $3::timestamptz AND id < $4::text)
+              $3::boolean = true
+              OR NOT EXISTS (
+                SELECT 1
+                  FROM conversation_participants cp
+                 WHERE cp.conversation_id = conversations.id
+                   AND cp.user_id IS NOT NULL
+                 LIMIT 1
+              )
+              OR EXISTS (
+                SELECT 1
+                  FROM conversation_participants cp2
+                 WHERE cp2.conversation_id = conversations.id
+                   AND cp2.user_id = $4::text
+                 LIMIT 1
+              )
+            )
+            AND (
+              updated_at < $5::timestamptz
+              OR (updated_at = $5::timestamptz AND id < $6::text)
             )
           ORDER BY updated_at DESC, id DESC
-          LIMIT $5
+          LIMIT $7
         `
         : `
           SELECT *
           FROM conversations
           WHERE parent_conversation_id = $1
             AND ($2::text IS NULL OR title ILIKE $2::text ESCAPE '\\')
+            AND (
+              $3::boolean = true
+              OR NOT EXISTS (
+                SELECT 1
+                  FROM conversation_participants cp
+                 WHERE cp.conversation_id = conversations.id
+                   AND cp.user_id IS NOT NULL
+                 LIMIT 1
+              )
+              OR EXISTS (
+                SELECT 1
+                  FROM conversation_participants cp2
+                 WHERE cp2.conversation_id = conversations.id
+                   AND cp2.user_id = $4::text
+                 LIMIT 1
+              )
+            )
           ORDER BY updated_at DESC, id DESC
-          LIMIT $3
+          LIMIT $5
         `,
       useCursor
-        ? [args.parentConversationId, qLike, args.beforeUpdatedAt, args.beforeId, pageSize]
-        : [args.parentConversationId, qLike, pageSize]
+        ? [args.parentConversationId, qLike, allowRestricted, authUserId, args.beforeUpdatedAt, args.beforeId, pageSize]
+        : [args.parentConversationId, qLike, allowRestricted, authUserId, pageSize]
     );
 
     const hasMoreBefore = convRows.length > limit;
@@ -2419,51 +2458,29 @@ export class ConversationService {
     // - When a thread has 2+ linked agents, we stop using a default agent fallback.
     //   Only explicit @mentions will trigger agent execution for that message.
     const isThread = Boolean(conversation.parentConversationId);
-    // For threads, channel/DM "type" is determined by the parent/root conversation, not the child conversation id.
     const contextConversationId = conversation.parentConversationId || data.conversationId;
 
-    const channelRepo = new ChannelRepository();
-    const channel = await channelRepo.findByConversationId(contextConversationId).catch(() => null);
-    const isChannel = Boolean(channel);
-    // Channel conversations (including threads under channels) are mention-only:
-    // - Only explicit @agent mentions should trigger execution (no default fallback agent).
-    // - This prevents surprising agent runs/charges from regular human chatter in channels/threads.
-    const isMentionOnlyChannel = Boolean(isChannel);
-    const dmRepo = new DirectMessageRepository();
-    const dm = await dmRepo.findByConversationId(contextConversationId).catch(() => null);
-    const isUserUserDm = dm?.dmType === 'user_user';
-    const isUserAgentDm = dm?.dmType === 'user_agent';
-    const dmAgentId = isUserAgentDm && dm?.agentId ? String(dm.agentId).trim() : '';
-    const restrictAgentMentionsToDmPeer = Boolean(isUserAgentDm && dmAgentId);
-
     let conversationAgents = await this.getConversationAgents(data.conversationId);
-    let isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && conversationAgents.length >= 2);
+    let isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
 
     let agentQueue: AgentModel[] = [];
     let noAgentToRun = false;
-    if (isUserUserDm) {
-      // user↔user DMs are human-only conversations. Do not link agents or run any agent workflow.
-      // We still persist the message + turn lifecycle for consistent streaming UX.
-      agentQueue = [];
-      noAgentToRun = true;
-    } else {
+    {
       const content = typeof data.content === 'string' ? data.content : '';
       const userTokenCountPre = (content.match(/<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/gi) || []).length;
       const hasUserMentions = userTokenCountPre > 0;
       // If any agent is explicitly mentioned, we should route by mention (mentions take precedence over explicitAgentId fallback).
       const mentionedAgentsPreAll = this.extractMentionedAgents(content, allStarshipAgents);
-      const mentionedAgentsPre = restrictAgentMentionsToDmPeer
-        ? mentionedAgentsPreAll.filter((a) => a.id === dmAgentId)
-        : mentionedAgentsPreAll;
+      const mentionedAgentsPre = mentionedAgentsPreAll;
       const hasAgentMentions = Array.isArray(mentionedAgentsPre) && mentionedAgentsPre.length > 0;
 
       // Explicit agent selection (client-provided agentId):
       // - Supported for normal conversations and threads (including threads under channels) where a default agent is allowed.
       // - NOT used for channel conversations or mention-only threads (those remain mention-gated to avoid surprising charges/agent runs).
       const explicitAgentIdRaw = typeof data.agentId === 'string' ? data.agentId.trim() : '';
-      const explicitAgentId = restrictAgentMentionsToDmPeer ? dmAgentId : explicitAgentIdRaw;
+      const explicitAgentId = explicitAgentIdRaw;
       // IMPORTANT: explicitAgentId is lower priority than explicit mentions, and must not trigger when the message contains user mentions.
-      if (explicitAgentId && !isMentionOnlyChannel && !isMentionOnlyThread && !hasUserMentions && !hasAgentMentions) {
+      if (explicitAgentId && !isMentionOnlyThread && !hasUserMentions && !hasAgentMentions) {
         const explicitAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === explicitAgentId);
         if (explicitAgent) {
           // Ensure the agent is linked so subsequent turns have a stable fallback.
@@ -2490,9 +2507,7 @@ export class ConversationService {
       // - For threads with 2+ agents: mention-only; no fallback agent.
       if (agentQueue.length === 0) {
         const initialTargetsUnlinkedAll = this.extractMentionedAgents(data.content, allStarshipAgents);
-        const initialTargetsUnlinked = restrictAgentMentionsToDmPeer
-          ? initialTargetsUnlinkedAll.filter((a) => a.id === dmAgentId)
-          : initialTargetsUnlinkedAll;
+        const initialTargetsUnlinked = initialTargetsUnlinkedAll;
         // Auto-link mentioned agents not yet linked
         let linkedAny = false;
         for (const a of initialTargetsUnlinked) {
@@ -2506,34 +2521,20 @@ export class ConversationService {
           conversationAgents = await this.getConversationAgents(data.conversationId);
         }
 
-        isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && conversationAgents.length >= 2);
-        const initialTargets = isMentionOnlyChannel
-          ? initialTargetsUnlinked
-          : initialTargetsUnlinked.length > 0
-            ? initialTargetsUnlinked
-            : (() => {
-                const fromLinked = this.extractMentionedAgents(data.content, conversationAgents);
-                return restrictAgentMentionsToDmPeer ? fromLinked.filter((a) => a.id === dmAgentId) : fromLinked;
-              })();
+        isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
+        const initialTargets = initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
 
         const fallbackAgent = conversationAgents[0];
         // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
         // This allows people to talk to each other in agent-backed threads without triggering an agent run.
         const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
-        const allowFallback = !isMentionOnlyChannel && !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
+        const allowFallback = !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
         agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
         // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
         // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
         noAgentToRun =
-          ((isMentionOnlyChannel || isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) ||
-          (blockFallbackDueToUserMentions && agentQueue.length === 0);
+          ((isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) || (blockFallbackDueToUserMentions && agentQueue.length === 0);
       }
-    }
-
-    // Preserve legacy behavior for non-thread, non-channel conversations that require a default agent:
-    // if no agents are linked AND there are no explicit/mentioned targets, surface a 404.
-    if (!isMentionOnlyChannel && !isUserUserDm && !isThread && conversationAgents.length < 1 && agentQueue.length < 1) {
-      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
 
     // Now that routing is finalized, publish the start/active turn lifecycle ONLY when an agent will run.
@@ -2912,26 +2913,15 @@ export class ConversationService {
       ]);
       if (!conversation || !starship) return false;
 
-      const channelRepo = new ChannelRepository();
-      const dmRepo = new DirectMessageRepository();
-
       const isThread = Boolean((conversation as { parentConversationId?: string | null }).parentConversationId);
-      const contextConversationId = (conversation as { parentConversationId?: string | null }).parentConversationId || conversationId;
 
-      const [channel, dm, conversationAgents, allStarshipAgents] = await Promise.all([
-        channelRepo.findByConversationId(contextConversationId).catch(() => null),
-        dmRepo.findByConversationId(contextConversationId).catch(() => null),
+      const [conversationAgents, allStarshipAgents] = await Promise.all([
         this.getConversationAgents(conversationId).catch(() => [] as AgentModel[]),
         this.agentRepository.findByStarship(starship.id).catch(() => [] as AgentModel[]),
       ]);
 
-      const isChannel = Boolean(channel);
-      const isMentionOnlyChannel = Boolean(isChannel);
-      const isUserUserDm = (dm as { dmType?: unknown } | null)?.dmType === 'user_user';
-      if (isUserUserDm) return false;
-
       const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0;
-      const isMentionOnlyThread = Boolean(isThread && !isMentionOnlyChannel && linkedAgentCount >= 2);
+      const isMentionOnlyThread = Boolean(isThread && linkedAgentCount >= 2);
 
       // Mentions are resolved against the full starship agent list (not only currently-linked agents).
       const mentioned = this.extractMentionedAgents(content, Array.isArray(allStarshipAgents) ? allStarshipAgents : []);
@@ -2939,7 +2929,7 @@ export class ConversationService {
       const hasUserMentionToken = /<@u:([a-z0-9]+(?:-[a-z0-9]+)*)>/i.test(content);
 
       // Mention-only contexts only trigger when at least one agent is mentioned.
-      if (isMentionOnlyChannel || isMentionOnlyThread) return hasMention;
+      if (isMentionOnlyThread) return hasMention;
 
       // If the message contains user mentions but no agent mentions, do not trigger any agent execution
       // (even if a default linked agent exists or a client provided agentId for convenience).

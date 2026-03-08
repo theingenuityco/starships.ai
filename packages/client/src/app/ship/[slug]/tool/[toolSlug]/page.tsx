@@ -9,7 +9,7 @@ import { ConversationMessageInput } from '@/components/conversation/Conversation
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useStarshipChannels } from '@/hooks/useConversations'
+import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
 
@@ -24,7 +24,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   const conversationId = useMemo(() => searchParams.get('conversationId') || null, [searchParams])
   const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
-  const { data: channelsData } = useStarshipChannels(starship?.id ?? '', Boolean(starship?.id))
   const selectedAgent = useMemo(() => {
     if (convAgents && convAgents.length > 0) return convAgents[0]
     return agents[0] || null
@@ -63,13 +62,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   const handleCancel = () => {
     if (conversationId) {
-      const channels = channelsData?.channels ?? []
-      const match = channels.find((ch: any) => String(ch?.conversationId || '') === String(conversationId)) ?? null
-      const channelSlug = match?.slug ? String(match.slug) : ''
-      if (channelSlug) {
-        router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
-        return
-      }
       router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
     } else {
       router.push(`/ship/${slug}`)

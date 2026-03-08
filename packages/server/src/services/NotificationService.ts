@@ -1,7 +1,5 @@
 import {
-  ChannelRepository,
   ConversationNotificationPrefRepository,
-  DirectMessageRepository,
   MessageMentionRepository,
   NotificationRepository,
   getConnection,
@@ -42,9 +40,7 @@ function parseMentionTokens(content: string): ParsedMentions {
 }
 
 export class NotificationService {
-  private readonly channelRepo = new ChannelRepository();
   private readonly prefRepo = new ConversationNotificationPrefRepository();
-  private readonly dmRepo = new DirectMessageRepository();
   private readonly mentionRepo = new MessageMentionRepository();
   private readonly notificationRepo = new NotificationRepository();
   private readonly streamBus = NotificationStreamBus.getInstance();
@@ -79,54 +75,40 @@ export class NotificationService {
 
     const authorUserId = typeof message.userId === 'string' ? message.userId.trim() : '';
 
-    // Identify whether this conversation is a channel or a DM (channels/DMs only per scope).
-    const [dm, channel] = await Promise.all([
-      this.dmRepo.findByConversationId(conversationId).catch(() => null),
-      this.channelRepo.findByConversationId(conversationId).catch(() => null),
-    ]);
-    const isDm = !!dm;
-    const isChannel = !!channel;
-    let isThread = false;
-    let parentChannelConversationId = '';
-    let parentChannelIsPrivate = false;
-    let parentChannelSlug = '';
-    if (!isDm && !isChannel) {
-      // Thread notifications:
-      // A thread is a child conversation whose parentConversationId points at a channel conversation.
-      try {
-        const conn = getConnection();
-        const row = await conn.queryOne<{ parent_conversation_id: string | null }>(
-          `SELECT parent_conversation_id FROM conversations WHERE id = $1`,
+    // Determine notification scope using the unified conversation model:
+    // - "Restricted" conversations (explicit user participants) behave like DMs for notification purposes.
+    // - Child conversations (parentConversationId set) behave like threads.
+    const conn = getConnection();
+    const [parentRow, userRows] = await Promise.all([
+      conn.queryOne<{ parent_conversation_id: string | null }>('SELECT parent_conversation_id FROM conversations WHERE id = $1', [
+        conversationId,
+      ]).catch(() => null),
+      conn
+        .query<{ user_id: string }>(
+          `SELECT user_id FROM conversation_participants WHERE conversation_id = $1 AND user_id IS NOT NULL`,
           [conversationId]
-        );
-        const parentId = typeof row?.parent_conversation_id === 'string' ? String(row.parent_conversation_id).trim() : '';
-        if (parentId) {
-          const parentChannel = await this.channelRepo.findByConversationId(parentId).catch(() => null);
-          if (parentChannel && String(parentChannel.starshipId) === String(starshipId)) {
-            isThread = true;
-            parentChannelConversationId = parentId;
-            parentChannelIsPrivate = Boolean(parentChannel.isPrivate);
-            parentChannelSlug = typeof parentChannel.slug === 'string' ? parentChannel.slug.trim() : '';
-          }
-        }
-      } catch {
-        // best-effort only
-      }
-      if (!isThread) {
-        // Out of scope for v1 notifications.
-        return;
-      }
-    }
+        )
+        .catch(() => []),
+    ]);
+    const parentConversationId = typeof parentRow?.parent_conversation_id === 'string' ? String(parentRow.parent_conversation_id).trim() : '';
+    const isThread = Boolean(parentConversationId);
+    const participantUserIds = Array.from(
+      new Set((Array.isArray(userRows) ? userRows : []).map((r) => String((r as any)?.user_id || '').trim()).filter(Boolean))
+    );
+    const isDm = participantUserIds.length > 0;
+    const isChannel = !isDm;
+
+    // Out-of-scope guard (keeps legacy notification volume bounded):
+    // only emit "message" notifications for restricted conversations or child conversations.
+    if (!isDm && !isThread) return;
 
     type NotificationWithThreadNav = NotificationModel & {
       threadParentConversationId?: string;
-      threadParentChannelSlug?: string | null;
     };
     const attachThreadNav = (notification: NotificationWithThreadNav) => {
       if (!isThread || !notification) return;
-      if (!parentChannelConversationId) return;
-      notification.threadParentConversationId = parentChannelConversationId;
-      notification.threadParentChannelSlug = parentChannelSlug || null;
+      if (!parentConversationId) return;
+      notification.threadParentConversationId = parentConversationId;
     };
 
     // Channel-level preferences:
@@ -157,12 +139,11 @@ export class NotificationService {
     const { userRefs, agentRefs } = parseMentionTokens(String(message.content || ''));
 
     // Resolve mention refs -> IDs within this starship.
-    const conn = getConnection();
     const uniq = (xs: string[]) => Array.from(new Set((Array.isArray(xs) ? xs : []).map((x) => String(x || '').trim()).filter(Boolean)));
     const uRefs = uniq(userRefs);
     const aRefs = uniq(agentRefs);
 
-    const [userRows, agentRows] = await Promise.all([
+    const [mentionUserRows, agentRows] = await Promise.all([
       uRefs.length > 0
         ? conn
             .query<{ id: string; slug: string | null }>(
@@ -195,7 +176,7 @@ export class NotificationService {
     ]);
 
     const userIdBySlug = new Map<string, string>();
-    for (const r of Array.isArray(userRows) ? userRows : []) {
+    for (const r of Array.isArray(mentionUserRows) ? mentionUserRows : []) {
       const id = String(r.id || '').trim();
       const slug = typeof r.slug === 'string' ? String(r.slug).trim() : '';
       if (slug && id) userIdBySlug.set(slug, id);
@@ -210,57 +191,9 @@ export class NotificationService {
     let userIds = uniq(uRefs.map((slug) => userIdBySlug.get(slug) || ''));
     let agentIds = uniq(aRefs.map((slug) => agentIdBySlug.get(slug) || ''));
 
-    // DMs: only allow mentions of the other participant.
-    // This prevents @mention notifications (and mention indexing) from being used to target arbitrary users/agents from a DM.
-    if (isDm && dm) {
-      const authorUserId = typeof message.userId === 'string' ? message.userId.trim() : '';
-      const authorAgentId = typeof message.agentId === 'string' ? message.agentId.trim() : '';
-
-      const allowUserIds = new Set<string>();
-      const allowAgentIds = new Set<string>();
-
-      if (dm.dmType === 'user_user') {
-        // Only allow mentioning the other user in this DM (never self, never third parties).
-        const a = typeof dm.userAId === 'string' ? dm.userAId.trim() : '';
-        const b = typeof dm.userBId === 'string' ? dm.userBId.trim() : '';
-        if (authorUserId && a && b) {
-          const other = authorUserId === a ? b : authorUserId === b ? a : '';
-          if (other) allowUserIds.add(other);
-        }
-      } else if (dm.dmType === 'user_agent') {
-        const dmUserId = typeof dm.userId === 'string' ? dm.userId.trim() : '';
-        const dmAgentId = typeof dm.agentId === 'string' ? dm.agentId.trim() : '';
-        // If the human authored the message, only allow mentioning the agent (the other participant).
-        if (authorUserId) {
-          if (dmAgentId) allowAgentIds.add(dmAgentId);
-        } else if (authorAgentId) {
-          // If the agent authored the message, only allow mentioning the human (the other participant).
-          if (dmUserId) allowUserIds.add(dmUserId);
-        }
-      }
-
-      if (userIds.length > 0) userIds = userIds.filter((id) => allowUserIds.has(String(id || '').trim()));
-      if (agentIds.length > 0) agentIds = agentIds.filter((id) => allowAgentIds.has(String(id || '').trim()));
-    }
-
-    // Private channel threads: do not notify (or index) mentions to non-members.
-    if (isThread && parentChannelIsPrivate && userIds.length > 0 && parentChannelConversationId) {
-      try {
-        const conn = getConnection();
-        const rows = await conn.query<{ user_id: string }>(
-          `SELECT user_id
-             FROM conversation_participants
-            WHERE conversation_id = $1
-              AND user_id IS NOT NULL`,
-          [parentChannelConversationId]
-        );
-        const allow = new Set(rows.map((r) => String(r.user_id)).filter(Boolean));
-        userIds = userIds.filter((uid) => allow.has(String(uid || '').trim()));
-      } catch {
-        // Fail closed: if we cannot evaluate membership, suppress mention notifications.
-        userIds = [];
-      }
-    }
+    // NOTE:
+    // We intentionally do not apply special mention allowlists here. Room mention policy and
+    // other access constraints are enforced at request-time (message creation) and via room invite approvals.
 
     // 1) Insert mention index rows (users + agents)
     const mentionTuples: Array<{ targetType: MentionTargetType; targetId: string }> = [];
@@ -277,19 +210,14 @@ export class NotificationService {
         .catch(() => undefined);
     }
 
-    // 2) DM notifications
-    if (isDm && dm) {
-      const recipients = new Set<string>();
-      if (dm.dmType === 'user_agent') {
-        const uid = typeof dm.userId === 'string' ? dm.userId.trim() : '';
-        if (uid) recipients.add(uid);
-      } else if (dm.dmType === 'user_user') {
-        const a = typeof dm.userAId === 'string' ? dm.userAId.trim() : '';
-        const b = typeof dm.userBId === 'string' ? dm.userBId.trim() : '';
-        if (a) recipients.add(a);
-        if (b) recipients.add(b);
-      }
+    // 2) "DM-style" message notifications (restricted conversations)
+    if (isDm) {
+      const recipients = new Set<string>(participantUserIds);
       if (authorUserId) recipients.delete(authorUserId);
+      // Conversation preference: muted means never notify.
+      if (mutedUserIds.size > 0) {
+        for (const uid of mutedUserIds) recipients.delete(uid);
+      }
 
       const results: Array<{ uid: string; r: { created: boolean; notification?: NotificationModel } }> = await Promise.all(
         Array.from(recipients).map((uid) =>
@@ -326,9 +254,7 @@ export class NotificationService {
       const targets = new Set(userIds.map((x) => String(x).trim()).filter(Boolean));
       if (authorUserId) targets.delete(authorUserId);
       // Conversation preference: muted means never notify (even on mention).
-      if ((isChannel || isThread) && mutedUserIds.size > 0) {
-        for (const uid of mutedUserIds) targets.delete(uid);
-      }
+      if (mutedUserIds.size > 0) for (const uid of mutedUserIds) targets.delete(uid);
       const results: Array<{ uid: string; r: { created: boolean; notification?: NotificationModel } }> = await Promise.all(
         Array.from(targets).map((uid) =>
           this.notificationRepo

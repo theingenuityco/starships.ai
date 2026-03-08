@@ -1084,13 +1084,6 @@ export class ConversationService {
     return out;
   }
 
-  private static ensureThreadTitlePrefix(title: string): string {
-    const t = (title || '').trim();
-    if (!t) return 'Thread';
-    if (/^thread\s*:/i.test(t)) return t;
-    return `Thread: ${t}`;
-  }
-
   /**
    * Create a new conversation
    */
@@ -1098,9 +1091,8 @@ export class ConversationService {
     data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
   ): Promise<ConversationModel> {
     const rawTitle = data.title || 'New Conversation';
-    const title = data.parentConversationId ? ConversationService.ensureThreadTitlePrefix(rawTitle) : rawTitle;
     let conversation = await this.conversationRepository.create({
-      title,
+      title: rawTitle,
       status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
@@ -1809,14 +1801,6 @@ export class ConversationService {
     updates: { title?: string; state?: Partial<ConversationState> | Record<string, unknown> }
   ): Promise<ConversationModel | null> {
     try {
-      // Threads should always persist titles with a "Thread:" prefix.
-      if (updates.title !== undefined) {
-        const existingForTitle = await this.getConversationById(conversationId);
-        if (existingForTitle?.parentConversationId) {
-          updates.title = ConversationService.ensureThreadTitlePrefix(updates.title);
-        }
-      }
-
       // If state is being updated, merge with existing state
       if (updates.state !== undefined) {
         const existing = await this.getConversationById(conversationId);
@@ -2414,8 +2398,7 @@ export class ConversationService {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
               const raw = gen.trim();
-              const normalized = convo.parentConversationId ? ConversationService.ensureThreadTitlePrefix(raw) : raw;
-              await this.conversationRepository.update(convo.id, { title: normalized, updatedAt: new Date().toISOString() });
+              await this.conversationRepository.update(convo.id, { title: raw, updatedAt: new Date().toISOString() });
 
               // Mark thread title generation as consumed so it only runs once.
               if (threadAutoTitlePending) {
@@ -2434,7 +2417,7 @@ export class ConversationService {
               try {
                 await this.uiActions.publish(convo.id, {
                   action: 'conversation_title_updated',
-                  payload: { conversationId: convo.id, title: normalized },
+                  payload: { conversationId: convo.id, title: raw },
                 });
               } catch (err) {
                 console.error('[ConversationService] Failed to publish conversation title update', {

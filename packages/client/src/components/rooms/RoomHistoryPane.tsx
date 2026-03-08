@@ -8,6 +8,24 @@ import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useMemo } from 'react'
 
+function normalizeConversationTitle(raw: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return t
+  // Back-compat: older DM conversations were titled like "DM • Alice".
+  const m = t.match(/^DM\s*[•·:\-–—]\s*(.+)$/i)
+  if (m?.[1]) {
+    const rest = String(m[1]).trim()
+    return rest || t
+  }
+  // Back-compat: older thread titles were created like "Thread: <snippet>".
+  const tm = t.match(/^Thread\s*:\s*(.+)$/i)
+  if (tm?.[1]) {
+    const rest = String(tm[1]).trim()
+    return rest || t
+  }
+  return t
+}
+
 export function RoomHistoryPane(props: {
   starshipId: string
   roomConversationId: string
@@ -50,16 +68,37 @@ export function RoomHistoryPane(props: {
     props.onOpenConversation(id)
   }
 
-  const Row = (rowProps: { title: string; whenText: string; onClick: () => void }) => {
+  const Row = (rowProps: { conversationId: string; title: string; whenText: string; agents: any[]; onClick: () => void }) => {
+    const participantsLabel = (() => {
+      const agents = Array.isArray(rowProps.agents) ? rowProps.agents : []
+      const selfLabel = 'You'
+      const names = [selfLabel]
+        .concat(
+          agents
+            .map(a => String((a as any)?.name || (a as any)?.slug || '').trim())
+            .filter(Boolean)
+        )
+      const unique = Array.from(new Set(names))
+      if (unique.length === 0) return 'No participants'
+      const firstTwo = unique.slice(0, 2)
+      const rest = unique.length - firstTwo.length
+      return rest > 0 ? `${firstTwo.join(', ')} +${rest}` : firstTwo.join(', ')
+    })()
+
     return (
       <Button
         type="button"
         variant="ghost"
-        className="group relative rounded-lg flex items-center gap-2 w-full h-10 px-2 text-[13px] font-medium border border-transparent justify-start text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
+        className="group relative rounded-lg flex items-start gap-2 w-full h-auto px-2 py-2 text-[13px] font-medium border border-transparent justify-start text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
         onClick={rowProps.onClick}
       >
-        <div className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="min-w-0 truncate">{rowProps.title}</span>
+        <div className="min-w-0 flex-1 flex flex-col gap-1">
+          <div className="min-w-0 flex items-center gap-2">
+            <span className="min-w-0 truncate">{rowProps.title}</span>
+          </div>
+          <div className="min-w-0 flex items-center gap-2 text-[11px] text-muted-foreground" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+            <span className="min-w-0 truncate">{participantsLabel}</span>
+          </div>
         </div>
         {rowProps.whenText ? <span className="text-[11px] text-muted-foreground flex-shrink-0">{rowProps.whenText}</span> : null}
       </Button>
@@ -127,25 +166,27 @@ export function RoomHistoryPane(props: {
                 const id = String(c?.id || '').trim()
                 if (!id) return null
                 const titleRaw = String(c?.title || '').trim()
-                const title = titleRaw || 'Untitled conversation'
+                const titleNorm = normalizeConversationTitle(titleRaw)
+                const title = titleNorm || 'Untitled conversation'
                 const when = c?.updatedAt || c?.createdAt
                 const whenText = when ? formatDistanceToNow(new Date(when), { addSuffix: false }) : ''
-                return <Row key={`history:${id}`} title={title} whenText={whenText} onClick={() => openConversation(c)} />
+                const agents = Array.isArray(c?.agents) ? (c.agents as any[]) : []
+                return <Row key={`history:${id}`} conversationId={id} title={title} whenText={whenText} agents={agents} onClick={() => openConversation(c)} />
               })}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground px-4 sm:px-0">No conversations yet.</div>
           )
         ) : null}
-
-        {history.hasMoreBefore ? (
-          <div className="pt-2">
-            <Button type="button" variant="outline" size="sm" className="w-full" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
-              {history.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </Button>
-          </div>
-        ) : null}
       </div>
+
+      {history.hasMoreBefore ? (
+        <div className="border-t border-border/60 p-3">
+          <Button type="button" variant="outline" size="sm" className="w-full" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
+            {history.isFetchingNextPage ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

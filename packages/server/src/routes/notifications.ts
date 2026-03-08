@@ -8,6 +8,8 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { enforceDirectMessageMembership, enforceRoomParticipantMembershipForConversation } from '@/utils/conversation-membership';
 
 const router: Router = Router();
 
@@ -28,16 +30,12 @@ async function attachThreadContext(starshipId: string, notifications: any[]): Pr
     if (threadIds.length === 0) return list;
 
     const db = getConnection();
-    const rows = await db.query<{ thread_id: string; parent_conversation_id: string; parent_channel_slug: string }>(
+    const rows = await db.query<{ thread_id: string; parent_conversation_id: string }>(
       `
       SELECT
         c.id AS thread_id,
-        c.parent_conversation_id,
-        ch.slug AS parent_channel_slug
+        c.parent_conversation_id
       FROM conversations c
-      INNER JOIN channels ch
-              ON ch.conversation_id = c.parent_conversation_id
-             AND ch.starship_id = c.starship_id
       WHERE c.starship_id = $1::text
         AND c.id = ANY($2::text[])
         AND c.parent_conversation_id IS NOT NULL
@@ -46,12 +44,11 @@ async function attachThreadContext(starshipId: string, notifications: any[]): Pr
     );
     if (!rows || rows.length === 0) return list;
 
-    const map = new Map<string, { parentId: string; parentSlug: string }>();
+    const map = new Map<string, { parentId: string }>();
     for (const r of rows) {
       const tid = String(r.thread_id || '').trim();
       const pid = String(r.parent_conversation_id || '').trim();
-      const pslug = String(r.parent_channel_slug || '').trim();
-      if (tid && pid) map.set(tid, { parentId: pid, parentSlug: pslug });
+      if (tid && pid) map.set(tid, { parentId: pid });
     }
     if (map.size === 0) return list;
 
@@ -59,7 +56,7 @@ async function attachThreadContext(starshipId: string, notifications: any[]): Pr
       const cid = typeof n?.conversationId === 'string' ? String(n.conversationId).trim() : '';
       const hit = cid ? map.get(cid) : null;
       if (!hit) return n;
-      return { ...n, threadParentConversationId: hit.parentId, threadParentChannelSlug: hit.parentSlug || null };
+      return { ...n, threadParentConversationId: hit.parentId };
     });
   } catch {
     return Array.isArray(notifications) ? notifications : [];
@@ -365,37 +362,18 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
     }
     if (!(await verifyStarshipAccess(starshipId, authUserId, res))) return;
 
-    // Authorization: ensure user can access this conversation (private channels / DMs / shared convos).
-    // NOTE: starship membership alone is not sufficient for private channels and DMs.
-    const dm = await db.queryOne<{ dm_type: string; user_id: string | null; user_a_id: string | null; user_b_id: string | null }>(
-      'SELECT dm_type, user_id, user_a_id, user_b_id FROM direct_messages WHERE conversation_id = $1',
-      [params.conversationId]
-    );
-    if (dm) {
-      const t = String(dm.dm_type || '');
-      const dmUserId = dm.user_id ? String(dm.user_id) : '';
-      const a = dm.user_a_id ? String(dm.user_a_id) : '';
-      const b = dm.user_b_id ? String(dm.user_b_id) : '';
-      const ok = t === 'user_agent' ? dmUserId === authUserId : t === 'user_user' ? authUserId === a || authUserId === b : false;
-      if (!ok) {
-        sendError(res, 'ACCESS_DENIED', 'User is not a participant in this direct message', 403);
-        return;
-      }
-    } else {
-      const ch = await db.queryOne<{ is_private: boolean }>('SELECT is_private FROM channels WHERE conversation_id = $1', [
-        params.conversationId,
-      ]);
-      if (ch?.is_private) {
-        const member = await db.queryOne<{ ok: boolean }>(
-          'SELECT true as ok FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2 LIMIT 1',
-          [params.conversationId, authUserId]
-        );
-        if (!member?.ok) {
-          sendError(res, 'ACCESS_DENIED', 'User is not a member of this private channel', 403);
-          return;
-        }
-      }
-    }
+    // Authorization: ensure user can access this conversation.
+    if (!(await enforceDirectMessageMembership({ conversationId: params.conversationId, userId: authUserId, req, res }))) return;
+    if (
+      !(await enforceRoomParticipantMembershipForConversation({
+        conversationId: params.conversationId,
+        conversationStarshipId: starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
 
     const last = await db.queryOne<{ id: string; created_at: string }>(
       `SELECT id, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`,
@@ -482,6 +460,7 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
     }
 
     const db = getConnection();
+    const allowRestricted = isInstanceAdmin(req.user);
     const rows = await db.query<{
       conversation_id: string;
       last_message_at: string | null;
@@ -492,26 +471,24 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       WITH scoped AS (
         SELECT c.id AS conversation_id
           FROM conversations c
-          LEFT JOIN channels ch ON ch.conversation_id = c.id
-          LEFT JOIN direct_messages dm ON dm.conversation_id = c.id
          WHERE c.starship_id = $1::text
            AND c.id = ANY($3::text[])
            AND (
-             -- DM access
-             (dm.conversation_id IS NOT NULL AND (
-               (dm.dm_type = 'user_agent' AND dm.user_id = $2::text)
-               OR (dm.dm_type = 'user_user' AND ($2::text = dm.user_a_id OR $2::text = dm.user_b_id))
-             ))
-             OR
-             -- Channel access: public OR private membership
-             (ch.conversation_id IS NOT NULL AND (
-               ch.is_private = false
-               OR EXISTS (SELECT 1 FROM conversation_participants cp WHERE cp.conversation_id = c.id AND cp.user_id = $2::text LIMIT 1)
-             ))
-             OR
-             -- Other conversation types: owner or explicit member
-             -- Note: conversations table has no owner column; starship access is enforced above.
-             (dm.conversation_id IS NULL AND ch.conversation_id IS NULL)
+             $4::boolean = true
+             OR NOT EXISTS (
+               SELECT 1
+                 FROM conversation_participants cp
+                WHERE cp.conversation_id = c.id
+                  AND cp.user_id IS NOT NULL
+                LIMIT 1
+             )
+             OR EXISTS (
+               SELECT 1
+                 FROM conversation_participants cp2
+                WHERE cp2.conversation_id = c.id
+                  AND cp2.user_id = $2::text
+                LIMIT 1
+             )
            )
       ),
       last_msg AS (
@@ -531,7 +508,7 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
         ON rs.conversation_id = s.conversation_id
        AND rs.user_id = $2
       `,
-      [params.starshipId, authUserId, ids]
+      [params.starshipId, authUserId, ids, allowRestricted]
     );
 
     const unreadByConversationId: Record<

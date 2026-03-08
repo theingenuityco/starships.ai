@@ -2,7 +2,7 @@
 
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
@@ -144,44 +144,6 @@ export function ConversationSummaryBar({
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
   const isConversationBusy = !!((currentConversation as any)?.state && typeof (currentConversation as any)?.state === 'object' && ((currentConversation as any).state as any).turnActive === true)
-
-  // Direct message context (lets us display participants even when there are no messages yet)
-  const { data: dmListData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId))
-  const dmItem = useMemo<DirectMessageListItem | null>(() => {
-    const cid = String(conversationId || '')
-    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
-    if (!cid || !Array.isArray(list) || list.length === 0) return null
-    return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
-  }, [dmListData?.directMessages, conversationId])
-
-  // Threads are child conversations; if the parent is a DM, we still want to show the DM participants
-  // in the thread header even before the peer has posted inside the thread.
-  const parentConversationId = useMemo(() => {
-    const raw = (currentConversation as any)?.parentConversationId ?? (currentConversation as any)?.parent_conversation_id
-    const v = typeof raw === 'string' ? raw.trim() : ''
-    return v || null
-  }, [currentConversation])
-  const parentDmItem = useMemo<DirectMessageListItem | null>(() => {
-    const pid = String(parentConversationId || '')
-    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
-    if (!pid || !Array.isArray(list) || list.length === 0) return null
-    return list.find(x => String((x as any)?.dm?.conversationId || '') === pid) || null
-  }, [dmListData?.directMessages, parentConversationId])
-
-  const dmDebug = useMemo(() => {
-    const dm: any = dmItem?.dm as any
-    const agent: any = (dmItem as any)?.agent
-    return {
-      conversationId: String(conversationId || ''),
-      dmType: typeof dm?.dmType === 'string' ? String(dm.dmType) : null,
-      dmAgentId: typeof dm?.agentId === 'string' ? String(dm.agentId) : null,
-      hasAgentObj: Boolean(agent),
-      agentId: typeof agent?.id === 'string' ? String(agent.id) : null,
-      agentName: typeof agent?.name === 'string' ? String(agent.name) : null,
-      agentRole: typeof agent?.role === 'string' ? String(agent.role) : null,
-      formatted: agent ? formatAgentDisplayName(agent) : null,
-    }
-  }, [conversationId, dmItem])
 
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
@@ -331,65 +293,6 @@ export function ConversationSummaryBar({
   }, [agents, authUserEmail, authUserId, authUserName, memberByUserId, participantsPreview])
 
   const effectiveParticipantItems = useMemo(() => {
-    // For DMs, always show both participants (even with 0 messages / before either has spoken).
-    if (dmItem?.dm) {
-      const items: ConversationParticipantItem[] = []
-      const seen = new Set<string>()
-
-      const addHuman = (args: { id?: string | null; label?: string | null; avatarUrl?: string | null }) => {
-        const id = typeof args.id === 'string' ? args.id.trim() : ''
-        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
-        const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
-        const label = labelRaw || (id ? `User ${id.slice(0, 6)}` : 'User')
-        const key = id ? `human:${id}` : label ? `human:name:${label}` : `human:unknown:${label}`
-        if (seen.has(key)) return
-        seen.add(key)
-        items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
-      }
-
-      const addAgent = (args: { id?: string | null; label?: string | null; seed?: string | null; avatarAttachmentId?: string | null }) => {
-        const id = typeof args.id === 'string' ? args.id.trim() : ''
-        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
-        const avatarAttachmentId = typeof args.avatarAttachmentId === 'string' ? args.avatarAttachmentId.trim() : ''
-        const label = labelRaw || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
-        const key = `agent:${id || label}`
-        if (seen.has(key)) return
-        seen.add(key)
-        const seed = (typeof args.seed === 'string' ? args.seed.trim() : '') || label || id || 'agent'
-        items.push({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) })
-      }
-
-      // Current user
-      addHuman({ id: authUserId ?? null, label: authUserName ?? authUserEmail ?? null, avatarUrl: authUserAvatar ?? null })
-
-      // Other participant
-      const dm = dmItem.dm as any
-      if (dm?.dmType === 'user_agent') {
-        const a: any = (dmItem as any)?.agent
-        addAgent({
-          id: typeof a?.id === 'string' ? String(a.id) : typeof dm?.agentId === 'string' ? String(dm.agentId) : null,
-          label: a ? formatAgentDisplayName(a) : null,
-          seed: typeof a?.name === 'string' ? String(a.name) : typeof dm?.agentId === 'string' ? String(dm.agentId) : 'agent',
-          avatarAttachmentId: typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId) : null,
-        })
-      } else if (dm?.dmType === 'user_user') {
-        const peer: any = (dmItem as any)?.peerUser
-        const peerId =
-          typeof peer?.id === 'string'
-            ? String(peer.id)
-            : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '')
-              ? String(dm.userAId)
-              : typeof dm?.userBId === 'string'
-                ? String(dm.userBId)
-                : null
-        const peerLabel =
-          (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
-        const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
-        addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
-      }
-
-      return items.length > 0 ? items : participantItemsFromConversation
-    }
     const rawOverride = Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : null
     const dedupedOverride =
       rawOverride != null
@@ -403,44 +306,7 @@ export function ConversationSummaryBar({
           })()
         : null
     const base = dedupedOverride != null && dedupedOverride.length > 0 ? dedupedOverride : participantItemsFromConversation
-
-    const inferredFromParentDm = (() => {
-      const items: ConversationParticipantItem[] = []
-      const dm: any = (parentDmItem as any)?.dm
-      if (!dm) return items
-      if (dm?.dmType !== 'user_user') return items
-
-      const addHuman = (args: { id?: string | null; label?: string | null; avatarUrl?: string | null }) => {
-        const id = typeof args.id === 'string' ? args.id.trim() : ''
-        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
-        const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
-        const label = labelRaw || (id ? `User ${id.slice(0, 6)}` : 'User')
-        const key = id ? `human:${id}` : label ? `human:name:${label}` : `human:unknown:${label}`
-        items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
-      }
-
-      // Current user
-      addHuman({ id: authUserId ?? null, label: authUserName ?? authUserEmail ?? null, avatarUrl: authUserAvatar ?? null })
-
-      // Peer (from parent DM item)
-      const peer: any = (parentDmItem as any)?.peerUser
-      const peerId =
-        typeof peer?.id === 'string'
-          ? String(peer.id)
-          : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '')
-            ? String(dm.userAId)
-            : typeof dm?.userBId === 'string'
-              ? String(dm.userBId)
-              : null
-      const peerLabel =
-        (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
-      const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
-      addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
-
-      return items
-    })()
-
-    const hint = [...(Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []), ...inferredFromParentDm]
+    const hint = Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []
     if (hint.length === 0) return base
 
     const out: ConversationParticipantItem[] = []
@@ -460,7 +326,7 @@ export function ConversationSummaryBar({
       out.push(p)
     }
     return out.length > 0 ? out : base
-  }, [authUserAvatar, authUserEmail, authUserId, authUserName, dmItem, parentDmItem, participantItemsFromConversation, participantsHint, participantsOverride])
+  }, [participantItemsFromConversation, participantsHint, participantsOverride])
 
   const participantsLabel = useMemo(() => {
     const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
@@ -572,26 +438,6 @@ export function ConversationSummaryBar({
   // Only render actual header when all data is ready to prevent layout shifts
   // If there are no avatars to load, don't wait for avatar loading
   const isDataReady = !isLoadingConversation && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
-
-  const titleDebug = useMemo(() => {
-    const rawTitle = typeof (currentConversation as any)?.title === 'string' ? String((currentConversation as any).title) : null
-    // We can compute the would-be title even when not ready; it will just use the fallback.
-    const normalizedTitle = normalizeConversationTitle(rawTitle || (conversationId ? `Conversation ${String(conversationId).slice(0, 8)}` : ''))
-    const dm: any = (dmItem as any)?.dm
-    const dmAgent: any = (dmItem as any)?.agent
-    const dmType = typeof dm?.dmType === 'string' ? String(dm.dmType) : null
-    const dmAgentLabel = dmType === 'user_agent' && dmAgent ? formatAgentDisplayName(dmAgent) : null
-    const effectiveTitle = dmAgentLabel || normalizedTitle || null
-    return {
-      conversationId: String(conversationId || ''),
-      rawTitle,
-      normalizedTitle: normalizedTitle || null,
-      dmType,
-      dmAgentLabel,
-      effectiveTitle,
-      hasDmItem: Boolean((dmItem as any)?.dm),
-    }
-  }, [conversationId, (currentConversation as any)?.title, Boolean((dmItem as any)?.dm)])
 
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page
@@ -782,15 +628,7 @@ export function ConversationSummaryBar({
     )
   }
 
-  // Prefer DM agent label for user↔agent DMs so the header always includes role.
-  // Conversation titles are persisted and may be name-only (e.g. "Echo") depending on creation path.
   const title = (() => {
-    const dm: any = (dmItem as any)?.dm
-    const dmAgent: any = (dmItem as any)?.agent
-    if (dm?.dmType === 'user_agent' && dmAgent) {
-      const label = formatAgentDisplayName(dmAgent)
-      if (label && label.trim().length > 0) return label
-    }
     return normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
   })()
   const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')

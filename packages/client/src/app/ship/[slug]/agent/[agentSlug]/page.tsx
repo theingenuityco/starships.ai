@@ -16,7 +16,7 @@ import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI, getCurrentToken } from '@/lib/api'
 import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useStarshipChannels } from '@/hooks/useConversations'
+import { useConversationAgents } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -39,7 +39,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const conversationId = searchParams.get('conversationId') || null
   const { data: agents = [], isLoading: isLoadingAgents } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
-  const { data: channelsData } = useStarshipChannels(starship?.id ?? '', Boolean(starship?.id))
   const selectedAgent = useMemo(() => {
     if (convAgents && convAgents.length > 0) return convAgents[0]
     return agents[0] || null
@@ -236,13 +235,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   const handleCancel = () => {
     if (conversationId) {
-      const channels = channelsData?.channels ?? []
-      const match = channels.find((ch: any) => String(ch?.conversationId || '') === String(conversationId)) ?? null
-      const channelSlug = match?.slug ? String(match.slug) : ''
-      if (channelSlug) {
-        router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
-        return
-      }
       router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
     } else {
       router.push(`/ship/${slug}`)

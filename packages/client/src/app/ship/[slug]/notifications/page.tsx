@@ -10,13 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { useStarshipChannels, useStarshipDirectMessages } from '@/hooks/useConversations'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import type { DirectMessageListItem } from '@/hooks/useConversations'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 import { MobileBottomFilterBar } from '@/components/layout/MobileBottomFilterBar'
 
-type Filter = 'all' | 'mentions' | 'dms' | 'reactions'
+type Filter = 'all' | 'mentions' | 'reactions'
 
 function safeDistanceToNow(input: string): string {
   try {
@@ -28,26 +25,11 @@ function safeDistanceToNow(input: string): string {
   }
 }
 
-function getDmPeerKey(item: DirectMessageListItem): string | null {
-  const dm: any = (item as any)?.dm
-  if (!dm) return null
-  const dmType = String(dm?.dmType || '')
-  if (dmType === 'user_agent') {
-    const agent: any = (item as any)?.agent
-    const slug = typeof agent?.slug === 'string' ? agent.slug.trim() : ''
-    if (slug) return slug
-    const id = typeof agent?.id === 'string' ? agent.id.trim() : ''
-    return id ? `a:${id}` : null
-  }
-  if (dmType === 'user_user') {
-    const peerUser: any = (item as any)?.peerUser
-    const id = typeof peerUser?.id === 'string' ? peerUser.id.trim() : ''
-    return id ? `u-${id}` : null
-  }
-  return null
-}
-
-function getConversationLabel(args: { starshipSlug: string; conversationId: string; channelByConversationId: Map<string, any>; dmByConversationId: Map<string, DirectMessageListItem> }): {
+function getConversationLabel(args: {
+  starshipSlug: string
+  conversationId: string
+  threadParentConversationId?: string | null
+}): {
   primary: string
   secondary?: string
   href: string
@@ -56,33 +38,20 @@ function getConversationLabel(args: { starshipSlug: string; conversationId: stri
   const shipBase = shipSlug ? `/ship/${encodeURIComponent(shipSlug)}` : ''
 
   const cid = String(args.conversationId || '').trim()
-  const ch = cid ? args.channelByConversationId.get(cid) : null
-  if (ch) {
-    const slug = String((ch as any)?.slug || '').trim()
-    const name = String((ch as any)?.name || '').trim()
-    const isPrivate = Boolean((ch as any)?.isPrivate)
-    const primary = slug ? `#${slug}` : name ? name : 'a channel'
-    const secondary = slug && name ? name : isPrivate ? 'Private channel' : undefined
-    const href = slug ? `${shipBase}/channels/${encodeURIComponent(slug)}` : `${shipBase}/conversations/${encodeURIComponent(cid)}`
-    return { primary, secondary, href }
+  const parentId = String(args.threadParentConversationId || '').trim()
+  if (parentId) {
+    return {
+      primary: 'a conversation',
+      secondary: 'Thread',
+      href: `${shipBase}/conversations/${encodeURIComponent(parentId)}?thread=${encodeURIComponent(cid)}`,
+    }
   }
 
-  const dm = cid ? args.dmByConversationId.get(cid) : null
-  if (dm) {
-    const peerUser: any = (dm as any)?.peerUser
-    const agent: any = (dm as any)?.agent
-    const peerLabel = (() => {
-      if (agent) return formatAgentDisplayName(agent)
-      const displayName = typeof peerUser?.displayName === 'string' ? peerUser.displayName.trim() : ''
-      const email = typeof peerUser?.email === 'string' ? peerUser.email.trim() : ''
-      return displayName || email || 'Someone'
-    })()
-    const peerKey = getDmPeerKey(dm)
-    const href = peerKey ? `${shipBase}/dm/${encodeURIComponent(peerKey)}` : `${shipBase}/conversations/${encodeURIComponent(cid)}`
-    return { primary: `DM with ${peerLabel}`, href }
+  return {
+    primary: 'a conversation',
+    secondary: cid ? `Conversation ${cid.slice(0, 8)}` : undefined,
+    href: `${shipBase}/conversations/${encodeURIComponent(cid)}`,
   }
-
-  return { primary: 'a conversation', secondary: cid ? `Conversation ${cid}` : undefined, href: `${shipBase}/conversations/${encodeURIComponent(cid)}` }
 }
 
 function getNotificationSentence(args: { type: string; locationLabel: string }): { title: string; iconName: 'tag' | 'chat' | 'smiley' | 'bell' } {
@@ -102,13 +71,10 @@ export default function NotificationsPage() {
 
   const [filter, setFilter] = useState<Filter>('all')
   const { notifications, unread, isLoading, markRead, hasMoreBefore, isLoadingOlder, loadOlder } = useNotificationsStream(starshipId, Boolean(starshipId))
-  const { data: channelsData } = useStarshipChannels(String(starshipId || ''), Boolean(starshipId))
-  const { data: dmsData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId))
 
   const filtered = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : []
     if (filter === 'mentions') return list.filter(n => n.type === 'mention')
-    if (filter === 'dms') return list.filter(n => n.type === 'dm')
     if (filter === 'reactions') return list.filter(n => n.type === 'reaction')
     return list
   }, [notifications, filter])
@@ -118,11 +84,10 @@ export default function NotificationsPage() {
 
   const filterCounts = useMemo(() => {
     const list = Array.isArray(notifications) ? notifications : []
-    const counts: Record<Filter, number> = { all: list.length, mentions: 0, dms: 0, reactions: 0 }
+    const counts: Record<Filter, number> = { all: list.length, mentions: 0, reactions: 0 }
     for (const n of list as any[]) {
       const t = String((n as any)?.type || '')
       if (t === 'mention') counts.mentions += 1
-      else if (t === 'dm') counts.dms += 1
       else if (t === 'reaction') counts.reactions += 1
     }
     return counts
@@ -133,51 +98,19 @@ export default function NotificationsPage() {
     return [
       { value: 'all', label: withCount('All', filterCounts.all) },
       { value: 'mentions', label: withCount('Mentions', filterCounts.mentions) },
-      { value: 'dms', label: withCount('Direct messages', filterCounts.dms) },
       { value: 'reactions', label: withCount('Reactions', filterCounts.reactions) },
     ]
   }, [filterCounts])
-
-  const channelByConversationId = useMemo(() => {
-    const map = new Map<string, any>()
-    const list = (channelsData as any)?.channels ?? []
-    for (const ch of list) {
-      const cid = String((ch as any)?.conversationId || '').trim()
-      if (cid) map.set(cid, ch)
-    }
-    return map
-  }, [channelsData])
-
-  const dmByConversationId = useMemo(() => {
-    const map = new Map<string, DirectMessageListItem>()
-    const list = (dmsData as any)?.directMessages ?? []
-    for (const it of list) {
-      const cid = String((it as any)?.dm?.conversationId || '').trim()
-      if (cid) map.set(cid, it as DirectMessageListItem)
-    }
-    return map
-  }, [dmsData])
 
   const renderRow = (n: any) => {
     const isUnread = !n.readAt
     const location = (() => {
       const cid = typeof n?.conversationId === 'string' ? String(n.conversationId).trim() : ''
       const parentId = typeof n?.threadParentConversationId === 'string' ? String(n.threadParentConversationId).trim() : ''
-      const parentSlug = typeof n?.threadParentChannelSlug === 'string' ? String(n.threadParentChannelSlug).trim() : ''
-      if (cid && parentId) {
-        const shipSlug = String(slug || '').trim()
-        const shipBase = shipSlug ? `/ship/${encodeURIComponent(shipSlug)}` : ''
-        const href = parentSlug
-          ? `${shipBase}/channels/${encodeURIComponent(parentSlug)}?thread=${encodeURIComponent(cid)}`
-          : `${shipBase}/conversations/${encodeURIComponent(parentId)}?thread=${encodeURIComponent(cid)}`
-        const primary = parentSlug ? `#${parentSlug}` : 'a channel'
-        return { primary, secondary: 'Thread', href }
-      }
       return getConversationLabel({
         starshipSlug: slug,
         conversationId: cid,
-        channelByConversationId,
-        dmByConversationId,
+        threadParentConversationId: parentId || null,
       })
     })()
     const sentence = getNotificationSentence({ type: n.type, locationLabel: location.primary })
@@ -258,9 +191,6 @@ export default function NotificationsPage() {
                   </TabsTrigger>
                   <TabsTrigger value="mentions" className="flex-1 sm:flex-none min-w-0 justify-center">
                     Mentions
-                  </TabsTrigger>
-                  <TabsTrigger value="dms" className="flex-1 sm:flex-none min-w-0 justify-center">
-                    Direct messages
                   </TabsTrigger>
                   <TabsTrigger value="reactions" className="flex-1 sm:flex-none min-w-0 justify-center">
                     Reactions

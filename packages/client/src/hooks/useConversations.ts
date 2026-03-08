@@ -2,7 +2,6 @@ import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
   AgentModel,
-  ChannelModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -99,16 +98,6 @@ export const CONVERSATION_QUERY_KEYS = {
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
 
-export const CHANNEL_QUERY_KEYS = {
-  all: ['channels'] as const,
-  byStarship: (starshipId: string) => [...CHANNEL_QUERY_KEYS.all, 'starship', starshipId] as const,
-} as const
-
-export const DIRECT_MESSAGE_QUERY_KEYS = {
-  all: ['direct-messages'] as const,
-  byStarship: (starshipId: string) => [...DIRECT_MESSAGE_QUERY_KEYS.all, 'starship', starshipId] as const,
-} as const
-
 type ConversationMessagesResponseData = {
   conversationId: string
   messages: MessageModel[]
@@ -121,27 +110,6 @@ type ConversationMessagesResponseData = {
   agents?: AgentModel[]
   turnActive?: boolean
   lastCompleteAt?: string | null
-}
-
-// Local DM model until protocol dist typings are available in-editor.
-// (The server contract is stable: dmType + peer fields + timestamps.)
-export type DirectMessageModel = {
-  conversationId: string
-  starshipId: string
-  dmType: 'user_agent' | 'user_user'
-  userId?: string | null
-  agentId?: string | null
-  userAId?: string | null
-  userBId?: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export type DirectMessageListItem = {
-  dm: DirectMessageModel
-  conversation: ConversationModel | null
-  agent: AgentModel | null
-  peerUser?: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null
 }
 
 export type PendingToolCallApproval = ToolCallApprovalModel & {
@@ -172,9 +140,6 @@ export function useCreateConversation() {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
         })
-        queryClient.invalidateQueries({
-          queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId),
-        })
       }
     },
     onError: (error: any) => {
@@ -196,126 +161,6 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     enabled: !!starshipId && enabled,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
-  })
-}
-
-export function useStarshipChannels(starshipId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CHANNEL_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async (): Promise<{ channels: ChannelModel[] }> => {
-      const response: FetchResponse<ApiResponse<{ channels: ChannelModel[] }>> = await api.get(`/api/v1/starships/${starshipId}/channels`)
-      return { channels: response.data.data?.channels || [] }
-    },
-    enabled: !!starshipId && enabled,
-    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
-    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
-  })
-}
-
-export function useStarshipDirectMessages(starshipId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async (): Promise<{ directMessages: DirectMessageListItem[] }> => {
-      const response: FetchResponse<ApiResponse<{ directMessages: DirectMessageListItem[] }>> = await api.get(`/api/v1/starships/${starshipId}/direct-messages`)
-      return { directMessages: response.data.data?.directMessages || [] }
-    },
-    enabled: !!starshipId && enabled,
-    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
-    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
-  })
-}
-
-export function useCreateDirectMessage() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: { starshipId: string; agentSlug?: string; agentId?: string; peerUserId?: string; title?: string }) => {
-      const response: FetchResponse<ApiResponse<{ dm: DirectMessageModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/direct-messages`, {
-        agentSlug: args.agentSlug,
-        agentId: args.agentId,
-        peerUserId: args.peerUserId,
-        title: args.title,
-      })
-      return response.data.data
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId) })
-    },
-    onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error)
-      toast.error('Failed to create direct message', { description: errorMessage })
-    },
-  })
-}
-
-export function useCreateChannel() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: { starshipId: string; slug: string; name: string; isPrivate?: boolean; topic?: string | null }) => {
-      const response: FetchResponse<ApiResponse<{ channel: ChannelModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/channels`, {
-        slug: args.slug,
-        name: args.name,
-        isPrivate: args.isPrivate,
-        topic: args.topic ?? null,
-      })
-      return response.data.data
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
-    },
-    onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error)
-      toast.error('Failed to create channel', { description: errorMessage })
-    },
-  })
-}
-
-export function useUpdateChannel() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: {
-      starshipId: string
-      channelId: string
-      name?: string
-      isPrivate?: boolean
-      topic?: string | null
-      attachedViewId?: string | null
-    }): Promise<ChannelModel> => {
-      const response: FetchResponse<ApiResponse<{ channel: ChannelModel }>> = await api.patch(`/api/v1/channels/${encodeURIComponent(args.channelId)}`, {
-        ...(args.name !== undefined ? { name: args.name } : null),
-        ...(args.isPrivate !== undefined ? { isPrivate: args.isPrivate } : null),
-        ...(args.topic !== undefined ? { topic: args.topic } : null),
-        ...(args.attachedViewId !== undefined ? { attachedViewId: args.attachedViewId } : null),
-      })
-      return response.data.data.channel
-    },
-    onSuccess: (_channel, variables) => {
-      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
-      toast.success('Channel updated!')
-    },
-    onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error)
-      toast.error('Failed to update channel', { description: errorMessage })
-    },
-  })
-}
-
-export function useDeleteChannel() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (args: { starshipId: string; channelId: string }) => {
-      const response: FetchResponse<ApiResponse<{ deleted: boolean }>> = await api.delete(`/api/v1/channels/${encodeURIComponent(args.channelId)}`)
-      return response.data.data
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
-      // Conversations lists can include channel-backed conversations; invalidate broadly.
-      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId) })
-      toast.success('Channel deleted')
-    },
-    onError: (error: any) => {
-      const errorMessage = getSafeErrorMessage(error)
-      toast.error('Failed to delete channel', { description: errorMessage })
-    },
   })
 }
 

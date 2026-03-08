@@ -1,10 +1,8 @@
 'use client'
 
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar } from '@/components/ui/avatar'
 import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
-import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { cn } from '@/lib/utils'
@@ -13,9 +11,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { motion } from 'motion/react'
-import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+import { useMemo, useEffect, useRef, type ReactNode } from 'react'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
@@ -60,6 +57,9 @@ interface ConversationSummaryBarProps {
    * in the thread conversation yet, so message-sampling would miss them.
    */
   participantsHint?: ConversationParticipantItem[] | null
+
+  /** Optional: clicking the participant count should open the room participants modal. */
+  onParticipantsClick?: (() => void) | null
 }
 
 interface ConversationAgent {
@@ -69,18 +69,6 @@ interface ConversationAgent {
   slug?: string
   model?: string
   avatarAttachmentId?: string
-}
-
-function initialsFromName(name?: string | null): string {
-  if (!name || typeof name !== 'string') return 'U'
-  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
-  if (parts.length === 0) return 'U'
-  return (
-    parts
-      .map(p => p[0]?.toUpperCase())
-      .filter(Boolean)
-      .join('') || 'U'
-  )
 }
 
 function normalizeConversationTitle(raw: string): string {
@@ -117,6 +105,7 @@ export function ConversationSummaryBar({
   fallbackSubtitle,
   participantsOverride,
   participantsHint,
+  onParticipantsClick,
 }: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const { isInstanceAdmin, userId: authUserId, userName: authUserName, userEmail: authUserEmail, userAvatar: authUserAvatar } = useAuth()
@@ -148,20 +137,6 @@ export function ConversationSummaryBar({
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
-  const overrideAvatarAttachmentIds = useMemo(() => {
-    const list = Array.isArray(participantsOverride) ? participantsOverride : []
-    return list
-      .filter(p => p && p.kind === 'agent')
-      .map(p => (typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''))
-      .filter(Boolean)
-  }, [participantsOverride])
-  const avatarAttachmentIds = useMemo(() => {
-    const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    return Array.from(new Set([...ids, ...overrideAvatarAttachmentIds]))
-  }, [agents, overrideAvatarAttachmentIds])
-  const hasAvatarIds = avatarAttachmentIds.length > 0
-  const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
-  const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   // Include human participants by sampling recent message authors (matches thread card behavior).
   // Derive from stream when available to avoid redundant /messages API call; fallback to API otherwise.
@@ -328,107 +303,20 @@ export function ConversationSummaryBar({
     return out.length > 0 ? out : base
   }, [participantItemsFromConversation, participantsHint, participantsOverride])
 
-  const participantsLabel = useMemo(() => {
-    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
-    if (labels.length === 0) return 'No participants'
-    if (labels.length <= 3) return labels.join(', ')
-    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
+  const participantCountLabel = useMemo(() => {
+    const n = Array.isArray(effectiveParticipantItems) ? effectiveParticipantItems.length : 0
+    if (n <= 0) return '0 participants'
+    if (n === 1) return '1 participant'
+    return `${n} participants`
   }, [effectiveParticipantItems])
 
-  const [participantsOpen, setParticipantsOpen] = useState(false)
-  const participantsHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const participantsTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const participantsContentRef = useRef<HTMLDivElement | null>(null)
-
-  const clearParticipantsHoverTimers = useCallback(() => {
-    if (participantsHoverCloseTimerRef.current) {
-      clearTimeout(participantsHoverCloseTimerRef.current)
-      participantsHoverCloseTimerRef.current = null
-    }
-  }, [])
-
-  const openParticipantsPopover = useCallback(() => {
-    clearParticipantsHoverTimers()
-    setParticipantsOpen(prev => (prev ? prev : true))
-  }, [clearParticipantsHoverTimers])
-
-  const closeParticipantsPopover = useCallback(
-    (delayMs = 180) => {
-      if (!participantsOpen) return
-      if (participantsHoverCloseTimerRef.current) return
-      participantsHoverCloseTimerRef.current = setTimeout(() => {
-        participantsHoverCloseTimerRef.current = null
-        setParticipantsOpen(false)
-      }, delayMs)
-    },
-    [participantsOpen]
-  )
-
-  // Avoid redundant open/close triggers:
-  // Only close when pointer truly leaves BOTH trigger and content (use relatedTarget across portal boundary).
-  const handleParticipantsTriggerPointerLeave = useCallback(
-    (e: React.PointerEvent) => {
-      const next = e.relatedTarget as Node | null
-      const contentEl = participantsContentRef.current
-      if (next && contentEl && contentEl.contains(next)) return
-      closeParticipantsPopover(220)
-    },
-    [closeParticipantsPopover]
-  )
-
-  const handleParticipantsContentPointerLeave = useCallback(
-    (e: React.PointerEvent) => {
-      const next = e.relatedTarget as Node | null
-      const triggerEl = participantsTriggerRef.current
-      if (next && triggerEl && triggerEl.contains(next)) return
-      closeParticipantsPopover(220)
-    },
-    [closeParticipantsPopover]
-  )
-
-  useEffect(() => {
-    return () => {
-      clearParticipantsHoverTimers()
-    }
-  }, [clearParticipantsHoverTimers])
-
-  const ParticipantsPopup = () => {
+  const participantsTooltipLabel = useMemo(() => {
     const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
-    if (labels.length === 0) return null
-    return (
-      <div className="w-full">
-        <div className="px-2 py-2 font-normal">
-          <div className="text-sm font-medium leading-tight truncate text-foreground">Participants</div>
-        </div>
-        <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
-          {effectiveParticipantItems.map(p => (
-            <div
-              key={p.key}
-              className="group relative rounded-lg flex items-center gap-2 w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-default text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
-            >
-              <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-                {p.kind === 'agent' ? (
-                  <div className="relative">
-                    <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                      <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="rounded-full object-cover" /> : null}
-                      <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                    </Avatar>
-                  </div>
-                )}
-              </div>
-              <span className="min-w-0 truncate">{p.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+    if (labels.length === 0) return 'No participants'
+    if (labels.length === 1) return labels[0] || 'Participant'
+    if (labels.length === 2) return `${labels[0]}, ${labels[1]}`
+    return `${labels[0]}, ${labels[1]} and ${labels.length - 2} more`
+  }, [effectiveParticipantItems])
 
   // Token indicator: utilization (server totals) vs max (model context window)
   const usageConversationId = showTokens ? conversationId : null
@@ -436,8 +324,7 @@ export function ConversationSummaryBar({
   const totalCost = Number(totalsData?.cost ?? 0)
 
   // Only render actual header when all data is ready to prevent layout shifts
-  // If there are no avatars to load, don't wait for avatar loading
-  const isDataReady = !isLoadingConversation && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
+  const isDataReady = !isLoadingConversation && !isLoadingAgents && !!currentConversation
 
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page
@@ -494,68 +381,18 @@ export function ConversationSummaryBar({
                       {isDraftHeader ? (
                         <>
                           {hasDraftParticipants ? (
-                            <Popover
-                              open={participantsOpen}
-                              onOpenChange={next => {
-                                clearParticipantsHoverTimers()
-                                setParticipantsOpen(next)
-                              }}
+                            <button
+                              type="button"
+                              className={cn(
+                                'inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                                onParticipantsClick ? 'cursor-pointer' : 'cursor-default'
+                              )}
+                              aria-label={`Participants: ${participantCountLabel}`}
+                              title={participantsTooltipLabel}
+                              onClick={() => onParticipantsClick?.()}
                             >
-                              <PopoverTrigger asChild>
-                                <button
-                                  type="button"
-                                  ref={participantsTriggerRef}
-                                  className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                  aria-label={`Participants: ${participantsLabel}`}
-                                  title={participantsLabel}
-                                  onPointerEnter={openParticipantsPopover}
-                                  onPointerLeave={handleParticipantsTriggerPointerLeave}
-                                  onFocus={() => {
-                                    clearParticipantsHoverTimers()
-                                    setParticipantsOpen(true)
-                                  }}
-                                >
-                                  <div className="flex items-center -space-x-1.5">
-                                    {effectiveParticipantItems.slice(0, 3).map(p => {
-                                      if (p.kind === 'agent') {
-                                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                                        return (
-                                          <div key={p.key} className="relative h-5 w-5">
-                                            <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                              <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
-                                            </div>
-                                          </div>
-                                        )
-                                      }
-                                      return (
-                                        <div key={p.key} className="relative h-5 w-5">
-                                          <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                          </Avatar>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                  {effectiveParticipantItems.length > 3 ? (
-                                    <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
-                                  ) : null}
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                ref={participantsContentRef}
-                                side="bottom"
-                                align="start"
-                                sideOffset={8}
-                                className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
-                                onOpenAutoFocus={e => e.preventDefault()}
-                                onCloseAutoFocus={e => e.preventDefault()}
-                                onPointerEnter={openParticipantsPopover}
-                                onPointerLeave={handleParticipantsContentPointerLeave}
-                              >
-                                <ParticipantsPopup />
-                              </PopoverContent>
-                            </Popover>
+                              <span className="font-medium leading-none text-muted-foreground">{participantCountLabel}</span>
+                            </button>
                           ) : (
                             <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
                               <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
@@ -691,67 +528,19 @@ export function ConversationSummaryBar({
                   <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
                     {effectiveParticipantItems.length > 0 ? (
                       <>
-                        {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
-                        <Popover
-                          open={participantsOpen}
-                          onOpenChange={next => {
-                            clearParticipantsHoverTimers()
-                            setParticipantsOpen(next)
-                          }}
+                        {/* Participants (count-only) + native tooltip preview */}
+                        <button
+                          type="button"
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                            onParticipantsClick ? 'cursor-pointer' : 'cursor-default'
+                          )}
+                          aria-label={`Participants: ${participantCountLabel}`}
+                          title={participantsTooltipLabel}
+                          onClick={() => onParticipantsClick?.()}
                         >
-                          <PopoverTrigger asChild>
-                            <button
-                              type="button"
-                              ref={participantsTriggerRef}
-                              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                              aria-label={`Participants: ${participantsLabel}`}
-                              title={participantsLabel}
-                              onPointerEnter={openParticipantsPopover}
-                              onPointerLeave={handleParticipantsTriggerPointerLeave}
-                              onFocus={() => {
-                                clearParticipantsHoverTimers()
-                                setParticipantsOpen(true)
-                              }}
-                            >
-                              <div className="flex items-center -space-x-1.5">
-                                {effectiveParticipantItems.slice(0, 3).map(p => {
-                                  if (p.kind === 'agent') {
-                                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                                    return (
-                                      <div key={p.key} className="relative h-5 w-5">
-                                        <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
-                                        </div>
-                                      </div>
-                                    )
-                                  }
-                                  return (
-                                    <div key={p.key} className="relative h-5 w-5">
-                                      <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                      </Avatar>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                              {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
-                            </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            ref={participantsContentRef}
-                            side="bottom"
-                            align="start"
-                            sideOffset={8}
-                            className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
-                            onOpenAutoFocus={e => e.preventDefault()}
-                            onCloseAutoFocus={e => e.preventDefault()}
-                            onPointerEnter={openParticipantsPopover}
-                            onPointerLeave={handleParticipantsContentPointerLeave}
-                          >
-                            <ParticipantsPopup />
-                          </PopoverContent>
-                        </Popover>
+                          <span className="font-medium leading-none text-muted-foreground">{participantCountLabel}</span>
+                        </button>
 
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />

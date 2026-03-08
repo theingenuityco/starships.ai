@@ -65,6 +65,7 @@ export function RoomConversationIndexView(props: {
   const searchParams = useSearchParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
+  const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
   const [starterTab, setStarterTab] = useState<'suggestions' | 'history' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
 
@@ -166,6 +167,7 @@ export function RoomConversationIndexView(props: {
       <ConversationSummaryBar
         conversationId={props.roomConversationId}
         starshipId={props.starshipId}
+        onParticipantsClick={() => participantsButtonRef.current?.click()}
         titleRightSlot={<NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />}
         titlePrefix={
           <span className="relative inline-flex items-center justify-center h-4 w-4">
@@ -185,6 +187,7 @@ export function RoomConversationIndexView(props: {
               roomConversationId={props.roomConversationId}
               roomIsPrivate={Boolean(props.roomIsPrivate)}
               starshipOwnerId={props.starshipOwnerId ?? null}
+              buttonRef={participantsButtonRef}
             />
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>

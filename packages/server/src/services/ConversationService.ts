@@ -870,7 +870,11 @@ export class ConversationService {
       if (!b || typeof b !== 'object') continue;
       if (b.type !== 'text') continue;
       const text = typeof b.text === 'string' ? b.text : '';
-      const next = this.replaceMentionTokensInText({ content: text, agentNameByRef: args.agentNameByRef, userNameByRef: args.userNameByRef });
+      const next = this.replaceMentionTokensInText({
+        content: text,
+        agentNameByRef: args.agentNameByRef,
+        userNameByRef: args.userNameByRef,
+      });
       if (next !== text) {
         blocks[i] = { ...b, text: next } as ContentBlock;
         changed = true;
@@ -2097,7 +2101,9 @@ export class ConversationService {
     const at = atDate.toISOString();
 
     const sanitizeInline = (value: string, max = 64): string => {
-      const s = String(value || '').replace(/\s+/g, ' ').trim();
+      const s = String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim();
       if (!s) return '';
       return s.length > max ? s.slice(0, max) : s;
     };
@@ -2187,7 +2193,10 @@ export class ConversationService {
       if (!looksLikeBracketTs(line)) return s;
       // Only rewrite headers that look like our injected format for this sender.
       // (Back-compat: older headers may have included "(user)" / "(agent)" after the sender.)
-      if (!line.includes(String(sender || '').trim()) && !(String(displayName || '').trim() && line.includes(String(displayName || '').trim())))
+      if (
+        !line.includes(String(sender || '').trim()) &&
+        !(String(displayName || '').trim() && line.includes(String(displayName || '').trim()))
+      )
         return s;
       const m = line.match(/^\[([^\]]+)\]\s+(.*)$/);
       if (!m) return s;
@@ -2458,7 +2467,6 @@ export class ConversationService {
     // - When a thread has 2+ linked agents, we stop using a default agent fallback.
     //   Only explicit @mentions will trigger agent execution for that message.
     const isThread = Boolean(conversation.parentConversationId);
-    const contextConversationId = conversation.parentConversationId || data.conversationId;
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
     let isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
@@ -2522,7 +2530,8 @@ export class ConversationService {
         }
 
         isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
-        const initialTargets = initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
+        const initialTargets =
+          initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
 
         const fallbackAgent = conversationAgents[0];
         // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
@@ -2533,7 +2542,8 @@ export class ConversationService {
         // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
         // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
         noAgentToRun =
-          ((isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) || (blockFallbackDueToUserMentions && agentQueue.length === 0);
+          ((isMentionOnlyThread || !fallbackAgent) && agentQueue.length === 0) ||
+          (blockFallbackDueToUserMentions && agentQueue.length === 0);
       }
     }
 
@@ -5021,7 +5031,6 @@ export class ConversationService {
               } catch {
                 /* best-effort */
               }
-
             }
           }
         } catch (e) {

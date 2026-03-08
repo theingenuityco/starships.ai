@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'motion/react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type MouseEvent, type ReactNode } from 'react'
 
 interface NavigationItemProps {
   href: string
@@ -19,16 +19,17 @@ interface NavigationItemProps {
   onClick?: () => void
   special?: boolean
   onItemClick?: () => void
+  trailing?: ReactNode
 }
 
-export function NavigationItem({ href, label, icon, isActive, badgeCount, showLabels = false, expanded = false, onClick, special = false, onItemClick }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, badgeCount, showLabels = false, expanded = false, onClick, special = false, onItemClick, trailing }: NavigationItemProps) {
   const router = useRouter()
 
   const hasBadge = typeof badgeCount === 'number' && Number.isFinite(badgeCount) && badgeCount > 0
   const badgeLabel = hasBadge ? `${badgeCount > 99 ? '99+' : String(badgeCount)} unread` : ''
 
   const handleClick = useCallback(
-    (e: React.MouseEvent) => {
+    (e: MouseEvent<HTMLDivElement>) => {
       e.preventDefault()
       e.stopPropagation()
       if (onClick) {
@@ -107,6 +108,8 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
           </motion.span>
         )}
       </AnimatePresence>
+
+      {trailing ? <span className="ml-1 flex-shrink-0 inline-flex items-center">{trailing}</span> : null}
 
       {hasBadge ? (
         expanded ? (

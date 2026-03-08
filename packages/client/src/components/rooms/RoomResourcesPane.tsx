@@ -140,8 +140,10 @@ export function RoomResourcesPane(props: {
                       </h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
-                      <span className="font-medium leading-none text-muted-foreground">{totalSaved > 0 ? `${totalSaved} saved` : 'No saved resources'}</span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                        <span className="font-medium leading-none text-muted-foreground">{totalSaved > 0 ? `${totalSaved} saved` : 'No saved resources'}</span>
+                      </div>
                     </div>
                   </div>
 

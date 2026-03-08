@@ -1021,6 +1021,23 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
   const [appendGateRevision, setAppendGateRevision] = useState(0)
 
+  const makeAbortedIterable = (convId: string, reason: string): AsyncIterable<StreamedChunk> => {
+    const at = new Date().toISOString()
+    // Yield a minimal snapshot so TanStack Query never treats the query result as undefined.
+    // This handles mid-flight aborts where the SSE iterable would otherwise yield 0 chunks.
+    return (async function* () {
+      yield {
+        type: 'snapshot',
+        data: {
+          conversationId: convId,
+          messages: [],
+          turn: { turnId: 'aborted', status: 'completed' },
+          at,
+        },
+      } as any
+    })()
+  }
+
   type AwaitRequested = {
     at: string
     nodeRef: string
@@ -1074,9 +1091,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
     const resolvers: Resolver[] = []
+    let pushedCount = 0
 
     const push = (item: StreamedChunk) => {
       if (closed) return
+      pushedCount++
       if (resolvers.length > 0) {
         const resolve = resolvers.shift()!
         resolve({ value: item, done: false })
@@ -1087,6 +1106,30 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
+      // If we are being manually aborted before any chunks were ever emitted,
+      // inject a minimal snapshot so the streamed query never resolves to undefined.
+      // This avoids the TanStack Query warning: "Query data cannot be undefined" for messages streams.
+      if (reason === 'manual' && pushedCount === 0) {
+        const at = new Date().toISOString()
+        const synthetic: StreamedChunk = {
+          type: 'snapshot',
+          data: {
+            conversationId: convId,
+            messages: [],
+            turn: { turnId: 'aborted', status: 'completed' },
+            at,
+            __synthetic: true,
+          },
+        } as any
+        pushedCount++
+        if (resolvers.length > 0) {
+          const resolve = resolvers.shift()!
+          resolve({ value: synthetic, done: false })
+        } else {
+          queue.push(synthetic)
+        }
+      }
+
       closed = true
 
       clearTimeout(timeoutId)
@@ -1108,89 +1151,93 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       instanceController.signal.addEventListener('abort', () => cleanup('manual'), { once: true })
     } catch {}
 
-    fetchEventSource(url, {
-      method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      openWhenHidden: true,
-      signal: combinedSignal,
-      async onopen(response) {
-        if (!isActiveInstance()) {
-          return
-        }
-        lastSseOpenAtRef.current = Date.now()
-        if (!response.ok) {
-          push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
-          cleanup('bad_status')
-        }
-      },
-      onmessage(ev: EventSourceMessage) {
-        if (!isActiveInstance()) {
-          return
-        }
-        try {
-          if (typeof ev.id === 'string' && ev.id) {
-            try {
-              if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
-            } catch {}
-          }
-
-          const eventType = String(ev.event || '')
-          const data = ev.data ? JSON.parse(ev.data) : null
-          if (!eventType || data == null) return
-
-          if (eventType === 'snapshot') {
-            push({ type: 'snapshot', data })
+    try {
+      fetchEventSource(url, {
+        method: 'GET',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        openWhenHidden: true,
+        signal: combinedSignal,
+        async onopen(response) {
+          if (!isActiveInstance()) {
             return
           }
-
-          // All other stream events use `type`+`data` shape; we keep `data` loosely typed
-          // to avoid runtime coupling and to allow forward-compatible fields.
-          switch (eventType) {
-            case 'turn.started':
-              push({ type: 'turn.started', data })
-              return
-            case 'turn.status':
-              push({ type: 'turn.status', data })
-              return
-            case 'turn.usage':
-              push({ type: 'turn.usage', data })
-              return
-            case 'await_requested':
-              push({ type: 'await_requested', data })
-              return
-            case 'assistant.delta':
-              push({ type: 'assistant.delta', data })
-              return
-            case 'assistant.reasoning_delta':
-              push({ type: 'assistant.reasoning_delta', data })
-              return
-            case 'message.append':
-              push({ type: 'message.append', data })
-              return
-            case 'message.reactions':
-              push({ type: 'message.reactions', data })
-              return
-            case 'ui_action':
-              push({ type: 'ui_action', data })
-              return
-            default:
-              return
+          lastSseOpenAtRef.current = Date.now()
+          if (!response.ok) {
+            push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
+            cleanup('bad_status')
           }
-        } catch (e) {
-          push({ type: 'error', error: e })
-        }
-      },
-      onclose() {
-        if (!isActiveInstance()) return
-        cleanup('onclose')
-      },
-      onerror(err) {
-        if (!isActiveInstance()) return
-        lastSseErrorAtRef.current = Date.now()
-        push({ type: 'error', error: err })
-        cleanup('onerror')
-      },
-    })
+        },
+        onmessage(ev: EventSourceMessage) {
+          if (!isActiveInstance()) {
+            return
+          }
+          try {
+            if (typeof ev.id === 'string' && ev.id) {
+              try {
+                if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
+              } catch {}
+            }
+
+            const eventType = String(ev.event || '')
+            const data = ev.data ? JSON.parse(ev.data) : null
+            if (!eventType || data == null) return
+
+            if (eventType === 'snapshot') {
+              push({ type: 'snapshot', data })
+              return
+            }
+
+            // All other stream events use `type`+`data` shape; we keep `data` loosely typed
+            // to avoid runtime coupling and to allow forward-compatible fields.
+            switch (eventType) {
+              case 'turn.started':
+                push({ type: 'turn.started', data })
+                return
+              case 'turn.status':
+                push({ type: 'turn.status', data })
+                return
+              case 'turn.usage':
+                push({ type: 'turn.usage', data })
+                return
+              case 'await_requested':
+                push({ type: 'await_requested', data })
+                return
+              case 'assistant.delta':
+                push({ type: 'assistant.delta', data })
+                return
+              case 'assistant.reasoning_delta':
+                push({ type: 'assistant.reasoning_delta', data })
+                return
+              case 'message.append':
+                push({ type: 'message.append', data })
+                return
+              case 'message.reactions':
+                push({ type: 'message.reactions', data })
+                return
+              case 'ui_action':
+                push({ type: 'ui_action', data })
+                return
+              default:
+                return
+            }
+          } catch (e) {
+            push({ type: 'error', error: e })
+          }
+        },
+        onclose() {
+          if (!isActiveInstance()) return
+          cleanup('onclose')
+        },
+        onerror(err) {
+          if (!isActiveInstance()) return
+          lastSseErrorAtRef.current = Date.now()
+          push({ type: 'error', error: err })
+          cleanup('onerror')
+        },
+      })
+    } catch (e) {
+      throw e
+    }
 
     return {
       [Symbol.asyncIterator]() {
@@ -1621,7 +1668,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     queryFn: streamedQuery({
       queryFn: async (_ctx: any) => {
         const token = await getCurrentToken()
-        return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal)
+        if (_ctx?.signal?.aborted) {
+          return makeAbortedIterable(conversationId!, 'ctx.signal.aborted after token')
+        }
+        const iterable = makeSSEAsyncIterable(conversationId!, token, _ctx?.signal)
+        return iterable
       },
       refetchMode: 'append',
     }),
@@ -2098,6 +2149,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (!id) return
       try {
         const guard = activeSseGuards.get(id)
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'901fe2'},body:JSON.stringify({sessionId:'901fe2',runId:'pre',hypothesisId:'C',location:'useConversations.ts:useConversationStreamed:stop',message:'stop() called for conversation stream',data:{conversationId:id,hadGuard:Boolean(guard),activeGuardsSize:activeSseGuards.size},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         guard?.abort()
         // `makeSSEAsyncIterable`'s cleanup will also delete the guard; best-effort delete here too.
         activeSseGuards.delete(id)

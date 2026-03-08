@@ -8,7 +8,7 @@ import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail, useConversationStreamed, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useApproveRoomInviteApproval, useDenyRoomInviteApproval, useRoomInviteApprovalsPending, type PendingRoomInviteApproval } from '@/hooks/useRooms'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -197,40 +197,8 @@ function LinkedConversationCard({
     (conversation as any)?.turn?.status ?? (conversation as any)?.state?.turn?.status ?? (conversation as any)?.state?.turnStatus ?? ''
   ).trim()
 
-  const likelyOngoingFromDetail = Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
-  const [streamStopped, setStreamStopped] = useState(false)
-  const streamEnabled = Boolean(linkedConversationId && !streamStopped && !isLoadingConversation && likelyOngoingFromDetail)
-  const stream = useConversationStreamed(linkedConversationId, starshipId ?? null, { enabled: streamEnabled })
-  const streamTurnStatus = stream?.turnStatus ?? null
-  const streamHasCompleteEvent = Boolean(stream?.hasCompleteEvent)
-  const didStartStreamRef = useRef(false)
-  useEffect(() => {
-    if (streamEnabled) didStartStreamRef.current = true
-  }, [streamEnabled])
-
-  // As soon as we observe completion, stop streaming to avoid keeping an extra open SSE.
-  useEffect(() => {
-    if (!streamHasCompleteEvent) return
-    stream?.stop?.()
-    setStreamStopped(true)
-  }, [streamHasCompleteEvent, stream])
-
-  // Ensure we don't leave a thread-card stream running after unmount.
-  useEffect(() => {
-    return () => {
-      if (!didStartStreamRef.current) return
-      try {
-        stream?.stop?.()
-      } catch {}
-    }
-  }, [stream])
-
-  const isOngoing = useMemo(() => {
-    if (streamTurnStatus) {
-      return streamTurnStatus === 'active' || streamTurnStatus === 'waiting_for_tools'
-    }
-    return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
-  }, [isLinkedConversationBusy, linkedTurnStatus, streamTurnStatus])
+  // Thread cards should not open their own SSE stream for the child conversation (it can race with the thread pane stream).
+  // Instead, poll the messages endpoint for fast-changing thread status (turnActive).
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
   const cleanedTitle = rawTitle.replace(/^thread:\s*/i, '').trim()
@@ -264,8 +232,24 @@ function LinkedConversationCard({
       const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 10 } })
       return (resp as any)?.data?.data ?? null
     },
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: data => {
+      try {
+        const turnActive = Boolean((data as any)?.turnActive)
+        return turnActive ? 1000 : false
+      } catch {
+        return false
+      }
+    },
   })
+
+  const isOngoing = useMemo(() => {
+    const turnActiveFromMsgs = Boolean((participantsPreview as any)?.turnActive)
+    if (turnActiveFromMsgs) return true
+    // Fallback to detail/state if messages payload doesn't include turnActive.
+    return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
+  }, [isLinkedConversationBusy, linkedTurnStatus, participantsPreview])
 
   type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -412,7 +396,7 @@ function LinkedConversationCard({
             </span>
           ) : null}
           {/* Thread status badge (ongoing vs completed) */}
-          {isLoadingConversation && !streamTurnStatus ? (
+          {isLoadingConversation ? (
             <Skeleton className="h-[16px] w-[64px] rounded-full" aria-hidden="true" />
           ) : (
             <span
@@ -469,6 +453,8 @@ interface ConversationMessageListProps {
   roomConversationId?: string | null
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
   channelName?: string | null
+  /** When true, do not render the channel/DM "starter hero" at the top of the timeline. */
+  hideStarterHero?: boolean
   /**
    * Optional override for the conversation title used in the empty-state hero.
    * Primarily used for draft direct-messages (no persisted conversation yet).
@@ -561,6 +547,7 @@ export function ConversationMessageList({
   starshipId,
   roomConversationId,
   channelName,
+  hideStarterHero = false,
   emptyHeroTitleOverride,
   emptyHeroParticipantOverride,
   bottomPaddingPx,
@@ -858,6 +845,7 @@ export function ConversationMessageList({
   const highlightTerm = submittedQuery.trim() || undefined
   // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
   const normalizedHighlightTerm = highlightTerm ? stripMarkdownToPlainText(highlightTerm).trim() || undefined : undefined
+
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -1481,7 +1469,17 @@ export function ConversationMessageList({
       const hasToolResults = Array.isArray(msg.toolResults) && msg.toolResults.length > 0
       const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
       const hasUIActions = Array.isArray(msg.uiActions) && msg.uiActions.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions
+      const hasLinkedConversation = (() => {
+        const anyMsg = msg as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown; linkedConversationIds?: unknown; linked_conversation_ids?: unknown }
+        const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+        if (typeof raw === 'string' && raw.trim().length > 0) return true
+        const a = anyMsg?.linkedConversationIds
+        const b = anyMsg?.linked_conversation_ids
+        if (Array.isArray(a) && a.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        if (Array.isArray(b) && b.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        return false
+      })()
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions || hasLinkedConversation
     }
     const filtered = displayMessages.filter(canRenderAssistant)
     const pinned = pinnedFirstMessage as ExtendedMessage | null | undefined
@@ -1963,9 +1961,9 @@ export function ConversationMessageList({
     return renderMessages.length === 0
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
+  const showChannelHero = Boolean(!hideStarterHero && enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
   // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
+  const showDirectMessageHero = Boolean(!hideStarterHero && !enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0

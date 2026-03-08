@@ -2930,7 +2930,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
     // - Child conversations (parentConversationId set) are allowed as nested threads (under rooms).
     // - Top-level conversations are reserved for room containers (created via the rooms API).
     const parentConversationId = bodyValidation.parentConversationId;
-    const effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
+    let effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
     if (!isInternal && !parentConversationId) {
       sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created under a room', 400, {
         hint: 'Provide parentConversationId (room conversation id). Use the Rooms UI / POST /starships/:starshipId/rooms to create a room.',
@@ -2983,7 +2983,18 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       )
         return;
 
-      // If the parent is a room, restrict the thread's agent (if any) to the room's agent allowlist.
+      // If the parent is a room and an agent is provided:
+      // - If allowed, link it on the new child conversation.
+      // - If NOT allowed, do not fail creation; simply omit the linked agent.
+      //
+      // Rationale:
+      // The message-send endpoint (`POST /conversations/:id/messages`) already supports the Slack-like
+      // "invite approval" flow: when a user selects/mentions an agent that isn't a room participant,
+      // the server will sanitize execution and create a `room_invite_approval` instead of rejecting.
+      //
+      // Creating a child conversation should not hard-fail in that case; the first message will drive
+      // the approval workflow and (on approval) the agent can be added to the room and the original
+      // message can trigger the agent turn.
       if (effectiveAgentId) {
         const ctx = await resolveRoomConversationContext({ conversationId: parentConversationId });
         if (ctx?.isRoom) {
@@ -2991,11 +3002,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
           const allowedAgentIds = await participantRepo.listAgentIdsByConversation(ctx.roomConversationId).catch(() => []);
           const allow = new Set((allowedAgentIds || []).map((x) => String(x || '').trim()).filter(Boolean));
           if (!allow.has(String(effectiveAgentId))) {
-            sendError(res, 'VALIDATION_ERROR', 'Agent is not allowed in this room', 400, {
-              roomConversationId: ctx.roomConversationId,
-              agentId: effectiveAgentId,
-            });
-            return;
+            effectiveAgentId = undefined;
           }
         }
       }

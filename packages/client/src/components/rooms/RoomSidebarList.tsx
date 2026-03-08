@@ -1,6 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
+import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useStarshipRooms } from '@/hooks/useRooms'
@@ -75,27 +76,25 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
               const slug = String(r.slug || '').trim()
               const name = String(r.name || '').trim() || slug || 'Room'
               const isActive = activeRoomSlug ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase() : false
+              const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
               return (
-                <button
-                  key={String(r.conversationId || slug)}
-                  type="button"
-                  onClick={() => openRoom(slug)}
-                  className={cn(
-                    'w-full rounded-lg flex items-center gap-1.5 border border-transparent h-7 px-1 text-left',
-                    'hover:bg-muted/60 dark:hover:bg-[#2C2C30]',
-                    isActive && 'bg-muted/60 dark:bg-[#2C2C30] border-border/40'
-                  )}
-                >
-                  <span className="flex-shrink-0 w-3 h-3 inline-flex items-center justify-center text-muted-foreground">
-                    <Icon name="hash" className="h-3 w-3" />
-                  </span>
-                  <span className="flex-1 min-w-0 truncate text-[12px]">{name}</span>
-                  {r.isPrivate ? (
-                    <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
-                      <Icon name="lock" weight="fill" className="h-3 w-3" />
-                    </span>
-                  ) : null}
-                </button>
+                <div key={String(r.conversationId || slug)} className="w-full">
+                  <NavigationItem
+                    href={href}
+                    label={name}
+                    icon="hash"
+                    isActive={isActive}
+                    expanded
+                    onClick={() => openRoom(slug)}
+                    trailing={
+                      r.isPrivate ? (
+                        <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
+                          <Icon name="lock" weight="fill" className="h-3 w-3" />
+                        </span>
+                      ) : null
+                    }
+                  />
+                </div>
               )
             })}
           </div>

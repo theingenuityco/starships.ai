@@ -187,23 +187,29 @@ function LinkedConversationCard({
   isUserOnline?: (userId: string) => boolean
   notifUnread?: any
 }) {
-  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
+  // Keep the detail query for title + metadata; use SSE turn status for instant badge updates.
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId, {
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    // Poll so the badge flips promptly when turnActive changes.
+    refetchInterval: 1000,
+    refetchIntervalInBackground: false,
+  })
   const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
   const { userId: authUserId } = useAuth()
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
+  const linkedTurnStatus = String(
+    (conversation as any)?.turn?.status ?? (conversation as any)?.state?.turn?.status ?? (conversation as any)?.state?.turnStatus ?? ''
+  ).trim()
+
+  // Thread cards should not open their own SSE stream for the child conversation (it can race with the thread pane stream).
+  // Instead, poll the messages endpoint for fast-changing thread status (turnActive).
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
-
-  const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
-
-  const avatarAttachmentIds = useMemo(() => {
-    const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
-    return Array.from(new Set(ids))
-  }, [agentList])
-  const { data: avatarAttachments = [], isLoading: isLoadingAvatarAttachments } = useMessageAttachments(avatarAttachmentIds, starshipId)
-  const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+  const cleanedTitle = rawTitle.replace(/^thread:\s*/i, '').trim()
+  const title =
+    cleanedTitle || (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   // Starship member directory (resolve userId -> displayName/avatar for participant list)
   const { data: membersAndInvites } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
@@ -232,8 +238,14 @@ function LinkedConversationCard({
       const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 10 } })
       return (resp as any)?.data?.data ?? null
     },
+    // Participants are just a hint; avoid frequent polling here (status badge uses conversation detail polling instead).
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
+
+  const isOngoing = useMemo(() => {
+    return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
+  }, [isLinkedConversationBusy, linkedTurnStatus])
 
   type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -335,8 +347,6 @@ function LinkedConversationCard({
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
 
-  const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
-
   const badgeCount = useMemo(() => {
     try {
       const cid = String(linkedConversationId || '').trim()
@@ -365,6 +375,11 @@ function LinkedConversationCard({
             <Icon name="thread" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <p className="text-sm font-medium text-foreground truncate">{title}</p>
           </div>
+          {(isLoadingParticipantsPreview || participantItems.length > 0) && (
+            <p className="mt-0.5 text-xs text-muted-foreground truncate" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+              {isLoadingParticipantsPreview ? 'Loading participants…' : participantsLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {badgeCount > 0 ? (
@@ -376,45 +391,21 @@ function LinkedConversationCard({
               {badgeCount > 99 ? '99+' : String(badgeCount)}
             </span>
           ) : null}
-          {/* Participants (overlapping avatars) */}
-          {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
-            <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
-              {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
-              <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
-                {shouldShowAvatarPlaceholders ? (
-                  <>
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/60 animate-pulse" aria-hidden="true" />
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/50 animate-pulse" aria-hidden="true" />
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/40 animate-pulse" aria-hidden="true" />
-                  </>
-                ) : (
-                  participantItems
-                    .slice(0, 3)
-                    .slice()
-                    .reverse()
-                    .map(p => {
-                      if (p.kind === 'agent') {
-                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                        return (
-                          <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                          </div>
-                        )
-                      }
-                      return (
-                        <div key={p.key} className="h-7 w-7">
-                          <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )
-                    })
-                )}
-              </div>
-              {participantItems.length > 3 ? <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span> : null}
-            </div>
-          ) : null}
+          {/* Thread status badge (ongoing vs completed) */}
+          {isLoadingConversation ? (
+            <Skeleton className="h-[16px] w-[64px] rounded-full" aria-hidden="true" />
+          ) : (
+            <span
+              className={cn(
+                'inline-flex items-center h-[16px] px-2 rounded-full text-[10px] leading-none font-semibold whitespace-nowrap',
+                isOngoing ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              )}
+              aria-label={isOngoing ? 'Thread ongoing' : 'Thread completed'}
+              title={isOngoing ? 'Ongoing' : 'Completed'}
+            >
+              {isOngoing ? 'Ongoing' : 'Completed'}
+            </span>
+          )}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
         </div>
       </div>
@@ -458,6 +449,8 @@ interface ConversationMessageListProps {
   roomConversationId?: string | null
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
   channelName?: string | null
+  /** When true, do not render the channel/DM "starter hero" at the top of the timeline. */
+  hideStarterHero?: boolean
   /**
    * Optional override for the conversation title used in the empty-state hero.
    * Primarily used for draft direct-messages (no persisted conversation yet).
@@ -550,6 +543,7 @@ export function ConversationMessageList({
   starshipId,
   roomConversationId,
   channelName,
+  hideStarterHero = false,
   emptyHeroTitleOverride,
   emptyHeroParticipantOverride,
   bottomPaddingPx,
@@ -839,6 +833,11 @@ export function ConversationMessageList({
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // Per-conversation “snap-to-bottom once content exists” state (prevents initial top->bottom jump).
   const bottomSnapStateRef = useRef<{ key: string; didSnapOnceContentExists: boolean } | null>(null)
+  // Delegation thread cards:
+  // The server can only persist a single `linkedConversationId` per message today, and during
+  // parallel call-agent creation it may be overwritten repeatedly as new child conversations are created.
+  // We accumulate observed ids per messageId so cards can render during "ongoing" even before tool_result rows arrive.
+  const delegationLinkedIdsByMessageIdRef = useRef<Map<string, string[]>>(new Map())
 
   // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
   const [searchInputValue, setSearchInputValue] = useState('')
@@ -847,6 +846,7 @@ export function ConversationMessageList({
   const highlightTerm = submittedQuery.trim() || undefined
   // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
   const normalizedHighlightTerm = highlightTerm ? stripMarkdownToPlainText(highlightTerm).trim() || undefined : undefined
+
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -1145,6 +1145,166 @@ export function ConversationMessageList({
 
     const baseMessages = collapsedMessages
 
+    const tryParseJson = (value: unknown): unknown => {
+      if (typeof value !== 'string') return value
+      const s = value.trim()
+      if (!s) return value
+      try {
+        return JSON.parse(s)
+      } catch {
+        return value
+      }
+    }
+
+    const extractChildConversationIdFromToolResult = (toolResultMessage: any): string | null => {
+      try {
+        const raw = toolResultMessage?.content ?? toolResultMessage?.result ?? null
+        const parsed = tryParseJson(raw)
+        const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+        const get = (v: unknown, k: string): unknown => (isRecord(v) ? v[k] : undefined)
+        const getStr = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+
+        // Common envelopes
+        const candidates: unknown[] = [parsed, get(parsed, 'data'), get(parsed, 'result'), get(get(parsed, 'data'), 'result')].filter(Boolean)
+
+        for (const c of candidates) {
+          if (!isRecord(c)) continue
+          const direct = getStr(get(c, 'childConversationId'))
+          if (direct) return direct
+
+          const conversationId = getStr(get(c, 'conversationId'))
+          if (conversationId) return conversationId
+
+          const convo = get(c, 'conversation')
+          if (isRecord(convo)) {
+            const id = getStr(get(convo, 'id'))
+            if (id) return id
+          }
+
+          // Some payloads nest it under childConversation
+          const childConvo = get(c, 'childConversation')
+          if (isRecord(childConvo)) {
+            const id = getStr(get(childConvo, 'id'))
+            if (id) return id
+          }
+        }
+
+        return null
+      } catch {
+        return null
+      }
+    }
+
+    const applyDelegationThreadCardTransform = (msg: ExtendedMessage): ExtendedMessage => {
+      try {
+        if (msg.role !== 'assistant') return msg
+        const toolCalls = Array.isArray(msg.toolCalls) ? msg.toolCalls : []
+        if (toolCalls.length === 0) return msg
+
+        // Only target delegation tool calls.
+        const isCallAgentTool = (tc: any): boolean => {
+          const n = typeof tc?.function?.name === 'string' ? String(tc.function.name).trim() : ''
+          return n === 'call-agent' || n === 'call_agent'
+        }
+        if (!toolCalls.some(isCallAgentTool)) return msg
+        const callAgentCount = toolCalls.filter(isCallAgentTool).length
+
+        const existingLinkedIds = (() => {
+          const anyMsg = msg as unknown as {
+            linkedConversationId?: unknown
+            linked_conversation_id?: unknown
+            linkedConversationIds?: unknown
+            linked_conversation_ids?: unknown
+          }
+          const ids: string[] = []
+          const push = (v: unknown) => {
+            if (typeof v !== 'string') return
+            const s = v.trim()
+            if (!s) return
+            ids.push(s)
+          }
+          push(anyMsg?.linkedConversationId)
+          push(anyMsg?.linked_conversation_id)
+          const arrA = anyMsg?.linkedConversationIds
+          const arrB = anyMsg?.linked_conversation_ids
+          if (Array.isArray(arrA)) for (const it of arrA) push(it)
+          if (Array.isArray(arrB)) for (const it of arrB) push(it)
+          // uniq
+          return Array.from(new Set(ids))
+        })()
+
+        const msgIdKey = String((msg as any)?.id ?? '').trim()
+        const observedLinkedIds = (() => {
+          if (!msgIdKey) return existingLinkedIds
+          const prev = delegationLinkedIdsByMessageIdRef.current.get(msgIdKey) ?? []
+          const next = [...prev]
+          for (const id of existingLinkedIds) {
+            if (!next.includes(id)) next.push(id)
+          }
+          if (next.length > 0) delegationLinkedIdsByMessageIdRef.current.set(msgIdKey, next)
+          return next
+        })()
+
+        // Map toolCallId -> tool_result message for quick lookup
+        const results = Array.isArray((msg as any).toolResults) ? ((msg as any).toolResults as any[]) : []
+        const resultById = new Map<string, any>()
+        for (const r of results) {
+          const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+          if (rid == null) continue
+          const key = String(rid).trim()
+          if (!key) continue
+          resultById.set(key, r)
+        }
+
+        // Preserve a stable, intuitive ordering: use the tool-call order (not completion order).
+        const orderedFromToolCalls: string[] = []
+        for (const tc of toolCalls) {
+          if (!isCallAgentTool(tc)) continue
+          const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+          const tcId = tcWithExtras.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+          const key = tcId != null ? String(tcId).trim() : ''
+          const tr = key ? resultById.get(key) : null
+          if (!tr) continue
+          const childId = extractChildConversationIdFromToolResult(tr)
+          if (childId) orderedFromToolCalls.push(childId)
+        }
+
+        const uniqOrderedFromToolCalls = Array.from(new Set(orderedFromToolCalls.filter(Boolean)))
+        // Important: tool results can arrive progressively.
+        // If we only have a *partial* tool_result mapping so far, prefer the accumulated observed ids so all
+        // cards can render during "ongoing". Once we have a full mapping, switch to tool-call order for stability.
+        const hasFullToolResultMapping = callAgentCount > 0 && uniqOrderedFromToolCalls.length >= callAgentCount
+        const partialLinkedConversationIds = (() => {
+          const out: string[] = []
+          // Keep known tool-call order first (stable for those we can map).
+          for (const id of uniqOrderedFromToolCalls) {
+            if (!out.includes(id)) out.push(id)
+          }
+          // Then append any observed ids that haven't yet been mapped from tool results (prevents "only 1 card" while ongoing).
+          for (const id of observedLinkedIds) {
+            if (!out.includes(id)) out.push(id)
+          }
+          return out
+        })()
+
+        const linkedConversationIds = hasFullToolResultMapping && uniqOrderedFromToolCalls.length > 0 ? uniqOrderedFromToolCalls : partialLinkedConversationIds
+        if (linkedConversationIds.length === 0) return msg
+        const linkedConversationId = linkedConversationIds[0] ?? null
+
+        // Remove the call-agent tool call row once we can show the thread card.
+        const filteredToolCalls = toolCalls.filter(tc => !isCallAgentTool(tc))
+
+        return {
+          ...msg,
+          linkedConversationId,
+          linkedConversationIds,
+          toolCalls: filteredToolCalls.length > 0 ? filteredToolCalls : undefined,
+        } as any
+      } catch {
+        return msg
+      }
+    }
+
     // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
@@ -1244,6 +1404,15 @@ export function ConversationMessageList({
       }
     }
 
+    // Delegation UX: when the delegation tool `call-agent` returns a child conversation id,
+    // show the linked thread card instead of the raw tool-call row.
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const m = groupedMessages[i] as ExtendedMessage
+      if (m && m.role === 'assistant') {
+        groupedMessages[i] = applyDelegationThreadCardTransform(m)
+      }
+    }
+
     // UI guard: drop blank assistant shells (no content/chunks/reasoning and no toolCalls).
     // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
@@ -1256,7 +1425,22 @@ export function ConversationMessageList({
       const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
       const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
       const hasUIActions = Array.isArray(extendedMsg.uiActions) && extendedMsg.uiActions.length > 0
-      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments || hasUIActions
+      const hasLinkedConversation = (() => {
+        const anyMsg = extendedMsg as unknown as {
+          linkedConversationId?: unknown
+          linked_conversation_id?: unknown
+          linkedConversationIds?: unknown
+          linked_conversation_ids?: unknown
+        }
+        const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+        if (typeof raw === 'string' && raw.trim().length > 0) return true
+        const a = anyMsg?.linkedConversationIds
+        const b = anyMsg?.linked_conversation_ids
+        if (Array.isArray(a) && a.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        if (Array.isArray(b) && b.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        return false
+      })()
+      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments || hasUIActions || hasLinkedConversation
       return shouldKeep
     })
 
@@ -1314,7 +1498,17 @@ export function ConversationMessageList({
       const hasToolResults = Array.isArray(msg.toolResults) && msg.toolResults.length > 0
       const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
       const hasUIActions = Array.isArray(msg.uiActions) && msg.uiActions.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions
+      const hasLinkedConversation = (() => {
+        const anyMsg = msg as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown; linkedConversationIds?: unknown; linked_conversation_ids?: unknown }
+        const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+        if (typeof raw === 'string' && raw.trim().length > 0) return true
+        const a = anyMsg?.linkedConversationIds
+        const b = anyMsg?.linked_conversation_ids
+        if (Array.isArray(a) && a.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        if (Array.isArray(b) && b.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        return false
+      })()
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions || hasLinkedConversation
     }
     const filtered = displayMessages.filter(canRenderAssistant)
     const pinned = pinnedFirstMessage as ExtendedMessage | null | undefined
@@ -1796,9 +1990,9 @@ export function ConversationMessageList({
     return renderMessages.length === 0
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
+  const showChannelHero = Boolean(!hideStarterHero && enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart && !isHydratingInitialMessages)
   // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
+  const showDirectMessageHero = Boolean(!hideStarterHero && !enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart && !isHydratingInitialMessages)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
@@ -2710,19 +2904,40 @@ const MemoizedMessageBubble = memo(
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     // Generic: allow any message to link to another conversation (thread preview/index post)
-    const linkedConversationId = useMemo(() => {
-      const anyMsg = message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
-      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
-      return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+    const linkedConversationIds = useMemo(() => {
+      const anyMsg = message as unknown as {
+        linkedConversationId?: unknown
+        linked_conversation_id?: unknown
+        linkedConversationIds?: unknown
+        linked_conversation_ids?: unknown
+      }
+      const ids: string[] = []
+      const push = (v: unknown) => {
+        if (typeof v !== 'string') return
+        const s = v.trim()
+        if (!s) return
+        ids.push(s)
+      }
+      push(anyMsg?.linkedConversationId)
+      push(anyMsg?.linked_conversation_id)
+      const arrA = anyMsg?.linkedConversationIds
+      const arrB = anyMsg?.linked_conversation_ids
+      if (Array.isArray(arrA)) for (const it of arrA) push(it)
+      if (Array.isArray(arrB)) for (const it of arrB) push(it)
+      return Array.from(new Set(ids))
     }, [message])
 
-    const linkedConversationHref = useMemo(() => {
-      if (!linkedConversationId) return null
-      if (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0) {
-        return `/ship/${encodeURIComponent(starshipSlug)}/conversations/${encodeURIComponent(linkedConversationId)}`
+    const linkedConversationId = linkedConversationIds[0] ?? null
+
+    const linkedConversationHrefById = useMemo(() => {
+      const map = new Map<string, string>()
+      const s = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+      if (!s) return map
+      for (const id of linkedConversationIds) {
+        map.set(id, `/ship/${encodeURIComponent(s)}/conversations/${encodeURIComponent(id)}`)
       }
-      return null
-    }, [linkedConversationId, starshipSlug])
+      return map
+    }, [linkedConversationIds, starshipSlug])
 
     const isActiveThreadLink = Boolean(linkedConversationId && activeThreadConversationId && linkedConversationId === activeThreadConversationId)
 
@@ -2865,17 +3080,22 @@ const MemoizedMessageBubble = memo(
                   )}
                 </div>
                 {!suppressLinkedConversationCard && (
-                  <LinkedConversationCard
-                    linkedConversationId={linkedConversationId}
-                    linkedConversationHref={linkedConversationHref}
-                    isActiveThread={isActiveThreadLink}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={onThreadAction}
-                    message={message}
-                    starshipId={starshipId}
-                    isUserOnline={isUserOnline}
-                    notifUnread={notifUnread}
-                  />
+                  <div className="flex flex-col gap-1">
+                    {linkedConversationIds.map(id => (
+                      <LinkedConversationCard
+                        key={`linked:${message.id}:${id}`}
+                        linkedConversationId={id}
+                        linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                        isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                        enableChannelMessageThreads={enableChannelMessageThreads}
+                        onThreadAction={onThreadAction}
+                        message={message}
+                        starshipId={starshipId}
+                        isUserOnline={isUserOnline}
+                        notifUnread={notifUnread}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
               {isConsecutiveSameUser ? (
@@ -3136,17 +3356,22 @@ const MemoizedMessageBubble = memo(
                 />
               )}
               {!suppressLinkedConversationCard && (
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  isActiveThread={isActiveThreadLink}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                  starshipId={starshipId}
-                  isUserOnline={isUserOnline}
-                  notifUnread={notifUnread}
-                />
+                <div className="flex flex-col gap-1">
+                  {linkedConversationIds.map(id => (
+                    <LinkedConversationCard
+                      key={`linked:${message.id}:${id}`}
+                      linkedConversationId={id}
+                      linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                      isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={onThreadAction}
+                      message={message}
+                      starshipId={starshipId}
+                      isUserOnline={isUserOnline}
+                      notifUnread={notifUnread}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -3273,17 +3498,22 @@ const MemoizedMessageBubble = memo(
                   />
                 )}
                 {!suppressLinkedConversationCard && (
-                  <LinkedConversationCard
-                    linkedConversationId={linkedConversationId}
-                    linkedConversationHref={linkedConversationHref}
-                    isActiveThread={isActiveThreadLink}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={onThreadAction}
-                    message={message}
-                    starshipId={starshipId}
-                    isUserOnline={isUserOnline}
-                    notifUnread={notifUnread}
-                  />
+                  <div className="flex flex-col gap-1">
+                    {linkedConversationIds.map(id => (
+                      <LinkedConversationCard
+                        key={`linked:${message.id}:${id}`}
+                        linkedConversationId={id}
+                        linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                        isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                        enableChannelMessageThreads={enableChannelMessageThreads}
+                        onThreadAction={onThreadAction}
+                        message={message}
+                        starshipId={starshipId}
+                        isUserOnline={isUserOnline}
+                        notifUnread={notifUnread}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -3399,17 +3629,22 @@ const MemoizedMessageBubble = memo(
                 />
               )}
               {!suppressLinkedConversationCard && (
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  isActiveThread={isActiveThreadLink}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                  starshipId={starshipId}
-                  isUserOnline={isUserOnline}
-                  notifUnread={notifUnread}
-                />
+                <div className="flex flex-col gap-1">
+                  {linkedConversationIds.map(id => (
+                    <LinkedConversationCard
+                      key={`linked:${message.id}:${id}`}
+                      linkedConversationId={id}
+                      linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                      isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={onThreadAction}
+                      message={message}
+                      starshipId={starshipId}
+                      isUserOnline={isUserOnline}
+                      notifUnread={notifUnread}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>

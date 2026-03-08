@@ -38,7 +38,7 @@ export function ExpandableMessageOverlay({ mode, conversationId, starshipId, bud
     >
       {/* Message List - Scrollable */}
       <div className="overflow-y-auto overflow-x-hidden transition-all duration-300 ease-out" style={{ height: listHeight }}>
-        <ConversationMessageList conversationId={conversationId} starshipId={starshipId} bottomPaddingPx={80} />
+        <ConversationMessageList conversationId={conversationId} starshipId={starshipId} hideStarterHero={true} bottomPaddingPx={80} />
       </div>
 
       {/* Toggle affordance (icon button) shown in semi/expanded */}

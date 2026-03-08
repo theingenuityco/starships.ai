@@ -377,7 +377,7 @@ export function ConversationSummaryBar({
                       </h3>
                     </div>
                     {/* Agents + updated row - exact structural match with same classes */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                       {isDraftHeader ? (
                         <>
                           {hasDraftParticipants ? (
@@ -418,26 +418,7 @@ export function ConversationSummaryBar({
                         </>
                       ) : (
                         <>
-                          {/* Agent placeholder - matches exact structure */}
-                          <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                            <div className="flex items-center -space-x-1.5">
-                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
-                              </Avatar>
-                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
-                              </Avatar>
-                              <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                <div className="h-5 w-5 rounded-full bg-muted/30 animate-pulse" />
-                              </Avatar>
-                              <span className="sr-only">Loading participants</span>
-                            </div>
-                          </div>
-                          {/* Separator and updated text - exact match */}
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
-                          </span>
+                          <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
                           {showTokens ? (
                             <>
                               {/* Token indicator placeholder (reserved space) */}
@@ -525,7 +506,7 @@ export function ConversationSummaryBar({
                   </div>
 
                   {/* Agents + updated row */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-6">
+                  <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                     {effectiveParticipantItems.length > 0 ? (
                       <>
                         {/* Participants (count-only) + native tooltip preview */}

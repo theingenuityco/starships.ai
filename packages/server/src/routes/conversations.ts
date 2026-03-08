@@ -989,6 +989,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Structure response to match client expectations
       const state = conversation?.state || {};
+      // Include server-authoritative latest turn status for non-streaming consumers.
+      // We cannot rely solely on `state.turnActive` (it may lag for delegated/child conversations).
+      const turnRepo = new TurnRepository();
+      const latestTurn = await turnRepo.findLatestByConversationId(conversationId).catch(() => null);
+      const turn =
+        latestTurn && typeof latestTurn.id === 'string'
+          ? {
+              turnId: latestTurn.id,
+              status: (latestTurn.status as StreamTurnStatus) || 'completed',
+              startedAt: latestTurn.startedAt,
+              completedAt: latestTurn.completedAt,
+            }
+          : null;
+      const awaitingToolApproval = turn?.status === 'waiting_for_tools';
       const responseData = {
         conversationId,
         messages,
@@ -1002,6 +1016,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // Server-authoritative turn state for non-streaming baseline consumers
         turnActive: !!state.turnActive,
         lastCompleteAt: state.lastCompleteAt,
+        turn,
+        awaitingToolApproval,
       };
 
       sendSuccess(res, responseData, 200);
@@ -2202,7 +2218,19 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    sendSuccess(res, conversation, 200);
+    // Augment with latest turn status (mirrors streaming snapshot shape).
+    const turnRepo = new TurnRepository();
+    const latestTurn = await turnRepo.findLatestByConversationId(conversationId).catch(() => null);
+    const turn =
+      latestTurn && typeof latestTurn.id === 'string'
+        ? {
+            turnId: latestTurn.id,
+            status: (latestTurn.status as StreamTurnStatus) || 'completed',
+            startedAt: latestTurn.startedAt,
+            completedAt: latestTurn.completedAt,
+          }
+        : null;
+    sendSuccess(res, { ...conversation, turn }, 200);
   } catch (error) {
     handleError(error, res, 'fetching conversation details');
   }

@@ -584,8 +584,8 @@ export function useLinkMessageToConversation() {
       // new link immediately, ensuring the UI shows the correct "Open thread" icon for *all* messages.
       if (conversationId && messageId && linkedConversationId) {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
-          if (!Array.isArray(old)) return old
-          return old.map((chunk: any) => {
+          const chunks = Array.isArray(old) ? old : []
+          return chunks.map((chunk: any) => {
             if (!chunk || typeof chunk !== 'object') return chunk
 
             // Back-compat local pre-seed event
@@ -758,7 +758,9 @@ export function useToggleMessageReaction() {
     },
     onError: (error: unknown, _vars, ctx) => {
       if (ctx?.key) {
-        queryClient.setQueryData(ctx.key, ctx.prev as any)
+        // Never restore `undefined` into the messages query cache; React Query warns on undefined data.
+        // If we didn't have prior data, fall back to an empty chunk list.
+        queryClient.setQueryData(ctx.key, (ctx.prev as any) ?? [])
       }
       const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to add reaction', { description: errorMessage })
@@ -826,15 +828,28 @@ export function useUpdateConversationStatus() {
 }
 
 // Get conversation detail (including state)
-export function useConversationDetail(conversationId: string | null) {
+export function useConversationDetail(
+  conversationId: string | null,
+  options?: {
+    enabled?: boolean
+    staleTime?: number
+    refetchOnWindowFocus?: boolean
+    refetchInterval?: number | false | ((data: ConversationModel | undefined) => number | false)
+    refetchIntervalInBackground?: boolean
+  }
+) {
+  const enabled = Boolean(conversationId && (options?.enabled ?? true))
   return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId!),
+    queryKey: conversationId ? CONVERSATION_QUERY_KEYS.detail(conversationId) : (['__noop__'] as const),
     queryFn: async (): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.get(`/api/v1/conversations/${conversationId}`)
       return response.data.data
     },
-    enabled: !!conversationId,
-    staleTime: process.env.NODE_ENV === 'development' ? 0 : 30 * 1000, // No cache in dev, 30 seconds in prod
+    enabled,
+    staleTime: options?.staleTime ?? (process.env.NODE_ENV === 'development' ? 0 : 30 * 1000), // No cache in dev, 30 seconds in prod
+    ...(typeof options?.refetchOnWindowFocus === 'boolean' ? { refetchOnWindowFocus: options.refetchOnWindowFocus } : null),
+    ...(options?.refetchInterval != null ? { refetchInterval: options.refetchInterval as any } : null),
+    ...(typeof options?.refetchIntervalInBackground === 'boolean' ? { refetchIntervalInBackground: options.refetchIntervalInBackground } : null),
   })
 }
 
@@ -1006,6 +1021,23 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastChunksRevisionKeyLoggedRef = useRef<string | null>(null)
   const [appendGateRevision, setAppendGateRevision] = useState(0)
 
+  const makeAbortedIterable = (convId: string, reason: string): AsyncIterable<StreamedChunk> => {
+    const at = new Date().toISOString()
+    // Yield a minimal snapshot so TanStack Query never treats the query result as undefined.
+    // This handles mid-flight aborts where the SSE iterable would otherwise yield 0 chunks.
+    return (async function* () {
+      yield {
+        type: 'snapshot',
+        data: {
+          conversationId: convId,
+          messages: [],
+          turn: { turnId: 'aborted', status: 'completed' },
+          at,
+        },
+      } as any
+    })()
+  }
+
   type AwaitRequested = {
     at: string
     nodeRef: string
@@ -1059,9 +1091,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
     const resolvers: Resolver[] = []
+    let pushedCount = 0
 
     const push = (item: StreamedChunk) => {
       if (closed) return
+      pushedCount++
       if (resolvers.length > 0) {
         const resolve = resolvers.shift()!
         resolve({ value: item, done: false })
@@ -1072,6 +1106,30 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
+      // If we are being manually aborted before any chunks were ever emitted,
+      // inject a minimal snapshot so the streamed query never resolves to undefined.
+      // This avoids the TanStack Query warning: "Query data cannot be undefined" for messages streams.
+      if (reason === 'manual' && pushedCount === 0) {
+        const at = new Date().toISOString()
+        const synthetic: StreamedChunk = {
+          type: 'snapshot',
+          data: {
+            conversationId: convId,
+            messages: [],
+            turn: { turnId: 'aborted', status: 'completed' },
+            at,
+            __synthetic: true,
+          },
+        } as any
+        pushedCount++
+        if (resolvers.length > 0) {
+          const resolve = resolvers.shift()!
+          resolve({ value: synthetic, done: false })
+        } else {
+          queue.push(synthetic)
+        }
+      }
+
       closed = true
 
       clearTimeout(timeoutId)
@@ -1093,89 +1151,93 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       instanceController.signal.addEventListener('abort', () => cleanup('manual'), { once: true })
     } catch {}
 
-    fetchEventSource(url, {
-      method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      openWhenHidden: true,
-      signal: combinedSignal,
-      async onopen(response) {
-        if (!isActiveInstance()) {
-          return
-        }
-        lastSseOpenAtRef.current = Date.now()
-        if (!response.ok) {
-          push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
-          cleanup('bad_status')
-        }
-      },
-      onmessage(ev: EventSourceMessage) {
-        if (!isActiveInstance()) {
-          return
-        }
-        try {
-          if (typeof ev.id === 'string' && ev.id) {
-            try {
-              if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
-            } catch {}
-          }
-
-          const eventType = String(ev.event || '')
-          const data = ev.data ? JSON.parse(ev.data) : null
-          if (!eventType || data == null) return
-
-          if (eventType === 'snapshot') {
-            push({ type: 'snapshot', data })
+    try {
+      fetchEventSource(url, {
+        method: 'GET',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        openWhenHidden: true,
+        signal: combinedSignal,
+        async onopen(response) {
+          if (!isActiveInstance()) {
             return
           }
-
-          // All other stream events use `type`+`data` shape; we keep `data` loosely typed
-          // to avoid runtime coupling and to allow forward-compatible fields.
-          switch (eventType) {
-            case 'turn.started':
-              push({ type: 'turn.started', data })
-              return
-            case 'turn.status':
-              push({ type: 'turn.status', data })
-              return
-            case 'turn.usage':
-              push({ type: 'turn.usage', data })
-              return
-            case 'await_requested':
-              push({ type: 'await_requested', data })
-              return
-            case 'assistant.delta':
-              push({ type: 'assistant.delta', data })
-              return
-            case 'assistant.reasoning_delta':
-              push({ type: 'assistant.reasoning_delta', data })
-              return
-            case 'message.append':
-              push({ type: 'message.append', data })
-              return
-            case 'message.reactions':
-              push({ type: 'message.reactions', data })
-              return
-            case 'ui_action':
-              push({ type: 'ui_action', data })
-              return
-            default:
-              return
+          lastSseOpenAtRef.current = Date.now()
+          if (!response.ok) {
+            push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
+            cleanup('bad_status')
           }
-        } catch (e) {
-          push({ type: 'error', error: e })
-        }
-      },
-      onclose() {
-        if (!isActiveInstance()) return
-        cleanup('onclose')
-      },
-      onerror(err) {
-        if (!isActiveInstance()) return
-        lastSseErrorAtRef.current = Date.now()
-        push({ type: 'error', error: err })
-        cleanup('onerror')
-      },
-    })
+        },
+        onmessage(ev: EventSourceMessage) {
+          if (!isActiveInstance()) {
+            return
+          }
+          try {
+            if (typeof ev.id === 'string' && ev.id) {
+              try {
+                if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
+              } catch {}
+            }
+
+            const eventType = String(ev.event || '')
+            const data = ev.data ? JSON.parse(ev.data) : null
+            if (!eventType || data == null) return
+
+            if (eventType === 'snapshot') {
+              push({ type: 'snapshot', data })
+              return
+            }
+
+            // All other stream events use `type`+`data` shape; we keep `data` loosely typed
+            // to avoid runtime coupling and to allow forward-compatible fields.
+            switch (eventType) {
+              case 'turn.started':
+                push({ type: 'turn.started', data })
+                return
+              case 'turn.status':
+                push({ type: 'turn.status', data })
+                return
+              case 'turn.usage':
+                push({ type: 'turn.usage', data })
+                return
+              case 'await_requested':
+                push({ type: 'await_requested', data })
+                return
+              case 'assistant.delta':
+                push({ type: 'assistant.delta', data })
+                return
+              case 'assistant.reasoning_delta':
+                push({ type: 'assistant.reasoning_delta', data })
+                return
+              case 'message.append':
+                push({ type: 'message.append', data })
+                return
+              case 'message.reactions':
+                push({ type: 'message.reactions', data })
+                return
+              case 'ui_action':
+                push({ type: 'ui_action', data })
+                return
+              default:
+                return
+            }
+          } catch (e) {
+            push({ type: 'error', error: e })
+          }
+        },
+        onclose() {
+          if (!isActiveInstance()) return
+          cleanup('onclose')
+        },
+        onerror(err) {
+          if (!isActiveInstance()) return
+          lastSseErrorAtRef.current = Date.now()
+          push({ type: 'error', error: err })
+          cleanup('onerror')
+        },
+      })
+    } catch (e) {
+      throw e
+    }
 
     return {
       [Symbol.asyncIterator]() {
@@ -1606,7 +1668,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     queryFn: streamedQuery({
       queryFn: async (_ctx: any) => {
         const token = await getCurrentToken()
-        return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal)
+        if (_ctx?.signal?.aborted) {
+          return makeAbortedIterable(conversationId!, 'ctx.signal.aborted after token')
+        }
+        const iterable = makeSSEAsyncIterable(conversationId!, token, _ctx?.signal)
+        return iterable
       },
       refetchMode: 'append',
     }),
@@ -1998,8 +2064,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
 
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any) => {
-          if (!Array.isArray(old)) return old
-          return [...old, { type: 'snapshot', data: nextSnapshot }]
+          const chunks = Array.isArray(old) ? old : []
+          return [...chunks, { type: 'snapshot', data: nextSnapshot }]
         })
       } catch (error: any) {
         const msg = getSafeErrorMessage(error)
@@ -2074,6 +2140,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     invalidate: () => {
       if (!conversationId) return Promise.resolve()
       return queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+    },
+    stop: () => {
+      // Explicitly abort the active SSE stream for this conversation (if any).
+      // This is useful for transient subscribers (e.g. thread cards) that want to ensure
+      // they don't leave background streams open after completion/unmount.
+      const id = typeof conversationId === 'string' ? conversationId : ''
+      if (!id) return
+      try {
+        const guard = activeSseGuards.get(id)
+        guard?.abort()
+        // `makeSSEAsyncIterable`'s cleanup will also delete the guard; best-effort delete here too.
+        activeSseGuards.delete(id)
+      } catch {
+        // ignore
+      }
     },
   }
 }

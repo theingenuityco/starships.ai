@@ -188,7 +188,13 @@ function LinkedConversationCard({
   notifUnread?: any
 }) {
   // Keep the detail query for title + metadata; use SSE turn status for instant badge updates.
-  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId, { refetchOnWindowFocus: true })
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId, {
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    // Poll so the badge flips promptly when turnActive changes.
+    refetchInterval: 1000,
+    refetchIntervalInBackground: false,
+  })
   const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
   const { userId: authUserId } = useAuth()
@@ -232,24 +238,44 @@ function LinkedConversationCard({
       const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 10 } })
       return (resp as any)?.data?.data ?? null
     },
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-    refetchInterval: data => {
-      try {
-        const turnActive = Boolean((data as any)?.turnActive)
-        return turnActive ? 1000 : false
-      } catch {
-        return false
-      }
-    },
+    // Participants are just a hint; avoid frequent polling here (status badge uses conversation detail polling instead).
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 
   const isOngoing = useMemo(() => {
-    const turnActiveFromMsgs = Boolean((participantsPreview as any)?.turnActive)
-    if (turnActiveFromMsgs) return true
-    // Fallback to detail/state if messages payload doesn't include turnActive.
     return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
-  }, [isLinkedConversationBusy, linkedTurnStatus, participantsPreview])
+  }, [isLinkedConversationBusy, linkedTurnStatus])
+
+  // #region agent log
+  useEffect(() => {
+    const cid = typeof linkedConversationId === 'string' ? linkedConversationId : ''
+    if (!cid) return
+    const turnActiveFromMsgs = Boolean((participantsPreview as any)?.turnActive)
+    const detailTurnActive = Boolean((conversation as any)?.state && typeof (conversation as any).state === 'object' && ((conversation as any).state as any).turnActive === true)
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
+      body: JSON.stringify({
+        sessionId: '901fe2',
+        runId: 'pre',
+        hypothesisId: 'I',
+        location: 'ConversationMessageList.tsx:LinkedConversationCard:isOngoing',
+        message: 'Thread card ongoing inputs',
+        data: {
+          linkedConversationId: cid,
+          isLoadingConversation,
+          isLoadingParticipantsPreview,
+          turnActiveFromMsgs,
+          detailTurnActive,
+          linkedTurnStatus,
+          computedIsOngoing: isOngoing,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [conversation, isLoadingConversation, isLoadingParticipantsPreview, isOngoing, linkedConversationId, linkedTurnStatus, participantsPreview])
+  // #endregion agent log
 
   type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -837,6 +863,11 @@ export function ConversationMessageList({
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // Per-conversation “snap-to-bottom once content exists” state (prevents initial top->bottom jump).
   const bottomSnapStateRef = useRef<{ key: string; didSnapOnceContentExists: boolean } | null>(null)
+  // Delegation thread cards:
+  // The server can only persist a single `linkedConversationId` per message today, and during
+  // parallel call-agent creation it may be overwritten repeatedly as new child conversations are created.
+  // We accumulate observed ids per messageId so cards can render during "ongoing" even before tool_result rows arrive.
+  const delegationLinkedIdsByMessageIdRef = useRef<Map<string, string[]>>(new Map())
 
   // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
   const [searchInputValue, setSearchInputValue] = useState('')
@@ -1206,6 +1237,7 @@ export function ConversationMessageList({
           return n === 'call-agent' || n === 'call_agent'
         }
         if (!toolCalls.some(isCallAgentTool)) return msg
+        const callAgentCount = toolCalls.filter(isCallAgentTool).length
 
         const existingLinkedIds = (() => {
           const anyMsg = msg as unknown as {
@@ -1231,6 +1263,18 @@ export function ConversationMessageList({
           return Array.from(new Set(ids))
         })()
 
+        const msgIdKey = String((msg as any)?.id ?? '').trim()
+        const observedLinkedIds = (() => {
+          if (!msgIdKey) return existingLinkedIds
+          const prev = delegationLinkedIdsByMessageIdRef.current.get(msgIdKey) ?? []
+          const next = [...prev]
+          for (const id of existingLinkedIds) {
+            if (!next.includes(id)) next.push(id)
+          }
+          if (next.length > 0) delegationLinkedIdsByMessageIdRef.current.set(msgIdKey, next)
+          return next
+        })()
+
         // Map toolCallId -> tool_result message for quick lookup
         const results = Array.isArray((msg as any).toolResults) ? ((msg as any).toolResults as any[]) : []
         const resultById = new Map<string, any>()
@@ -1244,6 +1288,15 @@ export function ConversationMessageList({
 
         // Preserve a stable, intuitive ordering: use the tool-call order (not completion order).
         const orderedFromToolCalls: string[] = []
+        const debugToolCallMap: Array<{
+          toolName: string
+          tcKey: string
+          hasResult: boolean
+          childIdFound: boolean
+          childConversationId?: string
+          argsHasChildConversationId?: boolean
+          argsHasConversationId?: boolean
+        }> = []
         for (const tc of toolCalls) {
           if (!isCallAgentTool(tc)) continue
           const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
@@ -1253,17 +1306,125 @@ export function ConversationMessageList({
           if (!tr) continue
           const childId = extractChildConversationIdFromToolResult(tr)
           if (childId) orderedFromToolCalls.push(childId)
+
+          // #region agent log
+          try {
+            let argsHasChildConversationId = false
+            let argsHasConversationId = false
+            try {
+              const rawArgs = (tc as any)?.function?.arguments
+              const parsedArgs = tryParseJson(rawArgs)
+              if (parsedArgs && typeof parsedArgs === 'object') {
+                argsHasChildConversationId = Boolean((parsedArgs as any).childConversationId)
+                argsHasConversationId = Boolean((parsedArgs as any).conversationId)
+              }
+            } catch {}
+
+            debugToolCallMap.push({
+              toolName: String((tc as any)?.function?.name ?? ''),
+              tcKey: key,
+              hasResult: Boolean(tr),
+              childIdFound: Boolean(childId),
+              childConversationId: childId || undefined,
+              argsHasChildConversationId,
+              argsHasConversationId,
+            })
+          } catch {}
+          // #endregion agent log
         }
 
         const uniqOrderedFromToolCalls = Array.from(new Set(orderedFromToolCalls.filter(Boolean)))
-        // Carry over any previously-known thread ids that we can't currently re-derive (e.g. transient missing toolResults).
-        const carryOver = existingLinkedIds.filter(id => !uniqOrderedFromToolCalls.includes(id))
-        const linkedConversationIds = [...uniqOrderedFromToolCalls, ...carryOver]
+        // Important: tool results can arrive progressively.
+        // If we only have a *partial* tool_result mapping so far, prefer the accumulated observed ids so all
+        // cards can render during "ongoing". Once we have a full mapping, switch to tool-call order for stability.
+        const hasFullToolResultMapping = callAgentCount > 0 && uniqOrderedFromToolCalls.length >= callAgentCount
+        const partialLinkedConversationIds = (() => {
+          const out: string[] = []
+          // Keep known tool-call order first (stable for those we can map).
+          for (const id of uniqOrderedFromToolCalls) {
+            if (!out.includes(id)) out.push(id)
+          }
+          // Then append any observed ids that haven't yet been mapped from tool results (prevents "only 1 card" while ongoing).
+          for (const id of observedLinkedIds) {
+            if (!out.includes(id)) out.push(id)
+          }
+          return out
+        })()
+
+        const linkedConversationIds = hasFullToolResultMapping && uniqOrderedFromToolCalls.length > 0 ? uniqOrderedFromToolCalls : partialLinkedConversationIds
         if (linkedConversationIds.length === 0) return msg
         const linkedConversationId = linkedConversationIds[0] ?? null
 
         // Remove the call-agent tool call row once we can show the thread card.
         const filteredToolCalls = toolCalls.filter(tc => !isCallAgentTool(tc))
+
+        // #region agent log
+        try {
+          const debugResults = results.slice(0, 8).map(r => {
+            const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+            const key = rid != null ? String(rid).trim() : ''
+            return {
+              messageId: String(r?.id ?? ''),
+              messageType: String(r?.messageType ?? ''),
+              hasToolCallId: Boolean(r?.toolCallId),
+              hasCallId: Boolean(r?.call_id),
+              key,
+            }
+          })
+
+          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
+            body: JSON.stringify({
+              sessionId: '901fe2',
+              runId: 'post2',
+              hypothesisId: 'K',
+              location: 'ConversationMessageList.tsx:applyDelegationThreadCardTransform',
+              message: 'Call-agent mapping detail',
+              data: {
+                messageId: String((msg as any)?.id ?? ''),
+                existingLinkedIds,
+                observedLinkedIds,
+                toolCallsCount: toolCalls.length,
+                callAgentCount,
+                resultsCount: results.length,
+                debugResults,
+                debugToolCallMap,
+                uniqOrderedFromToolCalls,
+                partialLinkedConversationIds,
+                hasFullToolResultMapping,
+                finalLinkedConversationIds: linkedConversationIds,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+        } catch {}
+        // #endregion agent log
+
+        // #region agent log
+        try {
+          const toolCallNames = toolCalls.map(tc => String((tc as any)?.function?.name ?? '')).filter(Boolean)
+          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '901fe2' },
+            body: JSON.stringify({
+              sessionId: '901fe2',
+              runId: 'pre',
+              hypothesisId: 'J',
+              location: 'ConversationMessageList.tsx:applyDelegationThreadCardTransform',
+              message: 'Delegation ordering computed',
+              data: {
+                messageId: String((msg as any)?.id ?? ''),
+                toolCallNames,
+                orderedFromToolCalls,
+                uniqOrderedFromToolCalls,
+                finalLinkedConversationIds: linkedConversationIds,
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+        } catch {}
+        // #endregion agent log
 
         return {
           ...msg,

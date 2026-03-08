@@ -791,6 +791,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   roomConversationId={activeConversationId}
                   roomIsPrivate={Boolean(activeRoom?.isPrivate)}
                   starshipOwnerId={starshipOwnerId}
+                  className="sr-only"
                 />
                 {canManagePins || hasAnyResources ? (
                   <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>

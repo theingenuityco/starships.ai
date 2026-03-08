@@ -188,6 +188,7 @@ export function RoomConversationIndexView(props: {
               roomIsPrivate={Boolean(props.roomIsPrivate)}
               starshipOwnerId={props.starshipOwnerId ?? null}
               buttonRef={participantsButtonRef}
+              className="sr-only"
             />
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>

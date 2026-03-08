@@ -8,7 +8,7 @@ import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail, useDeleteMessage, useStarshipDirectMessages, useUpdateMessage, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useApproveRoomInviteApproval, useDenyRoomInviteApproval, useRoomInviteApprovalsPending, type PendingRoomInviteApproval } from '@/hooks/useRooms'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -652,54 +652,18 @@ export function ConversationMessageList({
   const { data: starshipAgentsRaw = [] } = useStarshipAgents(sid, Boolean(sid))
   const starshipAgents = useMemo(() => (Array.isArray(starshipAgentsRaw) ? (starshipAgentsRaw as any[]) : []), [starshipAgentsRaw])
 
-  // For user↔user DMs, derive the peer user from the DM list (same source as ConversationSummaryBar).
-  const { data: dmListData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId && conversationId))
-  const dmItem = useMemo<DirectMessageListItem | null>(() => {
-    const cid = String(conversationId || '')
-    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
-    if (!cid || !Array.isArray(list) || list.length === 0) return null
-    return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
-  }, [dmListData?.directMessages, conversationId])
-
   const resolvedEmptyHeroParticipant = useMemo(() => {
-    // Prefer explicit override (draft DM target).
+    // Prefer explicit override (e.g. demos / draft placeholders).
     if (emptyHeroParticipantOverride) return emptyHeroParticipantOverride
 
-    // user↔user DM: show peer avatar instead of chat icon.
-    const dm: any = (dmItem as any)?.dm
-    // user↔agent DM: prefer the DM list's resolved agent (authoritative for this DM).
-    // The conversation "agents" list can include extra agents (e.g. defaults) or be ordered unexpectedly,
-    // which would make the empty-state hero show the wrong agent.
-    if (dm?.dmType === 'user_agent') {
-      const dmAgent: any = (dmItem as any)?.agent ?? null
-      const agentId = typeof dm?.agentId === 'string' ? String(dm.agentId).trim() : ''
-      const agent = dmAgent || (agentId ? (conversationAgents.find(a => String((a as any)?.id || '').trim() === agentId) as any) : null) || null
-      if (agent) {
-        const label = formatAgentDisplayName(agent) || 'Agent'
-        const seed = String(agent?.name || agent?.slug || agent?.id || label)
-        const avatarAttachmentId = typeof agent?.avatarAttachmentId === 'string' ? String(agent.avatarAttachmentId) : null
-        return { kind: 'agent' as const, label, seed, avatarAttachmentId }
-      }
-      // If we can't resolve the DM's agent, prefer "no participant" (generic DM hero)
-      // rather than falling back to conversationAgents[0] (which may be unrelated like Aria).
-      return null
-    }
-    if (dm?.dmType === 'user_user') {
-      const peer: any = (dmItem as any)?.peerUser
-      const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
-      const label = (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
-      const avatarUrl = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
-      return { kind: 'human' as const, label, avatarUrl }
-    }
-
-    // Otherwise derive from the conversation's first agent (works for empty/brand-new DM conversations too).
+    // Otherwise derive from the conversation's first linked agent (works for empty conversations).
     const a0: any = conversationAgents?.[0]
     if (!a0) return null
     const label = formatAgentDisplayName(a0) || 'Agent'
     const seed = String(a0?.name || a0?.slug || a0?.id || label)
     const avatarAttachmentId = typeof a0?.avatarAttachmentId === 'string' ? String(a0.avatarAttachmentId) : null
     return { kind: 'agent' as const, label, seed, avatarAttachmentId }
-  }, [conversationAgents, dmItem, emptyHeroParticipantOverride])
+  }, [conversationAgents, emptyHeroParticipantOverride])
 
   const emptyHeroAvatarAttachmentIds = useMemo(() => {
     const p = resolvedEmptyHeroParticipant

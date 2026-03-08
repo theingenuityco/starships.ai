@@ -19,15 +19,9 @@ import { useMemo } from 'react'
 
 export type NotificationLevel = 'all' | 'mentions' | 'mute'
 
-export type NotificationMenuType = 'channel' | 'room' | 'thread'
+export type NotificationMenuType = 'room' | 'thread'
 
 type NotificationMenuProps =
-  | {
-      type: 'channel'
-      channelId: string
-      starshipId: string
-      className?: string
-    }
   | {
       type: 'room'
       roomId: string
@@ -42,9 +36,6 @@ type NotificationMenuProps =
     }
 
 const getQueryKey = (type: NotificationMenuType, id: string) => {
-  if (type === 'channel') {
-    return ['channels', 'notification-level', id] as const
-  }
   if (type === 'room') {
     return ['rooms', 'notification-level', id] as const
   }
@@ -52,9 +43,6 @@ const getQueryKey = (type: NotificationMenuType, id: string) => {
 }
 
 const getApiPath = (type: NotificationMenuType, id: string) => {
-  if (type === 'channel') {
-    return `/api/v1/channels/${encodeURIComponent(id)}/notification-level`
-  }
   if (type === 'room') {
     return `/api/v1/rooms/${encodeURIComponent(id)}/notification-level`
   }
@@ -115,7 +103,7 @@ function getBadgeCountForConversation(unread: any, conversationId: string): numb
 
 export function NotificationMenu(props: NotificationMenuProps) {
   const type = props.type
-  const id = type === 'channel' ? props.channelId : type === 'room' ? props.roomId : props.conversationId
+  const id = type === 'room' ? props.roomId : props.conversationId
   const starshipId = String(props.starshipId || '').trim()
   const qc = useQueryClient()
 
@@ -169,8 +157,8 @@ export function NotificationMenu(props: NotificationMenuProps) {
   const showBadge = badgeCount > 0
   const showDot = !showBadge && hasUnread
 
-  const menuLabel = type === 'channel' ? 'Channel notifications' : type === 'room' ? 'Room notifications' : 'Thread notifications'
-  const ariaLabelPrefix = type === 'channel' ? 'Channel notifications' : type === 'room' ? 'Room notifications' : 'Thread notifications'
+  const menuLabel = type === 'room' ? 'Room notifications' : 'Thread notifications'
+  const ariaLabelPrefix = type === 'room' ? 'Room notifications' : 'Thread notifications'
 
   return (
     <DropdownMenu>

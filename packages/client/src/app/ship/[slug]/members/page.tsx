@@ -429,7 +429,7 @@ export default function MembersPage() {
         statusLabel={presenceText}
       />
     )
-    const chatHref = !isAuthedUser && slug && userId ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(`u-${userId}`)}` : null
+    const chatHref = !isAuthedUser && slug ? `/ship/${encodeURIComponent(slug)}/rooms/lobby` : null
     const canKick = Boolean(!isAuthedUser && m.role !== 'owner' && userId)
     return (
       <div key={userId || `${label.primary}-${label.secondary || ''}`} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
@@ -590,8 +590,8 @@ export default function MembersPage() {
       />
     )
     const detailsHref = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : null
-    const dmPeerKey = agentSlug || (typeof a.id === 'string' && a.id.trim().length > 0 ? `a:${a.id.trim()}` : '')
-    const chatHref = slug && dmPeerKey ? `/ship/${encodeURIComponent(slug)}/dm/${encodeURIComponent(dmPeerKey)}` : null
+    const agentId = typeof a.id === 'string' ? a.id.trim() : ''
+    const chatHref = slug && agentId ? `/ship/${encodeURIComponent(slug)}/rooms/lobby?agentId=${encodeURIComponent(agentId)}` : slug ? `/ship/${encodeURIComponent(slug)}/rooms/lobby` : null
     const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
     const isPublished = a.publicationStatus === 'published'
     const canKickAgent = Boolean(fromMarketplace && a.id)

@@ -34,6 +34,8 @@ export function RoomParticipantsButton(props: {
   roomIsPrivate: boolean
   starshipOwnerId?: string | null
   className?: string
+  /** Optional ref to the underlying trigger button (for programmatic open). */
+  buttonRef?: React.Ref<HTMLButtonElement>
 }) {
   const { user, isInstanceAdmin } = useAuth()
   const [open, setOpen] = useState(false)
@@ -164,7 +166,7 @@ export function RoomParticipantsButton(props: {
 
   return (
     <>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)} className={props.className}>
+      <Button ref={props.buttonRef as any} type="button" size="sm" variant="outline" onClick={() => setOpen(true)} className={props.className}>
         <Icon name="users" className="h-4 w-4 mr-1" />
         Participants
       </Button>
@@ -208,7 +210,7 @@ export function RoomParticipantsButton(props: {
                 </div>
               </div>
 
-              <TabsContent value="humans" className="mt-0">
+              <TabsContent value="humans" className="mt-3">
                 <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-1">
                   {membersAndInvites.isLoading || roomParticipants.isLoading ? (
                     <div className="py-10 text-sm text-muted-foreground text-center">Loading…</div>
@@ -271,7 +273,7 @@ export function RoomParticipantsButton(props: {
                 </div>
               </TabsContent>
 
-              <TabsContent value="agents" className="mt-0">
+              <TabsContent value="agents" className="mt-3">
                 <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-1">
                   {starshipAgents.isLoading || roomParticipants.isLoading ? (
                     <div className="py-10 text-sm text-muted-foreground text-center">Loading…</div>

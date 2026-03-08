@@ -18,10 +18,8 @@ import { DELETED_MESSAGE_MARKER } from '@starships/protocol';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
 import {
-  ChannelRepository,
   ConversationRepository,
   ConversationParticipantRepository,
-  DirectMessageRepository,
   MessageReactionRepository,
   NotificationRepository,
 } from '@starships/models';
@@ -581,38 +579,30 @@ router.post('/messages/:messageId/reactions', jwtAuthMiddleware, async (req: Req
     }
 
     // Best-effort: create a durable notification for the message author when someone reacts.
-    // Scope matches v1 notifications: channels + DMs only.
     try {
       if (toggled === 'added') {
         const authorUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : '';
         if (authorUserId && authorUserId !== authUserId) {
-          const [dm, channel] = await Promise.all([
-            new DirectMessageRepository().findByConversationId(conversationId).catch(() => null),
-            new ChannelRepository().findByConversationId(conversationId).catch(() => null),
-          ]);
-          if (dm || channel) {
-            const notifRepo = new NotificationRepository();
-            // NOTE: Reactions should notify for each add event (no per-message dedupe).
-            // We keep the same { created, notification } shape so existing debug logs remain unchanged.
-            const created: { created: boolean; notification?: any } = await notifRepo
-              .create({
-                starshipId,
-                userId: authorUserId,
-                type: 'reaction',
-                conversationId,
-                messageId,
-              })
-              .then((notification) => ({ created: true, notification }))
-              .catch(() => ({ created: false, notification: undefined }));
-            if (created?.created && created?.notification) {
-              const notifBus = NotificationStreamBus.getInstance();
-              await notifBus.publish(starshipId, authorUserId, {
-                type: 'notification.append',
-                data: { notification: created.notification },
-              });
-              const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authorUserId });
-              await notifBus.publish(starshipId, authorUserId, { type: 'notification.state', data: { unread } });
-            }
+          const notifRepo = new NotificationRepository();
+          // NOTE: Reactions should notify for each add event (no per-message dedupe).
+          const created: { created: boolean; notification?: any } = await notifRepo
+            .create({
+              starshipId,
+              userId: authorUserId,
+              type: 'reaction',
+              conversationId,
+              messageId,
+            })
+            .then((notification) => ({ created: true, notification }))
+            .catch(() => ({ created: false, notification: undefined }));
+          if (created?.created && created?.notification) {
+            const notifBus = NotificationStreamBus.getInstance();
+            await notifBus.publish(starshipId, authorUserId, {
+              type: 'notification.append',
+              data: { notification: created.notification },
+            });
+            const unread = await notifRepo.getUnreadCounts({ starshipId, userId: authorUserId });
+            await notifBus.publish(starshipId, authorUserId, { type: 'notification.state', data: { unread } });
           }
         }
       }

@@ -34,6 +34,8 @@ export function RoomParticipantsButton(props: {
   roomIsPrivate: boolean
   starshipOwnerId?: string | null
   className?: string
+  /** Optional ref to the underlying trigger button (for programmatic open). */
+  buttonRef?: React.Ref<HTMLButtonElement>
 }) {
   const { user, isInstanceAdmin } = useAuth()
   const [open, setOpen] = useState(false)
@@ -164,7 +166,7 @@ export function RoomParticipantsButton(props: {
 
   return (
     <>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)} className={props.className}>
+      <Button ref={props.buttonRef as any} type="button" size="sm" variant="outline" onClick={() => setOpen(true)} className={props.className}>
         <Icon name="users" className="h-4 w-4 mr-1" />
         Participants
       </Button>

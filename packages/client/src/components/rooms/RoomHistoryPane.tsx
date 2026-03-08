@@ -178,15 +178,22 @@ export function RoomHistoryPane(props: {
             <div className="text-sm text-muted-foreground px-4 sm:px-0">No conversations yet.</div>
           )
         ) : null}
-      </div>
 
-      {history.hasMoreBefore ? (
-        <div className="border-t border-border/60 p-3">
-          <Button type="button" variant="outline" size="sm" className="w-full" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>
-            {history.isFetchingNextPage ? 'Loading…' : 'Load more'}
-          </Button>
-        </div>
-      ) : null}
+        {history.hasMoreBefore ? (
+          <div className="flex justify-center pb-4 pt-2">
+            <button
+              type="button"
+              className={[
+                'text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted transition-colors',
+                history.isFetchingNextPage ? 'opacity-60 pointer-events-none' : '',
+              ].join(' ')}
+              onClick={() => void history.fetchNextPage()}
+            >
+              {history.isFetchingNextPage ? 'Loading…' : 'Load more'}
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

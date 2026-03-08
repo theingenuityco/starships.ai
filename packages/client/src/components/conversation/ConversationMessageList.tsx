@@ -8,7 +8,7 @@ import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useConversationStreamed, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useApproveRoomInviteApproval, useDenyRoomInviteApproval, useRoomInviteApprovalsPending, type PendingRoomInviteApproval } from '@/hooks/useRooms'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -187,23 +187,55 @@ function LinkedConversationCard({
   isUserOnline?: (userId: string) => boolean
   notifUnread?: any
 }) {
-  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId)
+  // Keep the detail query for title + metadata; use SSE turn status for instant badge updates.
+  const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(linkedConversationId, { refetchOnWindowFocus: true })
   const { data: agents = [], isLoading: isLoadingAgents } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
   const { userId: authUserId } = useAuth()
   const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
+  const linkedTurnStatus = String(
+    (conversation as any)?.turn?.status ?? (conversation as any)?.state?.turn?.status ?? (conversation as any)?.state?.turnStatus ?? ''
+  ).trim()
+
+  const likelyOngoingFromDetail = Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
+  const [streamStopped, setStreamStopped] = useState(false)
+  const streamEnabled = Boolean(linkedConversationId && !streamStopped && !isLoadingConversation && likelyOngoingFromDetail)
+  const stream = useConversationStreamed(linkedConversationId, starshipId ?? null, { enabled: streamEnabled })
+  const streamTurnStatus = stream?.turnStatus ?? null
+  const streamHasCompleteEvent = Boolean(stream?.hasCompleteEvent)
+  const didStartStreamRef = useRef(false)
+  useEffect(() => {
+    if (streamEnabled) didStartStreamRef.current = true
+  }, [streamEnabled])
+
+  // As soon as we observe completion, stop streaming to avoid keeping an extra open SSE.
+  useEffect(() => {
+    if (!streamHasCompleteEvent) return
+    stream?.stop?.()
+    setStreamStopped(true)
+  }, [streamHasCompleteEvent, stream])
+
+  // Ensure we don't leave a thread-card stream running after unmount.
+  useEffect(() => {
+    return () => {
+      if (!didStartStreamRef.current) return
+      try {
+        stream?.stop?.()
+      } catch {}
+    }
+  }, [stream])
+
+  const isOngoing = useMemo(() => {
+    if (streamTurnStatus) {
+      return streamTurnStatus === 'active' || streamTurnStatus === 'waiting_for_tools'
+    }
+    return Boolean(isLinkedConversationBusy || linkedTurnStatus === 'active' || linkedTurnStatus === 'waiting_for_tools')
+  }, [isLinkedConversationBusy, linkedTurnStatus, streamTurnStatus])
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
-
-  const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
-
-  const avatarAttachmentIds = useMemo(() => {
-    const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
-    return Array.from(new Set(ids))
-  }, [agentList])
-  const { data: avatarAttachments = [], isLoading: isLoadingAvatarAttachments } = useMessageAttachments(avatarAttachmentIds, starshipId)
-  const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+  const cleanedTitle = rawTitle.replace(/^thread:\s*/i, '').trim()
+  const title =
+    cleanedTitle || (isLoadingConversation || isLoadingAgents ? 'Loading thread...' : linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   // Starship member directory (resolve userId -> displayName/avatar for participant list)
   const { data: membersAndInvites } = useStarshipMembersAndInvites(String(starshipId || ''), Boolean(starshipId))
@@ -335,8 +367,6 @@ function LinkedConversationCard({
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
 
-  const shouldShowAvatarPlaceholders = Boolean(isLoadingParticipantsPreview || isLoadingAvatarAttachments)
-
   const badgeCount = useMemo(() => {
     try {
       const cid = String(linkedConversationId || '').trim()
@@ -365,6 +395,11 @@ function LinkedConversationCard({
             <Icon name="thread" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <p className="text-sm font-medium text-foreground truncate">{title}</p>
           </div>
+          {(isLoadingParticipantsPreview || participantItems.length > 0) && (
+            <p className="mt-0.5 text-xs text-muted-foreground truncate" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+              {isLoadingParticipantsPreview ? 'Loading participants…' : participantsLabel}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {badgeCount > 0 ? (
@@ -376,45 +411,21 @@ function LinkedConversationCard({
               {badgeCount > 99 ? '99+' : String(badgeCount)}
             </span>
           ) : null}
-          {/* Participants (overlapping avatars) */}
-          {participantItems.length > 0 || shouldShowAvatarPlaceholders ? (
-            <div className="flex items-center gap-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
-              {/* Render most-recent participant LEFTMOST (and on top in the overlap stack). */}
-              <div className="flex items-center -space-x-2 space-x-reverse flex-row-reverse">
-                {shouldShowAvatarPlaceholders ? (
-                  <>
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/60 animate-pulse" aria-hidden="true" />
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/50 animate-pulse" aria-hidden="true" />
-                    <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted/40 animate-pulse" aria-hidden="true" />
-                  </>
-                ) : (
-                  participantItems
-                    .slice(0, 3)
-                    .slice()
-                    .reverse()
-                    .map(p => {
-                      if (p.kind === 'agent') {
-                        const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                        return (
-                          <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                          </div>
-                        )
-                      }
-                      return (
-                        <div key={p.key} className="h-7 w-7">
-                          <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" className="object-cover" /> : null}
-                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )
-                    })
-                )}
-              </div>
-              {participantItems.length > 3 ? <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">and {participantItems.length - 3} more</span> : null}
-            </div>
-          ) : null}
+          {/* Thread status badge (ongoing vs completed) */}
+          {isLoadingConversation && !streamTurnStatus ? (
+            <Skeleton className="h-[16px] w-[64px] rounded-full" aria-hidden="true" />
+          ) : (
+            <span
+              className={cn(
+                'inline-flex items-center h-[16px] px-2 rounded-full text-[10px] leading-none font-semibold whitespace-nowrap',
+                isOngoing ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              )}
+              aria-label={isOngoing ? 'Thread ongoing' : 'Thread completed'}
+              title={isOngoing ? 'Ongoing' : 'Completed'}
+            >
+              {isOngoing ? 'Ongoing' : 'Completed'}
+            </span>
+          )}
           <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
         </div>
       </div>
@@ -1145,6 +1156,138 @@ export function ConversationMessageList({
 
     const baseMessages = collapsedMessages
 
+    const tryParseJson = (value: unknown): unknown => {
+      if (typeof value !== 'string') return value
+      const s = value.trim()
+      if (!s) return value
+      try {
+        return JSON.parse(s)
+      } catch {
+        return value
+      }
+    }
+
+    const extractChildConversationIdFromToolResult = (toolResultMessage: any): string | null => {
+      try {
+        const raw = toolResultMessage?.content ?? toolResultMessage?.result ?? null
+        const parsed = tryParseJson(raw)
+        const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+        const get = (v: unknown, k: string): unknown => (isRecord(v) ? v[k] : undefined)
+        const getStr = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+
+        // Common envelopes
+        const candidates: unknown[] = [parsed, get(parsed, 'data'), get(parsed, 'result'), get(get(parsed, 'data'), 'result')].filter(Boolean)
+
+        for (const c of candidates) {
+          if (!isRecord(c)) continue
+          const direct = getStr(get(c, 'childConversationId'))
+          if (direct) return direct
+
+          const conversationId = getStr(get(c, 'conversationId'))
+          if (conversationId) return conversationId
+
+          const convo = get(c, 'conversation')
+          if (isRecord(convo)) {
+            const id = getStr(get(convo, 'id'))
+            if (id) return id
+          }
+
+          // Some payloads nest it under childConversation
+          const childConvo = get(c, 'childConversation')
+          if (isRecord(childConvo)) {
+            const id = getStr(get(childConvo, 'id'))
+            if (id) return id
+          }
+        }
+
+        return null
+      } catch {
+        return null
+      }
+    }
+
+    const applyDelegationThreadCardTransform = (msg: ExtendedMessage): ExtendedMessage => {
+      try {
+        if (msg.role !== 'assistant') return msg
+        const toolCalls = Array.isArray(msg.toolCalls) ? msg.toolCalls : []
+        if (toolCalls.length === 0) return msg
+
+        // Only target delegation tool calls.
+        const isCallAgentTool = (tc: any): boolean => {
+          const n = typeof tc?.function?.name === 'string' ? String(tc.function.name).trim() : ''
+          return n === 'call-agent' || n === 'call_agent'
+        }
+        if (!toolCalls.some(isCallAgentTool)) return msg
+
+        const existingLinkedIds = (() => {
+          const anyMsg = msg as unknown as {
+            linkedConversationId?: unknown
+            linked_conversation_id?: unknown
+            linkedConversationIds?: unknown
+            linked_conversation_ids?: unknown
+          }
+          const ids: string[] = []
+          const push = (v: unknown) => {
+            if (typeof v !== 'string') return
+            const s = v.trim()
+            if (!s) return
+            ids.push(s)
+          }
+          push(anyMsg?.linkedConversationId)
+          push(anyMsg?.linked_conversation_id)
+          const arrA = anyMsg?.linkedConversationIds
+          const arrB = anyMsg?.linked_conversation_ids
+          if (Array.isArray(arrA)) for (const it of arrA) push(it)
+          if (Array.isArray(arrB)) for (const it of arrB) push(it)
+          // uniq
+          return Array.from(new Set(ids))
+        })()
+
+        // Map toolCallId -> tool_result message for quick lookup
+        const results = Array.isArray((msg as any).toolResults) ? ((msg as any).toolResults as any[]) : []
+        const resultById = new Map<string, any>()
+        for (const r of results) {
+          const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+          if (rid == null) continue
+          const key = String(rid).trim()
+          if (!key) continue
+          resultById.set(key, r)
+        }
+
+        // Preserve a stable, intuitive ordering: use the tool-call order (not completion order).
+        const orderedFromToolCalls: string[] = []
+        for (const tc of toolCalls) {
+          if (!isCallAgentTool(tc)) continue
+          const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+          const tcId = tcWithExtras.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+          const key = tcId != null ? String(tcId).trim() : ''
+          const tr = key ? resultById.get(key) : null
+          if (!tr) continue
+          const childId = extractChildConversationIdFromToolResult(tr)
+          if (childId) orderedFromToolCalls.push(childId)
+        }
+
+        const uniqOrderedFromToolCalls = Array.from(new Set(orderedFromToolCalls.filter(Boolean)))
+        // Carry over any previously-known thread ids that we can't currently re-derive (e.g. transient missing toolResults).
+        const carryOver = existingLinkedIds.filter(id => !uniqOrderedFromToolCalls.includes(id))
+        const linkedConversationIds = [...uniqOrderedFromToolCalls, ...carryOver]
+        if (linkedConversationIds.length === 0) return msg
+        const linkedConversationId = linkedConversationIds[0] ?? null
+
+        // Remove the call-agent tool call row once we can show the thread card.
+        const filteredToolCalls = toolCalls.filter(tc => !isCallAgentTool(tc))
+
+        return {
+          ...msg,
+          linkedConversationId,
+          linkedConversationIds,
+          toolCalls: filteredToolCalls.length > 0 ? filteredToolCalls : undefined,
+        } as any
+      } catch {
+        return msg
+      }
+    }
+
     // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
@@ -1244,6 +1387,15 @@ export function ConversationMessageList({
       }
     }
 
+    // Delegation UX: when the delegation tool `call-agent` returns a child conversation id,
+    // show the linked thread card instead of the raw tool-call row.
+    for (let i = 0; i < groupedMessages.length; i++) {
+      const m = groupedMessages[i] as ExtendedMessage
+      if (m && m.role === 'assistant') {
+        groupedMessages[i] = applyDelegationThreadCardTransform(m)
+      }
+    }
+
     // UI guard: drop blank assistant shells (no content/chunks/reasoning and no toolCalls).
     // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
@@ -1256,7 +1408,22 @@ export function ConversationMessageList({
       const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
       const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
       const hasUIActions = Array.isArray(extendedMsg.uiActions) && extendedMsg.uiActions.length > 0
-      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments || hasUIActions
+      const hasLinkedConversation = (() => {
+        const anyMsg = extendedMsg as unknown as {
+          linkedConversationId?: unknown
+          linked_conversation_id?: unknown
+          linkedConversationIds?: unknown
+          linked_conversation_ids?: unknown
+        }
+        const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+        if (typeof raw === 'string' && raw.trim().length > 0) return true
+        const a = anyMsg?.linkedConversationIds
+        const b = anyMsg?.linked_conversation_ids
+        if (Array.isArray(a) && a.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        if (Array.isArray(b) && b.some(x => typeof x === 'string' && x.trim().length > 0)) return true
+        return false
+      })()
+      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments || hasUIActions || hasLinkedConversation
       return shouldKeep
     })
 
@@ -2710,19 +2877,40 @@ const MemoizedMessageBubble = memo(
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     // Generic: allow any message to link to another conversation (thread preview/index post)
-    const linkedConversationId = useMemo(() => {
-      const anyMsg = message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
-      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
-      return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+    const linkedConversationIds = useMemo(() => {
+      const anyMsg = message as unknown as {
+        linkedConversationId?: unknown
+        linked_conversation_id?: unknown
+        linkedConversationIds?: unknown
+        linked_conversation_ids?: unknown
+      }
+      const ids: string[] = []
+      const push = (v: unknown) => {
+        if (typeof v !== 'string') return
+        const s = v.trim()
+        if (!s) return
+        ids.push(s)
+      }
+      push(anyMsg?.linkedConversationId)
+      push(anyMsg?.linked_conversation_id)
+      const arrA = anyMsg?.linkedConversationIds
+      const arrB = anyMsg?.linked_conversation_ids
+      if (Array.isArray(arrA)) for (const it of arrA) push(it)
+      if (Array.isArray(arrB)) for (const it of arrB) push(it)
+      return Array.from(new Set(ids))
     }, [message])
 
-    const linkedConversationHref = useMemo(() => {
-      if (!linkedConversationId) return null
-      if (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0) {
-        return `/ship/${encodeURIComponent(starshipSlug)}/conversations/${encodeURIComponent(linkedConversationId)}`
+    const linkedConversationId = linkedConversationIds[0] ?? null
+
+    const linkedConversationHrefById = useMemo(() => {
+      const map = new Map<string, string>()
+      const s = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+      if (!s) return map
+      for (const id of linkedConversationIds) {
+        map.set(id, `/ship/${encodeURIComponent(s)}/conversations/${encodeURIComponent(id)}`)
       }
-      return null
-    }, [linkedConversationId, starshipSlug])
+      return map
+    }, [linkedConversationIds, starshipSlug])
 
     const isActiveThreadLink = Boolean(linkedConversationId && activeThreadConversationId && linkedConversationId === activeThreadConversationId)
 
@@ -2865,17 +3053,22 @@ const MemoizedMessageBubble = memo(
                   )}
                 </div>
                 {!suppressLinkedConversationCard && (
-                  <LinkedConversationCard
-                    linkedConversationId={linkedConversationId}
-                    linkedConversationHref={linkedConversationHref}
-                    isActiveThread={isActiveThreadLink}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={onThreadAction}
-                    message={message}
-                    starshipId={starshipId}
-                    isUserOnline={isUserOnline}
-                    notifUnread={notifUnread}
-                  />
+                  <div className="flex flex-col gap-1">
+                    {linkedConversationIds.map(id => (
+                      <LinkedConversationCard
+                        key={`linked:${message.id}:${id}`}
+                        linkedConversationId={id}
+                        linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                        isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                        enableChannelMessageThreads={enableChannelMessageThreads}
+                        onThreadAction={onThreadAction}
+                        message={message}
+                        starshipId={starshipId}
+                        isUserOnline={isUserOnline}
+                        notifUnread={notifUnread}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
               {isConsecutiveSameUser ? (
@@ -3136,17 +3329,22 @@ const MemoizedMessageBubble = memo(
                 />
               )}
               {!suppressLinkedConversationCard && (
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  isActiveThread={isActiveThreadLink}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                  starshipId={starshipId}
-                  isUserOnline={isUserOnline}
-                  notifUnread={notifUnread}
-                />
+                <div className="flex flex-col gap-1">
+                  {linkedConversationIds.map(id => (
+                    <LinkedConversationCard
+                      key={`linked:${message.id}:${id}`}
+                      linkedConversationId={id}
+                      linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                      isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={onThreadAction}
+                      message={message}
+                      starshipId={starshipId}
+                      isUserOnline={isUserOnline}
+                      notifUnread={notifUnread}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -3273,17 +3471,22 @@ const MemoizedMessageBubble = memo(
                   />
                 )}
                 {!suppressLinkedConversationCard && (
-                  <LinkedConversationCard
-                    linkedConversationId={linkedConversationId}
-                    linkedConversationHref={linkedConversationHref}
-                    isActiveThread={isActiveThreadLink}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={onThreadAction}
-                    message={message}
-                    starshipId={starshipId}
-                    isUserOnline={isUserOnline}
-                    notifUnread={notifUnread}
-                  />
+                  <div className="flex flex-col gap-1">
+                    {linkedConversationIds.map(id => (
+                      <LinkedConversationCard
+                        key={`linked:${message.id}:${id}`}
+                        linkedConversationId={id}
+                        linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                        isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                        enableChannelMessageThreads={enableChannelMessageThreads}
+                        onThreadAction={onThreadAction}
+                        message={message}
+                        starshipId={starshipId}
+                        isUserOnline={isUserOnline}
+                        notifUnread={notifUnread}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -3399,17 +3602,22 @@ const MemoizedMessageBubble = memo(
                 />
               )}
               {!suppressLinkedConversationCard && (
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  isActiveThread={isActiveThreadLink}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                  starshipId={starshipId}
-                  isUserOnline={isUserOnline}
-                  notifUnread={notifUnread}
-                />
+                <div className="flex flex-col gap-1">
+                  {linkedConversationIds.map(id => (
+                    <LinkedConversationCard
+                      key={`linked:${message.id}:${id}`}
+                      linkedConversationId={id}
+                      linkedConversationHref={linkedConversationHrefById.get(id) ?? null}
+                      isActiveThread={Boolean(activeThreadConversationId && id === activeThreadConversationId)}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={onThreadAction}
+                      message={message}
+                      starshipId={starshipId}
+                      isUserOnline={isUserOnline}
+                      notifUnread={notifUnread}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>

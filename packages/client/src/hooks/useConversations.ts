@@ -584,8 +584,8 @@ export function useLinkMessageToConversation() {
       // new link immediately, ensuring the UI shows the correct "Open thread" icon for *all* messages.
       if (conversationId && messageId && linkedConversationId) {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
-          if (!Array.isArray(old)) return old
-          return old.map((chunk: any) => {
+          const chunks = Array.isArray(old) ? old : []
+          return chunks.map((chunk: any) => {
             if (!chunk || typeof chunk !== 'object') return chunk
 
             // Back-compat local pre-seed event
@@ -758,7 +758,9 @@ export function useToggleMessageReaction() {
     },
     onError: (error: unknown, _vars, ctx) => {
       if (ctx?.key) {
-        queryClient.setQueryData(ctx.key, ctx.prev as any)
+        // Never restore `undefined` into the messages query cache; React Query warns on undefined data.
+        // If we didn't have prior data, fall back to an empty chunk list.
+        queryClient.setQueryData(ctx.key, (ctx.prev as any) ?? [])
       }
       const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to add reaction', { description: errorMessage })
@@ -826,15 +828,28 @@ export function useUpdateConversationStatus() {
 }
 
 // Get conversation detail (including state)
-export function useConversationDetail(conversationId: string | null) {
+export function useConversationDetail(
+  conversationId: string | null,
+  options?: {
+    enabled?: boolean
+    staleTime?: number
+    refetchOnWindowFocus?: boolean
+    refetchInterval?: number | false | ((data: ConversationModel | undefined) => number | false)
+    refetchIntervalInBackground?: boolean
+  }
+) {
+  const enabled = Boolean(conversationId && (options?.enabled ?? true))
   return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId!),
+    queryKey: conversationId ? CONVERSATION_QUERY_KEYS.detail(conversationId) : (['__noop__'] as const),
     queryFn: async (): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.get(`/api/v1/conversations/${conversationId}`)
       return response.data.data
     },
-    enabled: !!conversationId,
-    staleTime: process.env.NODE_ENV === 'development' ? 0 : 30 * 1000, // No cache in dev, 30 seconds in prod
+    enabled,
+    staleTime: options?.staleTime ?? (process.env.NODE_ENV === 'development' ? 0 : 30 * 1000), // No cache in dev, 30 seconds in prod
+    ...(typeof options?.refetchOnWindowFocus === 'boolean' ? { refetchOnWindowFocus: options.refetchOnWindowFocus } : null),
+    ...(options?.refetchInterval != null ? { refetchInterval: options.refetchInterval as any } : null),
+    ...(typeof options?.refetchIntervalInBackground === 'boolean' ? { refetchIntervalInBackground: options.refetchIntervalInBackground } : null),
   })
 }
 
@@ -1998,8 +2013,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
 
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any) => {
-          if (!Array.isArray(old)) return old
-          return [...old, { type: 'snapshot', data: nextSnapshot }]
+          const chunks = Array.isArray(old) ? old : []
+          return [...chunks, { type: 'snapshot', data: nextSnapshot }]
         })
       } catch (error: any) {
         const msg = getSafeErrorMessage(error)
@@ -2074,6 +2089,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     invalidate: () => {
       if (!conversationId) return Promise.resolve()
       return queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+    },
+    stop: () => {
+      // Explicitly abort the active SSE stream for this conversation (if any).
+      // This is useful for transient subscribers (e.g. thread cards) that want to ensure
+      // they don't leave background streams open after completion/unmount.
+      const id = typeof conversationId === 'string' ? conversationId : ''
+      if (!id) return
+      try {
+        const guard = activeSseGuards.get(id)
+        guard?.abort()
+        // `makeSSEAsyncIterable`'s cleanup will also delete the guard; best-effort delete here too.
+        activeSseGuards.delete(id)
+      } catch {
+        // ignore
+      }
     },
   }
 }

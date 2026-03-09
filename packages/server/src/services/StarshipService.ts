@@ -90,7 +90,7 @@ export class StarshipService {
     // Default entitlements should come from the Scout plan when available (Stripe metadata),
     // falling back to hard-coded Scout defaults if the plan catalog is unavailable/missing.
     const scoutEntitlements = shipClass === 'scout' ? await SubscriptionPlanCatalogService.getEntitlementsForShipClass('scout') : null;
-    const fallbackScout = { maxAgents: 5, maxConcurrentTurns: 3 };
+    const fallbackScout = { maxAgents: 10, maxConcurrentTurns: 3 };
     const defaultEntitlements = scoutEntitlements ?? fallbackScout;
 
     const starship = await this.starshipRepository.create({

@@ -87,6 +87,43 @@ export function RoomConversationIndexView(props: {
     setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
   }, [preselectAgentId, starshipAgents])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const timer = window.setTimeout(() => {
+      if (!starterInputRef.current) return
+
+      try {
+        const raw = window.sessionStorage.getItem('lead_gen_pending_prompt')
+        if (!raw) return
+
+        const parsed = JSON.parse(raw) as { prompt?: string; createdAt?: number }
+        const prompt = String(parsed?.prompt || '').trim()
+        if (!prompt) return
+
+        const createdAt = typeof parsed?.createdAt === 'number' ? parsed.createdAt : null
+        const maxAgeMs = 15 * 60 * 1000
+        if (createdAt && Date.now() - createdAt > maxAgeMs) {
+          return
+        }
+
+        starterInputRef.current.setInitialContent?.(prompt)
+      } catch {
+        // Ignore storage/parsing errors.
+      } finally {
+        try {
+          window.sessionStorage.removeItem('lead_gen_pending_prompt')
+        } catch {
+          // Ignore cleanup errors.
+        }
+      }
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [])
+
   const starterBadgeClass = (active: boolean) =>
     cn(
       badgeVariants({ variant: active ? 'connected' : 'outline' }),

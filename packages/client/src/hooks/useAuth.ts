@@ -211,6 +211,25 @@ export function useLogin() {
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
 
+      // Lead generation flow override:
+      // If the user arrived at /login from the lead-gen use case and we still have a pending prompt,
+      // send them directly into the Lobby starter view so the prompt can be applied there.
+      try {
+        if (typeof window !== 'undefined') {
+          const qp = new URLSearchParams(window.location.search)
+          const fromLeadGen = qp.get('fromLeadGen') === '1'
+          const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
+          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
+            const target = addWelcome(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
+            router.push(target)
+            queryClient.invalidateQueries()
+            return
+          }
+        }
+      } catch {
+        // Ignore storage/URL parsing errors and fall back to default behavior.
+      }
+
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
@@ -281,6 +300,21 @@ export function useRegister() {
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
+      try {
+        if (typeof window !== 'undefined') {
+          const qp = new URLSearchParams(window.location.search)
+          const fromLeadGen = qp.get('fromLeadGen') === '1'
+          const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
+          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
+            router.push(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
+            queryClient.invalidateQueries()
+            return
+          }
+        }
+      } catch {
+        // Ignore storage/URL parsing errors and fall back to default behavior.
+      }
+
       if (redirectTarget) {
         router.push(redirectTarget)
       } else if (starship?.slug) {
@@ -345,6 +379,22 @@ export function useOAuthLogin() {
 
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
+
+      try {
+        if (typeof window !== 'undefined') {
+          const qp = new URLSearchParams(window.location.search)
+          const fromLeadGen = qp.get('fromLeadGen') === '1'
+          const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
+          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
+            const target = addWelcome(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
+            router.push(target)
+            queryClient.invalidateQueries()
+            return
+          }
+        }
+      } catch {
+        // Ignore storage/URL parsing errors and fall back to default behavior.
+      }
 
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))

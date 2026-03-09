@@ -104,6 +104,8 @@ export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
   setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => void
+  /** Programmatically replace the editor content with the provided text (used for deep-link flows). */
+  setInitialContent: (text: string) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -2095,6 +2097,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 tiptap.commands.focus('end')
               } catch {}
             }
+          } catch {}
+        },
+        setInitialContent: (text: string) => {
+          try {
+            if (!tiptap) return
+            const value = String(text || '').trim()
+            if (!value) return
+            tiptap.commands.setContent(value + ' ')
+            tiptap.commands.focus('end')
           } catch {}
         },
       }),

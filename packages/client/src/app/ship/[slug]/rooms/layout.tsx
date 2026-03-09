@@ -245,6 +245,48 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     )
   }, [roomsData?.rooms, normalizedRoomSlug])
 
+  // Lead-gen flow guardrail:
+  // If we somehow land in the Lobby while there is still a pending lead-gen prompt in sessionStorage
+  // and a "leadgen" room exists for this starship, bounce the user into that room so the prompt
+  // can be prefilled there, instead of staying in Lobby.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Only intervene when we're currently on the Lobby room route.
+    if (normalizedRoomSlug !== 'lobby') return
+
+    const rooms = roomsData?.rooms ?? []
+    const hasLeadgenRoom = rooms.some(
+      (r: RoomModel) =>
+        String(r.slug || '')
+          .trim()
+          .toLowerCase() === 'leadgen'
+    )
+    if (!hasLeadgenRoom) return
+
+    let hasFreshPendingPrompt = false
+    try {
+      const raw = window.sessionStorage.getItem('lead_gen_pending_prompt')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { prompt?: string; createdAt?: number }
+        const createdAt = typeof parsed?.createdAt === 'number' ? parsed.createdAt : null
+        const maxAgeMs = 15 * 60 * 1000
+        if (!createdAt || Date.now() - createdAt <= maxAgeMs) {
+          hasFreshPendingPrompt = true
+        }
+      }
+    } catch {
+      // Ignore storage/parsing errors and fall back to normal behavior.
+    }
+
+    if (!hasFreshPendingPrompt) return
+
+    const slug = String(routeParams.slug || '').trim()
+    if (!slug) return
+
+    router.replace(`/ship/${encodeURIComponent(slug)}/rooms/leadgen?fromLeadGen=1`)
+  }, [normalizedRoomSlug, roomsData?.rooms, routeParams.slug, router])
+
   const activeConversationId = useMemo(() => {
     const cid = activeRoom?.conversationId
     return cid ? String(cid) : null

@@ -41,21 +41,27 @@ function isValidRedirectUrl(url: string): boolean {
 
 function pickLandingStarship(
   accessible: StarshipModel[],
-  userId: string,
-  preferMemberFirst: boolean
+  userId: string
 ): { id: string; slug: string; name: string } | null {
   const list = Array.isArray(accessible) ? accessible : [];
   if (list.length === 0) return null;
 
-  // If the user hasn't completed onboarding yet and they belong to a non-owned starship
-  // (e.g. came in via invite), prefer landing them there to avoid forcing onboarding for
-  // their default-owned starship. Onboarding is triggered when they later visit their OWN ship.
-  const memberFirst =
-    preferMemberFirst
-      ? list.find((s) => s.status === 'active' && s.ownerId !== userId) || list.find((s) => s.ownerId !== userId) || null
-      : null;
-  const ship = memberFirst || list.find((s) => s.status === 'active') || list[0] || null;
-  return ship ? { id: ship.id, slug: ship.slug, name: ship.name } : null;
+  // Always prefer the earliest-created starship the user OWNS.
+  const ownedActive = list
+    .filter((s) => s.ownerId === userId && s.status === 'active')
+    .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+  const ownedAny = list
+    .filter((s) => s.ownerId === userId)
+    .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+
+  const owned = ownedActive[0] ?? ownedAny[0] ?? null;
+  if (owned) {
+    return { id: owned.id, slug: owned.slug, name: owned.name };
+  }
+
+  // Fallback: user has no owned starships; choose the first accessible active ship.
+  const firstActive = list.find((s) => s.status === 'active') || list[0] || null;
+  return firstActive ? { id: firstActive.id, slug: firstActive.slug, name: firstActive.name } : null;
 }
 
 // Zod schemas for validation
@@ -184,8 +190,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
-      firstStarship = pickLandingStarship(accessible, user.id, preferMemberFirst);
+      firstStarship = pickLandingStarship(accessible, user.id);
     } catch (error) {
       logger.error('[AUTH] Failed to fetch starships for user', {
         userId: user.id,
@@ -882,8 +887,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
     try {
       const starshipService = new StarshipService();
       const accessible = await starshipService.getStarshipsForUser(user.id);
-      const preferMemberFirst = !(user.wizardOnboardingCompleted ?? false);
-      firstStarship = pickLandingStarship(accessible, user.id, preferMemberFirst);
+      firstStarship = pickLandingStarship(accessible, user.id);
     } catch (error) {
       logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {
         userId: user.id,

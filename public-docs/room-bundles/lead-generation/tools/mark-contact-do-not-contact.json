@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.701Z",
+  "metadata": {
+    "fromSlug": "mark-contact-do-not-contact",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Mark Contact Do-Not-Contact",
+      "description": "Soft-delete a contact by setting lead_status='do_not_contact' via upsert. Input is aligned to Contacts schema. Requires contact_id; optional notes.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "contact_id"
+        ],
+        "properties": {
+          "notes": {
+            "type": "string"
+          },
+          "contact_id": {
+            "type": "number"
+          },
+          "starshipId": {
+            "type": "string",
+            "description": "Optional override. Defaults to env('STARSHIP_ID')."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prep",
+            "ref": "e1",
+            "from": "s"
+          },
+          {
+            "to": "upsert",
+            "ref": "e2",
+            "from": "prep"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e3",
+            "from": "upsert"
+          },
+          {
+            "to": "e",
+            "ref": "e4",
+            "from": "unwrap"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prep",
+            "name": "Build Do-Not-Contact Update Row",
+            "type": "code",
+            "parameters": {
+              "code": "\nfunction assertFiniteNumber(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${path} must be a finite number`);\n}\n\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const contactId = input.contact_id;\n  if (contactId == null) throw new Error('contact_id is required');\n  assertFiniteNumber('contact_id', contactId);\n\n  const row = {\n    contact_id: contactId,\n    lead_status: 'do_not_contact'\n  };\n\n  if (typeof input.notes === 'string' && input.notes.trim()) {\n    row.notes = input.notes.trim();\n  }\n\n  return {\n    starshipId,\n    datasetSlug: 'contacts',\n    mode: 'upsert',\n    rows: [row]\n  };\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "upsert",
+            "name": "Connector: upsert-dataset-rows",
+            "type": "connector_action",
+            "parameters": {
+              "action": "upsert-dataset-rows",
+              "timeout": 30000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap Response",
+            "type": "code",
+            "parameters": {
+              "code": "\nasync function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) return body.data;\n  return body ?? resp;\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('unwrap') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -192,7 +192,7 @@ export function useLogin() {
 
       return data.data as AuthLoginResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
@@ -213,17 +213,50 @@ export function useLogin() {
 
       // Lead generation flow override:
       // If the user arrived at /login from the lead-gen use case and we still have a pending prompt,
-      // send them directly into the Lobby starter view so the prompt can be applied there.
+      // ensure the dedicated leadgen room exists for this starship and send them there.
       try {
         if (typeof window !== 'undefined') {
           const qp = new URLSearchParams(window.location.search)
-          const fromLeadGen = qp.get('fromLeadGen') === '1'
           const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
-          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
-            const target = addWelcome(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
-            router.push(target)
-            queryClient.invalidateQueries()
-            return
+          const fromLeadGen = qp.get('fromLeadGen') === '1'
+          // Debug: surface detection in console for troubleshooting (URL param may be lost in OAuth flows).
+          if (fromLeadGen || hasPendingPrompt) {
+            // eslint-disable-next-line no-console
+            console.debug('[leadgen] login flow detected', {
+              fromLeadGen,
+              hasPendingPrompt,
+              starshipSlug: starship?.slug,
+              starshipId: starship?.id,
+            })
+          }
+          // Treat a fresh pending prompt as the source of truth for the lead-gen flow.
+          if (hasPendingPrompt && starship?.slug && starship?.id && token) {
+            try {
+              const resp = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/ensure-leadgen-room`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+
+              if (resp.ok) {
+                const json = (await resp.json()) as ApiResponse<{ room: { slug: string } }>
+                const roomSlug = json.data?.room?.slug || 'leadgen'
+                const target = addWelcome(`/ship/${starship.slug}/rooms/${roomSlug}?fromLeadGen=1`)
+                router.push(target)
+                queryClient.invalidateQueries()
+                return
+              } else {
+                // eslint-disable-next-line no-console
+                console.warn('[leadgen] ensure-leadgen-room failed', {
+                  status: resp.status,
+                  statusText: resp.statusText,
+                })
+              }
+            } catch {
+              // Ignore bundle provisioning errors and fall back to default redirect.
+            }
           }
         }
       } catch {
@@ -272,7 +305,7 @@ export function useRegister() {
 
       return data.data as AuthRegisterResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       // Check if this is an email verification response
       if (data.emailVerificationSent) {
         // Email verification sent - no immediate login
@@ -300,20 +333,6 @@ export function useRegister() {
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
-      try {
-        if (typeof window !== 'undefined') {
-          const qp = new URLSearchParams(window.location.search)
-          const fromLeadGen = qp.get('fromLeadGen') === '1'
-          const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
-          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
-            router.push(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
-            queryClient.invalidateQueries()
-            return
-          }
-        }
-      } catch {
-        // Ignore storage/URL parsing errors and fall back to default behavior.
-      }
 
       if (redirectTarget) {
         router.push(redirectTarget)
@@ -356,7 +375,7 @@ export function useOAuthLogin() {
       const data = await response.json()
       return data.data as AuthLoginResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
@@ -383,13 +402,46 @@ export function useOAuthLogin() {
       try {
         if (typeof window !== 'undefined') {
           const qp = new URLSearchParams(window.location.search)
-          const fromLeadGen = qp.get('fromLeadGen') === '1'
           const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
-          if (fromLeadGen && hasPendingPrompt && starship?.slug) {
-            const target = addWelcome(`/ship/${starship.slug}/rooms/lobby?fromLeadGen=1`)
-            router.push(target)
-            queryClient.invalidateQueries()
-            return
+          const fromLeadGen = qp.get('fromLeadGen') === '1'
+          if (fromLeadGen || hasPendingPrompt) {
+            // eslint-disable-next-line no-console
+            console.debug('[leadgen] oauth login flow detected', {
+              fromLeadGen,
+              hasPendingPrompt,
+              starshipSlug: starship?.slug,
+              starshipId: starship?.id,
+            })
+          }
+          // For OAuth, the original fromLeadGen=1 query param is often lost during redirects,
+          // so rely primarily on the existence of a pending lead-gen prompt here.
+          if (hasPendingPrompt && starship?.slug && starship?.id && token) {
+            try {
+              const resp = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/ensure-leadgen-room`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+              })
+
+              if (resp.ok) {
+                const json = (await resp.json()) as ApiResponse<{ room: { slug: string } }>
+                const roomSlug = json.data?.room?.slug || 'leadgen'
+                const target = addWelcome(`/ship/${starship.slug}/rooms/${roomSlug}?fromLeadGen=1`)
+                router.push(target)
+                queryClient.invalidateQueries()
+                return
+              } else {
+                // eslint-disable-next-line no-console
+                console.warn('[leadgen] ensure-leadgen-room (oauth) failed', {
+                  status: resp.status,
+                  statusText: resp.statusText,
+                })
+              }
+            } catch {
+              // Ignore bundle provisioning errors and fall back to default behavior.
+            }
           }
         }
       } catch {

@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.699Z",
+  "metadata": {
+    "fromSlug": "update-contact",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Update Contact",
+      "description": "Update a Contacts row via upsert. Inputs are strictly aligned to the Contacts dataset schema (types, enums, references).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "required": [
+              "contact_id",
+              "lead_status"
+            ],
+            "properties": {
+              "raw": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "account": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "datasetIdOrSlug",
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "number"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "dataset_row"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "datasetIdOrSlug": {
+                    "type": "string",
+                    "const": "accounts"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "country": {
+                "type": "string"
+              },
+              "last_name": {
+                "type": "string"
+              },
+              "seniority": {
+                "enum": [
+                  "ic",
+                  "manager",
+                  "director",
+                  "vp",
+                  "c_level",
+                  "owner"
+                ],
+                "type": "string"
+              },
+              "contact_id": {
+                "type": "number"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "department": {
+                "enum": [
+                  "sales",
+                  "marketing",
+                  "product",
+                  "engineering",
+                  "ops",
+                  "hr",
+                  "finance",
+                  "it",
+                  "other"
+                ],
+                "type": "string"
+              },
+              "first_name": {
+                "type": "string"
+              },
+              "lead_score": {
+                "type": "number"
+              },
+              "source_url": {
+                "type": "string"
+              },
+              "lead_status": {
+                "enum": [
+                  "new",
+                  "attempted",
+                  "connected",
+                  "responded",
+                  "qualified",
+                  "unqualified",
+                  "do_not_contact"
+                ],
+                "type": "string"
+              },
+              "linkedin_url": {
+                "type": "string"
+              },
+              "last_touch_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "contact_id",
+                "lead_status"
+              ],
+              "properties": {
+                "raw": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "phone": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "account": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "datasetIdOrSlug",
+                    "key"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "number"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "dataset_row"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "datasetIdOrSlug": {
+                      "type": "string",
+                      "const": "accounts"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "country": {
+                  "type": "string"
+                },
+                "last_name": {
+                  "type": "string"
+                },
+                "seniority": {
+                  "enum": [
+                    "ic",
+                    "manager",
+                    "director",
+                    "vp",
+                    "c_level",
+                    "owner"
+                  ],
+                  "type": "string"
+                },
+                "contact_id": {
+                  "type": "number"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "department": {
+                  "enum": [
+                    "sales",
+                    "marketing",
+                    "product",
+                    "engineering",
+                    "ops",
+                    "hr",
+                    "finance",
+                    "it",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                "first_name": {
+                  "type": "string"
+                },
+                "lead_score": {
+                  "type": "number"
+                },
+                "source_url": {
+                  "type": "string"
+                },
+                "lead_status": {
+                  "enum": [
+                    "new",
+                    "attempted",
+                    "connected",
+                    "responded",
+                    "qualified",
+                    "unqualified",
+                    "do_not_contact"
+                  ],
+                  "type": "string"
+                },
+                "linkedin_url": {
+                  "type": "string"
+                },
+                "last_touch_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "starshipId": {
+            "type": "string",
+            "description": "Optional override. Defaults to env('STARSHIP_ID')."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prep",
+            "ref": "e1",
+            "from": "s"
+          },
+          {
+            "to": "upsert",
+            "ref": "e2",
+            "from": "prep"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e3",
+            "from": "upsert"
+          },
+          {
+            "to": "e",
+            "ref": "e4",
+            "from": "unwrap"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prep",
+            "name": "Validate & Normalize Input",
+            "type": "code",
+            "parameters": {
+              "code": "\nfunction assertEnum(path, value, options) {\n  if (value == null) return;\n  const v = String(value).trim();\n  if (!options.includes(v)) throw new Error(`${path} must be one of: ${options.join(', ')}`);\n}\n\nfunction assertIsoDatetime(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'string' || !value.trim()) throw new Error(`${path} must be an ISO8601 datetime string`);\n  const s = value.trim();\n  if (!(/[zZ]$/.test(s) || /[+-]\\d{2}:\\d{2}$/.test(s))) {\n    throw new Error(`${path} must include timezone offset or Z (e.g. 2026-03-07T12:00:00Z)`);\n  }\n  const t = Date.parse(s);\n  if (!Number.isFinite(t)) throw new Error(`${path} must be parseable ISO8601 datetime`);\n}\n\nfunction assertFiniteNumber(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${path} must be a finite number`);\n}\n\nfunction assertReference(path, value, datasetIdOrSlug) {\n  if (value == null) return;\n  if (!value || typeof value !== 'object' || Array.isArray(value)) {\n    throw new Error(`${path} must be a reference object`);\n  }\n  if (value.kind !== 'dataset_row') throw new Error(`${path}.kind must be 'dataset_row'`);\n  if (value.datasetIdOrSlug !== datasetIdOrSlug) throw new Error(`${path}.datasetIdOrSlug must be '${datasetIdOrSlug}'`);\n  if (value.key == null) throw new Error(`${path}.key is required`);\n  assertFiniteNumber(`${path}.key`, value.key);\n  const allowed = new Set(['kind', 'datasetIdOrSlug', 'key', 'label']);\n  for (const k of Object.keys(value)) {\n    if (!allowed.has(k)) throw new Error(`${path} has unknown field: ${k}`);\n  }\n}\n\nfunction assertNoUnknownFields(obj, allowed, where) {\n  for (const k of Object.keys(obj)) {\n    if (!allowed.has(k)) throw new Error(`${where} has unknown field: ${k}`);\n  }\n}\n\nfunction normalizeRow(row, idx) {\n  if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(`rows[${idx}] must be an object`);\n\n  const allowedKeys = new Set([\n    'contact_id',\n    'account',\n    'first_name',\n    'last_name',\n    'title',\n    'seniority',\n    'department',\n    'email',\n    'phone',\n    'linkedin_url',\n    'country',\n    'state',\n    'city',\n    'lead_status',\n    'lead_score',\n    'owner',\n    'source',\n    'source_url',\n    'created_at',\n    'last_touch_at',\n    'notes',\n    'raw'\n  ]);\n\n  assertNoUnknownFields(row, allowedKeys, `rows[${idx}]`);\n\n  // primary key is number\n  if (row.contact_id == null) throw new Error(`rows[${idx}].contact_id is required`);\n  assertFiniteNumber(`rows[${idx}].contact_id`, row.contact_id);\n\n  // Dataset constraint for upsert.\n  if (row.lead_status == null || String(row.lead_status).trim() === '') {\n    throw new Error(`rows[${idx}].lead_status is required (dataset constraint)`);\n  }\n\n  assertEnum(`rows[${idx}].lead_status`, row.lead_status, ['new', 'attempted', 'connected', 'responded', 'qualified', 'unqualified', 'do_not_contact']);\n  assertEnum(`rows[${idx}].seniority`, row.seniority, ['ic', 'manager', 'director', 'vp', 'c_level', 'owner']);\n  assertEnum(`rows[${idx}].department`, row.department, ['sales', 'marketing', 'product', 'engineering', 'ops', 'hr', 'finance', 'it', 'other']);\n\n  // lead_score is number\n  assertFiniteNumber(`rows[${idx}].lead_score`, row.lead_score);\n\n  assertReference(`rows[${idx}].account`, row.account, 'accounts');\n\n  assertIsoDatetime(`rows[${idx}].created_at`, row.created_at);\n  assertIsoDatetime(`rows[${idx}].last_touch_at`, row.last_touch_at);\n\n  return row;\n}\n\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const datasetSlug = 'contacts';\n  const mode = 'upsert';\n\n  let rows = [];\n  if (Array.isArray(input.rows) && input.rows.length) {\n    rows = input.rows;\n  } else if (input.row && typeof input.row === 'object' && !Array.isArray(input.row)) {\n    rows = [input.row];\n  }\n\n  if (!Array.isArray(rows) || rows.length === 0) {\n    throw new Error('Provide either row (object) or rows (non-empty array)');\n  }\n\n  rows = rows.map((r, idx) => normalizeRow(r, idx));\n\n  return { starshipId, datasetSlug, mode, rows };\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "upsert",
+            "name": "Connector: upsert-dataset-rows",
+            "type": "connector_action",
+            "parameters": {
+              "action": "upsert-dataset-rows",
+              "timeout": 30000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap Response",
+            "type": "code",
+            "parameters": {
+              "code": "\nasync function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) return body.data;\n  return body ?? resp;\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('unwrap') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.300Z",
+  "metadata": {
+    "fromSlug": "edit-agent",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Edit Agent",
+      "description": "Update an existing agent by slug with partial fields (name, role, description, model, systemPrompt, temperature, maxTokens, blueprint, timeout, previewPrompts). Returns a lean agent summary (no blueprint/state).",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "slug"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New agent name"
+          },
+          "role": {
+            "type": "string",
+            "description": "New agent role (separate field from systemPrompt). If you change role, consider updating the systemPrompt identity/header to match."
+          },
+          "slug": {
+            "type": "string",
+            "description": "Agent slug to update (kebab-case)"
+          },
+          "model": {
+            "type": "string",
+            "description": "New LLM model"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "New execution timeout in ms"
+          },
+          "blueprint": {
+            "type": "object",
+            "description": "New Autopilot blueprint { nodes, edges }"
+          },
+          "maxTokens": {
+            "type": "number",
+            "description": "New max tokens"
+          },
+          "description": {
+            "type": "string",
+            "description": "New agent description"
+          },
+          "temperature": {
+            "type": "number",
+            "description": "New temperature (0-2)"
+          },
+          "systemPrompt": {
+            "type": "string",
+            "description": "New system instructions. Must begin with <character name=\"AGENT_NAME\">ROLE</character> as the first line and preserve this header unless explicitly changing name/role."
+          },
+          "previewPrompts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "New preview/example prompts (max 10)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "fetch_agent",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "prepare_update",
+            "ref": "e3",
+            "from": "fetch_agent"
+          },
+          {
+            "to": "http_update",
+            "ref": "e4",
+            "from": "prepare_update"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e5",
+            "from": "http_update"
+          },
+          {
+            "to": "slim",
+            "ref": "e6",
+            "from": "unwrap"
+          },
+          {
+            "to": "end_1",
+            "ref": "e7",
+            "from": "slim"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Update Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              if (!input.slug) {\n                throw new Error('slug is required');\n              }\n\n              // Build partial update body with only provided fields\n              const body = {};\n              if (input.name !== undefined) body.name = input.name;\n              if (input.role !== undefined) body.role = input.role;\n              if (input.description !== undefined) body.description = input.description;\n              if (input.model !== undefined) body.model = input.model;\n              if (input.systemPrompt !== undefined) body.systemPrompt = input.systemPrompt;\n              if (input.temperature !== undefined) body.temperature = input.temperature;\n              if (input.maxTokens !== undefined) body.maxTokens = input.maxTokens;\n              if (input.blueprint !== undefined) body.blueprint = input.blueprint;\n              if (input.timeout !== undefined) body.timeout = input.timeout;\n              if (Array.isArray(input.previewPrompts)) {\n                const prompts = input.previewPrompts.filter(p => typeof p === 'string' && p.trim()).slice(0, 10);\n                body.previewPrompts = prompts;\n              }\n\n              if (Object.keys(body).length === 0) {\n                throw new Error('At least one field must be provided for update');\n              }\n\n              return {\n                slug: input.slug,\n                body: body\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Build URL, headers and partial body for agent update"
+          },
+          {
+            "ref": "fetch_agent",
+            "name": "Fetch Agent by Slug",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "slug": "{{ (lastOutputOf(\"prepare\") || {}).slug }}",
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "get-agent",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /starships/:starshipId/agents/:slug to resolve agent ID"
+          },
+          {
+            "ref": "prepare_update",
+            "name": "Prepare Update Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};\n              const agentData = fetchResponse.body?.data || fetchResponse.body;\n\n              if (!agentData || !agentData.id) {\n                throw new Error('Failed to resolve agent by slug');\n              }\n\n              const prep = ctx.lastOutputOf('prepare') || {};\n\n              return {\n                agentId: String(agentData.id),\n                ...(prep.body || {})\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Extract agent ID and prepare PUT request"
+          },
+          {
+            "ref": "http_update",
+            "name": "Update Agent",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf(\"prepare_update\") }}",
+              "action": "update-agent",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "PUT /agents/:id with partial updates"
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const resp = ctx.input || {};\n              const body = resp && typeof resp === 'object' ? resp.body : undefined;\n\n              if (body && typeof body === 'object') {\n                if (body.success === true) return body.data ?? body;\n                if (body.success === false) return body.error ?? body;\n              }\n              return body ?? resp;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return body.data/body.error where applicable; otherwise return body/resp"
+          },
+          {
+            "ref": "slim",
+            "name": "Slim Agent",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const agent = ctx.input;\n\n              // Pass through structured errors unchanged.\n              if (agent && typeof agent === 'object') {\n                const a = agent;\n                if (typeof a.code === 'string' && typeof a.message === 'string') return a;\n              }\n\n              if (!agent || typeof agent !== 'object') return agent;\n\n              const a = agent;\n              const out = {};\n\n              if (typeof a.slug === 'string') out.slug = a.slug;\n              if (typeof a.name === 'string') out.name = a.name;\n              if (typeof a.role === 'string') out.role = a.role;\n              if (typeof a.description === 'string') out.description = a.description;\n              if (typeof a.category === 'string') out.category = a.category;\n\n              if (typeof a.model === 'string') out.model = a.model;\n              if (typeof a.systemPrompt === 'string') out.systemPrompt = a.systemPrompt;\n\n              if (typeof a.temperature === 'number') out.temperature = a.temperature;\n              if (typeof a.maxTokens === 'number') out.maxTokens = a.maxTokens;\n              if (typeof a.timeout === 'number') out.timeout = a.timeout;\n\n              if (typeof a.version === 'string') out.version = a.version;\n\n              if (Array.isArray(a.previewPrompts)) {\n                const prompts = a.previewPrompts.filter((p) => typeof p === 'string');\n                out.previewPrompts = prompts;\n              }\n\n              if (Array.isArray(a.assignedToolSlugs)) {\n                const slugs = a.assignedToolSlugs.filter((s) => typeof s === 'string');\n                out.assignedToolSlugs = slugs;\n              }\n\n              return out;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return a lean agent summary (omit blueprint/state and internal metadata)"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"slim\") }}"
+            },
+            "description": "Return lean updated agent summary"
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -90,6 +90,12 @@ export function RoomConversationIndexView(props: {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    const slug = String(props.roomSlug || '').trim()
+    if (slug !== 'leadgen') return
+
+    const fromLeadGen = searchParams.get('fromLeadGen') === '1'
+    if (!fromLeadGen) return
+
     const timer = window.setTimeout(() => {
       if (!starterInputRef.current) return
 
@@ -122,7 +128,7 @@ export function RoomConversationIndexView(props: {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [])
+  }, [props.roomSlug, searchParams])
 
   const starterBadgeClass = (active: boolean) =>
     cn(

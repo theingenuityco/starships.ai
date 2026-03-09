@@ -3233,6 +3233,29 @@ router.post(
           // Ignore if already a participant or if a constraint is hit.
         }
 
+        // Best-effort: ensure all leadgen bundle agents are already room participants so that
+        // mentions like <@a:nora> do not trigger an "Add to room" approval banner.
+        try {
+          const agentRepo = new AgentRepository();
+          const participantRepo = new ConversationParticipantRepository();
+          const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+          for (const slug of leadgenAgentSlugs) {
+            const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+            if (!agent?.id) continue;
+            try {
+              await participantRepo.addAgentParticipant({
+                conversationId: existingRoom.conversationId,
+                agentId: agent.id,
+                createdBy: user.id,
+              });
+            } catch {
+              // Ignore if agent is already a participant or if a constraint is hit.
+            }
+          }
+        } catch {
+          // Best-effort only; if this fails we still return the room.
+        }
+
         // eslint-disable-next-line no-console
         console.debug('[leadgen] Reusing existing leadgen room', {
           starshipId,
@@ -3349,6 +3372,29 @@ router.post(
           imported: importSummary.imported,
         });
         return;
+      }
+
+      // Best-effort: ensure all leadgen bundle agents are added as room participants for the
+      // newly created room so user messages mentioning them do not require manual approval.
+      try {
+        const agentRepo = new AgentRepository();
+        const participantRepo = new ConversationParticipantRepository();
+        const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+        for (const slug of leadgenAgentSlugs) {
+          const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+          if (!agent?.id) continue;
+          try {
+            await participantRepo.addAgentParticipant({
+              conversationId: createdRoom.conversationId,
+              agentId: agent.id,
+              createdBy: user.id,
+            });
+          } catch {
+            // Ignore if agent is already a participant or if a constraint is hit.
+          }
+        }
+      } catch {
+        // Best-effort only; room provisioning should still succeed even if this step fails.
       }
 
       // eslint-disable-next-line no-console

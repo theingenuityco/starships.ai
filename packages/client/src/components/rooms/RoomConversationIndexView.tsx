@@ -113,7 +113,17 @@ export function RoomConversationIndexView(props: {
           return
         }
 
-        starterInputRef.current.setInitialContent?.(prompt)
+        // Prefer tagging the lead-gen Nora agent as a leading mention, when available.
+        const noraAgent =
+          (starshipAgents as AgentModel[]).find(a => String((a as any)?.slug || '').trim().toLowerCase() === 'nora') ??
+          (starshipAgents as AgentModel[]).find(a => String((a as any)?.name || '').trim().toLowerCase() === 'nora') ??
+          null
+
+        if (noraAgent && starterInputRef.current.setLeadingMentionAgent) {
+          starterInputRef.current.setLeadingMentionAgent(noraAgent, prompt)
+        } else {
+          starterInputRef.current.setInitialContent?.(prompt)
+        }
       } catch {
         // Ignore storage/parsing errors.
       } finally {
@@ -128,7 +138,7 @@ export function RoomConversationIndexView(props: {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [props.roomSlug, searchParams])
+  }, [props.roomSlug, searchParams, starshipAgents])
 
   const starterBadgeClass = (active: boolean) =>
     cn(

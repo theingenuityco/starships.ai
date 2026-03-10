@@ -542,8 +542,23 @@ async function applyRoomBundleToStarship(opts: {
         (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
         (agentNameKey ? agentsByName.get(agentNameKey) : null);
 
+      // eslint-disable-next-line no-console
+      console.debug('[leadgen] Agent bundle decision', {
+        starshipId,
+        fromSlug: sourceSlug,
+        agentName: agentPayload?.name,
+        decision: decision.action,
+        hasExistingTarget: Boolean(target?.id),
+      });
+
       if (decision.action === 'skip') {
         if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
+        // eslint-disable-next-line no-console
+        console.debug('[leadgen] Agent import skipped', {
+          starshipId,
+          fromSlug: sourceSlug,
+          agentName: agentPayload?.name,
+        });
         continue;
       }
 
@@ -580,6 +595,13 @@ async function applyRoomBundleToStarship(opts: {
           }
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
+          // eslint-disable-next-line no-console
+          console.debug('[leadgen] Agent overwritten from bundle', {
+            starshipId,
+            fromSlug: sourceSlug,
+            agentName: agentPayload?.name,
+            agentId: updated.id,
+          });
         }
         continue;
       }
@@ -598,10 +620,24 @@ async function applyRoomBundleToStarship(opts: {
         if (result?.kind === 'agent' && result.agent) {
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, result.agent.id);
+          // eslint-disable-next-line no-console
+          console.debug('[leadgen] Agent imported from bundle', {
+            starshipId,
+            fromSlug: sourceSlug,
+            agentName: agentPayload?.name,
+            agentId: result.agent.id,
+          });
         }
       } catch (err) {
         const message = (err as any)?.message || String(err);
         warnings.push(`Agent import failed for ${String(agentPayload?.name || a.file)}: ${message}`);
+        // eslint-disable-next-line no-console
+        console.error('[leadgen] Agent import failed from bundle', {
+          starshipId,
+          fromSlug: sourceSlug,
+          agentName: agentPayload?.name,
+          error: message,
+        });
         // Swallow agent import errors (e.g. agent limit reached) so that room provisioning can continue.
       }
     }

@@ -1,0 +1,182 @@
+{
+  "schemaVersion": "1",
+  "kind": "dataset",
+  "exportedAt": "2026-03-10T19:02:15.317Z",
+  "metadata": {
+    "fromSlug": "contacts",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "dataset": {
+      "name": "Contacts",
+      "description": "People/contacts associated with accounts. References Accounts.",
+      "columns": [
+        {
+          "name": "contact_id",
+          "type": "number",
+          "constraints": {
+            "unique": true,
+            "autoincrement": true
+          },
+          "description": "Internal contact id"
+        },
+        {
+          "name": "account",
+          "type": "reference",
+          "reference": {
+            "target": {
+              "kind": "dataset_row",
+              "datasetIdOrSlug": "accounts"
+            },
+            "labelColumn": "account_name"
+          },
+          "description": "Reference to accounts row"
+        },
+        {
+          "name": "first_name",
+          "type": "string",
+          "description": "First name"
+        },
+        {
+          "name": "last_name",
+          "type": "string",
+          "description": "Last name"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Job title"
+        },
+        {
+          "enum": {
+            "options": [
+              "ic",
+              "manager",
+              "director",
+              "vp",
+              "c_level",
+              "owner"
+            ]
+          },
+          "name": "seniority",
+          "type": "enum",
+          "description": "Seniority"
+        },
+        {
+          "enum": {
+            "options": [
+              "sales",
+              "marketing",
+              "product",
+              "engineering",
+              "ops",
+              "hr",
+              "finance",
+              "it",
+              "other"
+            ]
+          },
+          "name": "department",
+          "type": "enum",
+          "description": "Department"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "description": "Email"
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "description": "Phone"
+        },
+        {
+          "name": "linkedin_url",
+          "type": "string",
+          "description": "LinkedIn URL"
+        },
+        {
+          "name": "country",
+          "type": "string",
+          "description": "Country"
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "description": "State/Region"
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "description": "City"
+        },
+        {
+          "enum": {
+            "options": [
+              "new",
+              "attempted",
+              "connected",
+              "responded",
+              "qualified",
+              "unqualified",
+              "do_not_contact"
+            ]
+          },
+          "name": "lead_status",
+          "type": "enum",
+          "constraints": {
+            "required": true
+          },
+          "description": "Lead workflow status"
+        },
+        {
+          "name": "lead_score",
+          "type": "number",
+          "format": "number",
+          "description": "Lead score 0-100"
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "description": "Owner/assignee"
+        },
+        {
+          "name": "source",
+          "type": "string",
+          "description": "Lead source"
+        },
+        {
+          "name": "source_url",
+          "type": "string",
+          "description": "URL where contact was found"
+        },
+        {
+          "name": "created_at",
+          "type": "datetime",
+          "description": "When contact was created"
+        },
+        {
+          "name": "last_touch_at",
+          "type": "datetime",
+          "description": "Last touch timestamp"
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "description": "Notes"
+        },
+        {
+          "name": "raw",
+          "type": "json",
+          "description": "Raw enrichment payloads"
+        }
+      ],
+      "primaryKey": "contact_id"
+    },
+    "rows": []
+  }
+}

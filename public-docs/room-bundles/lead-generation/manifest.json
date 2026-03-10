@@ -44,7 +44,26 @@
       }
     ],
     "views": [],
-    "datasets": [],
+    "datasets": [
+      {
+        "kind": "dataset",
+        "fromSlug": "accounts",
+        "fromStarshipSlug": "starborn-dvlif0",
+        "file": "datasets/accounts.json"
+      },
+      {
+        "kind": "dataset",
+        "fromSlug": "icp-profiles",
+        "fromStarshipSlug": "starborn-dvlif0",
+        "file": "datasets/icp-profiles.json"
+      },
+      {
+        "kind": "dataset",
+        "fromSlug": "contacts",
+        "fromStarshipSlug": "starborn-dvlif0",
+        "file": "datasets/contacts.json"
+      }
+    ],
     "taskBoards": [
       {
         "kind": "task_board",

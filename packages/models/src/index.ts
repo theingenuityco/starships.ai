@@ -4,6 +4,7 @@ export type { PostgresConfig } from './helpers/database';
 
 /* Entity exports */
 export { AgentEntity } from './entities/AgentEntity';
+export { AgentSpriteAssetEntity } from './entities/AgentSpriteAssetEntity';
 export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { ConnectorSecretEntity } from './entities/ConnectorSecretEntity';
@@ -53,6 +54,7 @@ export { AutopilotAwaitFiringEntity } from './entities/AutopilotAwaitFiringEntit
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
+export { AgentSpriteAssetRepository } from './repositories/AgentSpriteAssetRepository';
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
 export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';

@@ -1,0 +1,311 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client'
+
+import { Application, Container, Graphics, Text } from 'pixi.js'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { RoomGameActor, RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameSnapshot } from '@/types'
+import { useRoomGameStream } from '@/hooks/useRoomGameStream'
+import { colorFromAppearanceKey, deriveRoomSeed } from '@/lib/appearance'
+import { generateTopDownRoom } from '@/procgen/room'
+
+type ActorById = Map<string, RoomGameActor>
+
+function applySnapshot(s: RoomGameSnapshot): ActorById {
+  const m: ActorById = new Map()
+  for (const a of Array.isArray(s.actors) ? s.actors : []) {
+    if (!a || typeof a.id !== 'string') continue
+    m.set(a.id, a)
+  }
+  return m
+}
+
+function applyPatch(prev: ActorById, patch: RoomGameActorsPatch): ActorById {
+  const next = new Map(prev)
+  for (const p of Array.isArray(patch.patches) ? patch.patches : []) {
+    const id = String((p as any)?.id || '').trim()
+    if (!id) continue
+    const cur = next.get(id)
+    if (!cur) continue
+    next.set(id, {
+      ...cur,
+      ...(typeof (p as any).x === 'number' ? { x: (p as any).x } : null),
+      ...(typeof (p as any).y === 'number' ? { y: (p as any).y } : null),
+      ...('facing' in (p as any) ? { facing: (p as any).facing ?? null } : null),
+      ...('anim' in (p as any) ? { anim: (p as any).anim ?? null } : null),
+      ...('appearanceKey' in (p as any) ? { appearanceKey: (p as any).appearanceKey ?? null } : null),
+      ...('avatarAttachmentId' in (p as any) ? { avatarAttachmentId: (p as any).avatarAttachmentId ?? null } : null),
+      ...('label' in (p as any) ? { label: (p as any).label ?? null } : null),
+    })
+  }
+  return next
+}
+
+function applyJoin(prev: ActorById, evt: RoomGameActorsJoinLeave): ActorById {
+  const next = new Map(prev)
+  const a = evt.actor
+  if (a && typeof a.id === 'string') next.set(a.id, a)
+  return next
+}
+
+function applyLeave(prev: ActorById, evt: RoomGameActorsJoinLeave): ActorById {
+  const next = new Map(prev)
+  const a = evt.actor
+  if (a && typeof a.id === 'string') next.delete(a.id)
+  return next
+}
+
+export function RoomGameView(props: {
+  roomConversationId: string
+  enabled?: boolean
+  getAuthToken?: () => Promise<string | null | undefined>
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const appRef = useRef<Application | null>(null)
+  const stageRef = useRef<Container | null>(null)
+  const actorLayerRef = useRef<Container | null>(null)
+  const tileLayerRef = useRef<Graphics | null>(null)
+
+  const [snapshot, setSnapshot] = useState<RoomGameSnapshot | null>(null)
+  const [actorsById, setActorsById] = useState<ActorById>(() => new Map())
+
+  const seed = useMemo(() => {
+    const s = snapshot?.seed
+    if (typeof s === 'string' && s.trim()) return s.trim()
+    return deriveRoomSeed(props.roomConversationId, snapshot?.generatorVersion || 'v1')
+  }, [props.roomConversationId, snapshot?.generatorVersion, snapshot?.seed])
+
+  const { streamState } = useRoomGameStream({
+    roomConversationId: props.roomConversationId,
+    enabled: props.enabled ?? true,
+    getAuthToken: props.getAuthToken,
+    onSnapshot: (s) => {
+      setSnapshot(s)
+      setActorsById(applySnapshot(s))
+    },
+    onActorsPatch: (p) => setActorsById((prev) => applyPatch(prev, p)),
+    onActorJoin: (e) => setActorsById((prev) => applyJoin(prev, e)),
+    onActorLeave: (e) => setActorsById((prev) => applyLeave(prev, e)),
+  })
+
+  const lastMoveAtRef = useRef<number>(0)
+  useEffect(() => {
+    if (props.enabled === false) return
+    const roomConversationId = String(props.roomConversationId || '').trim()
+    if (!roomConversationId) return
+
+    const sendMove = async (dx: number, dy: number) => {
+      const now = Date.now()
+      if (now - lastMoveAtRef.current < 90) return // ~11Hz max
+      lastMoveAtRef.current = now
+      const token = props.getAuthToken ? await props.getAuthToken().catch(() => null) : null
+      await fetch(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/game/input`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : null),
+        } as any,
+        body: JSON.stringify({ type: 'move', dx, dy }),
+      }).catch(() => undefined)
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return
+      const key = e.key
+      if (key === 'ArrowUp' || key === 'w') {
+        e.preventDefault()
+        void sendMove(0, -1)
+      } else if (key === 'ArrowDown' || key === 's') {
+        e.preventDefault()
+        void sendMove(0, 1)
+      } else if (key === 'ArrowLeft' || key === 'a') {
+        e.preventDefault()
+        void sendMove(-1, 0)
+      } else if (key === 'ArrowRight' || key === 'd') {
+        e.preventDefault()
+        void sendMove(1, 0)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, { passive: false })
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [props.enabled, props.getAuthToken, props.roomConversationId])
+
+  // Mount Pixi app
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    if (appRef.current) return
+
+    const app = new Application()
+    appRef.current = app
+
+    let disposed = false
+    ;(async () => {
+      await app.init({
+        background: '#0b1020',
+        antialias: true,
+        resizeTo: el,
+        resolution: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+        autoDensity: true,
+      })
+      if (disposed) return
+      el.appendChild(app.canvas)
+
+      const stage = new Container()
+      stageRef.current = stage
+      app.stage.addChild(stage)
+
+      const tileLayer = new Graphics()
+      tileLayerRef.current = tileLayer
+      stage.addChild(tileLayer)
+
+      // Background grid
+      const bg = new Graphics()
+      bg.alpha = 0.22
+      stage.addChild(bg)
+
+      const actorLayer = new Container()
+      actorLayerRef.current = actorLayer
+      stage.addChild(actorLayer)
+
+      const drawBg = () => {
+        const w = app.renderer.width
+        const h = app.renderer.height
+        bg.clear()
+        bg.rect(0, 0, w, h)
+        bg.fill({ color: 0x0b1020 })
+        const cell = 32
+        bg.stroke({ width: 1, color: 0xffffff, alpha: 0.08 })
+        for (let x = 0; x <= w; x += cell) {
+          bg.moveTo(x, 0)
+          bg.lineTo(x, h)
+        }
+        for (let y = 0; y <= h; y += cell) {
+          bg.moveTo(0, y)
+          bg.lineTo(w, y)
+        }
+        bg.stroke()
+      }
+      drawBg()
+      app.renderer.on('resize', drawBg)
+    })()
+
+    return () => {
+      disposed = true
+      try {
+        app.renderer.off('resize', () => undefined)
+      } catch {
+        // ignore
+      }
+      try {
+        el.querySelector('canvas')?.remove()
+      } catch {
+        // ignore
+      }
+      try {
+        app.destroy(true)
+      } catch {
+        // ignore
+      }
+      appRef.current = null
+      stageRef.current = null
+      actorLayerRef.current = null
+      tileLayerRef.current = null
+    }
+  }, [])
+
+  // Render procedural tiles (simple fallback for now)
+  useEffect(() => {
+    const app = appRef.current
+    const tileLayer = tileLayerRef.current
+    if (!app || !tileLayer) return
+
+    const cell = 32
+    const renderTiles = () => {
+      const tilesWide = Math.max(8, Math.ceil(app.renderer.width / cell))
+      const tilesHigh = Math.max(8, Math.ceil(app.renderer.height / cell))
+      const grid = generateTopDownRoom({ seed, width: tilesWide, height: tilesHigh })
+
+      tileLayer.clear()
+      for (let y = 0; y < grid.length; y++) {
+        const row = grid[y]
+        for (let x = 0; x < row.length; x++) {
+          const t = row[x]
+          const px = x * cell
+          const py = y * cell
+          if (t === 0) {
+            tileLayer.rect(px, py, cell, cell)
+            tileLayer.fill({ color: 0x0f172a, alpha: 1 })
+          } else if (t === 1) {
+            tileLayer.rect(px, py, cell, cell)
+            tileLayer.fill({ color: 0x1f2937, alpha: 1 })
+          } else {
+            tileLayer.rect(px + 6, py + 6, cell - 12, cell - 12)
+            tileLayer.fill({ color: 0x334155, alpha: 1 })
+          }
+        }
+      }
+    }
+
+    renderTiles()
+    app.renderer.on('resize', renderTiles)
+    return () => {
+      try {
+        app.renderer.off('resize', renderTiles)
+      } catch {
+        // ignore
+      }
+    }
+  }, [seed])
+
+  // Render actors (simple tokens for now; sprite assets will replace these)
+  useEffect(() => {
+    const layer = actorLayerRef.current
+    const app = appRef.current
+    if (!layer || !app) return
+
+    layer.removeChildren()
+
+    const actors = Array.from(actorsById.values())
+    for (const a of actors) {
+      const g = new Graphics()
+      const css = colorFromAppearanceKey(a.appearanceKey || a.avatarAttachmentId || a.id)
+      // Pixi v8 accepts CSS in fill? use numeric conversion fallback
+      const color = Number.parseInt(css.replace('#', ''), 16)
+      const radius = 10
+      g.circle(0, 0, radius)
+      g.fill({ color: Number.isFinite(color) ? color : 0x64748b, alpha: 0.95 })
+      g.x = Math.round((a.x || 0) * 32 + 32)
+      g.y = Math.round((a.y || 0) * 32 + 32)
+
+      const label = String(a.label || (a.kind === 'agent' ? 'Agent' : 'User'))
+      const t = new Text({
+        text: label,
+        style: { fontFamily: 'monospace', fontSize: 11, fill: 0xe2e8f0 },
+      })
+      t.anchor.set(0.5, 0)
+      t.x = g.x
+      t.y = g.y + radius + 4
+
+      layer.addChild(g)
+      layer.addChild(t)
+    }
+  }, [actorsById, seed])
+
+  const statusLine = useMemo(() => {
+    if (streamState.status === 'connected') return 'Connected'
+    if (streamState.status === 'connecting') return 'Connecting…'
+    if (streamState.status === 'error') return `Error: ${streamState.message}`
+    return 'Idle'
+  }, [streamState])
+
+  return (
+    <div className="relative h-full w-full min-h-0">
+      <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute left-3 top-3 z-10 rounded-md bg-black/40 backdrop-blur px-2 py-1 text-xs text-white font-mono">
+        RoomGame · {statusLine} · seed:{seed.slice(0, 6)}
+      </div>
+    </div>
+  )
+}
+

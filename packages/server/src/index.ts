@@ -22,6 +22,7 @@ import { createServer } from 'http';
 // Route imports
 import agentTemplateRoutes from '@/routes/agent-templates';
 import agentRoutes from '@/routes/agents';
+import agentSpriteAssetRoutes from '@/routes/agent-sprite-assets';
 import attachmentRoutes from '@/routes/attachments';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
@@ -29,6 +30,7 @@ import connectorRoutes from '@/routes/connectors';
 import exploreRoutes from '@/routes/explore';
 import messageRoutes from '@/routes/messages';
 import roomRoutes from '@/routes/rooms';
+import roomGameRoutes from '@/routes/room-game';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
 import walletRoutes from '@/routes/wallets';
@@ -109,9 +111,11 @@ app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
 app.use('/api/v1', agentTemplateRoutes);
+app.use('/api/v1', agentSpriteAssetRoutes);
 app.use('/api/v1', attachmentRoutes);
 app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', roomRoutes);
+app.use('/api/v1', roomGameRoutes);
 app.use('/api/v1', connectorRoutes);
 app.use('/api/v1', exploreRoutes);
 app.use('/api/v1', messageRoutes);

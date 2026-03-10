@@ -32,11 +32,12 @@ import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipTools } from '@/hooks/useTools'
-import api from '@/lib/api'
+import api, { getCurrentToken } from '@/lib/api'
+import { RoomGameView } from '@starships/game'
 
 const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
 
@@ -52,7 +53,15 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const params = useParams<{ slug: string; roomSlug?: string; conversationId?: string; threadId?: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { user } = useAuthContext()
+
+  const isGameRoute = useMemo(() => {
+    const p = typeof pathname === 'string' ? pathname : ''
+    const clean = p.split('?')[0]
+    const parts = clean.split('/').filter(Boolean)
+    return parts[parts.length - 1] === 'game'
+  }, [pathname])
 
   const [conversationAgent, setConversationAgent] = useState<AgentModel | null>(null)
   const [conversationDraftParentConversationId, setConversationDraftParentConversationId] = useState<string | null>(null)
@@ -285,7 +294,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const isHistoryPaneOpen = roomPaneKey === 'history'
   const threadKey = routeThreadKey
   const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : isHistoryPaneOpen ? 'history' : null) as 'thread' | 'resources' | 'history' | null
-  const isSidePaneOpen = Boolean(paneKind)
+  const isSidePaneOpen = Boolean(paneKind) && !isGameRoute
   const PANE_ANIM_MS = 300
   const PANE_OPEN_CONTENT_DELAY_MS = 120
   const [isSidePaneMounted, setIsSidePaneMounted] = useState<boolean>(isSidePaneOpen)
@@ -713,7 +722,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       }}
     >
       <div className={cn('flex-1 min-w-0 h-full', isSidePaneOpen && 'hidden md:block')}>
-        {activeConversationId && conversationKey ? (
+        {isGameRoute && activeConversationId ? (
+          <RoomGameView roomConversationId={activeConversationId} enabled={Boolean(activeConversationId)} getAuthToken={getCurrentToken} />
+        ) : activeConversationId && conversationKey ? (
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}

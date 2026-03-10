@@ -89,6 +89,35 @@ export function RoomConversationIndexView(props: {
     setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
   }, [preselectAgentId, starshipAgents])
 
+  // Default the starter agent to Nora in leadgen rooms when available,
+  // so users can send messages without manually selecting an agent.
+  useEffect(() => {
+    const slug = String(props.roomSlug || '').trim()
+    const isLeadGenRoom =
+      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
+    if (!isLeadGenRoom) return
+    if (!Array.isArray(starshipAgents) || starshipAgents.length === 0) return
+
+    const noraAgent =
+      (starshipAgents as AgentModel[]).find(
+        a =>
+          String((a as any)?.slug || '')
+            .trim()
+            .toLowerCase() === 'nora'
+      ) ??
+      (starshipAgents as AgentModel[]).find(
+        a =>
+          String((a as any)?.name || '')
+            .trim()
+            .toLowerCase() === 'nora'
+      ) ??
+      null
+
+    if (!noraAgent) return
+
+    setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
+  }, [props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -137,6 +166,8 @@ export function RoomConversationIndexView(props: {
           null
 
         if (noraAgent && starterInputRef.current.setLeadingMentionAgent) {
+          // Ensure Nora is the active starter agent as well.
+          setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
           starterInputRef.current.setLeadingMentionAgent(noraAgent, prompt)
         } else {
           starterInputRef.current.setInitialContent?.(prompt)

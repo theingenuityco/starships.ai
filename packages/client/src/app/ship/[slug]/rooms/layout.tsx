@@ -255,14 +255,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     // Only intervene when we're currently on the Lobby room route.
     if (normalizedRoomSlug !== 'lobby') return
 
-    const rooms = roomsData?.rooms ?? []
-    const hasLeadgenRoom = rooms.some(
-      (r: RoomModel) =>
-        String(r.slug || '')
-          .trim()
-          .toLowerCase() === 'leadgen'
-    )
-    if (!hasLeadgenRoom) return
+    const rooms = (roomsData?.rooms ?? []) as RoomModel[]
+    const leadgenRoom = rooms.find(r => (r as any).provisionedByBundle === 'lead-generation')
+    if (!leadgenRoom?.slug) return
 
     let hasFreshPendingPrompt = false
     try {
@@ -284,7 +279,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const slug = String(routeParams.slug || '').trim()
     if (!slug) return
 
-    router.replace(`/ship/${encodeURIComponent(slug)}/rooms/leadgen?fromLeadGen=1`)
+    router.replace(`/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(String(leadgenRoom.slug))}?fromLeadGen=1`)
   }, [normalizedRoomSlug, roomsData?.rooms, routeParams.slug, router])
 
   const activeConversationId = useMemo(() => {
@@ -850,6 +845,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             roomSlug={activeRoom?.slug ?? null}
             roomName={activeRoom?.name ?? null}
             roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+            roomProvisionedByBundle={(activeRoom as any)?.provisionedByBundle ?? null}
             starshipOwnerId={starshipOwnerId}
             starshipSlug={routeParams.slug}
             allowedMentionUserIds={roomParticipants.data?.userIds ?? []}

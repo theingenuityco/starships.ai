@@ -25,7 +25,7 @@ export async function up(client: Client): Promise<void> {
   );
 }
 
-export async function down(client: Client): Promise<void> {
+export async function down(): Promise<void> {
   // This migration is intentionally irreversible because we don't know the previous
   // per-starship entitlements once we've increased the max_agents value.
   // If needed, a manual rollback can be performed with a targeted UPDATE.

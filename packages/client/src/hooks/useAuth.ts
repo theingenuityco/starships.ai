@@ -230,8 +230,21 @@ async function handleLeadGenPostAuth(args: {
 
       if (resp.ok) {
         const json = (await resp.json()) as ApiResponse<{ room: { slug: string } }>
-        const roomSlug = json.data?.room?.slug || 'leadgen'
-        const baseTarget = `/ship/${starship.slug}/rooms/${roomSlug}?fromLeadGen=1`
+        const roomSlug = json.data?.room?.slug
+        if (!roomSlug) {
+          // If the server response is malformed, fall back to the default redirect logic.
+          return false
+        }
+
+        try {
+          if (typeof window !== 'undefined' && starship.id) {
+            window.sessionStorage.setItem('lead_gen_last_starship_id', String(starship.id))
+          }
+        } catch {
+          // Ignore storage errors; redirect should still proceed.
+        }
+
+        const baseTarget = `/ship/${starship.slug}/rooms/${encodeURIComponent(roomSlug)}?fromLeadGen=1`
         const target = isFirstLogin ? addWelcomeParamToPath(baseTarget) : baseTarget
         router.push(target)
         queryClient.invalidateQueries()

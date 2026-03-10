@@ -90,7 +90,7 @@ describe('starships leadgen room route', () => {
     jest.clearAllMocks();
   });
 
-  it('reuses existing leadgen room and adds user as participant', async () => {
+  it('reuses existing leadgen bundle-provisioned room and adds user as participant', async () => {
     jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
 
     const existingRoom = {
@@ -102,7 +102,7 @@ describe('starships leadgen room route', () => {
     };
 
     const roomRepo = {
-      findBySlug: jest.fn().mockResolvedValue(existingRoom),
+      findLeadGenBundleRoom: jest.fn().mockResolvedValue(existingRoom),
     };
     (RoomRepository as unknown as jest.Mock).mockImplementation(() => roomRepo);
 
@@ -121,7 +121,7 @@ describe('starships leadgen room route', () => {
     await handler(req, res as unknown as Response);
 
     expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_123', expect.anything());
-    expect(roomRepo.findBySlug).toHaveBeenCalledWith('leadgen', 'starship_1234');
+    expect(roomRepo.findLeadGenBundleRoom).toHaveBeenCalledWith('starship_1234');
     expect(participantRepo.addUserParticipant).toHaveBeenCalledWith({
       conversationId: existingRoom.conversationId,
       userId: 'user_123',
@@ -139,6 +139,7 @@ describe('starships leadgen room route', () => {
     jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
 
     const roomRepo = {
+      findLeadGenBundleRoom: jest.fn().mockResolvedValue(null),
       findBySlug: jest.fn().mockResolvedValue(null),
     };
     (RoomRepository as unknown as jest.Mock).mockImplementation(() => roomRepo);
@@ -154,7 +155,7 @@ describe('starships leadgen room route', () => {
     const handler = getHandler('/starships/:id/ensure-leadgen-room', 'post');
     await handler(req, res as unknown as Response);
 
-    expect(roomRepo.findBySlug).toHaveBeenCalledWith('leadgen', 'starship_1234');
+    expect(roomRepo.findLeadGenBundleRoom).toHaveBeenCalledWith('starship_1234');
     expect(existsSync).toHaveBeenCalled();
 
     expect(res.status).toHaveBeenCalledWith(500);

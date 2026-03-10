@@ -343,11 +343,17 @@ async function applyRoomBundleToStarship(opts: {
   zip: AdmZip;
   manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>;
   decisions: RoomBundleDecisions;
+  /**
+   * Optional provenance tag to stamp on any rooms created by this bundle
+   * application (e.g. "lead-generation"). This allows callers to later
+   * identify bundle-provisioned rooms even if their slugs change.
+   */
+  provisionedByBundleTag?: string | null;
 }): Promise<{
   imported: Record<string, number>;
   warnings?: string[];
 }> {
-  const { starshipId, userId, zip, manifest, decisions } = opts;
+  const { starshipId, userId, zip, manifest, decisions, provisionedByBundleTag } = opts;
   const ContainerSchema = ImportExportContainerSchemaV1RoomBundle;
   const conn = getConnection();
 
@@ -965,6 +971,7 @@ async function applyRoomBundleToStarship(opts: {
         name: String(roomPayload?.name || 'Room'),
         isPrivate: Boolean(roomPayload?.isPrivate),
         topic: roomPayload?.topic ?? null,
+        provisionedByBundle: provisionedByBundleTag ?? null,
       });
 
       // Creator becomes admin participant.
@@ -3294,11 +3301,13 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
     if (!user) return;
     if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
 
+    const roomRepo = new RoomRepository();
     const starshipId = paramValidation.id;
 
-    // If a leadgen room already exists for this starship, reuse it.
-    const roomRepo = new RoomRepository();
-    const existingRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
+    // If a leadgen bundle-provisioned room already exists for this starship, reuse it,
+    // regardless of its slug. This prevents collisions with user-created rooms that
+    // happen to use the same slug.
+    const existingRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
     if (existingRoom) {
       // Best-effort: ensure caller is a participant.
       try {
@@ -3439,9 +3448,10 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
       zip,
       manifest: manifestParsed.data,
       decisions: emptyDecisions,
+      provisionedByBundleTag: 'lead-generation',
     });
 
-    const createdRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
+    const createdRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
     if (!createdRoom) {
       // eslint-disable-next-line no-console
       console.error('[leadgen] Leadgen room not found after import', {

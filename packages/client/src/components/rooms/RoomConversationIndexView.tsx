@@ -20,6 +20,8 @@ export function RoomConversationIndexView(props: {
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  /** Optional provenance tag for bundle-provisioned rooms (e.g. "lead-generation"). */
+  roomProvisionedByBundle?: string | null
   starshipOwnerId?: string | null
   starshipSlug?: string | null
   /** Optional allowlists to scope @mention and agent selection within room conversations. */
@@ -91,10 +93,9 @@ export function RoomConversationIndexView(props: {
     if (typeof window === 'undefined') return
 
     const slug = String(props.roomSlug || '').trim()
-    if (slug !== 'leadgen') return
-
-    const fromLeadGen = searchParams.get('fromLeadGen') === '1'
-    if (!fromLeadGen) return
+    const isLeadGenRoom =
+      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
+    if (!isLeadGenRoom) return
 
     const timer = window.setTimeout(() => {
       if (!starterInputRef.current) return
@@ -102,6 +103,12 @@ export function RoomConversationIndexView(props: {
       try {
         const raw = window.sessionStorage.getItem('lead_gen_pending_prompt')
         if (!raw) return
+
+        // Optional safety: only hydrate when the pending prompt was captured for this starship.
+        const lastStarshipId = window.sessionStorage.getItem('lead_gen_last_starship_id')
+        if (props.starshipId && lastStarshipId && lastStarshipId !== props.starshipId) {
+          return
+        }
 
         const parsed = JSON.parse(raw) as { prompt?: string; createdAt?: number }
         const prompt = String(parsed?.prompt || '').trim()
@@ -148,7 +155,7 @@ export function RoomConversationIndexView(props: {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [props.roomSlug, searchParams, starshipAgents])
+  }, [props.starshipId, props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
 
   const starterBadgeClass = (active: boolean) =>
     cn(

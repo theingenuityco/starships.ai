@@ -218,22 +218,28 @@ function isAllowedRoomBundlePath(file: unknown): file is string {
 
 function assertRoomBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>): void {
   for (const t of manifest.entities.tools) {
-    if (!isAllowedRoomBundlePath(t.file) || !t.file.startsWith('tools/')) throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
+    if (!isAllowedRoomBundlePath(t.file) || !t.file.startsWith('tools/'))
+      throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
   }
   for (const a of manifest.entities.agents) {
-    if (!isAllowedRoomBundlePath(a.file) || !a.file.startsWith('agents/')) throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
+    if (!isAllowedRoomBundlePath(a.file) || !a.file.startsWith('agents/'))
+      throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
   }
   for (const r of manifest.entities.rooms) {
-    if (!isAllowedRoomBundlePath(r.file) || !r.file.startsWith('rooms/')) throw new Error(`Invalid manifest path for room entry: ${String(r.file)}`);
+    if (!isAllowedRoomBundlePath(r.file) || !r.file.startsWith('rooms/'))
+      throw new Error(`Invalid manifest path for room entry: ${String(r.file)}`);
   }
   for (const v of manifest.entities.views) {
-    if (!isAllowedRoomBundlePath(v.file) || !v.file.startsWith('views/')) throw new Error(`Invalid manifest path for view entry: ${String(v.file)}`);
+    if (!isAllowedRoomBundlePath(v.file) || !v.file.startsWith('views/'))
+      throw new Error(`Invalid manifest path for view entry: ${String(v.file)}`);
   }
   for (const d of manifest.entities.datasets) {
-    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('datasets/')) throw new Error(`Invalid manifest path for dataset entry: ${String(d.file)}`);
+    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('datasets/'))
+      throw new Error(`Invalid manifest path for dataset entry: ${String(d.file)}`);
   }
   for (const b of manifest.entities.taskBoards) {
-    if (!isAllowedRoomBundlePath(b.file) || !b.file.startsWith('task-boards/')) throw new Error(`Invalid manifest path for task board entry: ${String(b.file)}`);
+    if (!isAllowedRoomBundlePath(b.file) || !b.file.startsWith('task-boards/'))
+      throw new Error(`Invalid manifest path for task board entry: ${String(b.file)}`);
   }
 }
 
@@ -379,7 +385,9 @@ async function applyRoomBundleToStarship(opts: {
     const toolsByHash = new Map<string, (typeof existingTools)[number]>();
     const toolsByName = new Map<string, (typeof existingTools)[number]>();
     const indexTool = (t: (typeof existingTools)[number]) => {
-      const nameKey = String(t.name || '').trim().toLowerCase();
+      const nameKey = String(t.name || '')
+        .trim()
+        .toLowerCase();
       if (nameKey) toolsByName.set(nameKey, t);
       const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
       if (hash) toolsByHash.set(hash, t);
@@ -422,7 +430,9 @@ async function applyRoomBundleToStarship(opts: {
       });
 
       const decision = decisions.tools[bundleHash] ?? { action: 'copy' as const };
-      const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
+      const toolNameKey = String(toolPayload?.name || '')
+        .trim()
+        .toLowerCase();
       const existingByHash = toolsByHash.get(bundleHash);
       const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
       const target = existingByHash ?? existingByName ?? null;
@@ -472,7 +482,9 @@ async function applyRoomBundleToStarship(opts: {
     const existingAgents = await agentRepo.findByStarship(starshipId);
     const agentsByName = new Map<string, (typeof existingAgents)[number]>();
     for (const a of existingAgents) {
-      const nameKey = String(a.name || '').trim().toLowerCase();
+      const nameKey = String(a.name || '')
+        .trim()
+        .toLowerCase();
       if (nameKey) agentsByName.set(nameKey, a);
     }
 
@@ -523,9 +535,12 @@ async function applyRoomBundleToStarship(opts: {
       });
 
       const decision = decisions.agents[bundleHash] ?? { action: 'copy' as const };
-      const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
+      const agentNameKey = String(agentPayload?.name || '')
+        .trim()
+        .toLowerCase();
       const target =
-        (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ?? (agentNameKey ? agentsByName.get(agentNameKey) : null);
+        (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
+        (agentNameKey ? agentsByName.get(agentNameKey) : null);
 
       if (decision.action === 'skip') {
         if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
@@ -559,7 +574,9 @@ async function applyRoomBundleToStarship(opts: {
           try {
             await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
           } catch (err) {
-            warnings.push(`Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`);
+            warnings.push(
+              `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+            );
           }
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
@@ -594,7 +611,9 @@ async function applyRoomBundleToStarship(opts: {
     const viewsByHash = new Map<string, (typeof existingViews)[number]>();
     const viewsByName = new Map<string, (typeof existingViews)[number]>();
     for (const v of existingViews) {
-      const nameKey = String(v.name || '').trim().toLowerCase();
+      const nameKey = String(v.name || '')
+        .trim()
+        .toLowerCase();
       if (nameKey) viewsByName.set(nameKey, v);
       viewsByHash.set(computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig }), v);
     }
@@ -628,7 +647,9 @@ async function applyRoomBundleToStarship(opts: {
         runtimeConfig: viewPayload?.runtimeConfig,
       });
       const decision = decisions.views[bundleHash] ?? { action: 'copy' as const };
-      const viewNameKey = String(viewPayload?.name || '').trim().toLowerCase();
+      const viewNameKey = String(viewPayload?.name || '')
+        .trim()
+        .toLowerCase();
       const existingByHash = viewsByHash.get(bundleHash);
       const existingByName = viewNameKey ? viewsByName.get(viewNameKey) : undefined;
       const target = existingByHash ?? existingByName ?? null;
@@ -671,7 +692,9 @@ async function applyRoomBundleToStarship(opts: {
     const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
     const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
     for (const d of existingDatasets) {
-      const nameKey = String(d.name || '').trim().toLowerCase();
+      const nameKey = String(d.name || '')
+        .trim()
+        .toLowerCase();
       if (nameKey) datasetsByName.set(nameKey, d);
       datasetsByHash.set(
         computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
@@ -716,7 +739,9 @@ async function applyRoomBundleToStarship(opts: {
         primaryKey: datasetPayload?.primaryKey ?? null,
       });
       const decision = decisions.datasets[bundleHash] ?? { action: 'copy' as const };
-      const datasetNameKey = String(datasetPayload?.name || '').trim().toLowerCase();
+      const datasetNameKey = String(datasetPayload?.name || '')
+        .trim()
+        .toLowerCase();
       const existingByHash = datasetsByHash.get(bundleHash);
       const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
       const target = existingByHash ?? existingByName ?? null;
@@ -775,7 +800,9 @@ async function applyRoomBundleToStarship(opts: {
     const existingBoards = await taskBoardRepo.listByStarship(starshipId, { includeArchived: true });
     const boardsByName = new Map<string, (typeof existingBoards)[number]>();
     for (const b of existingBoards) {
-      const nameKey = String(b.name || '').trim().toLowerCase();
+      const nameKey = String(b.name || '')
+        .trim()
+        .toLowerCase();
       if (nameKey) boardsByName.set(nameKey, b);
     }
 
@@ -839,7 +866,7 @@ async function applyRoomBundleToStarship(opts: {
         const colId = createdColumnByTitle.get(colTitle);
         if (!colId) continue;
         const sourceAssigneeSlug = typeof c?.assigneeAgentSlug === 'string' ? String(c.assigneeAgentSlug).trim() : '';
-        const assigneeAgentId = sourceAssigneeSlug ? agentIdMap.get(sourceAssigneeSlug) ?? null : null;
+        const assigneeAgentId = sourceAssigneeSlug ? (agentIdMap.get(sourceAssigneeSlug) ?? null) : null;
         const assigneeUserSlug = typeof c?.assigneeUserSlug === 'string' ? String(c.assigneeUserSlug).trim() : '';
         const assigneeUserId = assigneeUserSlug.startsWith('u:') ? assigneeUserSlug.slice(2) : null;
         const createdCard = await taskCardRepo.create({
@@ -883,7 +910,11 @@ async function applyRoomBundleToStarship(opts: {
 
       const payload = containerParsed.data.payload as any;
       const roomPayload = payload?.room ?? {};
-      const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+      const bundleHash = computeBundleHash({
+        name: roomPayload?.name,
+        isPrivate: roomPayload?.isPrivate,
+        topic: roomPayload?.topic ?? null,
+      });
       const decision = decisions.rooms[bundleHash] ?? { action: 'copy' as const };
       if (decision.action === 'skip') continue;
 
@@ -2804,7 +2835,9 @@ router.post(
       const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
       const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
       for (const t of existingTools) {
-        const nameKey = String(t.name || '').trim().toLowerCase();
+        const nameKey = String(t.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
         const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingToolsByHash.set(storedHash, t);
@@ -2833,7 +2866,9 @@ router.post(
       const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
       const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
       for (const a of existingAgents) {
-        const nameKey = String(a.name || '').trim().toLowerCase();
+        const nameKey = String(a.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
         const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingAgentsByHash.set(storedHash, a);
@@ -2867,7 +2902,9 @@ router.post(
       const existingViewsByHash = new Map<string, (typeof existingViews)[number]>();
       const existingViewsByName = new Map<string, (typeof existingViews)[number]>();
       for (const v of existingViews) {
-        const nameKey = String(v.name || '').trim().toLowerCase();
+        const nameKey = String(v.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingViewsByName.set(nameKey, v);
         const h = computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig });
         existingViewsByHash.set(h, v);
@@ -2877,7 +2914,9 @@ router.post(
       const existingDatasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
       const existingDatasetsByName = new Map<string, (typeof existingDatasets)[number]>();
       for (const d of existingDatasets) {
-        const nameKey = String(d.name || '').trim().toLowerCase();
+        const nameKey = String(d.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingDatasetsByName.set(nameKey, d);
         const h = computeBundleHash({
           name: d.name,
@@ -2892,7 +2931,9 @@ router.post(
       const existingBoardsByHash = new Map<string, (typeof existingBoards)[number]>();
       const existingBoardsByName = new Map<string, (typeof existingBoards)[number]>();
       for (const b of existingBoards) {
-        const nameKey = String(b.name || '').trim().toLowerCase();
+        const nameKey = String(b.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingBoardsByName.set(nameKey, b);
         const h = computeBundleHash({ name: b.name, description: b.description });
         existingBoardsByHash.set(h, b);
@@ -2902,7 +2943,9 @@ router.post(
       const existingRoomsByHash = new Map<string, (typeof existingRooms)[number]>();
       const existingRoomsByName = new Map<string, (typeof existingRooms)[number]>();
       for (const r of existingRooms) {
-        const nameKey = String(r.name || '').trim().toLowerCase();
+        const nameKey = String(r.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingRoomsByName.set(nameKey, r);
         const h = computeBundleHash({ name: r.name, isPrivate: r.isPrivate, topic: r.topic ?? null });
         existingRoomsByHash.set(h, r);
@@ -3165,7 +3208,11 @@ router.post(
         const payload = containerParsed.data.payload as unknown as { room?: Record<string, unknown> };
         const roomPayload = payload?.room ?? {};
         const name = String(roomPayload?.name || '').trim();
-        const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+        const bundleHash = computeBundleHash({
+          name: roomPayload?.name,
+          isPrivate: roomPayload?.isPrivate,
+          topic: roomPayload?.topic ?? null,
+        });
         const existingByHash = existingRoomsByHash.get(bundleHash);
         const existingByName = name ? existingRoomsByName.get(name.toLowerCase()) : undefined;
         const existing = existingByHash ?? existingByName;
@@ -3202,180 +3249,36 @@ router.post(
  *
  * Starship owner / instance-admin only (same access model as generic bundle import).
  */
-router.post(
-  '/starships/:id/ensure-leadgen-room',
-  jwtAuthMiddleware,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
-      if (!paramValidation) return;
+router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
-      const user = requireAuthUser(req, res);
-      if (!user) return;
-      if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
 
-      const starshipId = paramValidation.id;
+    const starshipId = paramValidation.id;
 
-      // If a leadgen room already exists for this starship, reuse it.
-      const roomRepo = new RoomRepository();
-      const existingRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
-      if (existingRoom) {
-        // Best-effort: ensure caller is a participant.
-        try {
-          const participantRepo = new ConversationParticipantRepository();
-          await participantRepo.addUserParticipant({
-            conversationId: existingRoom.conversationId,
-            userId: user.id,
-            role: 'admin',
-            createdBy: user.id,
-          });
-        } catch {
-          // Ignore if already a participant or if a constraint is hit.
-        }
-
-        // Best-effort: ensure all leadgen bundle agents are already room participants so that
-        // mentions like <@a:nora> do not trigger an "Add to room" approval banner.
-        try {
-          const agentRepo = new AgentRepository();
-          const participantRepo = new ConversationParticipantRepository();
-          const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
-          for (const slug of leadgenAgentSlugs) {
-            const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
-            if (!agent?.id) continue;
-            try {
-              await participantRepo.addAgentParticipant({
-                conversationId: existingRoom.conversationId,
-                agentId: agent.id,
-                createdBy: user.id,
-              });
-            } catch {
-              // Ignore if agent is already a participant or if a constraint is hit.
-            }
-          }
-        } catch {
-          // Best-effort only; if this fails we still return the room.
-        }
-
-        // eslint-disable-next-line no-console
-        console.debug('[leadgen] Reusing existing leadgen room', {
-          starshipId,
-          roomSlug: existingRoom.slug,
+    // If a leadgen room already exists for this starship, reuse it.
+    const roomRepo = new RoomRepository();
+    const existingRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
+    if (existingRoom) {
+      // Best-effort: ensure caller is a participant.
+      try {
+        const participantRepo = new ConversationParticipantRepository();
+        await participantRepo.addUserParticipant({
           conversationId: existingRoom.conversationId,
+          userId: user.id,
+          role: 'admin',
+          createdBy: user.id,
         });
-
-        sendSuccess(res, { room: existingRoom });
-        return;
-      }
-
-      // No existing room; apply the lead-generation bundle from disk.
-      const docsRoot = resolvePublicDocsRoot();
-      const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
-      if (!fs.existsSync(zipPath)) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room bundle is not available on the server', 500);
-        return;
-      }
-
-      let zip: AdmZip;
-      try {
-        const buffer = fs.readFileSync(zipPath);
-        zip = new AdmZip(buffer);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to read lead generation room bundle', 500);
-        return;
-      }
-
-      let manifestEntry = zip.getEntry('manifest.json');
-      if (!manifestEntry) {
-        // Some bundles may be zipped with a top-level folder (e.g. "lead-generation/manifest.json").
-        const entries = zip.getEntries();
-        const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
-        if (alt) {
-          manifestEntry = alt;
-        }
-      }
-      if (!manifestEntry) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] manifest.json missing from bundle', {
-          zipPath,
-          entries: zip.getEntries().map((e) => e.entryName),
-        });
-        sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle is missing manifest.json', 500);
-        return;
-      }
-
-      let manifestRaw: unknown;
-      try {
-        manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
       } catch {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
-        sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json is not valid JSON', 500);
-        return;
+        // Ignore if already a participant or if a constraint is hit.
       }
 
-      const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
-      if (!manifestParsed.success) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] manifest.json shape is invalid', {
-          zipPath,
-          issues: manifestParsed.error.issues,
-        });
-        sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json has an unexpected shape', 500, {
-          issues: manifestParsed.error.issues,
-        });
-        return;
-      }
-
-      try {
-        assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] manifest.json contains invalid file paths', {
-          zipPath,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest contains invalid file paths', 500, {
-          message: err instanceof Error ? err.message : String(err),
-        });
-        return;
-      }
-
-      const emptyDecisions: RoomBundleDecisions = {
-        rooms: {},
-        views: {},
-        datasets: {},
-        taskBoards: {},
-        tools: {},
-        agents: {},
-      };
-
-      const importSummary = await applyRoomBundleToStarship({
-        starshipId,
-        userId: user.id,
-        zip,
-        manifest: manifestParsed.data,
-        decisions: emptyDecisions,
-      });
-
-      const createdRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
-      if (!createdRoom) {
-        // eslint-disable-next-line no-console
-        console.error('[leadgen] Leadgen room not found after import', {
-          starshipId,
-          imported: importSummary.imported,
-        });
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room was not created from bundle', 500, {
-          imported: importSummary.imported,
-        });
-        return;
-      }
-
-      // Best-effort: ensure all leadgen bundle agents are added as room participants for the
-      // newly created room so user messages mentioning them do not require manual approval.
+      // Best-effort: ensure all leadgen bundle agents are already room participants so that
+      // mentions like <@a:nora> do not trigger an "Add to room" approval banner.
       try {
         const agentRepo = new AgentRepository();
         const participantRepo = new ConversationParticipantRepository();
@@ -3385,7 +3288,7 @@ router.post(
           if (!agent?.id) continue;
           try {
             await participantRepo.addAgentParticipant({
-              conversationId: createdRoom.conversationId,
+              conversationId: existingRoom.conversationId,
               agentId: agent.id,
               createdBy: user.id,
             });
@@ -3394,23 +3297,163 @@ router.post(
           }
         }
       } catch {
-        // Best-effort only; room provisioning should still succeed even if this step fails.
+        // Best-effort only; if this fails we still return the room.
       }
 
       // eslint-disable-next-line no-console
-      console.debug('[leadgen] Leadgen room created from bundle', {
+      console.debug('[leadgen] Reusing existing leadgen room', {
         starshipId,
-        roomSlug: createdRoom.slug,
-        conversationId: createdRoom.conversationId,
-        imported: importSummary.imported,
+        roomSlug: existingRoom.slug,
+        conversationId: existingRoom.conversationId,
       });
 
-      sendSuccess(res, { room: createdRoom, importSummary });
-    } catch (error) {
-      handleError(error, res, 'ensuring leadgen room for starship');
+      sendSuccess(res, { room: existingRoom });
+      return;
     }
+
+    // No existing room; apply the lead-generation bundle from disk.
+    const docsRoot = resolvePublicDocsRoot();
+    const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
+    if (!fs.existsSync(zipPath)) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room bundle is not available on the server', 500);
+      return;
+    }
+
+    let zip: AdmZip;
+    try {
+      const buffer = fs.readFileSync(zipPath);
+      zip = new AdmZip(buffer);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to read lead generation room bundle', 500);
+      return;
+    }
+
+    let manifestEntry = zip.getEntry('manifest.json');
+    if (!manifestEntry) {
+      // Some bundles may be zipped with a top-level folder (e.g. "lead-generation/manifest.json").
+      const entries = zip.getEntries();
+      const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
+      if (alt) {
+        manifestEntry = alt;
+      }
+    }
+    if (!manifestEntry) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json missing from bundle', {
+        zipPath,
+        entries: zip.getEntries().map((e) => e.entryName),
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle is missing manifest.json', 500);
+      return;
+    }
+
+    let manifestRaw: unknown;
+    try {
+      manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+    } catch {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json is not valid JSON', 500);
+      return;
+    }
+
+    const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+    if (!manifestParsed.success) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json shape is invalid', {
+        zipPath,
+        issues: manifestParsed.error.issues,
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json has an unexpected shape', 500, {
+        issues: manifestParsed.error.issues,
+      });
+      return;
+    }
+
+    try {
+      assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json contains invalid file paths', {
+        zipPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest contains invalid file paths', 500, {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+
+    const emptyDecisions: RoomBundleDecisions = {
+      rooms: {},
+      views: {},
+      datasets: {},
+      taskBoards: {},
+      tools: {},
+      agents: {},
+    };
+
+    const importSummary = await applyRoomBundleToStarship({
+      starshipId,
+      userId: user.id,
+      zip,
+      manifest: manifestParsed.data,
+      decisions: emptyDecisions,
+    });
+
+    const createdRoom = await roomRepo.findBySlug(LEADGEN_ROOM_SLUG, starshipId);
+    if (!createdRoom) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Leadgen room not found after import', {
+        starshipId,
+        imported: importSummary.imported,
+      });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room was not created from bundle', 500, {
+        imported: importSummary.imported,
+      });
+      return;
+    }
+
+    // Best-effort: ensure all leadgen bundle agents are added as room participants for the
+    // newly created room so user messages mentioning them do not require manual approval.
+    try {
+      const agentRepo = new AgentRepository();
+      const participantRepo = new ConversationParticipantRepository();
+      const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+      for (const slug of leadgenAgentSlugs) {
+        const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+        if (!agent?.id) continue;
+        try {
+          await participantRepo.addAgentParticipant({
+            conversationId: createdRoom.conversationId,
+            agentId: agent.id,
+            createdBy: user.id,
+          });
+        } catch {
+          // Ignore if agent is already a participant or if a constraint is hit.
+        }
+      }
+    } catch {
+      // Best-effort only; room provisioning should still succeed even if this step fails.
+    }
+
+    // eslint-disable-next-line no-console
+    console.debug('[leadgen] Leadgen room created from bundle', {
+      starshipId,
+      roomSlug: createdRoom.slug,
+      conversationId: createdRoom.conversationId,
+      imported: importSummary.imported,
+    });
+
+    sendSuccess(res, { room: createdRoom, importSummary });
+  } catch (error) {
+    handleError(error, res, 'ensuring leadgen room for starship');
   }
-);
+});
 
 /**
  * POST /starships/:id/import-room-bundle/apply
@@ -3542,7 +3585,9 @@ router.post(
         const toolsByHash = new Map<string, (typeof existingTools)[number]>();
         const toolsByName = new Map<string, (typeof existingTools)[number]>();
         const indexTool = (t: (typeof existingTools)[number]) => {
-          const nameKey = String(t.name || '').trim().toLowerCase();
+          const nameKey = String(t.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) toolsByName.set(nameKey, t);
           const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
           if (hash) toolsByHash.set(hash, t);
@@ -3585,7 +3630,9 @@ router.post(
           });
 
           const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-          const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
+          const toolNameKey = String(toolPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = toolsByHash.get(bundleHash);
           const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -3635,7 +3682,9 @@ router.post(
         const existingAgents = await agentRepo.findByStarship(starshipId);
         const agentsByName = new Map<string, (typeof existingAgents)[number]>();
         for (const a of existingAgents) {
-          const nameKey = String(a.name || '').trim().toLowerCase();
+          const nameKey = String(a.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) agentsByName.set(nameKey, a);
         }
 
@@ -3686,8 +3735,12 @@ router.post(
           });
 
           const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
-          const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
-          const target = (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ?? (agentNameKey ? agentsByName.get(agentNameKey) : null);
+          const agentNameKey = String(agentPayload?.name || '')
+            .trim()
+            .toLowerCase();
+          const target =
+            (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
+            (agentNameKey ? agentsByName.get(agentNameKey) : null);
 
           if (decision.action === 'skip') {
             if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
@@ -3721,7 +3774,9 @@ router.post(
               try {
                 await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
               } catch (err) {
-                warnings.push(`Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`);
+                warnings.push(
+                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+                );
               }
               imported.agents += 1;
               if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
@@ -3750,7 +3805,9 @@ router.post(
         const viewsByHash = new Map<string, (typeof existingViews)[number]>();
         const viewsByName = new Map<string, (typeof existingViews)[number]>();
         for (const v of existingViews) {
-          const nameKey = String(v.name || '').trim().toLowerCase();
+          const nameKey = String(v.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) viewsByName.set(nameKey, v);
           viewsByHash.set(computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig }), v);
         }
@@ -3784,7 +3841,9 @@ router.post(
             runtimeConfig: viewPayload?.runtimeConfig,
           });
           const decision = decisionsParsed.data.views[bundleHash] ?? { action: 'copy' as const };
-          const viewNameKey = String(viewPayload?.name || '').trim().toLowerCase();
+          const viewNameKey = String(viewPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = viewsByHash.get(bundleHash);
           const existingByName = viewNameKey ? viewsByName.get(viewNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -3827,7 +3886,9 @@ router.post(
         const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
         const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
         for (const d of existingDatasets) {
-          const nameKey = String(d.name || '').trim().toLowerCase();
+          const nameKey = String(d.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) datasetsByName.set(nameKey, d);
           datasetsByHash.set(
             computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
@@ -3872,7 +3933,9 @@ router.post(
             primaryKey: datasetPayload?.primaryKey ?? null,
           });
           const decision = decisionsParsed.data.datasets[bundleHash] ?? { action: 'copy' as const };
-          const datasetNameKey = String(datasetPayload?.name || '').trim().toLowerCase();
+          const datasetNameKey = String(datasetPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = datasetsByHash.get(bundleHash);
           const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -3931,7 +3994,9 @@ router.post(
         const existingBoards = await taskBoardRepo.listByStarship(starshipId, { includeArchived: true });
         const boardsByName = new Map<string, (typeof existingBoards)[number]>();
         for (const b of existingBoards) {
-          const nameKey = String(b.name || '').trim().toLowerCase();
+          const nameKey = String(b.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) boardsByName.set(nameKey, b);
         }
 
@@ -3995,7 +4060,7 @@ router.post(
             const colId = createdColumnByTitle.get(colTitle);
             if (!colId) continue;
             const sourceAssigneeSlug = typeof c?.assigneeAgentSlug === 'string' ? String(c.assigneeAgentSlug).trim() : '';
-            const assigneeAgentId = sourceAssigneeSlug ? agentIdMap.get(sourceAssigneeSlug) ?? null : null;
+            const assigneeAgentId = sourceAssigneeSlug ? (agentIdMap.get(sourceAssigneeSlug) ?? null) : null;
             const assigneeUserSlug = typeof c?.assigneeUserSlug === 'string' ? String(c.assigneeUserSlug).trim() : '';
             const assigneeUserId = assigneeUserSlug.startsWith('u:') ? assigneeUserSlug.slice(2) : null;
             const createdCard = await taskCardRepo.create({
@@ -4039,7 +4104,11 @@ router.post(
 
           const payload = containerParsed.data.payload as any;
           const roomPayload = payload?.room ?? {};
-          const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+          const bundleHash = computeBundleHash({
+            name: roomPayload?.name,
+            isPrivate: roomPayload?.isPrivate,
+            topic: roomPayload?.topic ?? null,
+          });
           const decision = decisionsParsed.data.rooms[bundleHash] ?? { action: 'copy' as const };
           if (decision.action === 'skip') continue;
 

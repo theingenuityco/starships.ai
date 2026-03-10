@@ -39,10 +39,7 @@ function isValidRedirectUrl(url: string): boolean {
   return true;
 }
 
-function pickLandingStarship(
-  accessible: StarshipModel[],
-  userId: string
-): { id: string; slug: string; name: string } | null {
+function pickLandingStarship(accessible: StarshipModel[], userId: string): { id: string; slug: string; name: string } | null {
   const list = Array.isArray(accessible) ? accessible : [];
   if (list.length === 0) return null;
 

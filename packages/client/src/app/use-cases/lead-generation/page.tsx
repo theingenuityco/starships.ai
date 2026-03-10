@@ -6,7 +6,6 @@ import { StarTheme } from '@/components/theme-context'
 import { USE_CASES_BY_SLUG } from '@/app/use-cases/use-cases.data'
 import { UseCaseSections } from '@/app/use-cases/components/UseCaseSections'
 import { LeadGenerationHero } from '@/app/use-cases/lead-generation/LeadGenerationHero'
-import { fetchPublicAgentTemplateBySlug } from '@/lib/server/public-templates'
 
 export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
@@ -44,9 +43,6 @@ export const metadata: Metadata = {
 }
 
 export default async function LeadGenerationUseCasePage() {
-  const piper = useCase.primaryTemplateSlug ? await fetchPublicAgentTemplateBySlug({ slug: useCase.primaryTemplateSlug }) : null
-  const previewPrompts = piper?.previewPrompts ?? []
-
   return (
     <StarTheme theme="light">
       <div className="min-h-screen bg-background relative">
@@ -57,14 +53,14 @@ export default async function LeadGenerationUseCasePage() {
               <PublicHeader />
             </div>
             <div className="overflow-x-hidden">
-              <LeadGenerationHero useCase={useCase} typewriterPrompts={previewPrompts} previewPromptTitles={useCase.previewPromptTitles} />
+              <LeadGenerationHero useCase={useCase} />
             </div>
           </div>
 
           {/* Everything below stays on the original light / cream palette */}
           <main className="overflow-x-hidden">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
-              <UseCaseSections useCase={useCase} previewPrompts={previewPrompts} />
+              <UseCaseSections useCase={useCase} />
             </div>
           </main>
 

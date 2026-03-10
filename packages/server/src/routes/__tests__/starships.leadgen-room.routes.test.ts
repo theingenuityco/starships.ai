@@ -60,10 +60,7 @@ jest.mock('fs', () => ({
 
 import starshipsRouter from '@/routes/starships';
 import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
-import {
-  ConversationParticipantRepository,
-  RoomRepository,
-} from '@starships/models';
+import { ConversationParticipantRepository, RoomRepository } from '@starships/models';
 import { existsSync } from 'fs';
 
 type MockRes = {
@@ -81,13 +78,8 @@ function createMockRes(): MockRes {
   return res;
 }
 
-function getHandler(
-  path: string,
-  method: 'get' | 'post' | 'delete' | 'patch' = 'get'
-): (req: Request, res: Response) => Promise<void> {
-  const layer = (starshipsRouter as any).stack.find(
-    (l: any) => l?.route?.path === path && Boolean(l?.route?.methods?.[method])
-  );
+function getHandler(path: string, method: 'get' | 'post' | 'delete' | 'patch' = 'get'): (req: Request, res: Response) => Promise<void> {
+  const layer = (starshipsRouter as any).stack.find((l: any) => l?.route?.path === path && Boolean(l?.route?.methods?.[method]));
   if (!layer) throw new Error(`Route not found: ${path}`);
   const stack = layer.route.stack;
   return stack[stack.length - 1].handle;
@@ -117,9 +109,7 @@ describe('starships leadgen room route', () => {
     const participantRepo = {
       addUserParticipant: jest.fn().mockResolvedValue(undefined),
     };
-    (ConversationParticipantRepository as unknown as jest.Mock).mockImplementation(
-      () => participantRepo
-    );
+    (ConversationParticipantRepository as unknown as jest.Mock).mockImplementation(() => participantRepo);
 
     const req = {
       user: { id: 'user_123', email: 'owner@test.com' },
@@ -130,11 +120,7 @@ describe('starships leadgen room route', () => {
     const handler = getHandler('/starships/:id/ensure-leadgen-room', 'post');
     await handler(req, res as unknown as Response);
 
-    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith(
-      'starship_1234',
-      'user_123',
-      expect.anything()
-    );
+    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_123', expect.anything());
     expect(roomRepo.findBySlug).toHaveBeenCalledWith('leadgen', 'starship_1234');
     expect(participantRepo.addUserParticipant).toHaveBeenCalledWith({
       conversationId: existingRoom.conversationId,
@@ -177,4 +163,3 @@ describe('starships leadgen room route', () => {
     expect(payload.error.code).toBe('INTERNAL_SERVER_ERROR');
   });
 });
-

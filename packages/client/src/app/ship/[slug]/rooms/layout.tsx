@@ -732,12 +732,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             <button type="button" className="text-sm underline underline-offset-2" onClick={() => router.push(`/ship/${routeParams.slug}/rooms`)}>
               Back to rooms
             </button>
-            <Button
-              type="button"
-              onClick={() => joinRoom.mutate()}
-              disabled={!canJoin || joinRoom.isPending || !activeConversationId}
-              title={!canJoin ? 'This room cannot be joined' : undefined}
-            >
+            <Button type="button" onClick={() => joinRoom.mutate()} disabled={!canJoin || joinRoom.isPending || !activeConversationId} title={!canJoin ? 'This room cannot be joined' : undefined}>
               {joinRoom.isPending ? 'Joining…' : 'Join room'}
             </Button>
           </div>
@@ -892,7 +887,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               setConversationAgent(selectedAgent ?? null)
               setConversationKeyInUrl(String(conversationId))
             }}
-            onOpenConversation={(conversationId) => {
+            onOpenConversation={conversationId => {
               setConversationKeyInUrl(String(conversationId))
             }}
           />

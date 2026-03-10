@@ -31,4 +31,3 @@ export async function down(client: Client): Promise<void> {
   // If needed, a manual rollback can be performed with a targeted UPDATE.
   console.log('Migration 179 down(): no-op (max_agents changes are not automatically reversible).');
 }
-

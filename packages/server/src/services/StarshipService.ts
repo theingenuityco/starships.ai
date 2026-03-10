@@ -1,7 +1,14 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ensureLobbyRoomForStarship } from '@/utils/default-room';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, ToolTemplateRepository, UserRepository } from '@starships/models';
+import {
+  AgentRepository,
+  StarshipMemberRepository,
+  StarshipRepository,
+  ToolRepository,
+  ToolTemplateRepository,
+  UserRepository,
+} from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';

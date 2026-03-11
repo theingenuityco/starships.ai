@@ -20,6 +20,8 @@ export function RoomConversationIndexView(props: {
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  /** Optional provenance tag for bundle-provisioned rooms (e.g. "lead-generation"). */
+  roomProvisionedByBundle?: string | null
   starshipOwnerId?: string | null
   starshipSlug?: string | null
   /** Optional allowlists to scope @mention and agent selection within room conversations. */
@@ -86,6 +88,105 @@ export function RoomConversationIndexView(props: {
     if (!match) return
     setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
   }, [preselectAgentId, starshipAgents])
+
+  // Default the starter agent to Nora in leadgen rooms when available,
+  // so users can send messages without manually selecting an agent.
+  useEffect(() => {
+    const slug = String(props.roomSlug || '').trim()
+    const isLeadGenRoom =
+      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
+    if (!isLeadGenRoom) return
+    if (!Array.isArray(starshipAgents) || starshipAgents.length === 0) return
+
+    const noraAgent =
+      (starshipAgents as AgentModel[]).find(
+        a =>
+          String((a as any)?.slug || '')
+            .trim()
+            .toLowerCase() === 'nora'
+      ) ??
+      (starshipAgents as AgentModel[]).find(
+        a =>
+          String((a as any)?.name || '')
+            .trim()
+            .toLowerCase() === 'nora'
+      ) ??
+      null
+
+    if (!noraAgent) return
+
+    setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
+  }, [props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const slug = String(props.roomSlug || '').trim()
+    const isLeadGenRoom =
+      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
+    if (!isLeadGenRoom) return
+
+    const timer = window.setTimeout(() => {
+      if (!starterInputRef.current) return
+
+      try {
+        const raw = window.sessionStorage.getItem('lead_gen_pending_prompt')
+        if (!raw) return
+
+        // Optional safety: only hydrate when the pending prompt was captured for this starship.
+        const lastStarshipId = window.sessionStorage.getItem('lead_gen_last_starship_id')
+        if (props.starshipId && lastStarshipId && lastStarshipId !== props.starshipId) {
+          return
+        }
+
+        const parsed = JSON.parse(raw) as { prompt?: string; createdAt?: number }
+        const prompt = String(parsed?.prompt || '').trim()
+        if (!prompt) return
+
+        const createdAt = typeof parsed?.createdAt === 'number' ? parsed.createdAt : null
+        const maxAgeMs = 15 * 60 * 1000
+        if (createdAt && Date.now() - createdAt > maxAgeMs) {
+          return
+        }
+
+        // Prefer tagging the lead-gen Nora agent as a leading mention, when available.
+        const noraAgent =
+          (starshipAgents as AgentModel[]).find(
+            a =>
+              String((a as any)?.slug || '')
+                .trim()
+                .toLowerCase() === 'nora'
+          ) ??
+          (starshipAgents as AgentModel[]).find(
+            a =>
+              String((a as any)?.name || '')
+                .trim()
+                .toLowerCase() === 'nora'
+          ) ??
+          null
+
+        if (noraAgent && starterInputRef.current.setLeadingMentionAgent) {
+          // Ensure Nora is the active starter agent as well.
+          setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
+          starterInputRef.current.setLeadingMentionAgent(noraAgent, prompt)
+        } else {
+          starterInputRef.current.setInitialContent?.(prompt)
+        }
+      } catch {
+        // Ignore storage/parsing errors.
+      } finally {
+        try {
+          window.sessionStorage.removeItem('lead_gen_pending_prompt')
+        } catch {
+          // Ignore cleanup errors.
+        }
+      }
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [props.starshipId, props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
 
   const starterBadgeClass = (active: boolean) =>
     cn(
@@ -175,7 +276,7 @@ export function RoomConversationIndexView(props: {
               buttonRef={participantsButtonRef}
               className="sr-only"
             />
-            {props.canManagePins || hasAnyResources ? (
+            {props.canManagePins ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
                 Resources
@@ -186,7 +287,7 @@ export function RoomConversationIndexView(props: {
       />
 
       {/* Room starter (conversation-starter style) */}
-      <div className="flex-1 min-h-0 overflow-auto bg-background px-4 py-8">
+      <div className="flex-1 min-h-0 overflow-auto room-conversation-bg px-4 py-8">
         <div className="w-full max-w-4xl mx-auto h-full flex">
           <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
@@ -237,7 +338,7 @@ export function RoomConversationIndexView(props: {
                   </div>
                 ) : null}
 
-                {starterTab === 'datasets' ? (
+              {starterTab === 'datasets' ? (
                 pinnedDatasets.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
                     {pinnedDatasets.map(p => {

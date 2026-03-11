@@ -73,7 +73,7 @@ export function RoomNestedRecentConversations(props: {
               variant="ghost"
               className={cn(
                 // Match NavigationItem compact sidebar row styling + add connector branch.
-                "relative w-full h-7 px-2 justify-start text-left text-[12px] font-medium rounded-lg border border-transparent gap-2 min-w-0 overflow-hidden",
+                "relative w-full h-7 px-2 justify-start text-left text-[12px] font-medium rounded-lg border border-transparent gap-2 min-w-0",
                 "bg-transparent hover:bg-transparent focus-visible:bg-transparent",
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
@@ -81,7 +81,11 @@ export function RoomNestedRecentConversations(props: {
               title={title}
             >
               <Icon name="message-square" className="h-3 w-3 flex-shrink-0 opacity-80" />
-              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <div className="min-w-0 flex-1">
+                <span className="block w-full" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {title}
+                </span>
+              </div>
               {whenText ? <span className="flex-shrink-0 text-[10px] text-muted-foreground">{whenText}</span> : null}
             </Button>
           )

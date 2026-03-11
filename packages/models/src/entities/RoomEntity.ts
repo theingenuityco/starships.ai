@@ -43,6 +43,11 @@ export class RoomEntity implements RoomModel {
   topic?: string | null;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  provisionedByBundle?: string | null;
+
+  @Expose()
   @IsISO8601()
   createdAt!: string;
 
@@ -65,6 +70,7 @@ export class RoomEntity implements RoomModel {
         name: dataRecord.name || '',
         isPrivate: Boolean(dataRecord.isPrivate),
         topic: (dataRecord.topic as string | null | undefined) ?? null,
+        provisionedByBundle: (dataRecord.provisionedByBundle as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
       });

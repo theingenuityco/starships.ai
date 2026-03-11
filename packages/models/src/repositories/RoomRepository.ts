@@ -54,7 +54,14 @@ export class RoomRepository extends BaseRepository {
     );
   }
 
-  async create(args: Omit<Room, 'slug'> & { slug?: string; conversationId: string; starshipId: string }): Promise<RoomModel> {
+  async create(
+    args: Omit<Room, 'slug'> & {
+      slug?: string;
+      conversationId: string;
+      starshipId: string;
+      provisionedByBundle?: string | null;
+    }
+  ): Promise<RoomModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -73,6 +80,7 @@ export class RoomRepository extends BaseRepository {
           name: args.name,
           isPrivate: Boolean(args.isPrivate),
           ...(args.topic !== undefined ? { topic: args.topic } : {}),
+          ...(args.provisionedByBundle !== undefined ? { provisionedByBundle: args.provisionedByBundle } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -96,6 +104,27 @@ export class RoomRepository extends BaseRepository {
       },
       'create',
       'Room'
+    );
+  }
+
+  /**
+   * Find the first room in a starship that was provisioned by the
+   * lead-generation bundle. This is used to reliably identify the
+   * dedicated lead-gen workspace even if its slug changes.
+   */
+  async findLeadGenBundleRoom(starshipId: string): Promise<RoomModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM rooms WHERE starship_id = $1 AND provisioned_by_bundle = $2 ORDER BY created_at ASC LIMIT 1',
+          [starshipId, 'lead-generation']
+        );
+        return row ? fromDatabase(RoomEntity, row) : null;
+      },
+      'findLeadGenBundleRoom',
+      'Room',
+      starshipId
     );
   }
 }

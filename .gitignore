@@ -76,3 +76,6 @@ github-runners/lambda/package/
 
 # github-runners terraform configuration (contains secrets)
 github-runners/**/terraform.tfvars
+
+# Lead generation room bundle source (only keep the zip in git)
+public-docs/room-bundles/lead-generation/

@@ -189,6 +189,7 @@ export function useChildConversationsPaged(
   args?: { enabled?: boolean; limit?: number }
 ): {
   conversations: Array<ConversationModel & { agents: AgentModel[] }>
+  total: number
   hasMoreBefore: boolean
   oldestCursor: { updatedAt: string; id: string } | null
   isLoading: boolean
@@ -222,6 +223,7 @@ export function useChildConversationsPaged(
   type Page = {
     parentConversationId: string
     conversations: Array<ConversationModel & { agents: AgentModel[] }>
+    total: number
     hasMoreBefore: boolean
     oldestCursor: Cursor | null
   }
@@ -232,7 +234,7 @@ export function useChildConversationsPaged(
     initialPageParam: null as Cursor | null,
     queryFn: async ({ pageParam }): Promise<Page> => {
       const id = String(parentConversationId || '')
-      if (!id) return { parentConversationId: '', conversations: [], hasMoreBefore: false, oldestCursor: null }
+      if (!id) return { parentConversationId: '', conversations: [], total: 0, hasMoreBefore: false, oldestCursor: null }
 
       const cursor = pageParam as Cursor | null
       const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children`, {
@@ -243,13 +245,16 @@ export function useChildConversationsPaged(
       })
       const data = response.data.data
       const conversations = Array.isArray(data?.conversations) ? (data.conversations as Array<ConversationModel & { agents: AgentModel[] }>) : []
+      const totalRaw = (data as any)?.total
+      const totalParsed = typeof totalRaw === 'number' ? totalRaw : typeof totalRaw === 'string' ? Number(totalRaw) : NaN
+      const total = Number.isFinite(totalParsed) ? totalParsed : conversations.length
       const hasMoreBefore = Boolean(data?.hasMoreBefore)
       const oldestCursorRaw = data?.oldestCursor
       const oldestCursor =
         oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.updatedAt === 'string' && typeof oldestCursorRaw.id === 'string'
           ? ({ updatedAt: toIso(oldestCursorRaw.updatedAt), id: oldestCursorRaw.id } as Cursor)
           : null
-      return { parentConversationId: id, conversations, hasMoreBefore, oldestCursor }
+      return { parentConversationId: id, conversations, total, hasMoreBefore, oldestCursor }
     },
     getNextPageParam: lastPage => {
       if (!lastPage?.hasMoreBefore) return undefined
@@ -263,9 +268,11 @@ export function useChildConversationsPaged(
   const pages = Array.isArray(q.data?.pages) ? q.data!.pages : []
   const conversations = pages.flatMap(p => (Array.isArray(p?.conversations) ? p.conversations : []))
   const lastPage = pages.length > 0 ? pages[pages.length - 1] : null
+  const total = pages.length > 0 ? Number((pages[0] as any)?.total ?? conversations.length) : conversations.length
 
   return {
     conversations,
+    total: Number.isFinite(total) ? total : conversations.length,
     hasMoreBefore: Boolean(lastPage?.hasMoreBefore),
     oldestCursor: (lastPage?.oldestCursor as Cursor | null) ?? null,
     isLoading: q.isLoading,

@@ -1,7 +1,14 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ensureLobbyRoomForStarship } from '@/utils/default-room';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, ToolTemplateRepository, UserRepository } from '@starships/models';
+import {
+  AgentRepository,
+  StarshipMemberRepository,
+  StarshipRepository,
+  ToolRepository,
+  ToolTemplateRepository,
+  UserRepository,
+} from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -90,7 +97,7 @@ export class StarshipService {
     // Default entitlements should come from the Scout plan when available (Stripe metadata),
     // falling back to hard-coded Scout defaults if the plan catalog is unavailable/missing.
     const scoutEntitlements = shipClass === 'scout' ? await SubscriptionPlanCatalogService.getEntitlementsForShipClass('scout') : null;
-    const fallbackScout = { maxAgents: 5, maxConcurrentTurns: 3 };
+    const fallbackScout = { maxAgents: 20, maxConcurrentTurns: 3 };
     const defaultEntitlements = scoutEntitlements ?? fallbackScout;
 
     const starship = await this.starshipRepository.create({

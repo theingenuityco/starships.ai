@@ -157,7 +157,7 @@ export class StarshipRepository extends BaseRepository {
           ...entity,
           slug,
           shipClass: entity.shipClass ?? 'scout',
-          maxAgents: entity.maxAgents ?? 5, // Default to Scout limit
+          maxAgents: entity.maxAgents ?? 20, // Default to Scout limit
           maxConcurrentTurns: entity.maxConcurrentTurns ?? 3, // Default to Scout concurrency
           status: entity.status || 'active', // Default to active
           createdAt: now,

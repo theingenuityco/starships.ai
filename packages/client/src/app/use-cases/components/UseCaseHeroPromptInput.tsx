@@ -44,10 +44,28 @@ export function UseCaseHeroPromptInput(props: {
     (q: string) => {
       const query = String(q || '').trim()
       if (!query) return
+
       if (submitRedirect === 'login') {
-        router.push('/login')
+        try {
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(
+              'lead_gen_pending_prompt',
+              JSON.stringify({
+                prompt: query,
+                createdAt: Date.now(),
+              })
+            )
+          }
+        } catch {
+          // Ignore storage errors and still proceed with redirect.
+        }
+
+        // Signal the login page that this flow originated from the lead-generation use case,
+        // and default to the sign-in tab rather than sign-up.
+        router.push('/login?tab=login&fromLeadGen=1')
         return
       }
+
       router.push(`/explore/agents?q=${encodeURIComponent(query)}`)
     },
     [router, submitRedirect]

@@ -3,8 +3,8 @@
 import Icon from '@/components/primitives/Icon'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
 import { useStarshipRooms } from '@/hooks/useRooms'
+import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
 import type { RoomModel } from '@starships/protocol'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
@@ -37,6 +37,20 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
     const slug = rest.split('/')[0] || ''
     return slug ? decodeURIComponent(slug) : null
   }, [pathname, props.starshipSlug])
+
+  const activeConversationId = useMemo(() => {
+    const p = String(pathname || '')
+    const parts = p.split('/').filter(Boolean) // ['ship', slug, 'rooms', roomSlug, 'conversation', conversationId, ...]
+    if (parts.length < 6) return null
+    if (parts[0] !== 'ship') return null
+    if (parts[2] !== 'rooms') return null
+    const roomSlug = parts[3] ? decodeURIComponent(parts[3]) : ''
+    if (!roomSlug || !activeRoomSlug) return null
+    if (roomSlug.toLowerCase() !== String(activeRoomSlug).toLowerCase()) return null
+    if (parts[4] !== 'conversation') return null
+    const cid = parts[5] ? decodeURIComponent(parts[5]) : ''
+    return cid ? cid : null
+  }, [activeRoomSlug, pathname])
 
   const openRoom = (roomSlug: string) => {
     const slug = String(roomSlug || '').trim()
@@ -77,6 +91,7 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
               const name = String(r.name || '').trim() || slug || 'Room'
               const isActive = activeRoomSlug ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase() : false
               const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
+              const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
               return (
                 <div key={String(r.conversationId || slug)} className="w-full">
                   <NavigationItem
@@ -94,6 +109,15 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                       ) : null
                     }
                   />
+                  {roomConversationId ? (
+                    <RoomNestedRecentConversations
+                      starshipSlug={props.starshipSlug}
+                      roomSlug={slug}
+                      roomConversationId={roomConversationId}
+                      activeConversationId={isActive ? activeConversationId : null}
+                      onNavigate={props.onNavigate}
+                    />
+                  ) : null}
                 </div>
               )
             })}

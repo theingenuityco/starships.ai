@@ -66,7 +66,7 @@ export function RoomConversationIndexView(props: {
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets'>('suggestions')
 
   // Optional deep-link support: preselect an agent in the room starter composer.
   // Used as a replacement for the removed `/dm/...` routes.
@@ -124,31 +124,10 @@ export function RoomConversationIndexView(props: {
   const assignedTools = (props.assignedTools || []).slice()
   const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
 
-  const openPinnedView = (viewId: string) => {
-    const id = String(viewId || '').trim()
-    if (!id) return
-    props.onOpenPinnedView?.(id)
-  }
-
   const openPinnedDataset = (datasetId: string) => {
     const id = String(datasetId || '').trim()
     if (!id) return
     const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(id)}` : null
-    if (!href) return
-    router.push(href)
-  }
-
-  const openPinnedBoard = () => {
-    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
-    if (!href) return
-    router.push(href)
-  }
-
-  const openPinnedTool = (toolId: string) => {
-    const id = String(toolId || '').trim()
-    if (!id) return
-    const toolSlug = props.toolSlugById?.get(id) || ''
-    const href = effectiveStarshipSlug && toolSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tool/${encodeURIComponent(toolSlug)}` : null
     if (!href) return
     router.push(href)
   }
@@ -159,7 +138,22 @@ export function RoomConversationIndexView(props: {
         conversationId={props.roomConversationId}
         starshipId={props.starshipId}
         onParticipantsClick={() => participantsButtonRef.current?.click()}
-        titleRightSlot={<NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />}
+        titleRightSlot={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+              aria-label="History"
+              title="History"
+              onClick={() => props.onOpenHistoryPane?.()}
+            >
+              <Icon name="clock" weight="bold" className="h-4 w-4" />
+            </Button>
+            <NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />
+          </>
+        }
         titlePrefix={
           <span className="relative inline-flex items-center justify-center h-4 w-4">
             <Icon name="hash" className="h-4 w-4" />
@@ -181,9 +175,6 @@ export function RoomConversationIndexView(props: {
               buttonRef={participantsButtonRef}
               className="sr-only"
             />
-            <Button type="button" size="icon" variant="outline" aria-label="History" title="History" onClick={() => props.onOpenHistoryPane?.()}>
-              <Icon name="clock" className="h-4 w-4" />
-            </Button>
             {props.canManagePins || hasAnyResources ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
@@ -228,15 +219,6 @@ export function RoomConversationIndexView(props: {
                 <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
                   Datasets
                 </button>
-                <button type="button" onClick={() => setStarterTab('views')} className={starterBadgeClass(starterTab === 'views')} role="tab" aria-selected={starterTab === 'views'}>
-                  Views
-                </button>
-                <button type="button" onClick={() => setStarterTab('tasks')} className={starterBadgeClass(starterTab === 'tasks')} role="tab" aria-selected={starterTab === 'tasks'}>
-                  Tasks
-                </button>
-                <button type="button" onClick={() => setStarterTab('tools')} className={starterBadgeClass(starterTab === 'tools')} role="tab" aria-selected={starterTab === 'tools'}>
-                  Tools
-                </button>
               </div>
 
               <div className="mt-4">
@@ -246,7 +228,7 @@ export function RoomConversationIndexView(props: {
                       'Suggest 5 conversation ideas for this room.',
                       'Summarize the key topics we should discuss here.',
                       'Draft a concise conversation title and first message.',
-                      'What are the most important datasets/views to start with?',
+                      'What are the most important datasets to start with?',
                     ].map(s => (
                       <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
                         {s}
@@ -272,96 +254,6 @@ export function RoomConversationIndexView(props: {
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
                     No pinned datasets in this room.
-                    {props.onOpenResourcesPane ? (
-                      <>
-                        {' '}
-                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
-                          Manage resources
-                        </button>
-                        .
-                      </>
-                    ) : null}
-                  </div>
-                )
-              ) : null}
-
-              {starterTab === 'views' ? (
-                pinnedViews.length > 0 ? (
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedViews.map(p => {
-                      const id = String(p.viewId)
-                      const name = props.viewLabelById?.get(id) || `View ${id.slice(0, 8)}`
-                      return (
-                        <Button key={`starter:view:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedView(id)}>
-                          <Icon name="layout" className="h-4 w-4 mr-1.5" />
-                          {name}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground">
-                    No pinned views in this room.
-                    {props.onOpenResourcesPane ? (
-                      <>
-                        {' '}
-                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
-                          Manage resources
-                        </button>
-                        .
-                      </>
-                    ) : null}
-                  </div>
-                )
-              ) : null}
-
-              {starterTab === 'tasks' ? (
-                pinnedBoards.length > 0 ? (
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedBoards.map(p => {
-                      const id = String(p.boardId)
-                      const name = props.taskBoardLabelById?.get(id) || `Board ${id.slice(0, 8)}`
-                      return (
-                        <Button key={`starter:board:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedBoard()}>
-                          <Icon name="list" className="h-4 w-4 mr-1.5" />
-                          {name}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground">
-                    No pinned task boards in this room.
-                    {props.onOpenResourcesPane ? (
-                      <>
-                        {' '}
-                        <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => props.onOpenResourcesPane?.()}>
-                          Manage resources
-                        </button>
-                        .
-                      </>
-                    ) : null}
-                  </div>
-                )
-              ) : null}
-
-              {starterTab === 'tools' ? (
-                assignedTools.length > 0 ? (
-                  <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {assignedTools.map(a => {
-                      const id = String(a.toolId)
-                      const name = props.toolLabelById?.get(id) || `Tool ${id.slice(0, 8)}`
-                      return (
-                        <Button key={`starter:tool:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedTool(id)}>
-                          <Icon name="workflow" className="h-4 w-4 mr-1.5" />
-                          {name}
-                        </Button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground">
-                    No assigned tools in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}

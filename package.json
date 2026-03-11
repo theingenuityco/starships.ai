@@ -7,13 +7,13 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev",
-    "dev:with-workers": "concurrently --verbose -n app,scheduler,worker -c \"cyan,magenta,green\" \"NODE_OPTIONS=--no-node-snapshot turbo run dev\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:worker\"",
+    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=20",
+    "dev:with-workers": "concurrently --verbose -n app,scheduler,worker -c \"cyan,magenta,green\" \"NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=20\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:worker\"",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "build": "turbo run build",
-    "start": "NODE_OPTIONS=--no-node-snapshot turbo run start",
+    "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --concurrency=20",
     "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
     "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
     "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",

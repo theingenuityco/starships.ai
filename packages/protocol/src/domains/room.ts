@@ -17,6 +17,11 @@ export interface Room {
 export interface RoomModel extends Room {
   conversationId: string;
   starshipId: string;
+  /**
+   * Optional provenance flag recording that this room was provisioned
+   * from a specific bundle (e.g. "lead-generation").
+   */
+  provisionedByBundle?: string | null;
   createdAt: string;
   updatedAt: string;
 }

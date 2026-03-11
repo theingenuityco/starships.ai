@@ -46,6 +46,8 @@ import OpenAI from 'openai';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 const router: Router = Router();
 const envConfig = getEnvConfig();
@@ -67,6 +69,8 @@ const openRouterClient =
         },
       })
     : null;
+
+const LEADGEN_ROOM_SLUG = 'leadgen';
 
 const ImportExportContainerSchemaV1 = z.object({
   schemaVersion: z.literal('1'),
@@ -214,22 +218,28 @@ function isAllowedRoomBundlePath(file: unknown): file is string {
 
 function assertRoomBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>): void {
   for (const t of manifest.entities.tools) {
-    if (!isAllowedRoomBundlePath(t.file) || !t.file.startsWith('tools/')) throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
+    if (!isAllowedRoomBundlePath(t.file) || !t.file.startsWith('tools/'))
+      throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
   }
   for (const a of manifest.entities.agents) {
-    if (!isAllowedRoomBundlePath(a.file) || !a.file.startsWith('agents/')) throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
+    if (!isAllowedRoomBundlePath(a.file) || !a.file.startsWith('agents/'))
+      throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
   }
   for (const r of manifest.entities.rooms) {
-    if (!isAllowedRoomBundlePath(r.file) || !r.file.startsWith('rooms/')) throw new Error(`Invalid manifest path for room entry: ${String(r.file)}`);
+    if (!isAllowedRoomBundlePath(r.file) || !r.file.startsWith('rooms/'))
+      throw new Error(`Invalid manifest path for room entry: ${String(r.file)}`);
   }
   for (const v of manifest.entities.views) {
-    if (!isAllowedRoomBundlePath(v.file) || !v.file.startsWith('views/')) throw new Error(`Invalid manifest path for view entry: ${String(v.file)}`);
+    if (!isAllowedRoomBundlePath(v.file) || !v.file.startsWith('views/'))
+      throw new Error(`Invalid manifest path for view entry: ${String(v.file)}`);
   }
   for (const d of manifest.entities.datasets) {
-    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('datasets/')) throw new Error(`Invalid manifest path for dataset entry: ${String(d.file)}`);
+    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('datasets/'))
+      throw new Error(`Invalid manifest path for dataset entry: ${String(d.file)}`);
   }
   for (const b of manifest.entities.taskBoards) {
-    if (!isAllowedRoomBundlePath(b.file) || !b.file.startsWith('task-boards/')) throw new Error(`Invalid manifest path for task board entry: ${String(b.file)}`);
+    if (!isAllowedRoomBundlePath(b.file) || !b.file.startsWith('task-boards/'))
+      throw new Error(`Invalid manifest path for task board entry: ${String(b.file)}`);
   }
 }
 
@@ -253,6 +263,22 @@ function stableStringify(value: unknown): string {
 function computeBundleHash(obj: unknown): string {
   return crypto.createHash('sha256').update(stableStringify(obj), 'utf8').digest('hex');
 }
+
+const RoomBundleDecisionSchema = z.object({
+  action: z.enum(['skip', 'copy', 'overwrite']),
+  targetId: z.string().optional(),
+});
+
+const RoomBundleDecisionsSchema = z.object({
+  rooms: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  views: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  datasets: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  taskBoards: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  tools: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  agents: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+});
+
+type RoomBundleDecisions = z.infer<typeof RoomBundleDecisionsSchema>;
 
 function makeTransactionConnection(client: {
   query: (text: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>;
@@ -311,6 +337,750 @@ function makeTransactionConnection(client: {
   return txConn as unknown as PostgresConnection;
 }
 
+async function applyRoomBundleToStarship(opts: {
+  starshipId: string;
+  userId: string;
+  zip: AdmZip;
+  manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>;
+  decisions: RoomBundleDecisions;
+  /**
+   * Optional provenance tag to stamp on any rooms created by this bundle
+   * application (e.g. "lead-generation"). This allows callers to later
+   * identify bundle-provisioned rooms even if their slugs change.
+   */
+  provisionedByBundleTag?: string | null;
+}): Promise<{
+  imported: Record<string, number>;
+  warnings?: string[];
+}> {
+  const { starshipId, userId, zip, manifest, decisions, provisionedByBundleTag } = opts;
+  const ContainerSchema = ImportExportContainerSchemaV1RoomBundle;
+  const conn = getConnection();
+
+  const applyResult = await conn.transaction(async (client) => {
+    const txConn = makeTransactionConnection(client);
+    const toolRepo = new ToolRepository(txConn);
+    const agentRepo = new AgentRepository(txConn);
+    const agentService = new AgentService(txConn);
+    const svc = new ImportExportService(txConn);
+    const viewRepo = new ViewRepository(txConn);
+    const datasetRepo = new StarshipDatasetRepository(txConn);
+    const datasetRowRepo = new StarshipDatasetRowRepository(txConn);
+    const taskBoardRepo = new TaskBoardRepository(txConn);
+    const taskColumnRepo = new TaskColumnRepository(txConn);
+    const taskCardRepo = new TaskCardRepository(txConn);
+    const roomRepo = new RoomRepository(txConn);
+    const roomViewsRepo = new RoomViewsRepository(txConn);
+    const roomDatasetsRepo = new RoomDatasetsRepository(txConn);
+    const roomTaskBoardsRepo = new RoomTaskBoardsRepository(txConn);
+    const roomToolsRepo = new RoomToolsRepository(txConn);
+    const participantRepo = new ConversationParticipantRepository(txConn);
+    const conversationRepo = new ConversationRepository(txConn);
+
+    const warnings: string[] = [];
+    const imported: Record<string, number> = { rooms: 0, views: 0, datasets: 0, taskBoards: 0, agents: 0, tools: 0 };
+
+    const toolSlugMap = new Map<string, string>();
+    const agentIdMap = new Map<string, string>(); // source slug -> created agent id
+    const viewSlugMap = new Map<string, string>(); // source slug -> created slug
+    const datasetSlugMap = new Map<string, string>();
+    const taskBoardSlugMap = new Map<string, string>();
+
+    // Index existing tools for overwrite/skip mapping.
+    const existingTools = await toolRepo.findByStarship(starshipId);
+    const toolsByHash = new Map<string, (typeof existingTools)[number]>();
+    const toolsByName = new Map<string, (typeof existingTools)[number]>();
+    const indexTool = (t: (typeof existingTools)[number]) => {
+      const nameKey = String(t.name || '')
+        .trim()
+        .toLowerCase();
+      if (nameKey) toolsByName.set(nameKey, t);
+      const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
+      if (hash) toolsByHash.set(hash, t);
+    };
+    for (const t of existingTools) indexTool(t);
+
+    // Tools first (same semantics as agent bundle import)
+    for (const t of manifest.entities.tools) {
+      const entry = getBundleEntry(zip, t.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing tool file: ${t.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`Tool file is not valid JSON: ${t.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
+        warnings.push(`Tool file is not a valid tool container: ${t.file}`);
+        continue;
+      }
+
+      const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
+      const toolPayload = payload?.tool ?? {};
+      const fromSlug = containerParsed.data.metadata?.fromSlug;
+      const bundleHash = computeToolContentHash({
+        name: toolPayload?.name,
+        description: toolPayload?.description,
+        parameters: toolPayload?.parameters,
+        blueprint: toolPayload?.blueprint,
+        transforms: toolPayload?.transforms,
+        mutations: toolPayload?.mutations,
+        condition: toolPayload?.condition,
+        isEnabled: toolPayload?.isEnabled,
+        status: toolPayload?.status,
+      });
+
+      const decision = decisions.tools[bundleHash] ?? { action: 'copy' as const };
+      const toolNameKey = String(toolPayload?.name || '')
+        .trim()
+        .toLowerCase();
+      const existingByHash = toolsByHash.get(bundleHash);
+      const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
+      const target = existingByHash ?? existingByName ?? null;
+
+      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
+      if (decision.action === 'skip') {
+        if (sourceSlug && target?.slug) toolSlugMap.set(sourceSlug, target.slug);
+        continue;
+      }
+
+      if (decision.action === 'overwrite') {
+        const targetId = decision.targetId || target?.id;
+        if (!targetId) {
+          warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
+          continue;
+        }
+        const updateReq: UpdateToolRequest = {
+          name: typeof toolPayload?.name === 'string' ? toolPayload.name : undefined,
+          description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
+          parameters: toolPayload?.parameters as UpdateToolRequest['parameters'],
+          blueprint: toolPayload?.blueprint as UpdateToolRequest['blueprint'],
+          transforms: toolPayload?.transforms as UpdateToolRequest['transforms'],
+          mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
+          condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
+          isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
+          status: toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
+        };
+        const updated = await toolRepo.update(targetId, updateReq);
+        if (updated) {
+          imported.tools += 1;
+          indexTool(updated);
+          if (sourceSlug) toolSlugMap.set(sourceSlug, updated.slug);
+        }
+        continue;
+      }
+
+      const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
+      if (result?.warnings?.length) warnings.push(...result.warnings);
+      if (result?.kind === 'tool' && result.tool) {
+        imported.tools += 1;
+        indexTool(result.tool as any);
+        if (sourceSlug && result.tool.slug) toolSlugMap.set(sourceSlug, result.tool.slug);
+      }
+    }
+
+    // Index existing agents for skip/overwrite target discovery.
+    const existingAgents = await agentRepo.findByStarship(starshipId);
+    const agentsByName = new Map<string, (typeof existingAgents)[number]>();
+    for (const a of existingAgents) {
+      const nameKey = String(a.name || '')
+        .trim()
+        .toLowerCase();
+      if (nameKey) agentsByName.set(nameKey, a);
+    }
+
+    // Agents (rewrite assigned tool slugs using toolSlugMap, and create agentIdMap).
+    for (const a of manifest.entities.agents) {
+      const entry = getBundleEntry(zip, a.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing agent file: ${a.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`Agent file is not valid JSON: ${a.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'agent') {
+        warnings.push(`Agent file is not a valid agent container: ${a.file}`);
+        continue;
+      }
+
+      const fromSlug = containerParsed.data.metadata?.fromSlug;
+      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
+
+      const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
+      const agentPayload = payload?.agent ?? {};
+      const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
+      const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
+      const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
+
+      const bundleHash = computeAgentContentHash({
+        name: agentPayload?.name,
+        role: agentPayload?.role,
+        description: agentPayload?.description,
+        model: agentPayload?.model,
+        temperature: agentPayload?.temperature,
+        maxTokens: agentPayload?.maxTokens,
+        timeout: agentPayload?.timeout,
+        reasoning: agentPayload?.reasoning,
+        systemPrompt: agentPayload?.systemPrompt,
+        state: agentPayload?.state,
+        blueprint: agentPayload?.blueprint,
+        category: agentPayload?.category,
+        previewPrompts: agentPayload?.previewPrompts,
+        assignedToolSlugs: assignedToolSlugs,
+      });
+
+      const decision = decisions.agents[bundleHash] ?? { action: 'copy' as const };
+      const agentNameKey = String(agentPayload?.name || '')
+        .trim()
+        .toLowerCase();
+      const target =
+        (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
+        (agentNameKey ? agentsByName.get(agentNameKey) : null);
+
+      // eslint-disable-next-line no-console
+      console.debug('[leadgen] Agent bundle decision', {
+        starshipId,
+        fromSlug: sourceSlug,
+        agentName: agentPayload?.name,
+        decision: decision.action,
+        hasExistingTarget: Boolean(target?.id),
+      });
+
+      if (decision.action === 'skip') {
+        if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
+        // eslint-disable-next-line no-console
+        console.debug('[leadgen] Agent import skipped', {
+          starshipId,
+          fromSlug: sourceSlug,
+          agentName: agentPayload?.name,
+        });
+        continue;
+      }
+
+      if (decision.action === 'overwrite') {
+        const targetId = decision.targetId || target?.id;
+        if (!targetId) {
+          warnings.push(`No overwrite target found for agent: ${String(agentPayload?.name || a.file)}`);
+          continue;
+        }
+
+        const updateReq: UpdateAgentRequest = {
+          name: typeof agentPayload?.name === 'string' ? agentPayload.name : undefined,
+          role: typeof agentPayload?.role === 'string' ? agentPayload.role : undefined,
+          description: typeof agentPayload?.description === 'string' ? agentPayload.description : undefined,
+          model: typeof agentPayload?.model === 'string' ? agentPayload.model : undefined,
+          temperature: typeof agentPayload?.temperature === 'number' ? agentPayload.temperature : undefined,
+          maxTokens: typeof agentPayload?.maxTokens === 'number' ? agentPayload.maxTokens : undefined,
+          timeout: typeof agentPayload?.timeout === 'number' ? agentPayload.timeout : undefined,
+          reasoning: agentPayload?.reasoning as UpdateAgentRequest['reasoning'],
+          systemPrompt: typeof agentPayload?.systemPrompt === 'string' ? agentPayload.systemPrompt : undefined,
+          state: agentPayload?.state as UpdateAgentRequest['state'],
+          blueprint: agentPayload?.blueprint as UpdateAgentRequest['blueprint'],
+          category: typeof agentPayload?.category === 'string' ? (agentPayload.category as any) : undefined,
+          previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as any) : undefined,
+        };
+        const updated = await agentService.updateAgent(targetId, updateReq);
+        if (updated) {
+          try {
+            await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
+          } catch (err) {
+            warnings.push(
+              `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+            );
+          }
+          imported.agents += 1;
+          if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
+          // eslint-disable-next-line no-console
+          console.debug('[leadgen] Agent overwritten from bundle', {
+            starshipId,
+            fromSlug: sourceSlug,
+            agentName: agentPayload?.name,
+            agentId: updated.id,
+          });
+        }
+        continue;
+      }
+
+      const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
+      const rewrittenContainer = {
+        ...(containerParsed.data as unknown as ImportExportContainerV1),
+        payload: {
+          ...basePayloadObj,
+          assignedToolSlugs: rewrittenToolSlugs,
+        },
+      } as unknown as ImportExportContainerV1;
+      try {
+        const result = await svc.importToStarship(starshipId, rewrittenContainer);
+        if (result?.warnings?.length) warnings.push(...result.warnings);
+        if (result?.kind === 'agent' && result.agent) {
+          imported.agents += 1;
+          if (sourceSlug) agentIdMap.set(sourceSlug, result.agent.id);
+          // eslint-disable-next-line no-console
+          console.debug('[leadgen] Agent imported from bundle', {
+            starshipId,
+            fromSlug: sourceSlug,
+            agentName: agentPayload?.name,
+            agentId: result.agent.id,
+          });
+        }
+      } catch (err) {
+        const message = (err as any)?.message || String(err);
+        warnings.push(`Agent import failed for ${String(agentPayload?.name || a.file)}: ${message}`);
+        // eslint-disable-next-line no-console
+        console.error('[leadgen] Agent import failed from bundle', {
+          starshipId,
+          fromSlug: sourceSlug,
+          agentName: agentPayload?.name,
+          error: message,
+        });
+        // Swallow agent import errors (e.g. agent limit reached) so that room provisioning can continue.
+      }
+    }
+
+    // Views
+    const existingViews = await viewRepo.findByStarshipId(starshipId);
+    const viewsByHash = new Map<string, (typeof existingViews)[number]>();
+    const viewsByName = new Map<string, (typeof existingViews)[number]>();
+    for (const v of existingViews) {
+      const nameKey = String(v.name || '')
+        .trim()
+        .toLowerCase();
+      if (nameKey) viewsByName.set(nameKey, v);
+      viewsByHash.set(computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig }), v);
+    }
+
+    for (const v of manifest.entities.views) {
+      const entry = getBundleEntry(zip, v.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing view file: ${v.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`View file is not valid JSON: ${v.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'view') {
+        warnings.push(`View file is not a valid view container: ${v.file}`);
+        continue;
+      }
+      const fromSlug = containerParsed.data.metadata?.fromSlug;
+      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
+      const payload = containerParsed.data.payload as unknown as { view?: Record<string, unknown> };
+      const viewPayload = payload?.view ?? {};
+      const bundleHash = computeBundleHash({
+        name: viewPayload?.name,
+        description: viewPayload?.description,
+        root: viewPayload?.root,
+        runtimeConfig: viewPayload?.runtimeConfig,
+      });
+      const decision = decisions.views[bundleHash] ?? { action: 'copy' as const };
+      const viewNameKey = String(viewPayload?.name || '')
+        .trim()
+        .toLowerCase();
+      const existingByHash = viewsByHash.get(bundleHash);
+      const existingByName = viewNameKey ? viewsByName.get(viewNameKey) : undefined;
+      const target = existingByHash ?? existingByName ?? null;
+
+      if (decision.action === 'skip') {
+        if (sourceSlug && target?.slug) viewSlugMap.set(sourceSlug, target.slug);
+        continue;
+      }
+
+      if (decision.action === 'overwrite') {
+        const targetId = decision.targetId || target?.id;
+        if (!targetId) {
+          warnings.push(`No overwrite target found for view: ${String(viewPayload?.name || v.file)}`);
+          continue;
+        }
+        const updated = await viewRepo.update(targetId, {
+          name: typeof viewPayload?.name === 'string' ? String(viewPayload.name) : undefined,
+          description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : undefined,
+          root: viewPayload?.root as any,
+          runtimeConfig: viewPayload?.runtimeConfig as any,
+        });
+        imported.views += 1;
+        if (sourceSlug) viewSlugMap.set(sourceSlug, updated.slug);
+        continue;
+      }
+
+      const created = await viewRepo.create({
+        starshipId,
+        name: String(viewPayload?.name || 'View'),
+        description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : '',
+        root: viewPayload?.root as any,
+        runtimeConfig: viewPayload?.runtimeConfig as any,
+      });
+      imported.views += 1;
+      if (sourceSlug) viewSlugMap.set(sourceSlug, created.slug);
+    }
+
+    // Datasets (include rows best-effort; overwrite clears rows).
+    const existingDatasets = await datasetRepo.listByStarship(starshipId, { includeArchived: true });
+    const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
+    const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
+    for (const d of existingDatasets) {
+      const nameKey = String(d.name || '')
+        .trim()
+        .toLowerCase();
+      if (nameKey) datasetsByName.set(nameKey, d);
+      datasetsByHash.set(
+        computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
+        d
+      );
+    }
+
+    for (const d of manifest.entities.datasets) {
+      const entry = getBundleEntry(zip, d.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing dataset file: ${d.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`Dataset file is not valid JSON: ${d.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'dataset') {
+        warnings.push(`Dataset file is not a valid dataset container: ${d.file}`);
+        continue;
+      }
+      const fromSlug = containerParsed.data.metadata?.fromSlug;
+      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
+      const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown>; rows?: unknown };
+      const datasetPayload = payload?.dataset ?? {};
+      const rowsRaw = Array.isArray((payload as any)?.rows) ? ((payload as any).rows as unknown[]) : [];
+      const rows = rowsRaw
+        .map((r: any) => ({
+          ...(typeof r?.rowKey === 'string' ? { rowKey: String(r.rowKey) } : r?.rowKey === null ? { rowKey: null } : {}),
+          data: isPlainObject(r?.data) ? (r.data as Record<string, unknown>) : {},
+        }))
+        .filter((r: any) => isPlainObject(r?.data));
+
+      const bundleHash = computeBundleHash({
+        name: datasetPayload?.name,
+        description: datasetPayload?.description,
+        columns: datasetPayload?.columns,
+        primaryKey: datasetPayload?.primaryKey ?? null,
+      });
+      const decision = decisions.datasets[bundleHash] ?? { action: 'copy' as const };
+      const datasetNameKey = String(datasetPayload?.name || '')
+        .trim()
+        .toLowerCase();
+      const existingByHash = datasetsByHash.get(bundleHash);
+      const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
+      const target = existingByHash ?? existingByName ?? null;
+
+      if (decision.action === 'skip') {
+        if (sourceSlug && target?.slug) datasetSlugMap.set(sourceSlug, target.slug);
+        continue;
+      }
+
+      const normalizedCreate = {
+        starshipId,
+        name: String(datasetPayload?.name || 'Dataset'),
+        description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
+        columns: Array.isArray((datasetPayload as any)?.columns) ? ((datasetPayload as any).columns as any[]) : [],
+        primaryKey:
+          typeof (datasetPayload as any)?.primaryKey === 'string'
+            ? String((datasetPayload as any).primaryKey)
+            : (datasetPayload as any)?.primaryKey === null
+              ? null
+              : undefined,
+      };
+
+      if (decision.action === 'overwrite') {
+        const targetId = decision.targetId || target?.id;
+        if (!targetId) {
+          warnings.push(`No overwrite target found for dataset: ${String(datasetPayload?.name || d.file)}`);
+          continue;
+        }
+        const updated = await datasetRepo.update(targetId, {
+          name: normalizedCreate.name,
+          description: normalizedCreate.description,
+          columns: normalizedCreate.columns as any,
+          primaryKey: normalizedCreate.primaryKey as any,
+          archived: false,
+        });
+        if (updated) {
+          await txConn.query(`DELETE FROM starship_dataset_rows WHERE dataset_id = $1`, [updated.id]);
+          if (rows.length > 0) {
+            await datasetRowRepo.appendMany(updated.id, rows);
+          }
+          imported.datasets += 1;
+          if (sourceSlug) datasetSlugMap.set(sourceSlug, updated.slug);
+        }
+        continue;
+      }
+
+      const created = await datasetRepo.create(normalizedCreate as any);
+      if (rows.length > 0) {
+        await datasetRowRepo.appendMany(created.id, rows);
+      }
+      imported.datasets += 1;
+      if (sourceSlug) datasetSlugMap.set(sourceSlug, created.slug);
+    }
+
+    // Task boards (copy/skip; overwrite treated as copy)
+    const existingBoards = await taskBoardRepo.listByStarship(starshipId, { includeArchived: true });
+    const boardsByName = new Map<string, (typeof existingBoards)[number]>();
+    for (const b of existingBoards) {
+      const nameKey = String(b.name || '')
+        .trim()
+        .toLowerCase();
+      if (nameKey) boardsByName.set(nameKey, b);
+    }
+
+    for (const b of manifest.entities.taskBoards) {
+      const entry = getBundleEntry(zip, b.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing task board file: ${b.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`Task board file is not valid JSON: ${b.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'task_board') {
+        warnings.push(`Task board file is not a valid task board container: ${b.file}`);
+        continue;
+      }
+      const fromSlug = containerParsed.data.metadata?.fromSlug;
+      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
+      const payload = containerParsed.data.payload as any;
+      const boardPayload = payload?.taskBoard ?? {};
+      const name = String(boardPayload?.name || '').trim();
+      const bundleHash = computeBundleHash({ name: boardPayload?.name, description: boardPayload?.description });
+      const decision = decisions.taskBoards[bundleHash] ?? { action: 'copy' as const };
+      const target = name ? boardsByName.get(name.toLowerCase()) : null;
+
+      if (decision.action === 'skip') {
+        if (sourceSlug && target?.slug) taskBoardSlugMap.set(sourceSlug, target.slug);
+        continue;
+      }
+
+      const createdBoard = await taskBoardRepo.create({
+        starshipId,
+        name: String(boardPayload?.name || 'Board'),
+        description: typeof boardPayload?.description === 'string' ? String(boardPayload.description) : '',
+        pos: typeof boardPayload?.pos === 'number' ? boardPayload.pos : undefined,
+      });
+
+      const columnsRaw = Array.isArray(payload?.columns) ? (payload.columns as any[]) : [];
+      const createdColumnByTitle = new Map<string, string>();
+      for (const c of columnsRaw) {
+        const title = String(c?.title || '').trim();
+        if (!title) continue;
+        const createdCol = await taskColumnRepo.create({
+          boardId: createdBoard.id,
+          title,
+          key: typeof c?.key === 'string' ? String(c.key) : c?.key === null ? null : undefined,
+          pos: typeof c?.pos === 'number' ? c.pos : undefined,
+          wipLimit: typeof c?.wipLimit === 'number' ? c.wipLimit : c?.wipLimit === null ? null : undefined,
+        });
+        createdColumnByTitle.set(title, createdCol.id);
+      }
+
+      const cardsRaw = Array.isArray(payload?.cards) ? (payload.cards as any[]) : [];
+      for (const c of cardsRaw) {
+        const colTitle = String(c?.columnTitle || '').trim();
+        const colId = createdColumnByTitle.get(colTitle);
+        if (!colId) continue;
+        const sourceAssigneeSlug = typeof c?.assigneeAgentSlug === 'string' ? String(c.assigneeAgentSlug).trim() : '';
+        const assigneeAgentId = sourceAssigneeSlug ? (agentIdMap.get(sourceAssigneeSlug) ?? null) : null;
+        const assigneeUserSlug = typeof c?.assigneeUserSlug === 'string' ? String(c.assigneeUserSlug).trim() : '';
+        const assigneeUserId = assigneeUserSlug.startsWith('u:') ? assigneeUserSlug.slice(2) : null;
+        const createdCard = await taskCardRepo.create({
+          boardId: createdBoard.id,
+          columnId: colId,
+          title: String(c?.title || 'Card'),
+          description: typeof c?.description === 'string' ? String(c.description) : '',
+          pos: typeof c?.pos === 'number' ? c.pos : undefined,
+          priority: typeof c?.priority === 'number' ? c.priority : c?.priority === null ? null : undefined,
+          assigneeAgentId,
+          assigneeUserId,
+        });
+        if (c?.archived === true) {
+          await taskCardRepo.update(createdCard.id, { archived: true });
+        }
+      }
+
+      imported.taskBoards += 1;
+      if (sourceSlug) taskBoardSlugMap.set(sourceSlug, createdBoard.slug);
+    }
+
+    // Rooms (copy/skip; overwrite treated as copy)
+    for (const r of manifest.entities.rooms) {
+      const entry = getBundleEntry(zip, r.file);
+      if (!entry) {
+        warnings.push(`Bundle is missing room file: ${r.file}`);
+        continue;
+      }
+      let containerRaw: unknown;
+      try {
+        containerRaw = JSON.parse(entry.getData().toString('utf8'));
+      } catch {
+        warnings.push(`Room file is not valid JSON: ${r.file}`);
+        continue;
+      }
+      const containerParsed = ContainerSchema.safeParse(containerRaw);
+      if (!containerParsed.success || containerParsed.data.kind !== 'room') {
+        warnings.push(`Room file is not a valid room container: ${r.file}`);
+        continue;
+      }
+
+      const payload = containerParsed.data.payload as any;
+      const roomPayload = payload?.room ?? {};
+      const bundleHash = computeBundleHash({
+        name: roomPayload?.name,
+        isPrivate: roomPayload?.isPrivate,
+        topic: roomPayload?.topic ?? null,
+      });
+      const decision = decisions.rooms[bundleHash] ?? { action: 'copy' as const };
+      if (decision.action === 'skip') continue;
+
+      const conversation = await conversationRepo.create({
+        title: String(roomPayload?.name || 'Room'),
+        status: 'active',
+        starshipId,
+      });
+      const createdRoom = await roomRepo.create({
+        conversationId: conversation.id,
+        starshipId,
+        name: String(roomPayload?.name || 'Room'),
+        isPrivate: Boolean(roomPayload?.isPrivate),
+        topic: roomPayload?.topic ?? null,
+        provisionedByBundle: provisionedByBundleTag ?? null,
+      });
+
+      // Creator becomes admin participant.
+      await participantRepo.addUserParticipant({
+        conversationId: createdRoom.conversationId,
+        userId,
+        role: 'admin',
+        createdBy: userId,
+      });
+
+      // Agent participants (best-effort; skip missing agents)
+      const agentSlugs = Array.isArray(payload?.agentParticipantSlugs) ? (payload.agentParticipantSlugs as unknown[]) : [];
+      for (const s of agentSlugs) {
+        const sourceSlug = typeof s === 'string' ? s.trim() : '';
+        if (!sourceSlug) continue;
+        const agentId = agentIdMap.get(sourceSlug);
+        if (!agentId) {
+          warnings.push(`Skipped missing room agent participant: ${sourceSlug}`);
+          continue;
+        }
+        await participantRepo.addAgentParticipant({ conversationId: createdRoom.conversationId, agentId, createdBy: userId });
+      }
+
+      // Tool assignments (map source tool slug -> created tool slug -> tool id)
+      const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as any[]) : [];
+      if (toolAssignments.length > 0) {
+        for (const ta of toolAssignments) {
+          const sourceToolSlug = typeof ta?.toolSlug === 'string' ? ta.toolSlug.trim() : '';
+          const permission = ta?.permission;
+          if (!sourceToolSlug) continue;
+          if (permission !== 'allow' && permission !== 'ask' && permission !== 'deny') continue;
+          const destToolSlug = toolSlugMap.get(sourceToolSlug) ?? sourceToolSlug;
+          const found = await toolRepo.findBySlugs([destToolSlug], starshipId);
+          const tool = found?.[0] ?? null;
+          if (!tool) {
+            warnings.push(`Skipped missing room tool assignment: ${destToolSlug}`);
+            continue;
+          }
+          await roomToolsRepo.upsert({ roomConversationId: createdRoom.conversationId, toolId: tool.id, permission });
+        }
+      }
+
+      // Pins (views/datasets/task boards)
+      const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as any[]) : [];
+      for (const p of viewPins) {
+        const sourceViewSlug = typeof p?.viewSlug === 'string' ? p.viewSlug.trim() : '';
+        if (!sourceViewSlug) continue;
+        const destSlug = viewSlugMap.get(sourceViewSlug) ?? sourceViewSlug;
+        const view = await viewRepo.findBySlug(destSlug, starshipId);
+        if (!view) {
+          warnings.push(`Skipped missing pinned view: ${destSlug}`);
+          continue;
+        }
+        await roomViewsRepo.upsert({
+          roomConversationId: createdRoom.conversationId,
+          viewId: view.id,
+          position: typeof p?.position === 'number' ? p.position : undefined,
+          createdBy: userId,
+        });
+      }
+
+      const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as any[]) : [];
+      for (const p of datasetPins) {
+        const sourceDatasetSlug = typeof p?.datasetSlug === 'string' ? p.datasetSlug.trim() : '';
+        if (!sourceDatasetSlug) continue;
+        const destSlug = datasetSlugMap.get(sourceDatasetSlug) ?? sourceDatasetSlug;
+        const dataset = await datasetRepo.findBySlug(destSlug, starshipId);
+        if (!dataset) {
+          warnings.push(`Skipped missing pinned dataset: ${destSlug}`);
+          continue;
+        }
+        await roomDatasetsRepo.upsert({
+          roomConversationId: createdRoom.conversationId,
+          datasetId: dataset.id,
+          position: typeof p?.position === 'number' ? p.position : undefined,
+          createdBy: userId,
+        });
+      }
+
+      const taskBoardPins = Array.isArray(payload?.taskBoardPins) ? (payload.taskBoardPins as any[]) : [];
+      for (const p of taskBoardPins) {
+        const sourceBoardSlug = typeof p?.taskBoardSlug === 'string' ? p.taskBoardSlug.trim() : '';
+        if (!sourceBoardSlug) continue;
+        const destSlug = taskBoardSlugMap.get(sourceBoardSlug) ?? sourceBoardSlug;
+        const board = await taskBoardRepo.findBySlug(destSlug, starshipId);
+        if (!board) {
+          warnings.push(`Skipped missing pinned task board: ${destSlug}`);
+          continue;
+        }
+        await roomTaskBoardsRepo.upsert({
+          roomConversationId: createdRoom.conversationId,
+          boardId: board.id,
+          position: typeof p?.position === 'number' ? p.position : undefined,
+          createdBy: userId,
+        });
+      }
+
+      imported.rooms += 1;
+    }
+
+    return {
+      imported,
+      warnings: warnings.length ? warnings : undefined,
+    };
+  });
+
+  return applyResult;
+}
+
 function extractTextFromHtml(html: string): string {
   // Very lightweight extraction to avoid extra deps.
   const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
@@ -326,6 +1096,46 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function readContentHash(value: unknown): string | undefined {
   return typeof value === 'string' && value.length === 64 ? value : undefined;
+}
+
+function resolvePublicDocsRoot(): string {
+  const fromEnv = process.env.STARSHIPS_PUBLIC_DOCS_DIR;
+  if (fromEnv && fs.existsSync(fromEnv) && fs.statSync(fromEnv).isDirectory()) {
+    return fromEnv;
+  }
+
+  const candidates = [
+    // When server is started from repo root
+    path.resolve(process.cwd(), 'public-docs'),
+    // When server cwd is packages/server (monorepo root up one or two levels)
+    path.resolve(process.cwd(), '..', '..', 'public-docs'),
+    path.resolve(process.cwd(), '..', 'public-docs'),
+  ];
+
+  for (const dir of candidates) {
+    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+      return dir;
+    }
+  }
+
+  // Fallback to original default (will error later with clear message)
+  return path.resolve(process.cwd(), 'public-docs');
+}
+
+function getBundleEntry(zip: AdmZip, file: string): AdmZip.IZipEntry | null {
+  const direct = zip.getEntry(file);
+  if (direct) return direct;
+
+  const normalized = file.replace(/^[./]+/, '');
+  const entries = zip.getEntries();
+  for (const entry of entries) {
+    const name = entry.entryName.replace(/^[./]+/, '');
+    if (name === normalized || name.endsWith('/' + normalized)) {
+      return entry;
+    }
+  }
+
+  return null;
 }
 
 function requireAuthUser(req: Request, res: Response): AuthUser | null {
@@ -2068,7 +2878,9 @@ router.post(
       const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
       const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
       for (const t of existingTools) {
-        const nameKey = String(t.name || '').trim().toLowerCase();
+        const nameKey = String(t.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingToolsByName.set(nameKey, t);
         const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingToolsByHash.set(storedHash, t);
@@ -2097,7 +2909,9 @@ router.post(
       const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
       const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
       for (const a of existingAgents) {
-        const nameKey = String(a.name || '').trim().toLowerCase();
+        const nameKey = String(a.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingAgentsByName.set(nameKey, a);
         const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingAgentsByHash.set(storedHash, a);
@@ -2131,7 +2945,9 @@ router.post(
       const existingViewsByHash = new Map<string, (typeof existingViews)[number]>();
       const existingViewsByName = new Map<string, (typeof existingViews)[number]>();
       for (const v of existingViews) {
-        const nameKey = String(v.name || '').trim().toLowerCase();
+        const nameKey = String(v.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingViewsByName.set(nameKey, v);
         const h = computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig });
         existingViewsByHash.set(h, v);
@@ -2141,7 +2957,9 @@ router.post(
       const existingDatasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
       const existingDatasetsByName = new Map<string, (typeof existingDatasets)[number]>();
       for (const d of existingDatasets) {
-        const nameKey = String(d.name || '').trim().toLowerCase();
+        const nameKey = String(d.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingDatasetsByName.set(nameKey, d);
         const h = computeBundleHash({
           name: d.name,
@@ -2156,7 +2974,9 @@ router.post(
       const existingBoardsByHash = new Map<string, (typeof existingBoards)[number]>();
       const existingBoardsByName = new Map<string, (typeof existingBoards)[number]>();
       for (const b of existingBoards) {
-        const nameKey = String(b.name || '').trim().toLowerCase();
+        const nameKey = String(b.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingBoardsByName.set(nameKey, b);
         const h = computeBundleHash({ name: b.name, description: b.description });
         existingBoardsByHash.set(h, b);
@@ -2166,7 +2986,9 @@ router.post(
       const existingRoomsByHash = new Map<string, (typeof existingRooms)[number]>();
       const existingRoomsByName = new Map<string, (typeof existingRooms)[number]>();
       for (const r of existingRooms) {
-        const nameKey = String(r.name || '').trim().toLowerCase();
+        const nameKey = String(r.name || '')
+          .trim()
+          .toLowerCase();
         if (nameKey) existingRoomsByName.set(nameKey, r);
         const h = computeBundleHash({ name: r.name, isPrivate: r.isPrivate, topic: r.topic ?? null });
         existingRoomsByHash.set(h, r);
@@ -2429,7 +3251,11 @@ router.post(
         const payload = containerParsed.data.payload as unknown as { room?: Record<string, unknown> };
         const roomPayload = payload?.room ?? {};
         const name = String(roomPayload?.name || '').trim();
-        const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+        const bundleHash = computeBundleHash({
+          name: roomPayload?.name,
+          isPrivate: roomPayload?.isPrivate,
+          topic: roomPayload?.topic ?? null,
+        });
         const existingByHash = existingRoomsByHash.get(bundleHash);
         const existingByName = name ? existingRoomsByName.get(name.toLowerCase()) : undefined;
         const existing = existingByHash ?? existingByName;
@@ -2457,6 +3283,223 @@ router.post(
     }
   }
 );
+
+/**
+ * POST /starships/:id/ensure-leadgen-room
+ *
+ * Ensure that the lead generation room bundle is applied for the given starship and return the room.
+ * This is used by the lead-generation landing flow to provision a dedicated workspace.
+ *
+ * Starship owner / instance-admin only (same access model as generic bundle import).
+ */
+router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+
+    const roomRepo = new RoomRepository();
+    const starshipId = paramValidation.id;
+
+    // If a leadgen bundle-provisioned room already exists for this starship, reuse it,
+    // regardless of its slug. This prevents collisions with user-created rooms that
+    // happen to use the same slug.
+    const existingRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
+    if (existingRoom) {
+      // Best-effort: ensure caller is a participant.
+      try {
+        const participantRepo = new ConversationParticipantRepository();
+        await participantRepo.addUserParticipant({
+          conversationId: existingRoom.conversationId,
+          userId: user.id,
+          role: 'admin',
+          createdBy: user.id,
+        });
+      } catch {
+        // Ignore if already a participant or if a constraint is hit.
+      }
+
+      // Best-effort: ensure all leadgen bundle agents are already room participants so that
+      // mentions like <@a:nora> do not trigger an "Add to room" approval banner.
+      try {
+        const agentRepo = new AgentRepository();
+        const participantRepo = new ConversationParticipantRepository();
+        const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+        for (const slug of leadgenAgentSlugs) {
+          const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+          if (!agent?.id) continue;
+          try {
+            await participantRepo.addAgentParticipant({
+              conversationId: existingRoom.conversationId,
+              agentId: agent.id,
+              createdBy: user.id,
+            });
+          } catch {
+            // Ignore if agent is already a participant or if a constraint is hit.
+          }
+        }
+      } catch {
+        // Best-effort only; if this fails we still return the room.
+      }
+
+      // eslint-disable-next-line no-console
+      console.debug('[leadgen] Reusing existing leadgen room', {
+        starshipId,
+        roomSlug: existingRoom.slug,
+        conversationId: existingRoom.conversationId,
+      });
+
+      sendSuccess(res, { room: existingRoom });
+      return;
+    }
+
+    // No existing room; apply the lead-generation bundle from disk.
+    const docsRoot = resolvePublicDocsRoot();
+    const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
+    if (!fs.existsSync(zipPath)) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room bundle is not available on the server', 500);
+      return;
+    }
+
+    let zip: AdmZip;
+    try {
+      const buffer = fs.readFileSync(zipPath);
+      zip = new AdmZip(buffer);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to read lead generation room bundle', 500);
+      return;
+    }
+
+    let manifestEntry = zip.getEntry('manifest.json');
+    if (!manifestEntry) {
+      // Some bundles may be zipped with a top-level folder (e.g. "lead-generation/manifest.json").
+      const entries = zip.getEntries();
+      const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
+      if (alt) {
+        manifestEntry = alt;
+      }
+    }
+    if (!manifestEntry) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json missing from bundle', {
+        zipPath,
+        entries: zip.getEntries().map((e) => e.entryName),
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle is missing manifest.json', 500);
+      return;
+    }
+
+    let manifestRaw: unknown;
+    try {
+      manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+    } catch {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json is not valid JSON', 500);
+      return;
+    }
+
+    const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+    if (!manifestParsed.success) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json shape is invalid', {
+        zipPath,
+        issues: manifestParsed.error.issues,
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json has an unexpected shape', 500, {
+        issues: manifestParsed.error.issues,
+      });
+      return;
+    }
+
+    try {
+      assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] manifest.json contains invalid file paths', {
+        zipPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest contains invalid file paths', 500, {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+
+    const emptyDecisions: RoomBundleDecisions = {
+      rooms: {},
+      views: {},
+      datasets: {},
+      taskBoards: {},
+      tools: {},
+      agents: {},
+    };
+
+    const importSummary = await applyRoomBundleToStarship({
+      starshipId,
+      userId: user.id,
+      zip,
+      manifest: manifestParsed.data,
+      decisions: emptyDecisions,
+      provisionedByBundleTag: 'lead-generation',
+    });
+
+    const createdRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
+    if (!createdRoom) {
+      // eslint-disable-next-line no-console
+      console.error('[leadgen] Leadgen room not found after import', {
+        starshipId,
+        imported: importSummary.imported,
+      });
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room was not created from bundle', 500, {
+        imported: importSummary.imported,
+      });
+      return;
+    }
+
+    // Best-effort: ensure all leadgen bundle agents are added as room participants for the
+    // newly created room so user messages mentioning them do not require manual approval.
+    try {
+      const agentRepo = new AgentRepository();
+      const participantRepo = new ConversationParticipantRepository();
+      const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+      for (const slug of leadgenAgentSlugs) {
+        const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+        if (!agent?.id) continue;
+        try {
+          await participantRepo.addAgentParticipant({
+            conversationId: createdRoom.conversationId,
+            agentId: agent.id,
+            createdBy: user.id,
+          });
+        } catch {
+          // Ignore if agent is already a participant or if a constraint is hit.
+        }
+      }
+    } catch {
+      // Best-effort only; room provisioning should still succeed even if this step fails.
+    }
+
+    // eslint-disable-next-line no-console
+    console.debug('[leadgen] Leadgen room created from bundle', {
+      starshipId,
+      roomSlug: createdRoom.slug,
+      conversationId: createdRoom.conversationId,
+      imported: importSummary.imported,
+    });
+
+    sendSuccess(res, { room: createdRoom, importSummary });
+  } catch (error) {
+    handleError(error, res, 'ensuring leadgen room for starship');
+  }
+});
 
 /**
  * POST /starships/:id/import-room-bundle/apply
@@ -2588,7 +3631,9 @@ router.post(
         const toolsByHash = new Map<string, (typeof existingTools)[number]>();
         const toolsByName = new Map<string, (typeof existingTools)[number]>();
         const indexTool = (t: (typeof existingTools)[number]) => {
-          const nameKey = String(t.name || '').trim().toLowerCase();
+          const nameKey = String(t.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) toolsByName.set(nameKey, t);
           const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
           if (hash) toolsByHash.set(hash, t);
@@ -2631,7 +3676,9 @@ router.post(
           });
 
           const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-          const toolNameKey = String(toolPayload?.name || '').trim().toLowerCase();
+          const toolNameKey = String(toolPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = toolsByHash.get(bundleHash);
           const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -2681,7 +3728,9 @@ router.post(
         const existingAgents = await agentRepo.findByStarship(starshipId);
         const agentsByName = new Map<string, (typeof existingAgents)[number]>();
         for (const a of existingAgents) {
-          const nameKey = String(a.name || '').trim().toLowerCase();
+          const nameKey = String(a.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) agentsByName.set(nameKey, a);
         }
 
@@ -2732,8 +3781,12 @@ router.post(
           });
 
           const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
-          const agentNameKey = String(agentPayload?.name || '').trim().toLowerCase();
-          const target = (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ?? (agentNameKey ? agentsByName.get(agentNameKey) : null);
+          const agentNameKey = String(agentPayload?.name || '')
+            .trim()
+            .toLowerCase();
+          const target =
+            (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
+            (agentNameKey ? agentsByName.get(agentNameKey) : null);
 
           if (decision.action === 'skip') {
             if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
@@ -2767,7 +3820,9 @@ router.post(
               try {
                 await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
               } catch (err) {
-                warnings.push(`Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`);
+                warnings.push(
+                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+                );
               }
               imported.agents += 1;
               if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
@@ -2796,7 +3851,9 @@ router.post(
         const viewsByHash = new Map<string, (typeof existingViews)[number]>();
         const viewsByName = new Map<string, (typeof existingViews)[number]>();
         for (const v of existingViews) {
-          const nameKey = String(v.name || '').trim().toLowerCase();
+          const nameKey = String(v.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) viewsByName.set(nameKey, v);
           viewsByHash.set(computeBundleHash({ name: v.name, description: v.description, root: v.root, runtimeConfig: v.runtimeConfig }), v);
         }
@@ -2830,7 +3887,9 @@ router.post(
             runtimeConfig: viewPayload?.runtimeConfig,
           });
           const decision = decisionsParsed.data.views[bundleHash] ?? { action: 'copy' as const };
-          const viewNameKey = String(viewPayload?.name || '').trim().toLowerCase();
+          const viewNameKey = String(viewPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = viewsByHash.get(bundleHash);
           const existingByName = viewNameKey ? viewsByName.get(viewNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -2873,7 +3932,9 @@ router.post(
         const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
         const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
         for (const d of existingDatasets) {
-          const nameKey = String(d.name || '').trim().toLowerCase();
+          const nameKey = String(d.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) datasetsByName.set(nameKey, d);
           datasetsByHash.set(
             computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
@@ -2918,7 +3979,9 @@ router.post(
             primaryKey: datasetPayload?.primaryKey ?? null,
           });
           const decision = decisionsParsed.data.datasets[bundleHash] ?? { action: 'copy' as const };
-          const datasetNameKey = String(datasetPayload?.name || '').trim().toLowerCase();
+          const datasetNameKey = String(datasetPayload?.name || '')
+            .trim()
+            .toLowerCase();
           const existingByHash = datasetsByHash.get(bundleHash);
           const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
@@ -2977,7 +4040,9 @@ router.post(
         const existingBoards = await taskBoardRepo.listByStarship(starshipId, { includeArchived: true });
         const boardsByName = new Map<string, (typeof existingBoards)[number]>();
         for (const b of existingBoards) {
-          const nameKey = String(b.name || '').trim().toLowerCase();
+          const nameKey = String(b.name || '')
+            .trim()
+            .toLowerCase();
           if (nameKey) boardsByName.set(nameKey, b);
         }
 
@@ -3041,7 +4106,7 @@ router.post(
             const colId = createdColumnByTitle.get(colTitle);
             if (!colId) continue;
             const sourceAssigneeSlug = typeof c?.assigneeAgentSlug === 'string' ? String(c.assigneeAgentSlug).trim() : '';
-            const assigneeAgentId = sourceAssigneeSlug ? agentIdMap.get(sourceAssigneeSlug) ?? null : null;
+            const assigneeAgentId = sourceAssigneeSlug ? (agentIdMap.get(sourceAssigneeSlug) ?? null) : null;
             const assigneeUserSlug = typeof c?.assigneeUserSlug === 'string' ? String(c.assigneeUserSlug).trim() : '';
             const assigneeUserId = assigneeUserSlug.startsWith('u:') ? assigneeUserSlug.slice(2) : null;
             const createdCard = await taskCardRepo.create({
@@ -3085,7 +4150,11 @@ router.post(
 
           const payload = containerParsed.data.payload as any;
           const roomPayload = payload?.room ?? {};
-          const bundleHash = computeBundleHash({ name: roomPayload?.name, isPrivate: roomPayload?.isPrivate, topic: roomPayload?.topic ?? null });
+          const bundleHash = computeBundleHash({
+            name: roomPayload?.name,
+            isPrivate: roomPayload?.isPrivate,
+            topic: roomPayload?.topic ?? null,
+          });
           const decision = decisionsParsed.data.rooms[bundleHash] ?? { action: 'copy' as const };
           if (decision.action === 'skip') continue;
 

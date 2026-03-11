@@ -355,7 +355,14 @@ export default function OnboardingPage() {
                     </div>
                     <div className={`space-y-2 ${INPUT_MAX_W}`}>
                       <Label htmlFor="starship-name">Starship name</Label>
-                      <Input id="starship-name" value={starshipName} onChange={e => setStarshipName(e.target.value)} placeholder="e.g. Acme Corp" maxLength={100} />
+                      <Input
+                        id="starship-name"
+                        value={starshipName}
+                        onChange={e => setStarshipName(e.target.value)}
+                        placeholder="e.g. Acme Corp"
+                        maxLength={100}
+                        style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                      />
                     </div>
                   </div>
                 </div>

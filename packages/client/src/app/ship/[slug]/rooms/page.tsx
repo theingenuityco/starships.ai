@@ -220,12 +220,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const [createPrivate, setCreatePrivate] = useState(false)
   const [createTopic, setCreateTopic] = useState('')
   const createNameLength = createName.length
-  const canCreate =
-    canManageRooms &&
-    !createRoom.isPending &&
-    createName.trim().length > 0 &&
-    createName === createName.trim() &&
-    createNameLength <= ROOM_NAME_MAX
+  const canCreate = canManageRooms && !createRoom.isPending && createName.trim().length > 0 && createName === createName.trim() && createNameLength <= ROOM_NAME_MAX
 
   const [editRoomTarget, setEditRoomTarget] = useState<RoomModel | null>(null)
   const [editName, setEditName] = useState('')
@@ -233,12 +228,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const [editTopic, setEditTopic] = useState('')
   const editNameLength = editName.length
   const canSaveEdit =
-    canManageRooms &&
-    Boolean(editRoomTarget?.conversationId) &&
-    !updateRoom.isPending &&
-    editName.trim().length > 0 &&
-    editName === editName.trim() &&
-    editNameLength <= ROOM_NAME_MAX
+    canManageRooms && Boolean(editRoomTarget?.conversationId) && !updateRoom.isPending && editName.trim().length > 0 && editName === editName.trim() && editNameLength <= ROOM_NAME_MAX
 
   const [deleteRoomTarget, setDeleteRoomTarget] = useState<RoomModel | null>(null)
   const [exportingRoomId, setExportingRoomId] = useState<string | null>(null)
@@ -344,7 +334,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {sorted.map((r) => {
+              {sorted.map(r => {
                 const roomSlug = String(r.slug || '').trim()
                 const href = roomSlug ? `/ship/${encodeURIComponent(slug)}/rooms/${encodeURIComponent(roomSlug)}` : null
                 const isExporting = exportingRoomId === String(r.conversationId)
@@ -448,7 +438,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       {/* Create */}
       <Dialog
         open={createOpen}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           setCreateOpen(open)
           if (!open) {
             setCreateName('')
@@ -465,7 +455,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
 
           <form
             className="space-y-4"
-            onSubmit={async (e) => {
+            onSubmit={async e => {
               e.preventDefault()
               e.stopPropagation()
               if (!canCreate) return
@@ -482,12 +472,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
           >
             <div className="space-y-1">
               <Label htmlFor="room-name">Name</Label>
-              <Input
-                id="room-name"
-                placeholder="Example"
-                value={createName}
-                onChange={(e) => setCreateName(String(e.target.value || ''))}
-              />
+              <Input id="room-name" placeholder="Example" value={createName} onChange={e => setCreateName(String(e.target.value || ''))} />
               <div className="flex items-center justify-between gap-2">
                 <p className={cn('text-xs', createNameLength > ROOM_NAME_MAX ? 'text-destructive' : 'text-muted-foreground')}>
                   {createNameLength}/{ROOM_NAME_MAX}
@@ -499,13 +484,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
 
             <div className="space-y-1">
               <Label htmlFor="room-topic">Topic (optional)</Label>
-              <Textarea
-                id="room-topic"
-                placeholder="What’s this room for?"
-                value={createTopic}
-                onChange={(e) => setCreateTopic(String(e.target.value || ''))}
-                rows={3}
-              />
+              <Textarea id="room-topic" placeholder="What’s this room for?" value={createTopic} onChange={e => setCreateTopic(String(e.target.value || ''))} rows={3} />
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -531,7 +510,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       {/* Import bundle */}
       <Dialog
         open={importOpen}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           setImportOpen(open)
           if (!open) {
             setImportStep(1)
@@ -562,7 +541,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                       type="file"
                       accept=".zip,application/zip"
                       disabled={isAnalyzingImport || isApplyingImport}
-                      onChange={(e) => {
+                      onChange={e => {
                         const f = e.target.files?.[0] ?? null
                         setImportFile(f)
                         setImportAnalysis(null)
@@ -599,7 +578,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                           { key: 'tools', label: 'Tools', allowOverwrite: true },
                           { key: 'agents', label: 'Agents', allowOverwrite: true },
                         ] as const
-                      ).map((section) => {
+                      ).map(section => {
                         const items = (importAnalysis?.[section.key] ?? []) as any[]
                         return (
                           <div key={section.key}>
@@ -608,7 +587,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                               <div className="text-xs text-muted-foreground">{items.length} in bundle</div>
                             </div>
                             <div className="mt-3 space-y-2">
-                              {items.map((x) => {
+                              {items.map(x => {
                                 const decision = importDecisions?.[section.key]?.[x.bundleHash] ?? {
                                   action: x.status === 'same' ? ('skip' as const) : ('copy' as const),
                                   targetId: x.existing?.id,
@@ -636,7 +615,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                                       className="h-8 rounded-md border border-border/60 bg-background px-2 text-sm"
                                       disabled={isApplyingImport || section.key === 'rooms'}
                                       value={decision.action}
-                                      onChange={(e) => {
+                                      onChange={e => {
                                         const action = e.target.value as 'skip' | 'copy' | 'overwrite'
                                         setImportDecisions((prev: any) => ({
                                           ...prev,
@@ -725,7 +704,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       {/* Edit */}
       <Dialog
         open={Boolean(editRoomTarget)}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           if (!open) closeEdit()
         }}
       >
@@ -738,7 +717,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
           <div className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="edit-room-name">Name</Label>
-              <Input id="edit-room-name" value={editName} onChange={(e) => setEditName(String(e.target.value || ''))} />
+              <Input id="edit-room-name" value={editName} onChange={e => setEditName(String(e.target.value || ''))} />
               <div className="flex items-center justify-between gap-2">
                 <p className={cn('text-xs', editNameLength > ROOM_NAME_MAX ? 'text-destructive' : 'text-muted-foreground')}>
                   {editNameLength}/{ROOM_NAME_MAX}
@@ -755,7 +734,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
 
             <div className="space-y-1">
               <Label htmlFor="edit-room-topic">Topic (optional)</Label>
-              <Textarea id="edit-room-topic" value={editTopic} onChange={(e) => setEditTopic(String(e.target.value || ''))} rows={3} />
+              <Textarea id="edit-room-topic" value={editTopic} onChange={e => setEditTopic(String(e.target.value || ''))} rows={3} />
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -795,7 +774,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       {/* Delete */}
       <Dialog
         open={Boolean(deleteRoomTarget)}
-        onOpenChange={(open) => {
+        onOpenChange={open => {
           if (!open) setDeleteRoomTarget(null)
         }}
       >
@@ -835,4 +814,3 @@ export default function RoomsIndexPage(): React.JSX.Element {
     </div>
   )
 }
-

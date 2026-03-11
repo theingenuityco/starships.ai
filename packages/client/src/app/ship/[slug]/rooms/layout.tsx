@@ -510,8 +510,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const canManagePins = useMemo(() => {
     const uid = typeof user?.id === 'string' ? user.id : ''
     const ownerId = typeof (starshipData as any)?.ownerId === 'string' ? String((starshipData as any).ownerId) : ''
-    return Boolean(uid && ownerId && String(uid) === String(ownerId))
-  }, [starshipData, user?.id])
+    const isInstanceAdmin = Boolean((user as any)?.isInstanceAdmin)
+    return Boolean(isInstanceAdmin || (uid && ownerId && String(uid) === String(ownerId)))
+  }, [starshipData, user])
 
   const starshipOwnerId = useMemo(() => {
     const ownerId = (starshipData as any)?.ownerId

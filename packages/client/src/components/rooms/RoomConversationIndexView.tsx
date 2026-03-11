@@ -315,10 +315,16 @@ export function RoomConversationIndexView(props: {
 
               <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
                 <button type="button" onClick={() => setStarterTab('suggestions')} className={starterBadgeClass(starterTab === 'suggestions')} role="tab" aria-selected={starterTab === 'suggestions'}>
-                  Suggestions
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="lightbulb" className="h-3.5 w-3.5" />
+                    <span>Suggestions</span>
+                  </span>
                 </button>
                 <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
-                  Datasets
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="database" className="h-3.5 w-3.5" />
+                    <span>Database</span>
+                  </span>
                 </button>
               </div>
 
@@ -329,7 +335,7 @@ export function RoomConversationIndexView(props: {
                       'Suggest 5 conversation ideas for this room.',
                       'Summarize the key topics we should discuss here.',
                       'Draft a concise conversation title and first message.',
-                      'What are the most important datasets to start with?',
+                      'What are the most important databases to start with?',
                     ].map(s => (
                       <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
                         {s}

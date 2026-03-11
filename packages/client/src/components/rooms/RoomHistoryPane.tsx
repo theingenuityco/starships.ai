@@ -4,27 +4,10 @@ import Icon from '@/components/primitives/Icon'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
+import { normalizeConversationTitle } from '@/lib/normalizeConversationTitle'
 import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useMemo } from 'react'
-
-function normalizeConversationTitle(raw: string): string {
-  const t = String(raw || '').trim()
-  if (!t) return t
-  // Back-compat: older DM conversations were titled like "DM • Alice".
-  const m = t.match(/^DM\s*[•·:\-–—]\s*(.+)$/i)
-  if (m?.[1]) {
-    const rest = String(m[1]).trim()
-    return rest || t
-  }
-  // Back-compat: older thread titles were created like "Thread: <snippet>".
-  const tm = t.match(/^Thread\s*:\s*(.+)$/i)
-  if (tm?.[1]) {
-    const rest = String(tm[1]).trim()
-    return rest || t
-  }
-  return t
-}
 
 export function RoomHistoryPane(props: {
   starshipId: string
@@ -111,7 +94,7 @@ export function RoomHistoryPane(props: {
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
         <div className="px-4 pt-3.5 pb-2 md:py-2">
           <div className="w-full">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 <div className="flex min-w-0 w-full gap-2 items-center">
                   <span className="flex-shrink-0 self-center md:hidden">

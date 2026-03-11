@@ -2650,7 +2650,7 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
       {
         parentConversationId: conversationId,
         conversations: page.conversations,
-        total: page.conversations.length,
+        total: page.total,
         hasMoreBefore: page.hasMoreBefore,
         oldestCursor: page.oldestCursor,
       },

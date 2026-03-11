@@ -68,7 +68,7 @@ export function RoomConversationIndexView(props: {
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets' | 'views' | 'tasks' | 'tools'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets'>('suggestions')
 
   // Optional deep-link support: preselect an agent in the room starter composer.
   // Used as a replacement for the removed `/dm/...` routes.
@@ -276,7 +276,7 @@ export function RoomConversationIndexView(props: {
               buttonRef={participantsButtonRef}
               className="sr-only"
             />
-            {props.canManagePins || hasAnyResources ? (
+            {props.canManagePins ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />
                 Resources
@@ -313,40 +313,30 @@ export function RoomConversationIndexView(props: {
               }}
             />
 
-            <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
-              <button type="button" onClick={() => setStarterTab('suggestions')} className={starterBadgeClass(starterTab === 'suggestions')} role="tab" aria-selected={starterTab === 'suggestions'}>
-                Suggestions
-              </button>
-              <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
-                Datasets
-              </button>
-              <button type="button" onClick={() => setStarterTab('views')} className={starterBadgeClass(starterTab === 'views')} role="tab" aria-selected={starterTab === 'views'}>
-                Views
-              </button>
-              <button type="button" onClick={() => setStarterTab('tasks')} className={starterBadgeClass(starterTab === 'tasks')} role="tab" aria-selected={starterTab === 'tasks'}>
-                Tasks
-              </button>
-              <button type="button" onClick={() => setStarterTab('tools')} className={starterBadgeClass(starterTab === 'tools')} role="tab" aria-selected={starterTab === 'tools'}>
-                Tools
-              </button>
-            </div>
+              <div className="mt-4 flex items-center justify-center gap-2 flex-wrap" role="tablist" aria-label="Room starter tabs">
+                <button type="button" onClick={() => setStarterTab('suggestions')} className={starterBadgeClass(starterTab === 'suggestions')} role="tab" aria-selected={starterTab === 'suggestions'}>
+                  Suggestions
+                </button>
+                <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
+                  Datasets
+                </button>
+              </div>
 
-            <div className="mt-4">
-              {starterTab === 'suggestions' ? (
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  {[
-                    'Suggest 5 conversation ideas for this room.',
-                    'Summarize the key topics we should discuss here.',
-                    'Draft a concise conversation title and first message.',
-                    // Use main's slightly clearer datasets copy but keep mention of views.
-                    'What are the most important datasets and views to start with?',
-                  ].map(s => (
-                    <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="mt-4">
+                {starterTab === 'suggestions' ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {[
+                      'Suggest 5 conversation ideas for this room.',
+                      'Summarize the key topics we should discuss here.',
+                      'Draft a concise conversation title and first message.',
+                      'What are the most important datasets to start with?',
+                    ].map(s => (
+                      <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
               {starterTab === 'datasets' ? (
                 pinnedDatasets.length > 0 ? (

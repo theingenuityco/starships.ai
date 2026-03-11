@@ -55,13 +55,7 @@ export function RoomNestedRecentConversations(props: {
   }
 
   return (
-    <div
-      className={cn(
-        // Indent under the room row and draw a subtle "tree spine".
-        'relative ml-2 pl-2 pr-1 pb-1',
-        "before:content-[''] before:absolute before:left-[10px] before:top-0 before:bottom-2 before:w-px before:bg-border/60"
-      )}
-    >
+    <div className="ml-2 pl-2 pr-1 pb-1">
       <div className="space-y-0.5">
         {recent.map((c: any, idx: number) => {
           const id = String(c?.id || '').trim()
@@ -79,18 +73,19 @@ export function RoomNestedRecentConversations(props: {
               variant="ghost"
               className={cn(
                 // Match NavigationItem compact sidebar row styling + add connector branch.
-                "relative w-full h-7 px-2 justify-start text-left text-[12px] font-medium rounded-lg border border-transparent gap-2 min-w-0 overflow-hidden",
+                "relative w-full h-7 px-2 justify-start text-left text-[12px] font-medium rounded-lg border border-transparent gap-2 min-w-0",
                 "bg-transparent hover:bg-transparent focus-visible:bg-transparent",
-                "before:content-[''] before:absolute before:left-[-6px] before:top-1/2 before:h-px before:w-3",
-                // Keep the vertical spine clean for the last visible item.
-                idx === recent.length - 1 ? "after:content-[''] after:absolute after:left-[-6px] after:top-1/2 after:bottom-0 after:w-px after:bg-background" : '',
-                isActive ? 'text-primary before:bg-primary/50' : 'text-muted-foreground hover:text-foreground before:bg-border/60'
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
               onClick={() => openConversation(id)}
               title={title}
             >
               <Icon name="message-square" className="h-3 w-3 flex-shrink-0 opacity-80" />
-              <span className="min-w-0 flex-1 truncate">{title}</span>
+              <div className="min-w-0 flex-1">
+                <span className="block w-full" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {title}
+                </span>
+              </div>
               {whenText ? <span className="flex-shrink-0 text-[10px] text-muted-foreground">{whenText}</span> : null}
             </Button>
           )
@@ -101,9 +96,7 @@ export function RoomNestedRecentConversations(props: {
             type="button"
             onClick={openHistoryPane}
             className={cn(
-              "relative ml-2 mt-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors",
-              // Align with the tree branch visually.
-              "before:content-[''] before:absolute before:left-[-14px] before:top-1/2 before:h-px before:w-3 before:bg-border/60"
+              "ml-2 mt-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
             )}
             aria-label={`Open history for room ${props.roomSlug}`}
             title="Open history"

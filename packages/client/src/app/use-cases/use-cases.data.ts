@@ -63,7 +63,7 @@ export const USE_CASES: UseCaseModel[] = [
     cardDescription: 'Source prospects, personalize outreach, and keep your pipeline warm with agents + automations.',
     tag: 'Growth',
     heroSubtitle: 'Source, enrich, and reach the right people, without the guesswork.',
-    videoEmbedUrl: 'https://www.youtube.com/embed/VIDEO_ID',
+    videoEmbedUrl: 'https://www.youtube.com/embed/okBRZcXnclQ?autoplay=1&mute=1&loop=1&playlist=okBRZcXnclQ',
     primaryTemplateSlug: 'piper',
     previewPromptTitles: ['Batch Enrichment', 'Build Lead Lists', 'Find Contact Info', 'Research Companies', 'Personalize Your Outreach'],
     workflowsSectionHeading: 'Try it yourself',

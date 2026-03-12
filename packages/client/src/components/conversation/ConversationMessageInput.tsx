@@ -1327,10 +1327,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     e.stopPropagation()
                     command(item)
                   }}
-                  onPointerDown={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
                 >
                   <div className="relative">
                     <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>

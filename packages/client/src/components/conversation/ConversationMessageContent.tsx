@@ -28,6 +28,7 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
+import Link from 'next/link'
 
 interface StreamChunk {
   content: string
@@ -324,6 +325,7 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+  starshipSlug?: string
   // Whether we're awaiting tool results (for showing loading state)
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
@@ -533,6 +535,7 @@ export function ConversationMessageContent({
   messageType,
   attachmentIds,
   starshipId,
+  starshipSlug,
   isAwaitingToolResults = false,
   isLastMessage = false,
   contentTextClass,
@@ -981,6 +984,85 @@ export function ConversationMessageContent({
     </div>
   ) : null
 
+  const widgetsFromToolResults = useMemo(() => {
+    if (!Array.isArray(toolResults) || toolResults.length === 0) return []
+    // Dedupe widgets by stable id so repeated tool calls (batch updates) don't spam cards.
+    // For the same widget key, we keep the *latest* occurrence.
+    const byKey = new Map<string, { key: string; widget: Record<string, unknown> }>()
+    for (let i = 0; i < toolResults.length; i += 1) {
+      const tr = toolResults[i] as ToolResultLike
+      const raw = (tr as any)?.content ?? (tr as any)?.result
+      const parsed = tryParseJSON(raw)
+      const widget = extractWidgetLike(parsed)
+      if (!widget) continue
+      const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : ''
+      const props = widget.props && typeof widget.props === 'object' && !Array.isArray(widget.props) ? (widget.props as Record<string, unknown>) : null
+      if (!widgetType || !props) continue
+      const id = typeof props.id === 'string' ? String(props.id).trim() : ''
+      const toolCallId = typeof tr?.toolCallId === 'string' ? tr.toolCallId : typeof (tr as any)?.call_id === 'string' ? String((tr as any).call_id) : ''
+      const key = [widgetType, id || toolCallId || String(i)].filter(Boolean).join(':')
+      // Ensure the latest occurrence ends up last in render order.
+      if (byKey.has(key)) byKey.delete(key)
+      byKey.set(key, { key, widget })
+    }
+    return Array.from(byKey.values())
+  }, [toolResults])
+
+  const widgetCardsNode: ReactNode = widgetsFromToolResults.length > 0 ? (
+    <div className="not-prose mt-3 flex flex-col gap-2">
+      {widgetsFromToolResults.map(({ key, widget }) => {
+        const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : ''
+        const props =
+          widget.props && typeof widget.props === 'object' && !Array.isArray(widget.props)
+            ? (widget.props as Record<string, unknown>)
+            : null
+        if (!props) return null
+
+        if (widgetType === 'dataset_card') {
+          const datasetIdOrSlug = typeof props.datasetIdOrSlug === 'string' ? props.datasetIdOrSlug.trim() : ''
+          if (!datasetIdOrSlug) return null
+          const title = typeof props.title === 'string' ? props.title.trim() : ''
+          const description = typeof props.description === 'string' ? props.description.trim() : ''
+          const href =
+            typeof starshipSlug === 'string' && starshipSlug.trim().length > 0
+              ? `/ship/${encodeURIComponent(starshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
+              : null
+
+          return (
+            <Card key={key} className="border border-border/60 bg-background/60 hover:bg-muted/40 transition-colors">
+              <CardHeader className="py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-sm font-semibold leading-none truncate">
+                      {title || `Dataset: ${datasetIdOrSlug}`}
+                    </CardTitle>
+                    {description ? (
+                      <CardDescription className="mt-1 text-xs leading-relaxed">{description}</CardDescription>
+                    ) : null}
+                  </div>
+                  <Badge variant="outline" className="flex-shrink-0 font-mono text-[10px]">
+                    dataset
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                {href ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={href}>Open dataset</Link>
+                  </Button>
+                ) : (
+                  <div className="text-xs text-muted-foreground">Dataset link unavailable (missing starship slug).</div>
+                )}
+              </CardContent>
+            </Card>
+          )
+        }
+
+        return null
+      })}
+    </div>
+  ) : null
+
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const extractMessageText = (): string => {
@@ -1342,6 +1424,7 @@ export function ConversationMessageContent({
 
         {/* Unified markdown rendering - message content at normal size */}
         {markdownWithToolsNode as any}
+        {widgetCardsNode}
 
         {/* Tool-result attachments (below tool panel) */}
         {toolResultAttachmentIds.length > 0 && starshipId && (

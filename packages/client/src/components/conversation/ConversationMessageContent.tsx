@@ -24,10 +24,12 @@ import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
+import { useStarship } from '@/hooks/useStarships'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
+import Link from 'next/link'
 
 interface StreamChunk {
   content: string
@@ -324,6 +326,7 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+  starshipSlug?: string
   // Whether we're awaiting tool results (for showing loading state)
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
@@ -533,6 +536,7 @@ export function ConversationMessageContent({
   messageType,
   attachmentIds,
   starshipId,
+  starshipSlug,
   isAwaitingToolResults = false,
   isLastMessage = false,
   contentTextClass,
@@ -565,6 +569,10 @@ export function ConversationMessageContent({
 
   // Mention token display resolution (keeps DB content parseable while rendering readable @names).
   const sid = typeof starshipId === 'string' ? starshipId : ''
+  const starshipSlugTrimmed = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+  const { data: starshipFromId } = useStarship(sid, Boolean(sid) && !starshipSlugTrimmed)
+  const resolvedStarshipSlug =
+    starshipSlugTrimmed || (typeof (starshipFromId as any)?.slug === 'string' ? String((starshipFromId as any).slug).trim() : '')
   const { data: starshipAgents = [] } = useStarshipAgents(sid, Boolean(sid))
   const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
   const memberUsers: StarshipMemberListItem[] = useMemo(() => {
@@ -981,6 +989,122 @@ export function ConversationMessageContent({
     </div>
   ) : null
 
+  const widgetsFromToolResults = useMemo(() => {
+    if (!Array.isArray(toolResults) || toolResults.length === 0) return []
+    // Dedupe widgets by stable id so repeated tool calls (batch updates) don't spam cards.
+    // For the same widget key, we keep the *latest* occurrence.
+    const byKey = new Map<string, { key: string; widget: Record<string, unknown> }>()
+    for (let i = 0; i < toolResults.length; i += 1) {
+      const tr = toolResults[i] as ToolResultLike
+      const raw = (tr as any)?.content ?? (tr as any)?.result
+      const parsed = tryParseJSON(raw)
+      const widget = extractWidgetLike(parsed)
+      if (!widget) continue
+      const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : ''
+      const props = widget.props && typeof widget.props === 'object' && !Array.isArray(widget.props) ? (widget.props as Record<string, unknown>) : null
+      if (!widgetType || !props) continue
+      const id = typeof props.id === 'string' ? String(props.id).trim() : ''
+      const toolCallId = typeof tr?.toolCallId === 'string' ? tr.toolCallId : typeof (tr as any)?.call_id === 'string' ? String((tr as any).call_id) : ''
+      const key = [widgetType, id || toolCallId || String(i)].filter(Boolean).join(':')
+      // Ensure the latest occurrence ends up last in render order.
+      if (byKey.has(key)) byKey.delete(key)
+      byKey.set(key, { key, widget })
+    }
+    return Array.from(byKey.values())
+  }, [toolResults])
+
+  const widgetCardsNode: ReactNode = widgetsFromToolResults.length > 0 ? (
+    <div className="not-prose flex flex-col gap-2">
+      {widgetsFromToolResults.map(({ key, widget }) => {
+        const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : ''
+        const props =
+          widget.props && typeof widget.props === 'object' && !Array.isArray(widget.props)
+            ? (widget.props as Record<string, unknown>)
+            : null
+        if (!props) return null
+
+        if (widgetType === 'dataset_card') {
+          const datasetIdOrSlug = typeof props.datasetIdOrSlug === 'string' ? props.datasetIdOrSlug.trim() : ''
+          if (!datasetIdOrSlug) return null
+          const title = typeof props.title === 'string' ? props.title.trim() : ''
+          const description = typeof props.description === 'string' ? props.description.trim() : ''
+          const href = resolvedStarshipSlug
+            ? `/ship/${encodeURIComponent(resolvedStarshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
+            : null
+
+          const cardInner = (
+            <Card
+              className={cn(
+                'border border-border/60 bg-background/70 backdrop-blur-sm transition-colors',
+                href ? 'hover:bg-muted/40 cursor-pointer' : 'opacity-80'
+              )}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+                      <Icon name="database" className="h-4 w-4" />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CardTitle className="text-sm font-semibold leading-tight truncate">
+                            {title || 'Dataset'}
+                          </CardTitle>
+                          <Badge variant="outline" className="font-mono text-[10px] flex-shrink-0">
+                            dataset
+                          </Badge>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate" title={datasetIdOrSlug}>
+                          {datasetIdOrSlug}
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        {href ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                            Open
+                            <Icon name="arrow-up-right" className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                            <Icon name="clock" className="h-3.5 w-3.5" />
+                            Loading
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {description ? (
+                      <CardDescription className="mt-2 text-xs leading-relaxed text-foreground/80">
+                        {description}
+                      </CardDescription>
+                    ) : null}
+
+                    {/* "Open" affordance lives in the header (top-right). */}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+
+          return href ? (
+            <Link key={key} href={href} className="block no-underline">
+              {cardInner}
+            </Link>
+          ) : (
+            <div key={key}>{cardInner}</div>
+          )
+        }
+
+        return null
+      })}
+    </div>
+  ) : null
+
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
   const extractMessageText = (): string => {
@@ -1342,6 +1466,7 @@ export function ConversationMessageContent({
 
         {/* Unified markdown rendering - message content at normal size */}
         {markdownWithToolsNode as any}
+        {widgetCardsNode}
 
         {/* Tool-result attachments (below tool panel) */}
         {toolResultAttachmentIds.length > 0 && starshipId && (

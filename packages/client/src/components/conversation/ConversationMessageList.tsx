@@ -44,6 +44,7 @@ import { MessageReactionAction } from './MessageReactionAction'
 import { HoverProfilePopover } from './HoverProfilePopover'
 import { AgentProfileHoverCardContent, UserProfileHoverCardContent } from './ProfileHoverCardContent'
 import { useNotificationsList } from '@/hooks/useNotifications'
+import { useStarship } from '@/hooks/useStarships'
 
 type TurnUsageForRing = {
   turnId: string
@@ -445,6 +446,12 @@ function LinkedConversationCard({
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  /**
+   * Optional starship slug override (used for deep-links like datasets/agents).
+   * When omitted, the list will attempt to resolve it from route params (`/ship/[slug]/*`)
+   * or by fetching the starship by id.
+   */
+  starshipSlug?: string
   /** When set, enables room invite approvals inline rendering/hydration. */
   roomConversationId?: string | null
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
@@ -541,6 +548,7 @@ interface ConversationMessageListProps {
 export function ConversationMessageList({
   conversationId,
   starshipId,
+  starshipSlug: starshipSlugProp,
   roomConversationId,
   channelName,
   hideStarterHero = false,
@@ -574,12 +582,38 @@ export function ConversationMessageList({
   activeThreadConversationId,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
-  const starshipSlug = useMemo(() => {
+  const starshipSlugFromParams = useMemo(() => {
     const raw = (params as any)?.slug
     if (typeof raw === 'string') return raw
     if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0]
     return undefined
   }, [params])
+
+  const { data: conversationDetail } = useConversationDetail(conversationId)
+
+  const effectiveStarshipId = useMemo(() => {
+    const fromProp = typeof starshipId === 'string' ? starshipId.trim() : ''
+    if (fromProp) return fromProp
+    const fromDetail = typeof (conversationDetail as any)?.starshipId === 'string' ? String((conversationDetail as any).starshipId).trim() : ''
+    return fromDetail || ''
+  }, [conversationDetail, starshipId])
+
+  // Some surfaces (e.g. overlays, modals) mount this list outside `/ship/[slug]/*`,
+  // so `useParams().slug` can be missing. In that case, resolve slug from starshipId.
+  const sid = effectiveStarshipId
+  const { data: starshipFromId } = useStarship(
+    sid,
+    Boolean(sid) && !(typeof starshipSlugProp === 'string' && starshipSlugProp.trim()) && !starshipSlugFromParams
+  )
+
+  const starshipSlug = useMemo(() => {
+    const fromProp = typeof starshipSlugProp === 'string' ? starshipSlugProp.trim() : ''
+    if (fromProp) return fromProp
+    const fromParams = typeof starshipSlugFromParams === 'string' ? starshipSlugFromParams.trim() : ''
+    if (fromParams) return fromParams
+    const fromId = typeof (starshipFromId as any)?.slug === 'string' ? String((starshipFromId as any).slug).trim() : ''
+    return fromId || undefined
+  }, [starshipFromId, starshipSlugFromParams, starshipSlugProp])
 
   // Render from stream context when available, otherwise allow static/demo rendering via overrides.
   const stream = useConversationStreamContextOptional()
@@ -594,7 +628,6 @@ export function ConversationMessageList({
   const turnAgentId = typeof (stream as any)?.turnAgentId === 'string' ? String((stream as any).turnAgentId).trim() : ''
   const turnAgentName = typeof (stream as any)?.turnAgentName === 'string' ? String((stream as any).turnAgentName).trim() : ''
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
-  const sid = typeof starshipId === 'string' ? starshipId : ''
   const { data: notifList } = useNotificationsList(sid || null, Boolean(sid))
   const notifUnread = useMemo(() => ((notifList as any)?.unread ?? null) as any, [notifList])
   const presence = useStarshipPresence(sid, Boolean(sid))
@@ -621,8 +654,6 @@ export function ConversationMessageList({
   const approveInvite = useApproveRoomInviteApproval(roomId)
   const denyInvite = useDenyRoomInviteApproval(roomId)
   const [submittingInviteApprovalId, setSubmittingInviteApprovalId] = useState<string | null>(null)
-
-  const { data: conversationDetail } = useConversationDetail(conversationId)
   const resolvedEmptyHeroTitle = useMemo(() => {
     const fromDetail = typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title).trim() : ''
     if (fromDetail) return fromDetail
@@ -2289,7 +2320,7 @@ export function ConversationMessageList({
                           agentModelId={assistant?.modelId}
                           agentMaxTokens={assistant?.maxTokens}
                           isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                          starshipId={starshipId}
+                          starshipId={sid || starshipId}
                           enableChannelMessageThreads={enableChannelMessageThreads}
                           onThreadAction={handleThreadAction}
                           showAssistantAvatar={showAssistantAvatar}
@@ -3341,6 +3372,7 @@ const MemoizedMessageBubble = memo(
                   messageType={message.messageType}
                   attachmentIds={message.attachmentIds}
                   starshipId={starshipId}
+                  starshipSlug={starshipSlug}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
@@ -3484,6 +3516,7 @@ const MemoizedMessageBubble = memo(
                   messageType={message.messageType}
                   attachmentIds={message.attachmentIds}
                   starshipId={starshipId}
+                  starshipSlug={starshipSlug}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
@@ -3615,6 +3648,7 @@ const MemoizedMessageBubble = memo(
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
+                starshipSlug={starshipSlug}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}

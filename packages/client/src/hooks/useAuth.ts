@@ -168,6 +168,104 @@ function isConnectorInstallPath(pathname: string | null | undefined): boolean {
   return p.startsWith('/connectors/') && p.includes('/install')
 }
 
+async function handleLeadGenPostAuth(args: {
+  token: string
+  starship?: { slug: string; id?: string; name?: string }
+  isFirstLogin?: boolean
+  queryClient: ReturnType<typeof useQueryClient>
+  router: { push: (url: string) => void }
+}): Promise<boolean> {
+  const { token, starship, isFirstLogin, queryClient, router } = args
+
+  if (typeof window === 'undefined') return false
+
+  try {
+    const qp = new URLSearchParams(window.location.search)
+    const hasPendingPrompt = !!window.sessionStorage.getItem('lead_gen_pending_prompt')
+    const fromLeadGen = qp.get('fromLeadGen') === '1'
+
+    // Debug: surface detection in console for troubleshooting (URL param may be lost in OAuth flows).
+    if (fromLeadGen || hasPendingPrompt) {
+      // eslint-disable-next-line no-console
+      console.debug('[leadgen] post-auth flow detected', {
+        fromLeadGen,
+        hasPendingPrompt,
+        starshipSlug: starship?.slug,
+        starshipId: starship?.id,
+      })
+    }
+
+    // Require a real pending prompt and a concrete starship target.
+    if (!hasPendingPrompt || !starship?.slug || !starship.id) {
+      return false
+    }
+
+    // Optimistically mark wizard onboarding as completed for this cohort in the client cache.
+    queryClient.setQueryData(AUTH_QUERY_KEYS.me(), (prev: AuthUser | null | undefined) =>
+      prev ? { ...prev, wizardOnboardingCompleted: true } : prev
+    )
+
+    // Best-effort server-side persistence so future sessions also skip the wizard.
+    try {
+      await fetch('/api/v1/users/me/onboarding/wizard/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    } catch {
+      // Ignore failures here; user experience should still proceed into the leadgen room.
+    }
+
+    // Ensure the dedicated leadgen room exists for this starship and send the user there.
+    try {
+      const resp = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/ensure-leadgen-room`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (resp.ok) {
+        const json = (await resp.json()) as ApiResponse<{ room: { slug: string } }>
+        const roomSlug = json.data?.room?.slug
+        if (!roomSlug) {
+          // If the server response is malformed, fall back to the default redirect logic.
+          return false
+        }
+
+        try {
+          if (typeof window !== 'undefined' && starship.id) {
+            window.sessionStorage.setItem('lead_gen_last_starship_id', String(starship.id))
+          }
+        } catch {
+          // Ignore storage errors; redirect should still proceed.
+        }
+
+        const baseTarget = `/ship/${starship.slug}/rooms/${encodeURIComponent(roomSlug)}?fromLeadGen=1`
+        const target = isFirstLogin ? addWelcomeParamToPath(baseTarget) : baseTarget
+        router.push(target)
+        queryClient.invalidateQueries()
+        return true
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('[leadgen] ensure-leadgen-room failed', {
+          status: resp.status,
+          statusText: resp.statusText,
+        })
+      }
+    } catch {
+      // Ignore bundle provisioning errors and fall back to default redirect.
+    }
+  } catch {
+    // Ignore storage/URL parsing errors and fall back to default behavior.
+  }
+
+  return false
+}
+
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -192,7 +290,7 @@ export function useLogin() {
 
       return data.data as AuthLoginResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
@@ -208,9 +306,19 @@ export function useLogin() {
         return
       }
 
+      const didHandleLeadGen = await handleLeadGenPostAuth({
+        token,
+        starship,
+        isFirstLogin,
+        queryClient,
+        router,
+      })
+      if (didHandleLeadGen) {
+        return
+      }
+
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
-
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {
@@ -253,7 +361,7 @@ export function useRegister() {
 
       return data.data as AuthRegisterResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       // Check if this is an email verification response
       if (data.emailVerificationSent) {
         // Email verification sent - no immediate login
@@ -281,6 +389,7 @@ export function useRegister() {
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
+
       if (redirectTarget) {
         router.push(redirectTarget)
       } else if (starship?.slug) {
@@ -322,7 +431,7 @@ export function useOAuthLogin() {
       const data = await response.json()
       return data.data as AuthLoginResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
@@ -343,9 +452,19 @@ export function useOAuthLogin() {
         return
       }
 
+      const didHandleLeadGen = await handleLeadGenPostAuth({
+        token,
+        starship,
+        isFirstLogin,
+        queryClient,
+        router,
+      })
+      if (didHandleLeadGen) {
+        return
+      }
+
       const redirectTarget = getPostAuthRedirectTarget()
       const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
-
       if (redirectTarget) {
         router.push(addWelcome(redirectTarget))
       } else if (starship?.slug) {

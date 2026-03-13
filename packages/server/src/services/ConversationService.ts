@@ -1205,6 +1205,7 @@ export class ConversationService {
     allowRestricted?: boolean;
   }): Promise<{
     conversations: Array<ConversationModel & { agents: AgentModel[] }>;
+    total: number;
     hasMoreBefore: boolean;
     oldestCursor: { updatedAt: string; id: string } | null;
   }> {
@@ -1230,6 +1231,35 @@ export class ConversationService {
 
     const authUserId = typeof args.userId === 'string' ? args.userId.trim() : '';
     const allowRestricted = Boolean(args.allowRestricted) || !authUserId;
+
+    const totalRows = await conn.query<Record<string, unknown>>(
+      `
+        SELECT COUNT(*) AS count
+        FROM conversations
+        WHERE parent_conversation_id = $1
+          AND ($2::text IS NULL OR title ILIKE $2::text ESCAPE '\\')
+          AND (
+            $3::boolean = true
+            OR NOT EXISTS (
+              SELECT 1
+                FROM conversation_participants cp
+               WHERE cp.conversation_id = conversations.id
+                 AND cp.user_id IS NOT NULL
+               LIMIT 1
+            )
+            OR EXISTS (
+              SELECT 1
+                FROM conversation_participants cp2
+               WHERE cp2.conversation_id = conversations.id
+                 AND cp2.user_id = $4::text
+               LIMIT 1
+            )
+          )
+      `,
+      [args.parentConversationId, qLike, allowRestricted, authUserId]
+    );
+    const totalRaw = totalRows?.[0] ? (totalRows[0] as any).count : 0;
+    const total = Number(totalRaw ?? 0);
 
     const convRows = await conn.query<Record<string, unknown>>(
       useCursor
@@ -1368,7 +1398,7 @@ export class ConversationService {
     const oldest = withAgents.length > 0 ? withAgents[withAgents.length - 1] : null;
     const updatedAt = oldest ? toIso(oldest.updatedAt ?? oldest.createdAt ?? '') : '';
 
-    return { conversations: withAgents, hasMoreBefore, oldestCursor: oldest && updatedAt ? { updatedAt, id: String(oldest.id) } : null };
+    return { conversations: withAgents, total: Number.isFinite(total) ? total : withAgents.length, hasMoreBefore, oldestCursor: oldest && updatedAt ? { updatedAt, id: String(oldest.id) } : null };
   }
 
   /**

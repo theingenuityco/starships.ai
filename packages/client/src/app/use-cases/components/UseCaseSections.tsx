@@ -6,38 +6,38 @@ import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { PromptEditorBlock } from './PromptCardWithCopy'
 
-const FALLBACK_PROSPECTING_CARDS = [
-  { title: 'Build Lead Lists', description: 'Create lead lists that match your target audience. Spot companies that look like your best customers and are active right now.' },
-  { title: 'Find Contact Info', description: 'Pull direct contact details for key decision-makers so you can reach the right people without hours of manual research.' },
-  { title: 'Personalize Your Outreach', description: 'Draft short, specific messages that reference recent activity, website copy, or product changes—no generic spray-and-pray.' },
-  { title: 'Meeting Prep', description: 'Walk into every call with context: company summary, key initiatives, recent news, and likely pain points in one place.' },
-  { title: 'Recruiting', description: 'Source candidates who match your ideal profile, then personalize outreach and follow-up so hiring pipelines stay warm.' },
+const LEAD_GEN_PROMPT_CARDS = [
+  {
+    title: 'Find ideal leads',
+    description: 'Find me 50 leads of professional photographers in London, with their website, LinkedIn, and work email.',
+  },
+  {
+    title: 'Get decision makers',
+    description: 'For each company in this sheet, list 1–2 likely decision makers with their role and LinkedIn profile.',
+  },
+  {
+    title: 'Enrich my list',
+    description: 'Enrich this CSV of companies with 1–2 decision makers per company, including role, LinkedIn, and verified work email.',
+  },
+  {
+    title: 'Write first-touch emails',
+    description: 'Write a short, friendly cold email for each contact that references one specific detail from their site or LinkedIn.',
+  },
+  {
+    title: 'Score the leads',
+    description: 'Score each lead as A/B/C based on fit and timing, and add one sentence on why you gave that score.',
+  },
 ]
 
-export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?: string[] }) {
-  const { useCase, previewPrompts = [] } = props
+export function UseCaseSections(props: { useCase: UseCaseModel }) {
+  const { useCase } = props
 
   const isLeadGeneration = useCase.slug === 'lead-generation'
 
-  const contentCards =
-    isLeadGeneration && previewPrompts.length > 0
-      ? previewPrompts.map((prompt, idx) => ({
-          title:
-            useCase.previewPromptTitles?.[idx] ??
-            prompt
-              .slice(0, 50)
-              .trim()
-              .replace(/\s+\S*$/, '') + '…',
-          description: prompt,
-        }))
-      : isLeadGeneration
-        ? FALLBACK_PROSPECTING_CARDS
-        : []
-
   const leadGenerationProspectingCards =
-    contentCards.length > 0
+    isLeadGeneration
       ? [
-          ...contentCards,
+          ...LEAD_GEN_PROMPT_CARDS,
           {
             title: 'See more prompts',
             description: 'Explore additional workflows and prompt ideas you can adapt for your own segments, offers, and channels.',
@@ -203,12 +203,8 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
                           <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">Explore more capabilities</h3>
 
                           <div className="mt-6">
-                            <Button
-                              asChild
-                              size="sm"
-                              className="relative inline-flex items-center justify-center h-10 px-6 rounded-full text-sm font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] active:-translate-y-[1px] transition"
-                            >
-                              <Link href={useCase.primaryTemplateSlug ? `/explore/agents/${useCase.primaryTemplateSlug}` : '/explore/agents'}>
+                            <Button asChild size="sm" className="relative inline-flex items-center justify-center h-10 px-6 rounded-full text-sm font-semibold whitespace-nowrap text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_4px_0_0_rgba(15,23,42,0.18)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(15,23,42,0.22)] active:-translate-y-[1px] transition">
+                              <Link href="/login">
                                 Get Started
                                 <Icon name="chevron-right" className="h-3.5 w-3.5" />
                               </Link>
@@ -232,8 +228,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel; previewPrompts?:
               <Card className="relative overflow-hidden rounded-2xl border-0 shadow-lg bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500">
                 <div className="p-7 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 text-white">
                   <div>
-                    <div className="text-xs font-semibold text-white/90">Next step</div>
-                    <h2 className="mt-2 text-xl sm:text-2xl font-semibold tracking-tight text-white">{useCase.nextTitle}</h2>
+                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-white">{useCase.nextTitle}</h2>
                     <p className="mt-2 text-base sm:text-lg text-white/90 max-w-[90ch]">{useCase.nextDescription}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">

@@ -104,6 +104,8 @@ export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
   focusInput: () => void
   setLeadingMentionAgent: (agent: AgentModel, afterText?: string) => void
+  /** Programmatically replace the editor content with the provided text (used for deep-link flows). */
+  setInitialContent: (text: string) => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -239,13 +241,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (!cid) return null
       const data = conversationParticipantsQuery.data
       if (!data) return null
-      const agentIds = new Set<string>(
-        (Array.isArray((data as any)?.agents) ? ((data as any).agents as any[]) : [])
-          .map(a => String(a?.id || '').trim())
-          .filter(Boolean)
-      )
+      const agentIds = new Set<string>((Array.isArray((data as any)?.agents) ? ((data as any).agents as any[]) : []).map(a => String(a?.id || '').trim()).filter(Boolean))
       const participants = Array.isArray((data as any)?.participants) ? ((data as any).participants as string[]) : []
-      const userIds = participants.map(x => String(x || '').trim()).filter(Boolean).filter(id => !agentIds.has(id))
+      const userIds = participants
+        .map(x => String(x || '').trim())
+        .filter(Boolean)
+        .filter(id => !agentIds.has(id))
       if (userIds.length < 1) return null
       return {
         userIdSet: new Set(userIds),
@@ -290,7 +291,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [starshipAgents])
 
     // Stream state must come from the (single) ship-layout provider; no fallbacks.
-    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, hasSnapshot, messages: streamMessages, hasMoreBefore: streamHasMoreBefore } = useConversationStreamContext()
+    const {
+      sendMessage: sendMessageFn,
+      isSending,
+      isResponding,
+      isAssistantStreaming,
+      isAwaitingAssistant,
+      isAwaitingToolResults,
+      hasSnapshot,
+      messages: streamMessages,
+      hasMoreBefore: streamHasMoreBefore,
+    } = useConversationStreamContext()
     const stopConversation = useConversationStop()
     // Track last known conversationId to enable stop during pre-stream window and to bridge route transitions
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
@@ -662,8 +673,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const ref = String(id || '').trim()
         if (!ref) return null
         const matchRef = (a: any) => String(a?.id || '').trim() === ref || String(a?.slug || '').trim() === ref
-        const fromStarship =
-          (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(matchRef) ?? null
+        const fromStarship = (Array.isArray(starshipAgentsForExecution) ? (starshipAgentsForExecution as AgentModel[]) : []).find(matchRef) ?? null
         if (fromStarship) return fromStarship
         const fromConvRaw = (Array.isArray(conversationAgents) ? (conversationAgents as AgentModel[]) : []).find(matchRef) ?? null
         return fromConvRaw ?? null
@@ -729,8 +739,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (isMentionOnlyThread) return { willTriggerAgentBestEffort: hasAgentMentionToken, hasUserMentionToken, hasAgentMention: hasAgentMentionToken }
 
         // If the message mentions any user(s) but no agent(s), do not run the default fallback agent.
-        if (hasUserMentionToken && !hasAgentMentionToken)
-          return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention: hasAgentMentionToken }
+        if (hasUserMentionToken && !hasAgentMentionToken) return { willTriggerAgentBestEffort: false, hasUserMentionToken, hasAgentMention: hasAgentMentionToken }
 
         // Otherwise: if we have an effective agent (explicit or fallback) or an agent mention, expect execution.
         return {
@@ -1298,12 +1307,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const inRoom = (item as any)?.inRoom !== false
             return (
               <div key={key}>
-                {showInRoomHeader ? (
-                  <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">In this room</div>
-                ) : null}
-                {showNotInRoomHeader ? (
-                  <div className="px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">Not in this room</div>
-                ) : null}
+                {showInRoomHeader ? <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">In this room</div> : null}
+                {showNotInRoomHeader ? <div className="px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">Not in this room</div> : null}
                 <button
                   id={`mention-option-${key}`}
                   ref={idx === active ? activeItemRef : null}
@@ -1322,27 +1327,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     e.stopPropagation()
                     command(item)
                   }}
-                  onPointerDown={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
                 >
                   <div className="relative">
                     <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
                       {kind === 'user' ? (
                         <>
-                          {user?.avatar ? (
-                            <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" />
-                          ) : null}
+                          {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
                           <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
                         </>
                       ) : (
-                        <AgentAvatar
-                          seed={label || 'Mention'}
-                          imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
-                          size={20}
-                          rounded
-                        />
+                        <AgentAvatar seed={label || 'Mention'} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={20} rounded />
                       )}
                     </Avatar>
                     <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
@@ -2097,6 +2091,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             }
           } catch {}
         },
+        setInitialContent: (text: string) => {
+          try {
+            if (!tiptap) return
+            const value = String(text || '').trim()
+            if (!value) return
+            tiptap.commands.setContent(value + ' ')
+            tiptap.commands.focus('end')
+          } catch {}
+        },
       }),
       [handleSuggestionSubmit, tiptap]
     )
@@ -2315,13 +2318,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               {/* Row 2: Actions toolbar (doesn't steal editor width) */}
               <div className="mt-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      'flex items-center gap-1 transition-opacity duration-200',
-                      isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
-                      'sm:opacity-100'
-                    )}
-                  >
+                  <div className={cn('flex items-center gap-1 transition-opacity duration-200', isMobileComposerEngaged && !isEditorFocused && 'opacity-30', 'sm:opacity-100')}>
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={disabled || fileUploading}
@@ -2441,13 +2438,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <div className={cn('flex relative gap-2', minimal ? 'items-center pl-3 pr-2 py-2.5' : 'items-end px-3 py-2.5')}>
               {/* Left-side Actions */}
               <div className={cn('flex flex-shrink-0 items-center', minimal ? 'gap-2' : 'gap-2 pb-0.5')}>
-                <div
-                  className={cn(
-                    'flex items-center gap-1 transition-opacity duration-200',
-                    isMobileComposerEngaged && !isEditorFocused && 'opacity-30',
-                    'sm:opacity-100'
-                  )}
-                >
+                <div className={cn('flex items-center gap-1 transition-opacity duration-200', isMobileComposerEngaged && !isEditorFocused && 'opacity-30', 'sm:opacity-100')}>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={disabled || fileUploading}

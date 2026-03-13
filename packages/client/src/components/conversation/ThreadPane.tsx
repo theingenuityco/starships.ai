@@ -305,6 +305,7 @@ export function ThreadPane(props: {
           <ConversationMessageList
             conversationId={effectiveConversationId}
             starshipId={starshipId}
+            starshipSlug={starshipSlug}
             roomConversationId={roomConversationId ?? null}
             hideStarterHero={true}
             bottomPaddingPx={inputHeight + 12}

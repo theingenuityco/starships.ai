@@ -2320,7 +2320,7 @@ export function ConversationMessageList({
                           agentModelId={assistant?.modelId}
                           agentMaxTokens={assistant?.maxTokens}
                           isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                          starshipId={starshipId}
+                          starshipId={sid || starshipId}
                           enableChannelMessageThreads={enableChannelMessageThreads}
                           onThreadAction={handleThreadAction}
                           showAssistantAvatar={showAssistantAvatar}
@@ -3648,6 +3648,7 @@ const MemoizedMessageBubble = memo(
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
+                starshipSlug={starshipSlug}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}

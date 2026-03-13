@@ -24,6 +24,7 @@ import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
+import { useStarship } from '@/hooks/useStarships'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
@@ -568,6 +569,10 @@ export function ConversationMessageContent({
 
   // Mention token display resolution (keeps DB content parseable while rendering readable @names).
   const sid = typeof starshipId === 'string' ? starshipId : ''
+  const starshipSlugTrimmed = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+  const { data: starshipFromId } = useStarship(sid, Boolean(sid) && !starshipSlugTrimmed)
+  const resolvedStarshipSlug =
+    starshipSlugTrimmed || (typeof (starshipFromId as any)?.slug === 'string' ? String((starshipFromId as any).slug).trim() : '')
   const { data: starshipAgents = [] } = useStarshipAgents(sid, Boolean(sid))
   const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
   const memberUsers: StarshipMemberListItem[] = useMemo(() => {
@@ -1023,38 +1028,75 @@ export function ConversationMessageContent({
           if (!datasetIdOrSlug) return null
           const title = typeof props.title === 'string' ? props.title.trim() : ''
           const description = typeof props.description === 'string' ? props.description.trim() : ''
-          const href =
-            typeof starshipSlug === 'string' && starshipSlug.trim().length > 0
-              ? `/ship/${encodeURIComponent(starshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
-              : null
+          const href = resolvedStarshipSlug
+            ? `/ship/${encodeURIComponent(resolvedStarshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
+            : null
 
-          return (
-            <Card key={key} className="border border-border/60 bg-background/60 hover:bg-muted/40 transition-colors">
-              <CardHeader className="py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="text-sm font-semibold leading-none truncate">
-                      {title || `Dataset: ${datasetIdOrSlug}`}
-                    </CardTitle>
-                    {description ? (
-                      <CardDescription className="mt-1 text-xs leading-relaxed">{description}</CardDescription>
-                    ) : null}
+          const cardInner = (
+            <Card
+              className={cn(
+                'border border-border/60 bg-background/70 backdrop-blur-sm transition-colors',
+                href ? 'hover:bg-muted/40 cursor-pointer' : 'opacity-80'
+              )}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+                      <Icon name="database" className="h-4 w-4" />
+                    </div>
                   </div>
-                  <Badge variant="outline" className="flex-shrink-0 font-mono text-[10px]">
-                    dataset
-                  </Badge>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CardTitle className="text-sm font-semibold leading-tight truncate">
+                            {title || 'Dataset'}
+                          </CardTitle>
+                          <Badge variant="outline" className="font-mono text-[10px] flex-shrink-0">
+                            dataset
+                          </Badge>
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate" title={datasetIdOrSlug}>
+                          {datasetIdOrSlug}
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        {href ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary">
+                            Open
+                            <Icon name="arrow-up-right" className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                            <Icon name="clock" className="h-3.5 w-3.5" />
+                            Loading
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {description ? (
+                      <CardDescription className="mt-2 text-xs leading-relaxed text-foreground/80">
+                        {description}
+                      </CardDescription>
+                    ) : null}
+
+                    {/* "Open" affordance lives in the header (top-right). */}
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0 pb-3">
-                {href ? (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={href}>Open dataset</Link>
-                  </Button>
-                ) : (
-                  <div className="text-xs text-muted-foreground">Dataset link unavailable (missing starship slug).</div>
-                )}
               </CardContent>
             </Card>
+          )
+
+          return href ? (
+            <Link key={key} href={href} className="block no-underline">
+              {cardInner}
+            </Link>
+          ) : (
+            <div key={key}>{cardInner}</div>
           )
         }
 

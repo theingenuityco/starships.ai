@@ -5,6 +5,7 @@
     { "path": "./packages/env" },
     { "path": "./packages/models" },
     { "path": "./packages/autopilot" },
+    { "path": "./packages/autopilot-cli" },
     { "path": "./packages/server" },
     { "path": "./packages/client" },
     { "path": "./packages/errors" }

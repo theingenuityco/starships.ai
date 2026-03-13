@@ -1,0 +1,39 @@
+{
+  "name": "@starships/autopilot-cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Terminal CLI for running exported Autopilot bundles locally",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "autopilot-cli": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/cli.ts run --help",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@starships/autopilot": "workspace:*",
+    "@starships/protocol": "workspace:*",
+    "adm-zip": "^0.5.16",
+    "openai": "^6.10.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^24.0.10",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
+

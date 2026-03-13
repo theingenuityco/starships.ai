@@ -589,10 +589,22 @@ export function ConversationMessageList({
     return undefined
   }, [params])
 
+  const { data: conversationDetail } = useConversationDetail(conversationId)
+
+  const effectiveStarshipId = useMemo(() => {
+    const fromProp = typeof starshipId === 'string' ? starshipId.trim() : ''
+    if (fromProp) return fromProp
+    const fromDetail = typeof (conversationDetail as any)?.starshipId === 'string' ? String((conversationDetail as any).starshipId).trim() : ''
+    return fromDetail || ''
+  }, [conversationDetail, starshipId])
+
   // Some surfaces (e.g. overlays, modals) mount this list outside `/ship/[slug]/*`,
   // so `useParams().slug` can be missing. In that case, resolve slug from starshipId.
-  const sid = typeof starshipId === 'string' ? starshipId : ''
-  const { data: starshipFromId } = useStarship(sid, Boolean(sid) && !(typeof starshipSlugProp === 'string' && starshipSlugProp.trim()) && !starshipSlugFromParams)
+  const sid = effectiveStarshipId
+  const { data: starshipFromId } = useStarship(
+    sid,
+    Boolean(sid) && !(typeof starshipSlugProp === 'string' && starshipSlugProp.trim()) && !starshipSlugFromParams
+  )
 
   const starshipSlug = useMemo(() => {
     const fromProp = typeof starshipSlugProp === 'string' ? starshipSlugProp.trim() : ''
@@ -642,8 +654,6 @@ export function ConversationMessageList({
   const approveInvite = useApproveRoomInviteApproval(roomId)
   const denyInvite = useDenyRoomInviteApproval(roomId)
   const [submittingInviteApprovalId, setSubmittingInviteApprovalId] = useState<string | null>(null)
-
-  const { data: conversationDetail } = useConversationDetail(conversationId)
   const resolvedEmptyHeroTitle = useMemo(() => {
     const fromDetail = typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title).trim() : ''
     if (fromDetail) return fromDetail

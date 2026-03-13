@@ -1009,7 +1009,7 @@ export function ConversationMessageContent({
   }, [toolResults])
 
   const widgetCardsNode: ReactNode = widgetsFromToolResults.length > 0 ? (
-    <div className="not-prose mt-3 flex flex-col gap-2">
+    <div className="not-prose flex flex-col gap-2">
       {widgetsFromToolResults.map(({ key, widget }) => {
         const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : ''
         const props =

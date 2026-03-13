@@ -569,6 +569,10 @@ export function ConversationMessageContent({
 
   // Mention token display resolution (keeps DB content parseable while rendering readable @names).
   const sid = typeof starshipId === 'string' ? starshipId : ''
+  const starshipSlugTrimmed = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+  const { data: starshipFromId } = useStarship(sid, Boolean(sid) && !starshipSlugTrimmed)
+  const resolvedStarshipSlug =
+    starshipSlugTrimmed || (typeof (starshipFromId as any)?.slug === 'string' ? String((starshipFromId as any).slug).trim() : '')
   const { data: starshipAgents = [] } = useStarshipAgents(sid, Boolean(sid))
   const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
   const memberUsers: StarshipMemberListItem[] = useMemo(() => {
@@ -1024,15 +1028,9 @@ export function ConversationMessageContent({
           if (!datasetIdOrSlug) return null
           const title = typeof props.title === 'string' ? props.title.trim() : ''
           const description = typeof props.description === 'string' ? props.description.trim() : ''
-          // Match the Resources pane behavior: always use a REAL starship slug in the URL.
-          // If the message surface doesn't have the slug (not mounted under `/ship/[slug]/*`),
-          // resolve it from starshipId (cached query).
-          const starshipSlugTrimmed = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
-          const starshipIdTrimmed = typeof starshipId === 'string' ? starshipId.trim() : ''
-          const { data: starshipFromId } = useStarship(starshipIdTrimmed, Boolean(starshipIdTrimmed) && !starshipSlugTrimmed)
-          const resolvedSlug =
-            starshipSlugTrimmed || (typeof (starshipFromId as any)?.slug === 'string' ? String((starshipFromId as any).slug).trim() : '')
-          const href = resolvedSlug ? `/ship/${encodeURIComponent(resolvedSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}` : null
+          const href = resolvedStarshipSlug
+            ? `/ship/${encodeURIComponent(resolvedStarshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
+            : null
 
           const cardInner = (
             <Card

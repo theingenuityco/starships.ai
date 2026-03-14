@@ -299,7 +299,6 @@ export function RoomGameView(props: {
       width: number
       height: number
       gridSize: number
-      collisions?: number[]
       collisionRects?: Array<{ x: number; y: number; width: number; height: number }>
     }) => {
       clearPropLayer()
@@ -308,18 +307,6 @@ export function RoomGameView(props: {
       const cell = m.gridSize
       const wPx = m.width * cell
       const hPx = m.height * cell
-
-      // Collision shading (optional rasterized cells)
-      const blocked = new Set<number>(Array.isArray(m.collisions) ? m.collisions : [])
-      if (blocked.size > 0) {
-        for (const i of blocked) {
-          if (!(i >= 0 && i < m.width * m.height)) continue
-          const x = i % m.width
-          const y = Math.floor(i / m.width)
-          g.rect(x * cell, y * cell, cell, cell)
-          g.fill({ color: 0xef4444, alpha: 0.12 })
-        }
-      }
 
       // Precise collision rects (preferred for debugging)
       const rects = Array.isArray(m.collisionRects) ? m.collisionRects : []
@@ -421,7 +408,6 @@ export function RoomGameView(props: {
         width,
         height,
         gridSize,
-        collisions: Array.isArray(m.collisions) ? m.collisions : [],
         collisionRects: Array.isArray(m.collisionRects) ? m.collisionRects : [],
       })
 

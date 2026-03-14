@@ -332,9 +332,9 @@ export function RoomGameView(props: {
 
       setMapRenderStatus(`map: rendering ${width}x${height} layers:${layers.length} cell:${gridSize}`)
       const baseW =
+        (sheet as any).source?.width ??
         (sheet as any).width ??
         (sheet as any).baseTexture?.width ??
-        (sheet as any).source?.width ??
         (sheet as any).textureCacheIds?.[0]?.width ??
         512
       const cols = Math.max(1, Math.floor(Number(baseW) / gridSize) || 1)
@@ -343,8 +343,8 @@ export function RoomGameView(props: {
         const tileIndex = gid - 1
         const sx = (tileIndex % cols) * gridSize
         const sy = Math.floor(tileIndex / cols) * gridSize
-        const base = (sheet as any).baseTexture ?? (sheet as any).source ?? sheet
-        return new (Texture as any)(base, new Rectangle(sx, sy, gridSize, gridSize)) as Texture
+        // Pixi v8: create sub-texture via TextureOptions { source, frame }
+        return new Texture({ source: (sheet as any).source ?? sheet, frame: new Rectangle(sx, sy, gridSize, gridSize) })
       }
 
       const textureCache = new Map<number, Texture>()

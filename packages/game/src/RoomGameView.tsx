@@ -64,10 +64,12 @@ export function RoomGameView(props: {
   const stageRef = useRef<Container | null>(null)
   const actorLayerRef = useRef<Container | null>(null)
   const tileLayerRef = useRef<Container | null>(null)
+  const propLayerRef = useRef<Container | null>(null)
   const gridPxRef = useRef<number>(32)
 
   const [snapshot, setSnapshot] = useState<RoomGameSnapshot | null>(null)
   const [actorsById, setActorsById] = useState<ActorById>(() => new Map())
+  const [pixiReady, setPixiReady] = useState<boolean>(false)
 
   const seed = useMemo(() => {
     const s = snapshot?.seed
@@ -160,6 +162,10 @@ export function RoomGameView(props: {
       tileLayerRef.current = tileLayer
       stage.addChild(tileLayer)
 
+      const propLayer = new Container()
+      propLayerRef.current = propLayer
+      stage.addChild(propLayer)
+
       // Background grid
       const bg = new Graphics()
       bg.alpha = 0.22
@@ -189,10 +195,14 @@ export function RoomGameView(props: {
       }
       drawBg()
       app.renderer.on('resize', drawBg)
+
+      // Signal that Pixi + layers are ready for rendering effects.
+      setPixiReady(true)
     })()
 
     return () => {
       disposed = true
+      setPixiReady(false)
       try {
         app.renderer.off('resize', () => undefined)
       } catch {
@@ -212,20 +222,31 @@ export function RoomGameView(props: {
       stageRef.current = null
       actorLayerRef.current = null
       tileLayerRef.current = null
+      propLayerRef.current = null
     }
   }, [])
 
   // Render map tiles
   useEffect(() => {
+    if (!pixiReady) return
     const app = appRef.current
     const tileLayer = tileLayerRef.current
-    if (!app || !tileLayer) return
+    const propLayer = propLayerRef.current
+    if (!app || !tileLayer || !propLayer) return
 
     let cancelled = false
 
     const clearTileLayer = () => {
       try {
         tileLayer.removeChildren()
+      } catch {
+        // ignore
+      }
+    }
+
+    const clearPropLayer = () => {
+      try {
+        propLayer.removeChildren()
       } catch {
         // ignore
       }
@@ -238,6 +259,7 @@ export function RoomGameView(props: {
       const grid = generateTopDownRoom({ seed, width: tilesWide, height: tilesHigh })
 
       clearTileLayer()
+      clearPropLayer()
       const g = new Graphics()
       for (let y = 0; y < grid.length; y++) {
         const row = grid[y]
@@ -270,8 +292,15 @@ export function RoomGameView(props: {
       const base = String(args.ldtkUrl || '').trim()
       if (base.startsWith('/')) {
         const baseDir = base.split('?')[0].split('#')[0].split('/').slice(0, -1).join('/') || ''
-        const cleaned = raw.replace(/\\/g, '/').replace(/^\.?\//, '')
-        return `${baseDir}/${cleaned}`
+        const cleaned = raw.replace(/\\/g, '/')
+        try {
+          // Normalize `..` segments etc.
+          const normalized = new URL(cleaned, `${window.location.origin}${baseDir}/`).pathname
+          return normalized
+        } catch {
+          const fallback = cleaned.replace(/^\.?\//, '')
+          return `${baseDir}/${fallback}`
+        }
       }
 
       // Backward-compatible dev fallback for files stored in repo root Modern_Office_Revamped_v1.2
@@ -285,6 +314,7 @@ export function RoomGameView(props: {
 
     const renderLdtkFromJson = async (ldtk: any, opts?: { ldtkUrl?: string | null }) => {
       clearTileLayer()
+      clearPropLayer()
       if (!ldtk || typeof ldtk !== 'object') {
         renderProcedural()
         return
@@ -376,6 +406,46 @@ export function RoomGameView(props: {
           layerContainer.addChild(spr)
         }
       }
+
+      // Render DeskSpot entities as visible workstation placeholders.
+      // (These are markers for dynamic furnishing; real sprites can replace later.)
+      const deskSpots: Array<{ cx: number; cy: number; x: number; y: number }> = []
+      for (const l of layers) {
+        const ents = Array.isArray((l as any)?.entityInstances) ? ((l as any).entityInstances as any[]) : []
+        for (const e of ents) {
+          const ident = String((e as any)?.__identifier || '').trim()
+          if (ident !== 'DeskSpot') continue
+          const cx = typeof (e as any)?.__cx === 'number' ? (e as any).__cx : Math.round((Number((e as any)?.x) || 0) / gridSize)
+          const cy = typeof (e as any)?.__cy === 'number' ? (e as any).__cy : Math.round((Number((e as any)?.y) || 0) / gridSize)
+          const x = typeof (e as any)?.x === 'number' ? (e as any).x : cx * gridSize
+          const y = typeof (e as any)?.y === 'number' ? (e as any).y : cy * gridSize
+          deskSpots.push({ cx, cy, x, y })
+        }
+      }
+      deskSpots.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx))
+
+      const agentActors = Array.isArray(snapshot?.actors) ? snapshot!.actors.filter((a) => a && a.kind === 'agent') : []
+      const assigned = deskSpots.slice(0, Math.max(0, agentActors.length))
+
+      for (let i = 0; i < assigned.length; i++) {
+        const spot = assigned[i]
+        const agent = agentActors[i]
+        const g = new Graphics()
+        g.roundRect(spot.x + 2, spot.y + 2, gridSize - 4, gridSize - 4, 6)
+        g.fill({ color: 0x0ea5e9, alpha: 0.22 })
+        g.stroke({ width: 2, color: 0x38bdf8, alpha: 0.85 })
+        propLayer.addChild(g)
+
+        const label = String(agent?.label || 'Agent')
+        const t = new Text({
+          text: label,
+          style: { fontFamily: 'monospace', fontSize: 10, fill: 0xe2e8f0 },
+        })
+        t.x = spot.x + 4
+        t.y = spot.y + gridSize - 14
+        t.alpha = 0.95
+        propLayer.addChild(t)
+      }
     }
 
     const mapRef = snapshot?.mapRef as any
@@ -392,6 +462,7 @@ export function RoomGameView(props: {
       return () => {
         cancelled = true
         clearTileLayer()
+        clearPropLayer()
       }
     }
 
@@ -410,6 +481,7 @@ export function RoomGameView(props: {
       return () => {
         cancelled = true
         clearTileLayer()
+        clearPropLayer()
       }
     }
 
@@ -423,10 +495,11 @@ export function RoomGameView(props: {
         // ignore
       }
     }
-  }, [props.getAuthToken, seed, snapshot?.mapRef, snapshot?.starshipId])
+  }, [pixiReady, props.getAuthToken, seed, snapshot?.mapRef, snapshot?.starshipId])
 
   // Render actors (simple tokens for now; sprite assets will replace these)
   useEffect(() => {
+    if (!pixiReady) return
     const layer = actorLayerRef.current
     const app = appRef.current
     if (!layer || !app) return
@@ -458,7 +531,7 @@ export function RoomGameView(props: {
       layer.addChild(g)
       layer.addChild(t)
     }
-  }, [actorsById, seed])
+  }, [pixiReady, actorsById, seed])
 
   const statusLine = useMemo(() => {
     if (streamState.status === 'connected') return 'Connected'

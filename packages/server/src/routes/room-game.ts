@@ -260,7 +260,10 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
         at,
         seed,
         generatorVersion,
-        mapRef: (await configSvc.get(roomConversationId).catch(() => null))?.mapRef ?? { kind: 'procedural', seed, generatorVersion },
+        mapRef:
+          (await configSvc.get(roomConversationId).catch(() => null))?.mapRef ??
+          // Dev-friendly default: show office template everywhere unless overridden.
+          { kind: 'ldtk_url', url: '/room-game/maps/office_template.ldtk' },
         actors,
       },
     };

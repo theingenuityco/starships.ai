@@ -8,10 +8,10 @@ export type {
   RoomGameMapRef,
   RoomGameSnapshot,
   RoomGameStreamEvent,
-} from '@/types'
+} from './types'
 
-export { RoomGameView } from '@/RoomGameView'
-export { useRoomGameStream } from '@/hooks/useRoomGameStream'
-export { deriveAgentAppearanceKey, deriveRoomSeed, colorFromAppearanceKey } from '@/lib/appearance'
-export { generateTopDownRoom } from '@/procgen/room'
+export { RoomGameView } from './RoomGameView'
+export { useRoomGameStream } from './hooks/useRoomGameStream'
+export { deriveAgentAppearanceKey, deriveRoomSeed, colorFromAppearanceKey } from './lib/appearance'
+export { generateTopDownRoom } from './procgen/room'
 

@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
+    "dev": "pnpm -C ../game sync-assets && next dev -p 3000",
+    "build": "pnpm -C ../game sync-assets && next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

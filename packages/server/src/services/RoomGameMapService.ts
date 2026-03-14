@@ -1,6 +1,7 @@
 import Redis, { type Redis as RedisClient } from 'ioredis';
 import { getEnvConfig } from '@starships/env';
 import crypto from 'crypto';
+import fs from 'fs';
 import path from 'path';
 import { TiledPrefabLoader, type Prefab } from '@/services/TiledPrefabLoader';
 
@@ -65,9 +66,28 @@ export class RoomGameMapService {
     return `starships:room_game:map:${roomConversationId}`;
   }
 
+  private static findRepoRoot(): string {
+    const candidates = [
+      process.cwd(),
+      path.resolve(process.cwd(), '..'),
+      path.resolve(process.cwd(), '..', '..'),
+      path.resolve(process.cwd(), '..', '..', '..'),
+    ];
+    for (const c of candidates) {
+      try {
+        if (fs.existsSync(path.join(c, 'pnpm-workspace.yaml'))) return c;
+      } catch {
+        // ignore
+      }
+    }
+    // Fallback: assume monorepo root is 2 levels up from packages/server when running there.
+    return path.resolve(process.cwd(), '..', '..');
+  }
+
   private async loadPrefabs(): Promise<Prefab[]> {
     if (this.prefabs) return this.prefabs;
-    const base = path.join(process.cwd(), 'packages/server/assets/room-game/workstations');
+    const repoRoot = RoomGameMapService.findRepoRoot();
+    const base = path.join(repoRoot, 'packages/game/assets/room-game/prefabs/workstations');
     const prefabs = [
       TiledPrefabLoader.loadFromFile(path.join(base, 'variantA.tmj')),
       TiledPrefabLoader.loadFromFile(path.join(base, 'variantB.tmj')),

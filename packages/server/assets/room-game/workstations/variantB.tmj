@@ -1,0 +1,66 @@
+{
+  "compressionlevel": -1,
+  "height": 4,
+  "infinite": false,
+  "layers": [
+    {
+      "data": [
+        0, 0, 0, 0, 0, 0,
+        0, 321, 322, 323, 0, 0,
+        0, 337, 338, 339, 0, 0,
+        0, 0, 0, 0, 0, 0
+      ],
+      "height": 4,
+      "id": 1,
+      "name": "props",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 6,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "data": [
+        0, 0, 0, 0, 0, 0,
+        0, 1, 1, 1, 0, 0,
+        0, 1, 1, 1, 0, 0,
+        0, 0, 0, 0, 0, 0
+      ],
+      "height": 4,
+      "id": 2,
+      "name": "collision",
+      "opacity": 0.35,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 6,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nextlayerid": 3,
+  "nextobjectid": 1,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.11.0",
+  "tileheight": 32,
+  "tilesets": [
+    {
+      "columns": 16,
+      "firstgid": 1,
+      "image": "/room-game/tilesets/Modern_Office_32x32.png",
+      "imageheight": 1696,
+      "imagewidth": 512,
+      "margin": 0,
+      "name": "Modern_Office_32x32",
+      "spacing": 0,
+      "tilecount": 848,
+      "tileheight": 32,
+      "tilewidth": 32
+    }
+  ],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "width": 6
+}

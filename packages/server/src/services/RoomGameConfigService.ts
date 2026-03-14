@@ -4,9 +4,7 @@ import { getEnvConfig } from '@starships/env';
 export type RoomGameMapRef =
   | { kind: 'none' }
   | { kind: 'procedural'; seed: string; generatorVersion: string }
-  | { kind: 'ldtk_attachment'; attachmentId: string }
-  | { kind: 'ldtk_url'; url: string }
-  | { kind: 'tiled_attachment'; attachmentId: string };
+  | { kind: 'dynamic_office'; theme?: 'default' | 'shadowless' | 'black_shadow'; density?: number };
 
 export type RoomGameConfig = {
   mapRef?: RoomGameMapRef;

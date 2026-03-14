@@ -16,10 +16,24 @@ export type RoomGameActor = {
 
 export type RoomGameMapRef =
   | { kind: 'none' }
-  | { kind: 'ldtk_attachment'; attachmentId: string }
-  | { kind: 'ldtk_url'; url: string }
-  | { kind: 'tiled_attachment'; attachmentId: string }
   | { kind: 'procedural'; seed: string; generatorVersion: string }
+  | { kind: 'dynamic_office'; theme?: 'default' | 'shadowless' | 'black_shadow'; density?: number }
+
+export type RoomGameMapLayer = {
+  name: string
+  /** Tiled GIDs (0 = empty). length = width*height */
+  data: number[]
+}
+
+export type RoomGameMap = {
+  gridSize: number
+  width: number
+  height: number
+  tilesetImageUrl: string
+  layers: RoomGameMapLayer[]
+  /** Cell indices blocked (y*width + x). */
+  collisions: number[]
+}
 
 export type RoomGameSnapshot = {
   roomConversationId: string
@@ -29,6 +43,7 @@ export type RoomGameSnapshot = {
   seed: string
   generatorVersion: string
   mapRef: RoomGameMapRef
+  map?: RoomGameMap
   actors: RoomGameActor[]
 }
 

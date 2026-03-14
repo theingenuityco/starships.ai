@@ -10,6 +10,7 @@ import { ConversationParticipantRepository, RoomRepository, getConnection } from
 import { RoomGameStreamBus, type RoomGameStreamEvent } from '@/services/RoomGameStreamBus';
 import { RoomGameStateService } from '@/services/RoomGameStateService';
 import { RoomGameConfigService } from '@/services/RoomGameConfigService';
+import { RoomGameMapService } from '@/services/RoomGameMapService';
 import crypto from 'crypto';
 
 const router: Router = Router();
@@ -117,6 +118,7 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
     const bus = RoomGameStreamBus.getInstance();
     const stateSvc = RoomGameStateService.getInstance();
     const configSvc = RoomGameConfigService.getInstance();
+    const mapSvc = RoomGameMapService.getInstance();
     const redisReader = bus.createReaderClient();
     try {
       await redisReader.connect();
@@ -260,10 +262,8 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
         at,
         seed,
         generatorVersion,
-        mapRef:
-          (await configSvc.get(roomConversationId).catch(() => null))?.mapRef ??
-          // Dev-friendly default: show office template everywhere unless overridden.
-          { kind: 'ldtk_url', url: '/room-game/maps/office_template.ldtk' },
+        mapRef: (await configSvc.get(roomConversationId).catch(() => null))?.mapRef ?? { kind: 'dynamic_office' },
+        map: (await mapSvc.getOrBuild(roomConversationId, agentIds).catch(() => null))?.map ?? undefined,
         actors,
       },
     };
@@ -322,6 +322,16 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
     const actorId = access.userId;
     const stateSvc = RoomGameStateService.getInstance();
     const bus = RoomGameStreamBus.getInstance();
+    const mapSvc = RoomGameMapService.getInstance();
+    const participantRepo = new ConversationParticipantRepository();
+    const agentIds = await participantRepo.listAgentIdsByConversation(roomConversationId).catch(() => []);
+    const mapEntry = await mapSvc.getOrBuild(roomConversationId, agentIds).catch(() => null);
+    const mapW = mapEntry?.map?.width ?? 50;
+    const mapH = mapEntry?.map?.height ?? 50;
+    const isBlocked = (x: number, y: number) => {
+      const idx = y * mapW + x;
+      return Boolean(mapEntry?.collisionSet?.has(idx));
+    };
 
     const cur = (await stateSvc.getActor(roomConversationId, actorId).catch(() => null)) ?? {
       id: actorId,
@@ -335,10 +345,14 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
       label: null,
     };
 
-    const nextX = Math.max(0, Math.min(50, Math.round((cur.x ?? 0) + body.dx)));
-    const nextY = Math.max(0, Math.min(50, Math.round((cur.y ?? 0) + body.dy)));
+    const boundedX = Math.max(0, Math.min(Math.max(0, mapW - 1), Math.round((cur.x ?? 0) + body.dx)));
+    const boundedY = Math.max(0, Math.min(Math.max(0, mapH - 1), Math.round((cur.y ?? 0) + body.dy)));
     const facing = body.dx > 0 ? 'right' : body.dx < 0 ? 'left' : body.dy > 0 ? 'down' : body.dy < 0 ? 'up' : (cur.facing ?? 'down');
-    const anim = body.dx !== 0 || body.dy !== 0 ? `walk_${facing}` : `idle_${facing}`;
+    const wantsMove = body.dx !== 0 || body.dy !== 0;
+    const blocked = wantsMove && isBlocked(boundedX, boundedY);
+    const nextX = blocked ? (cur.x ?? 0) : boundedX;
+    const nextY = blocked ? (cur.y ?? 0) : boundedY;
+    const anim = wantsMove && !blocked ? `walk_${facing}` : `idle_${facing}`;
 
     const at = new Date().toISOString();
     const next = {
@@ -386,18 +400,11 @@ router.post('/rooms/:roomId/game/config', jwtAuthMiddleware, async (req: Request
               seed: z.string().trim().min(1).max(255),
               generatorVersion: z.string().trim().min(1).max(128),
             }),
-            z.object({ kind: z.literal('ldtk_attachment'), attachmentId: z.string().trim().min(1).max(255) }),
             z.object({
-              kind: z.literal('ldtk_url'),
-              url: z
-                .string()
-                .trim()
-                .min(1)
-                .max(2048)
-                // Restrict to same-origin relative URLs (Next public assets, etc.)
-                .refine((s) => s.startsWith('/'), { message: 'ldtk_url must start with /' }),
+              kind: z.literal('dynamic_office'),
+              theme: z.enum(['default', 'shadowless', 'black_shadow']).optional(),
+              density: z.number().min(0).max(1).optional(),
             }),
-            z.object({ kind: z.literal('tiled_attachment'), attachmentId: z.string().trim().min(1).max(255) }),
           ])
           .optional(),
       })

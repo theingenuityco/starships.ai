@@ -282,202 +282,68 @@ export function RoomGameView(props: {
       tileLayer.addChild(g)
     }
 
-    const resolveTileImageUrl = (args: { relPath: string | null | undefined; ldtkUrl?: string | null }) => {
-      const raw = String(args.relPath || '').trim()
-      if (!raw) return '/public-assets/modern-office/Modern_Office_32x32.png'
-      if (/^https?:\/\//i.test(raw)) return raw
-      if (raw.startsWith('/')) return raw
-
-      // Resolve relative to the LDtk file location when possible.
-      const base = String(args.ldtkUrl || '').trim()
-      if (base.startsWith('/')) {
-        const baseDir = base.split('?')[0].split('#')[0].split('/').slice(0, -1).join('/') || ''
-        const cleaned = raw.replace(/\\/g, '/')
-        try {
-          // Normalize `..` segments etc.
-          const normalized = new URL(cleaned, `${window.location.origin}${baseDir}/`).pathname
-          return normalized
-        } catch {
-          const fallback = cleaned.replace(/^\.?\//, '')
-          return `${baseDir}/${fallback}`
-        }
-      }
-
-      // Backward-compatible dev fallback for files stored in repo root Modern_Office_Revamped_v1.2
-      let p = raw.replace(/\\/g, '/').replace(/^\.?\//, '')
-      const lower = p.toLowerCase()
-      const marker = 'modern_office_revamped_v1.2/'
-      const idx = lower.indexOf(marker)
-      if (idx >= 0) p = p.slice(idx + marker.length)
-      return `/public-assets/modern-office/${p}`
-    }
-
-    const renderLdtkFromJson = async (ldtk: any, opts?: { ldtkUrl?: string | null }) => {
+    const renderMap = async (m: any) => {
       clearTileLayer()
       clearPropLayer()
-      if (!ldtk || typeof ldtk !== 'object') {
-        renderProcedural()
-        return
-      }
 
-      const level = Array.isArray((ldtk as any).levels) ? (ldtk as any).levels[0] : null
-      const layers = level && Array.isArray((level as any).layerInstances) ? ((level as any).layerInstances as any[]) : []
-      const defsTilesets =
-        ldtk && (ldtk as any).defs && Array.isArray((ldtk as any).defs.tilesets) ? ((ldtk as any).defs.tilesets as any[]) : []
-      const tilesetByUid = new Map<number, any>()
-      for (const ts of defsTilesets) {
-        const uid = typeof ts?.uid === 'number' ? ts.uid : null
-        if (uid == null) continue
-        tilesetByUid.set(uid, ts)
-      }
+      const width = typeof m?.width === 'number' ? m.width : 0
+      const height = typeof m?.height === 'number' ? m.height : 0
+      const gridSize = typeof m?.gridSize === 'number' ? m.gridSize : 32
+      const tilesetImageUrl = typeof m?.tilesetImageUrl === 'string' ? m.tilesetImageUrl : ''
+      const layers = Array.isArray(m?.layers) ? m.layers : []
+      if (!(width > 0 && height > 0 && tilesetImageUrl)) return renderProcedural()
 
-      const gridSizeFromLayer = layers.find((l) => typeof (l as any)?.__gridSize === 'number')?.__gridSize
-      const gridSize = typeof gridSizeFromLayer === 'number' && gridSizeFromLayer > 0 ? gridSizeFromLayer : 32
       gridPxRef.current = gridSize
 
-      // Collect tileset UIDs used by layers/tiles.
-      const usedTilesetUids = new Set<number>()
-      for (const l of layers) {
-        const uid = typeof (l as any)?.__tilesetDefUid === 'number' ? (l as any).__tilesetDefUid : null
-        if (uid != null) usedTilesetUids.add(uid)
-        for (const t of ([] as any[]).concat((l as any)?.gridTiles ?? [], (l as any)?.autoLayerTiles ?? [])) {
-          const tuid = typeof (t as any)?.t === 'number' ? (t as any).t : typeof (t as any)?.tilesetUid === 'number' ? (t as any).tilesetUid : null
-          if (tuid != null) usedTilesetUids.add(tuid)
-        }
-      }
+      const sheet = (await Assets.load(tilesetImageUrl)) as unknown as Texture
+      if (cancelled) return
 
-      const sheetByUid = new Map<number, Texture>()
-      for (const uid of usedTilesetUids) {
-        const def = tilesetByUid.get(uid)
-        const imgUrl = resolveTileImageUrl({ relPath: def?.relPath, ldtkUrl: opts?.ldtkUrl ?? null })
-        try {
-          const tex = (await Assets.load(imgUrl)) as unknown as Texture
-          sheetByUid.set(uid, tex)
-        } catch {
-          // ignore; missing tilesets will be skipped
-        }
-      }
+      const baseW =
+        (sheet as any).width ??
+        (sheet as any).baseTexture?.width ??
+        (sheet as any).source?.width ??
+        (sheet as any).textureCacheIds?.[0]?.width ??
+        512
+      const cols = Math.max(1, Math.floor(Number(baseW) / gridSize) || 1)
 
-      const mkSubTexture = (sheet: Texture, sx: number, sy: number, size: number) => {
+      const mkSubTexture = (gid: number) => {
+        const tileIndex = gid - 1
+        const sx = (tileIndex % cols) * gridSize
+        const sy = Math.floor(tileIndex / cols) * gridSize
         const base = (sheet as any).baseTexture ?? (sheet as any).source ?? sheet
-        return new (Texture as any)(base, new Rectangle(sx, sy, size, size)) as Texture
+        return new (Texture as any)(base, new Rectangle(sx, sy, gridSize, gridSize)) as Texture
       }
 
-      // Render each layer into its own container (keep LDtk order).
-      for (const l of layers) {
+      const textureCache = new Map<number, Texture>()
+
+      for (const layer of layers) {
         if (cancelled) return
+        const data = Array.isArray(layer?.data) ? (layer.data as unknown[]) : []
+        if (data.length !== width * height) continue
         const layerContainer = new Container()
         tileLayer.addChild(layerContainer)
 
-        const tiles: any[] = ([] as any[]).concat((l as any)?.autoLayerTiles ?? [], (l as any)?.gridTiles ?? [])
-        const fallbackTilesetUid = typeof (l as any)?.__tilesetDefUid === 'number' ? (l as any).__tilesetDefUid : null
-
-        for (const tile of tiles) {
-          if (cancelled) return
-          const px = Array.isArray(tile?.px) ? tile.px : null
-          const src = Array.isArray(tile?.src) ? tile.src : null
-          if (!px || px.length < 2 || !src || src.length < 2) continue
-
-          // In standard LDtk exports, `tile.t` is a *tileId* (not tileset UID).
-          // Tileset UID comes from the layer instance (`__tilesetDefUid`) or an override.
-          const uid = typeof tile?.tilesetUid === 'number' ? tile.tilesetUid : fallbackTilesetUid
-          if (typeof uid !== 'number') continue
-          const sheet = sheetByUid.get(uid)
-          if (!sheet) continue
-
-          const tex = mkSubTexture(sheet, Number(src[0]) || 0, Number(src[1]) || 0, gridSize)
+        for (let i = 0; i < data.length; i++) {
+          const gid = Number(data[i] || 0)
+          if (!(gid > 0)) continue
+          let tex = textureCache.get(gid)
+          if (!tex) {
+            tex = mkSubTexture(gid)
+            textureCache.set(gid, tex)
+          }
+          const x = i % width
+          const y = Math.floor(i / width)
           const spr = new Sprite(tex)
-          spr.x = Math.round(Number(px[0]) || 0)
-          spr.y = Math.round(Number(px[1]) || 0)
-
-          const f = typeof tile?.f === 'number' ? tile.f : 0
-          // LDtk flip flags: bit 0 = X, bit 1 = Y
-          if (f & 1) {
-            spr.scale.x = -1
-            spr.x += gridSize
-          }
-          if (f & 2) {
-            spr.scale.y = -1
-            spr.y += gridSize
-          }
-          const a = typeof tile?.a === 'number' ? tile.a : null
-          if (typeof a === 'number') spr.alpha = a > 1 ? Math.max(0, Math.min(1, a / 255)) : Math.max(0, Math.min(1, a))
-
+          spr.x = x * gridSize
+          spr.y = y * gridSize
           layerContainer.addChild(spr)
         }
       }
-
-      // Render DeskSpot entities as visible workstation placeholders.
-      // (These are markers for dynamic furnishing; real sprites can replace later.)
-      const deskSpots: Array<{ cx: number; cy: number; x: number; y: number }> = []
-      for (const l of layers) {
-        const ents = Array.isArray((l as any)?.entityInstances) ? ((l as any).entityInstances as any[]) : []
-        for (const e of ents) {
-          const ident = String((e as any)?.__identifier || '').trim()
-          if (ident !== 'DeskSpot') continue
-          const cx = typeof (e as any)?.__cx === 'number' ? (e as any).__cx : Math.round((Number((e as any)?.x) || 0) / gridSize)
-          const cy = typeof (e as any)?.__cy === 'number' ? (e as any).__cy : Math.round((Number((e as any)?.y) || 0) / gridSize)
-          const x = typeof (e as any)?.x === 'number' ? (e as any).x : cx * gridSize
-          const y = typeof (e as any)?.y === 'number' ? (e as any).y : cy * gridSize
-          deskSpots.push({ cx, cy, x, y })
-        }
-      }
-      deskSpots.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx))
-
-      const agentActors = Array.isArray(snapshot?.actors) ? snapshot!.actors.filter((a) => a && a.kind === 'agent') : []
-      const assigned = deskSpots.slice(0, Math.max(0, agentActors.length))
-
-      for (let i = 0; i < assigned.length; i++) {
-        const spot = assigned[i]
-        const agent = agentActors[i]
-        const g = new Graphics()
-        g.roundRect(spot.x + 2, spot.y + 2, gridSize - 4, gridSize - 4, 6)
-        g.fill({ color: 0x0ea5e9, alpha: 0.22 })
-        g.stroke({ width: 2, color: 0x38bdf8, alpha: 0.85 })
-        propLayer.addChild(g)
-
-        const label = String(agent?.label || 'Agent')
-        const t = new Text({
-          text: label,
-          style: { fontFamily: 'monospace', fontSize: 10, fill: 0xe2e8f0 },
-        })
-        t.x = spot.x + 4
-        t.y = spot.y + gridSize - 14
-        t.alpha = 0.95
-        propLayer.addChild(t)
-      }
     }
 
-    const mapRef = snapshot?.mapRef as any
-    const isLdtkAttachment = mapRef && mapRef.kind === 'ldtk_attachment' && typeof mapRef.attachmentId === 'string' && mapRef.attachmentId.trim()
-    const isLdtkUrl = mapRef && mapRef.kind === 'ldtk_url' && typeof mapRef.url === 'string' && mapRef.url.trim()
-    const starshipId = snapshot?.starshipId
-
-    if (isLdtkUrl) {
-      const ldtkUrl = String(mapRef.url).trim()
-      void fetch(ldtkUrl)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((json) => renderLdtkFromJson(json, { ldtkUrl }))
-        .catch(() => renderProcedural())
-      return () => {
-        cancelled = true
-        clearTileLayer()
-        clearPropLayer()
-      }
-    }
-
-    if (isLdtkAttachment && typeof starshipId === 'string' && starshipId.trim()) {
-      void (async () => {
-        const token = props.getAuthToken ? await props.getAuthToken().catch(() => null) : null
-        const url = `/api/v1/attachments/${encodeURIComponent(String(mapRef.attachmentId).trim())}/preview?starshipId=${encodeURIComponent(starshipId.trim())}`
-        const resp = await fetch(url, { method: 'GET', headers: token ? ({ Authorization: `Bearer ${token}` } as any) : undefined }).catch(
-          () => null
-        )
-        if (!resp || !resp.ok) return renderProcedural()
-        const txt = await resp.text().catch(() => '')
-        const json = txt ? JSON.parse(txt) : null
-        return renderLdtkFromJson(json, { ldtkUrl: null })
-      })().catch(() => renderProcedural())
+    const map = snapshot?.map as any
+    if (map) {
+      void renderMap(map).catch(() => renderProcedural())
       return () => {
         cancelled = true
         clearTileLayer()
@@ -495,7 +361,7 @@ export function RoomGameView(props: {
         // ignore
       }
     }
-  }, [pixiReady, props.getAuthToken, seed, snapshot?.mapRef, snapshot?.starshipId])
+  }, [pixiReady, seed, snapshot?.map])
 
   // Render actors (simple tokens for now; sprite assets will replace these)
   useEffect(() => {

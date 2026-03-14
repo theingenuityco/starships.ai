@@ -19,6 +19,8 @@ export type RoomGameMap = {
   layers: RoomGameMapLayer[];
   /** Cell indices that are blocked (y*width + x). */
   collisions: number[];
+  /** Optional precise collision rectangles (tile units), for debugging/visualization. */
+  collisionRects?: CollisionRect[];
 };
 
 type CollisionRect = { x: number; y: number; width: number; height: number };
@@ -253,6 +255,7 @@ export class RoomGameMapService {
         tilesetImageUrl,
         layers: [{ name: 'base', data: base }, ...propsLayers],
         collisions,
+        collisionRects,
       },
       collisionRects,
     };

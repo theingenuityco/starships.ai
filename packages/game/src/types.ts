@@ -33,6 +33,8 @@ export type RoomGameMap = {
   layers: RoomGameMapLayer[]
   /** Cell indices blocked (y*width + x). */
   collisions: number[]
+  /** Optional precise collision rectangles (tile units), for debugging/visualization. */
+  collisionRects?: Array<{ x: number; y: number; width: number; height: number }>
 }
 
 export type RoomGameSnapshot = {

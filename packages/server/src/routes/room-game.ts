@@ -351,9 +351,13 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
     const collidesAt = (x: number, y: number) => {
       // Treat actors as a small circle in tile units.
       const radius = 0.28;
+      // Actor positions are stored in "cell coordinates" (0,0 is the top-left cell),
+      // but rendered at cell centers. Collision needs to use the same center point.
+      const cx = x + 0.5;
+      const cy = y + 0.5;
       for (const r of rects) {
         if (!r) continue;
-        if (circleIntersectsRect(x, y, radius, r.x, r.y, r.width, r.height)) return true;
+        if (circleIntersectsRect(cx, cy, radius, r.x, r.y, r.width, r.height)) return true;
       }
       return false;
     };

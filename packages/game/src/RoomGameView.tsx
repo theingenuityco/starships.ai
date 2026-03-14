@@ -295,7 +295,13 @@ export function RoomGameView(props: {
       }
     }
 
-    const renderOverlayGrid = (m: { width: number; height: number; gridSize: number; collisions?: number[] }) => {
+    const renderOverlayGrid = (m: {
+      width: number
+      height: number
+      gridSize: number
+      collisions?: number[]
+      collisionRects?: Array<{ x: number; y: number; width: number; height: number }>
+    }) => {
       clearPropLayer()
 
       const g = new Graphics()
@@ -303,7 +309,7 @@ export function RoomGameView(props: {
       const wPx = m.width * cell
       const hPx = m.height * cell
 
-      // Collision shading (optional)
+      // Collision shading (optional rasterized cells)
       const blocked = new Set<number>(Array.isArray(m.collisions) ? m.collisions : [])
       if (blocked.size > 0) {
         for (const i of blocked) {
@@ -313,6 +319,17 @@ export function RoomGameView(props: {
           g.rect(x * cell, y * cell, cell, cell)
           g.fill({ color: 0xef4444, alpha: 0.12 })
         }
+      }
+
+      // Precise collision rects (preferred for debugging)
+      const rects = Array.isArray(m.collisionRects) ? m.collisionRects : []
+      if (rects.length > 0) {
+        g.stroke({ width: 2, color: 0x22c55e, alpha: 0.9 })
+        for (const r of rects) {
+          if (!r) continue
+          g.rect(r.x * cell, r.y * cell, r.width * cell, r.height * cell)
+        }
+        g.stroke()
       }
 
       // Grid lines (map-aligned)
@@ -400,7 +417,13 @@ export function RoomGameView(props: {
       gridPxRef.current = gridSize
 
       // Map-aligned debug overlay grid + collision shading.
-      renderOverlayGrid({ width, height, gridSize, collisions: Array.isArray(m.collisions) ? m.collisions : [] })
+      renderOverlayGrid({
+        width,
+        height,
+        gridSize,
+        collisions: Array.isArray(m.collisions) ? m.collisions : [],
+        collisionRects: Array.isArray(m.collisionRects) ? m.collisionRects : [],
+      })
 
       setMapRenderStatus(`map: loading tileset ${tilesetImageUrl}`)
       let sheet: Texture

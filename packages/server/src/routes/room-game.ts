@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { ConversationParticipantRepository, RoomRepository, getConnection } from '@starships/models';
 import { RoomGameStreamBus, type RoomGameStreamEvent } from '@/services/RoomGameStreamBus';
 import { RoomGameStateService } from '@/services/RoomGameStateService';
+import type { RoomGameActorState } from '@/services/RoomGameStateService';
 import { RoomGameConfigService } from '@/services/RoomGameConfigService';
 import { RoomGameMapService } from '@/services/RoomGameMapService';
 import crypto from 'crypto';
@@ -233,7 +234,10 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
         };
         actors.push(actor);
         // Seed state if not present (best-effort)
-        if (!existing) void stateSvc.setActor(roomConversationId, actor as any).catch(() => undefined);
+        if (!existing) {
+          const seedState: RoomGameActorState = { ...actor, updatedAt: undefined };
+          void stateSvc.setActor(roomConversationId, seedState).catch(() => undefined);
+        }
       } else {
         const info = agentInfoById.get(item.id);
         const avatarAttachmentId = info?.avatarAttachmentId ?? null;
@@ -250,7 +254,10 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
           anim: 'idle_down',
         };
         actors.push(actor);
-        if (!existing) void stateSvc.setActor(roomConversationId, actor as any).catch(() => undefined);
+        if (!existing) {
+          const seedState: RoomGameActorState = { ...actor, updatedAt: undefined };
+          void stateSvc.setActor(roomConversationId, seedState).catch(() => undefined);
+        }
       }
     }
 
@@ -363,7 +370,8 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
       anim,
     };
 
-    await stateSvc.setActor(roomConversationId, next as any);
+    const nextState: RoomGameActorState = next;
+    await stateSvc.setActor(roomConversationId, nextState);
 
     await bus.publish(roomConversationId, {
       type: 'actors.patch',

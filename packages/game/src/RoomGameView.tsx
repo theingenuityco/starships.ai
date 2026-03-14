@@ -1,14 +1,26 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RoomGameActor, RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameSnapshot } from '@/types'
+import type { RoomGameActor, RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameMap, RoomGameSnapshot } from '@/types'
 import { useRoomGameStream } from '@/hooks/useRoomGameStream'
 import { colorFromAppearanceKey, deriveRoomSeed } from '@/lib/appearance'
 import { generateTopDownRoom } from '@/procgen/room'
 
 type ActorById = Map<string, RoomGameActor>
+
+function isRoomGameMap(v: unknown): v is RoomGameMap {
+  if (!v || typeof v !== 'object') return false
+  const r = v as Record<string, unknown>
+  return (
+    typeof r.gridSize === 'number' &&
+    typeof r.width === 'number' &&
+    typeof r.height === 'number' &&
+    typeof r.tilesetImageUrl === 'string' &&
+    Array.isArray(r.layers) &&
+    Array.isArray(r.collisions)
+  )
+}
 
 function applySnapshot(s: RoomGameSnapshot): ActorById {
   const m: ActorById = new Map()
@@ -22,19 +34,19 @@ function applySnapshot(s: RoomGameSnapshot): ActorById {
 function applyPatch(prev: ActorById, patch: RoomGameActorsPatch): ActorById {
   const next = new Map(prev)
   for (const p of Array.isArray(patch.patches) ? patch.patches : []) {
-    const id = String((p as any)?.id || '').trim()
+    const id = String(p?.id || '').trim()
     if (!id) continue
     const cur = next.get(id)
     if (!cur) continue
     next.set(id, {
       ...cur,
-      ...(typeof (p as any).x === 'number' ? { x: (p as any).x } : null),
-      ...(typeof (p as any).y === 'number' ? { y: (p as any).y } : null),
-      ...('facing' in (p as any) ? { facing: (p as any).facing ?? null } : null),
-      ...('anim' in (p as any) ? { anim: (p as any).anim ?? null } : null),
-      ...('appearanceKey' in (p as any) ? { appearanceKey: (p as any).appearanceKey ?? null } : null),
-      ...('avatarAttachmentId' in (p as any) ? { avatarAttachmentId: (p as any).avatarAttachmentId ?? null } : null),
-      ...('label' in (p as any) ? { label: (p as any).label ?? null } : null),
+      ...(typeof p.x === 'number' ? { x: p.x } : null),
+      ...(typeof p.y === 'number' ? { y: p.y } : null),
+      ...('facing' in p ? { facing: p.facing ?? null } : null),
+      ...('anim' in p ? { anim: p.anim ?? null } : null),
+      ...('appearanceKey' in p ? { appearanceKey: p.appearanceKey ?? null } : null),
+      ...('avatarAttachmentId' in p ? { avatarAttachmentId: p.avatarAttachmentId ?? null } : null),
+      ...('label' in p ? { label: p.label ?? null } : null),
     })
   }
   return next
@@ -107,7 +119,7 @@ export function RoomGameView(props: {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : null),
-        } as any,
+        },
         body: JSON.stringify({ type: 'move', dx, dy }),
       }).catch(() => undefined)
     }
@@ -304,16 +316,12 @@ export function RoomGameView(props: {
       tileLayer.addChild(g)
     }
 
-    const renderMap = async (m: any) => {
+    const renderMap = async (m: RoomGameMap) => {
       clearTileLayer()
       clearPropLayer()
 
-      const width = typeof m?.width === 'number' ? m.width : 0
-      const height = typeof m?.height === 'number' ? m.height : 0
-      const gridSize = typeof m?.gridSize === 'number' ? m.gridSize : 32
-      const tilesetImageUrl = typeof m?.tilesetImageUrl === 'string' ? m.tilesetImageUrl : ''
-      const layers = Array.isArray(m?.layers) ? m.layers : []
-      if (!(width > 0 && height > 0 && tilesetImageUrl)) {
+      const { width, height, gridSize, tilesetImageUrl, layers } = m
+      if (!(width > 0 && height > 0 && gridSize > 0 && tilesetImageUrl)) {
         setMapRenderStatus('map: invalid (missing width/height/tilesetImageUrl)')
         return renderProcedural()
       }
@@ -323,7 +331,7 @@ export function RoomGameView(props: {
       setMapRenderStatus(`map: loading tileset ${tilesetImageUrl}`)
       let sheet: Texture
       try {
-        sheet = (await Assets.load(tilesetImageUrl)) as unknown as Texture
+        sheet = (await Assets.load(tilesetImageUrl)) as Texture
       } catch {
         renderDebugGrid({ width, height, gridSize, layers }, `tileset load failed: ${tilesetImageUrl}`)
         return
@@ -331,12 +339,7 @@ export function RoomGameView(props: {
       if (cancelled) return
 
       setMapRenderStatus(`map: rendering ${width}x${height} layers:${layers.length} cell:${gridSize}`)
-      const baseW =
-        (sheet as any).source?.width ??
-        (sheet as any).width ??
-        (sheet as any).baseTexture?.width ??
-        (sheet as any).textureCacheIds?.[0]?.width ??
-        512
+      const baseW = sheet.source?.width ?? sheet.width
       const cols = Math.max(1, Math.floor(Number(baseW) / gridSize) || 1)
 
       const mkSubTexture = (gid: number) => {
@@ -344,7 +347,7 @@ export function RoomGameView(props: {
         const sx = (tileIndex % cols) * gridSize
         const sy = Math.floor(tileIndex / cols) * gridSize
         // Pixi v8: create sub-texture via TextureOptions { source, frame }
-        return new Texture({ source: (sheet as any).source ?? sheet, frame: new Rectangle(sx, sy, gridSize, gridSize) })
+        return new Texture({ source: sheet.source, frame: new Rectangle(sx, sy, gridSize, gridSize) })
       }
 
       const textureCache = new Map<number, Texture>()
@@ -374,8 +377,8 @@ export function RoomGameView(props: {
       }
     }
 
-    const map = snapshot?.map as any
-    if (map) {
+    const map = snapshot?.map
+    if (isRoomGameMap(map)) {
       void renderMap(map).catch(() => {
         setMapRenderStatus('map: render failed (exception), falling back to procedural')
         renderProcedural()

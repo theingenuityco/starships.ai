@@ -19,7 +19,13 @@ function shaSeedHex(input: string): string {
   return crypto.createHash('sha256').update(s).digest('hex').slice(0, 13);
 }
 
-function appearanceKey(args: { agentId: string; avatarAttachmentId?: string | null; styleId?: string; modelVersion?: string; generatorVersion?: string }): string {
+function appearanceKey(args: {
+  agentId: string;
+  avatarAttachmentId?: string | null;
+  styleId?: string;
+  modelVersion?: string;
+  generatorVersion?: string;
+}): string {
   const agentId = String(args.agentId || '').trim();
   const avatar = String(args.avatarAttachmentId || '').trim();
   const styleId = String(args.styleId || 'default').trim();
@@ -28,7 +34,11 @@ function appearanceKey(args: { agentId: string; avatarAttachmentId?: string | nu
   return shaSeedHex(`${agentId}:${avatar}:${styleId}:${modelVersion}:${generatorVersion}`);
 }
 
-async function requireRoomParticipant(args: { roomConversationId: string; req: Request; res: Response }): Promise<{ userId: string; starshipId: string } | null> {
+async function requireRoomParticipant(args: {
+  roomConversationId: string;
+  req: Request;
+  res: Response;
+}): Promise<{ userId: string; starshipId: string } | null> {
   const roomConversationId = String(args.roomConversationId || '').trim();
   if (!roomConversationId) {
     sendError(args.res, 'VALIDATION_ERROR', 'Missing roomId', 400);
@@ -51,7 +61,10 @@ async function requireRoomParticipant(args: { roomConversationId: string; req: R
   const participantRepo = new ConversationParticipantRepository();
   const ok = await participantRepo.isUserParticipant(userId, roomConversationId).catch(() => false);
   if (!ok) {
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, { roomId: roomConversationId, reason: 'room_membership_required' });
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this room', 403, {
+      roomId: roomConversationId,
+      reason: 'room_membership_required',
+    });
     return null;
   }
   return { userId, starshipId: String(room.starshipId) };
@@ -194,10 +207,7 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
 
     const actors: SnapshotActor[] = [];
 
-    const all = [
-      ...userIds.map((id) => ({ id, kind: 'user' as const })),
-      ...agentIds.map((id) => ({ id, kind: 'agent' as const })),
-    ];
+    const all = [...userIds.map((id) => ({ id, kind: 'user' as const })), ...agentIds.map((id) => ({ id, kind: 'agent' as const }))];
     for (let i = 0; i < all.length; i++) {
       const item = all[i];
       const angle = (Math.PI * 2 * i) / Math.max(1, all.length);
@@ -246,6 +256,7 @@ router.get('/rooms/:roomId/game/stream', jwtAuthMiddleware, async (req: Request,
       type: 'snapshot',
       data: {
         roomConversationId,
+        starshipId: access.starshipId,
         at,
         seed,
         generatorVersion,
@@ -323,8 +334,7 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
 
     const nextX = Math.max(0, Math.min(50, Math.round((cur.x ?? 0) + body.dx)));
     const nextY = Math.max(0, Math.min(50, Math.round((cur.y ?? 0) + body.dy)));
-    const facing =
-      body.dx > 0 ? 'right' : body.dx < 0 ? 'left' : body.dy > 0 ? 'down' : body.dy < 0 ? 'up' : (cur.facing ?? 'down');
+    const facing = body.dx > 0 ? 'right' : body.dx < 0 ? 'left' : body.dy > 0 ? 'down' : body.dy < 0 ? 'up' : (cur.facing ?? 'down');
     const anim = body.dx !== 0 || body.dy !== 0 ? `walk_${facing}` : `idle_${facing}`;
 
     const at = new Date().toISOString();
@@ -368,8 +378,22 @@ router.post('/rooms/:roomId/game/config', jwtAuthMiddleware, async (req: Request
         mapRef: z
           .discriminatedUnion('kind', [
             z.object({ kind: z.literal('none') }),
-            z.object({ kind: z.literal('procedural'), seed: z.string().trim().min(1).max(255), generatorVersion: z.string().trim().min(1).max(128) }),
+            z.object({
+              kind: z.literal('procedural'),
+              seed: z.string().trim().min(1).max(255),
+              generatorVersion: z.string().trim().min(1).max(128),
+            }),
             z.object({ kind: z.literal('ldtk_attachment'), attachmentId: z.string().trim().min(1).max(255) }),
+            z.object({
+              kind: z.literal('ldtk_url'),
+              url: z
+                .string()
+                .trim()
+                .min(1)
+                .max(2048)
+                // Restrict to same-origin relative URLs (Next public assets, etc.)
+                .refine((s) => s.startsWith('/'), { message: 'ldtk_url must start with /' }),
+            }),
             z.object({ kind: z.literal('tiled_attachment'), attachmentId: z.string().trim().min(1).max(255) }),
           ])
           .optional(),
@@ -395,4 +419,3 @@ router.post('/rooms/:roomId/game/config', jwtAuthMiddleware, async (req: Request
 });
 
 export default router;
-

@@ -18,6 +18,8 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import { createServer } from 'http';
+import fs from 'fs';
+import path from 'path';
 
 // Route imports
 import agentTemplateRoutes from '@/routes/agent-templates';
@@ -78,6 +80,28 @@ function validateUrlFormat(url: string, name: string) {
 
 const app: express.Application = express();
 const PORT = config.SERVER_PORT || 3001;
+
+// -----------------------------------------------------------------------------
+// Temporary public static assets (development convenience)
+// -----------------------------------------------------------------------------
+// NOTE: This intentionally serves local workspace files. Treat as unsafe for
+// production and replace with authenticated attachment/CDN delivery.
+try {
+  const modernOfficeDir = path.join(process.cwd(), 'Modern_Office_Revamped_v1.2');
+  if (fs.existsSync(modernOfficeDir)) {
+    app.use(
+      '/public-assets/modern-office',
+      express.static(modernOfficeDir, {
+        fallthrough: true,
+        etag: true,
+        maxAge: '7d',
+      })
+    );
+    console.log(`🧱 Serving Modern Office tileset at /public-assets/modern-office`);
+  }
+} catch {
+  // best-effort
+}
 
 // Validate URL formats
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');

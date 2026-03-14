@@ -17,11 +17,14 @@ export type RoomGameActor = {
 export type RoomGameMapRef =
   | { kind: 'none' }
   | { kind: 'ldtk_attachment'; attachmentId: string }
+  | { kind: 'ldtk_url'; url: string }
   | { kind: 'tiled_attachment'; attachmentId: string }
   | { kind: 'procedural'; seed: string; generatorVersion: string }
 
 export type RoomGameSnapshot = {
   roomConversationId: string
+  /** Starship ID for resolving attachment access (e.g. LDtk maps). */
+  starshipId: string
   at: string
   seed: string
   generatorVersion: string

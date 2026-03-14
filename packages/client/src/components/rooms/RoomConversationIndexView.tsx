@@ -8,9 +8,11 @@ import type { ConversationMessageInputRef } from '@/components/conversation/Conv
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LEAD_GEN_PROMPT_CARDS } from '@/app/use-cases/lead-gen-prompts'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -205,6 +207,12 @@ export function RoomConversationIndexView(props: {
     return slug || 'Room'
   }, [props.roomName, props.roomSlug])
 
+  const isLeadGenRoom =
+    String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' ||
+    String(props.roomSlug || '').trim().toLowerCase() === 'leadgen'
+
+  const isLobbyRoom = String(props.roomSlug || '').trim().toLowerCase() === 'lobby'
+
   const onCreateConversation = () => {
     if (props.onCreateDraftConversation) {
       props.onCreateDraftConversation()
@@ -287,11 +295,13 @@ export function RoomConversationIndexView(props: {
       />
 
       {/* Room starter (conversation-starter style) */}
-      <div className="flex-1 min-h-0 overflow-auto room-conversation-bg px-4 py-8">
-        <div className="w-full max-w-4xl mx-auto h-full flex">
-          <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 pt-16 sm:pt-20 lg:pt-24 pb-12">
+      <div className="flex-1 min-h-0 overflow-auto room-conversation-bg px-4 py-8 flex flex-col">
+        <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col min-h-0">
+          <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto flex flex-col flex-1 min-h-0 pt-16 sm:pt-20 lg:pt-24 pb-12">
             <div className="mb-6 text-center">
-              <h1 className="text-3xl font-normal text-foreground">Start a new conversation</h1>
+              <h1 className="text-3xl font-normal text-foreground">
+                {isLeadGenRoom ? "Let's generate leads" : 'Start a new conversation'}
+              </h1>
             </div>
 
             <ConversationMessageInput
@@ -331,16 +341,27 @@ export function RoomConversationIndexView(props: {
               <div className="mt-4">
                 {starterTab === 'suggestions' ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {[
-                      'Suggest 5 conversation ideas for this room.',
-                      'Summarize the key topics we should discuss here.',
-                      'Draft a concise conversation title and first message.',
-                      'What are the most important databases to start with?',
-                    ].map(s => (
-                      <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
-                        {s}
-                      </button>
-                    ))}
+                    {isLeadGenRoom
+                      ? LEAD_GEN_PROMPT_CARDS.map(card => (
+                          <button
+                            key={card.title}
+                            type="button"
+                            onClick={() => starterInputRef.current?.setInitialContent(card.description)}
+                            className={starterBadgeClass(false)}
+                          >
+                            {card.title}
+                          </button>
+                        ))
+                      : [
+                          'Suggest 5 conversation ideas for this room.',
+                          'Summarize the key topics we should discuss here.',
+                          'Draft a concise conversation title and first message.',
+                          'What are the most important databases to start with?',
+                        ].map(s => (
+                          <button key={s} type="button" onClick={() => void starterInputRef.current?.handleSuggestionSubmit(s)} className={starterBadgeClass(false)}>
+                            {s}
+                          </button>
+                        ))}
                   </div>
                 ) : null}
 
@@ -373,10 +394,26 @@ export function RoomConversationIndexView(props: {
                   </div>
                 )
               ) : null}
+
             </div>
           </div>
         </div>
       </div>
+
+      {isLobbyRoom ? (
+        <div className="flex-none room-conversation-bg px-4 py-5 sm:py-6 flex flex-col items-center gap-4" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}>
+          <Button
+            asChild
+            size="lg"
+            className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition border-0 gap-2"
+          >
+            <Link href="/use-cases/lead-generation" className="inline-flex items-center gap-2">
+              Generate Leads
+              <Icon name="chevron-right" className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

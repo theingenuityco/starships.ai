@@ -2423,12 +2423,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       size="icon"
                       className={cn(
                         'h-8 w-8 rounded-full shrink-0 transition-all',
-                        canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                        canSend
+                          ? 'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] [&_svg]:text-white'
+                          : 'border border-border bg-muted/80 text-muted-foreground cursor-not-allowed [&_svg]:text-muted-foreground'
                       )}
                       aria-label="Send"
                       title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
                     >
-                      {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                      {sending ? <div className={cn('h-4 w-4 rounded-full animate-spin border-2 border-t-transparent', canSend ? 'border-white' : 'border-muted-foreground')} /> : <Icon name="send" className="h-4 w-4" />}
                     </Button>
                   )}
                 </div>
@@ -2571,12 +2573,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     size="icon"
                     className={cn(
                       'h-8 w-8 rounded-full shrink-0 transition-all',
-                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      canSend
+                        ? 'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] [&_svg]:text-white'
+                        : 'border border-border bg-muted/80 text-muted-foreground cursor-not-allowed [&_svg]:text-muted-foreground'
                     )}
                     aria-label="Send"
                     title={canSend ? 'Send' : !hasTargetAgent ? 'Select an agent to send' : 'Send'}
                   >
-                    {sending ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Icon name="send" className="h-4 w-4" />}
+                    {sending ? <div className={cn('h-4 w-4 rounded-full animate-spin border-2 border-t-transparent', canSend ? 'border-white' : 'border-muted-foreground')} /> : <Icon name="send" className="h-4 w-4" />}
                   </Button>
                 )}
               </div>

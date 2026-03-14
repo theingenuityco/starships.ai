@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "tsc --watch",
     "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
-    "sync-assets": "tsx scripts/sync-assets.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "clean": "rm -rf dist",

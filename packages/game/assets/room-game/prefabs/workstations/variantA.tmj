@@ -1,52 +1,49 @@
 { "compressionlevel":-1,
- "height":4,
+ "height":3,
  "infinite":false,
  "layers":[
         {
          "id":6,
          "layers":[
                 {
-                 "data":[0, 0, 0, 0, 0, 0,
-                    0, 482, 483, 484, 0, 0,
-                    0, 498, 499, 500, 0, 0,
-                    0, 0, 0, 0, 0, 0],
-                 "height":4,
+                 "data":[482, 483, 484, 0,
+                    498, 499, 500, 96,
+                    0, 96, 96, 96],
+                 "height":3,
                  "id":1,
                  "name":"props-table",
                  "opacity":1,
                  "type":"tilelayer",
                  "visible":true,
-                 "width":6,
+                 "width":4,
                  "x":0,
                  "y":0
                 }, 
                 {
-                 "data":[0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 167, 0,
-                    0, 0, 129, 0, 183, 0,
-                    0, 0, 145, 0, 0, 0],
-                 "height":4,
-                 "id":5,
-                 "name":"props-chair",
-                 "opacity":1,
-                 "type":"tilelayer",
-                 "visible":true,
-                 "width":6,
-                 "x":0,
-                 "y":0
-                }, 
-                {
-                 "data":[0, 0, 0, 0, 0, 0,
-                    0, 491, 492, 493, 0, 0,
-                    0, 507, 508, 509, 0, 0,
-                    0, 0, 0, 0, 0, 0],
-                 "height":4,
+                 "data":[491, 492, 493, 0,
+                    507, 508, 509, 128,
+                    0, 128, 128, 128],
+                 "height":3,
                  "id":4,
                  "name":"props-desktop",
                  "opacity":1,
                  "type":"tilelayer",
                  "visible":true,
-                 "width":6,
+                 "width":4,
+                 "x":0,
+                 "y":0
+                }, 
+                {
+                 "data":[0, 0, 0, 167,
+                    0, 129, 0, 183,
+                    0, 145, 96, 0],
+                 "height":3,
+                 "id":5,
+                 "name":"props-chair",
+                 "opacity":1,
+                 "type":"tilelayer",
+                 "visible":true,
+                 "width":4,
                  "x":0,
                  "y":0
                 }],
@@ -71,8 +68,8 @@
                  "type":"",
                  "visible":true,
                  "width":81.4850151116035,
-                 "x":36.4304023919316,
-                 "y":50.3818210454244
+                 "x":4.16129761512625,
+                 "y":17.6237904386674
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -103,5 +100,5 @@
  "tilewidth":32,
  "type":"map",
  "version":"1.10",
- "width":6
+ "width":4
 }

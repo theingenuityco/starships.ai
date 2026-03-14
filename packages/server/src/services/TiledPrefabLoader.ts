@@ -54,7 +54,13 @@ export type Prefab = {
   height: number;
   /** Props layers in draw order. Each is a Tiled GID grid (0 means empty). */
   propsLayers: Array<{ name: string; data: number[] }>;
+  /** Rasterized collision grid (used for coarse placement checks). */
   collision: boolean[];
+  /**
+   * Collision rectangles in tile units (x/y/width/height). These come from the Tiled
+   * `collision` object layer (preferred) or from a legacy collision tilelayer.
+   */
+  collisionRects: Array<{ x: number; y: number; width: number; height: number }>;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -131,6 +137,7 @@ export class TiledPrefabLoader {
 
     const props: number[] = new Array(expectedLen);
     const collision: boolean[] = new Array(expectedLen);
+    const collisionRects: Array<{ x: number; y: number; width: number; height: number }> = [];
     props.fill(0);
     collision.fill(false);
 
@@ -157,6 +164,13 @@ export class TiledPrefabLoader {
         const { gid } = decodeGid(rawGid);
         collision[i] = gid > 0;
       }
+      // Convert blocked cells into rects (tile units).
+      for (let i = 0; i < expectedLen; i++) {
+        if (!collision[i]) continue;
+        const x = i % width;
+        const y = Math.floor(i / width);
+        collisionRects.push({ x, y, width: 1, height: 1 });
+      }
     } else if (isObjectGroupLayer(collisionRoot)) {
       const tw = map.tilewidth;
       const th = map.tileheight;
@@ -165,25 +179,31 @@ export class TiledPrefabLoader {
         if (!o || typeof o.x !== 'number' || typeof o.y !== 'number') continue;
         const wPx = typeof o.width === 'number' ? o.width : 0;
         const hPx = typeof o.height === 'number' ? o.height : 0;
-        const x0 = Math.floor(o.x / tw);
-        const y0 = Math.floor(o.y / th);
-        const x1 = Math.ceil((o.x + wPx) / tw) - 1;
-        const y1 = Math.ceil((o.y + hPx) / th) - 1;
+        const rx = o.x / tw;
+        const ry = o.y / th;
+        const rw = wPx / tw;
+        const rh = hPx / th;
+        if (!(rw > 0 && rh > 0)) continue;
+        collisionRects.push({ x: rx, y: ry, width: rw, height: rh });
+
+        // Also rasterize into grid for placement checks (conservative).
+        const x0 = Math.floor(rx);
+        const y0 = Math.floor(ry);
+        const x1 = Math.ceil(rx + rw) - 1;
+        const y1 = Math.ceil(ry + rh) - 1;
         const minX = Math.max(0, Math.min(width - 1, x0));
         const minY = Math.max(0, Math.min(height - 1, y0));
         const maxX = Math.max(0, Math.min(width - 1, x1 >= x0 ? x1 : x0));
         const maxY = Math.max(0, Math.min(height - 1, y1 >= y0 ? y1 : y0));
         for (let y = minY; y <= maxY; y++) {
-          for (let x = minX; x <= maxX; x++) {
-            collision[y * width + x] = true;
-          }
+          for (let x = minX; x <= maxX; x++) collision[y * width + x] = true;
         }
       }
     } else {
       throw new Error(`[TiledPrefabLoader] Missing collision tilelayer/objectgroup: ${filePath}`);
     }
 
-    return { width, height, propsLayers, collision };
+    return { width, height, propsLayers, collision, collisionRects };
   }
 }
 

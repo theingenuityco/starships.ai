@@ -21,7 +21,13 @@ export type RoomGameMap = {
   collisions: number[];
 };
 
-type CacheEntry = { map: RoomGameMap; expiresAtMs: number; collisionSet: Set<number> };
+type CollisionRect = { x: number; y: number; width: number; height: number };
+type CacheEntry = { map: RoomGameMap; expiresAtMs: number; collisionSet: Set<number>; collisionRects: CollisionRect[] };
+type StoredCacheJson = { map: RoomGameMap; collisionRects: CollisionRect[] };
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -106,7 +112,7 @@ export class RoomGameMapService {
     return prefabs;
   }
 
-  private buildDynamicOffice(args: { roomConversationId: string; agentIds: string[] }): RoomGameMap {
+  private buildDynamicOffice(args: { roomConversationId: string; agentIds: string[] }): { map: RoomGameMap; collisionRects: CollisionRect[] } {
     const gridSize = 32;
     const tilesetImageUrl = '/room-game/tilesets/Modern_Office_32x32.png';
 
@@ -120,6 +126,7 @@ export class RoomGameMapService {
 
     const base: number[] = new Array(width * height).fill(0);
     const collision = new Array<boolean>(width * height).fill(false);
+    const collisionRects: CollisionRect[] = [];
 
     const idx = (x: number, y: number) => y * width + x;
 
@@ -130,6 +137,13 @@ export class RoomGameMapService {
         if (isBorder) collision[idx(x, y)] = true;
       }
     }
+    // Border collision as rectangles (tile units) for precise movement checks.
+    collisionRects.push(
+      { x: 0, y: 0, width, height: 1 },
+      { x: 0, y: height - 1, width, height: 1 },
+      { x: 0, y: 0, width: 1, height },
+      { x: width - 1, y: 0, width: 1, height }
+    );
 
     // Place workstation prefabs in rows, leaving walkways.
     const prefabs = this.prefabs ?? [];
@@ -140,6 +154,23 @@ export class RoomGameMapService {
     }));
     const reserved = new Set<number>();
     for (let i = 0; i < collision.length; i++) if (collision[i]) reserved.add(i);
+
+    const markRectCells = (r: CollisionRect) => {
+      const x0 = Math.floor(r.x);
+      const y0 = Math.floor(r.y);
+      const x1 = Math.ceil(r.x + r.width) - 1;
+      const y1 = Math.ceil(r.y + r.height) - 1;
+      const minX = Math.max(0, Math.min(width - 1, x0));
+      const minY = Math.max(0, Math.min(height - 1, y0));
+      const maxX = Math.max(0, Math.min(width - 1, x1 >= x0 ? x1 : x0));
+      const maxY = Math.max(0, Math.min(height - 1, y1 >= y0 ? y1 : y0));
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          collision[idx(x, y)] = true;
+          reserved.add(idx(x, y));
+        }
+      }
+    };
 
     const placePrefab = (p: Prefab, ox: number, oy: number) => {
       // bounds check
@@ -165,11 +196,18 @@ export class RoomGameMapService {
             const gid = src.data[pIdx] || 0;
             if (gid) layer.data[i] = gid;
           }
+          // Collision grid for placement checks (legacy/conservative).
           if (p.collision[pIdx]) {
             collision[i] = true;
             reserved.add(i);
           }
         }
+      }
+      // Precise collision rectangles (tile units) for movement checks.
+      for (const r of Array.isArray(p.collisionRects) ? p.collisionRects : []) {
+        const world: CollisionRect = { x: ox + r.x, y: oy + r.y, width: r.width, height: r.height };
+        collisionRects.push(world);
+        markRectCells(world); // keep debug/compat collision indices roughly in sync
       }
       return true;
     };
@@ -208,12 +246,15 @@ export class RoomGameMapService {
     for (let i = 0; i < collision.length; i++) if (collision[i]) collisions.push(i);
 
     return {
-      gridSize,
-      width,
-      height,
-      tilesetImageUrl,
-      layers: [{ name: 'base', data: base }, ...propsLayers],
-      collisions,
+      map: {
+        gridSize,
+        width,
+        height,
+        tilesetImageUrl,
+        layers: [{ name: 'base', data: base }, ...propsLayers],
+        collisions,
+      },
+      collisionRects,
     };
   }
 
@@ -230,12 +271,18 @@ export class RoomGameMapService {
     try {
       const raw = await this.redis.get(key);
       if (raw) {
-        const map = JSON.parse(raw) as RoomGameMap;
-        if (map && typeof map.width === 'number' && Array.isArray(map.layers)) {
-          const set = new Set<number>(Array.isArray(map.collisions) ? map.collisions : []);
-          const entry: CacheEntry = { map, collisionSet: set, expiresAtMs: now + 30_000 };
-          this.mem.set(memKey, entry);
-          return entry;
+        const parsed = JSON.parse(raw) as unknown;
+        if (isRecord(parsed) && 'map' in parsed && 'collisionRects' in parsed) {
+          const maybeMap = (parsed as { map?: unknown }).map;
+          const maybeRects = (parsed as { collisionRects?: unknown }).collisionRects;
+          if (isRecord(maybeMap) && Array.isArray((maybeMap as { layers?: unknown }).layers) && Array.isArray(maybeRects)) {
+            const map = maybeMap as RoomGameMap;
+            const rects = maybeRects as CollisionRect[];
+            const set = new Set<number>(Array.isArray(map.collisions) ? map.collisions : []);
+            const entry: CacheEntry = { map, collisionRects: rects, collisionSet: set, expiresAtMs: now + 30_000 };
+            this.mem.set(memKey, entry);
+            return entry;
+          }
         }
       }
     } catch {
@@ -250,16 +297,24 @@ export class RoomGameMapService {
       }
     }
 
-    const map = this.buildDynamicOffice({ roomConversationId, agentIds });
+    // Build map + collision rects (kept in-memory alongside the map).
+    // Note: map.collisions is still a rasterized view for debug/client overlay.
+    const built = this.buildDynamicOffice({ roomConversationId, agentIds });
     const ttlSeconds = typeof opts?.ttlSeconds === 'number' && opts.ttlSeconds > 0 ? Math.floor(opts.ttlSeconds) : 2 * 60 * 60;
     try {
-      await this.redis.set(key, JSON.stringify(map), 'EX', ttlSeconds);
+      const stored: StoredCacheJson = { map: built.map, collisionRects: built.collisionRects };
+      await this.redis.set(key, JSON.stringify(stored), 'EX', ttlSeconds);
     } catch {
       // best-effort
     }
 
-    const set = new Set<number>(map.collisions);
-    const entry: CacheEntry = { map, collisionSet: set, expiresAtMs: now + 30_000 };
+    const set = new Set<number>(built.map.collisions);
+    const entry: CacheEntry = {
+      map: built.map,
+      collisionRects: built.collisionRects,
+      collisionSet: set,
+      expiresAtMs: now + 30_000,
+    };
     this.mem.set(memKey, entry);
     return entry;
   }

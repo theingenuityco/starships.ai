@@ -312,8 +312,9 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
   const body = validateData(
     z.object({
       type: z.literal('move'),
-      dx: z.number().int().min(-1).max(1),
-      dy: z.number().int().min(-1).max(1),
+      // Allow small continuous deltas (tile units).
+      dx: z.number().min(-1).max(1),
+      dy: z.number().min(-1).max(1),
     }),
     req.body,
     res,
@@ -335,9 +336,26 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
     const mapEntry = await mapSvc.getOrBuild(roomConversationId, agentIds).catch(() => null);
     const mapW = mapEntry?.map?.width ?? 50;
     const mapH = mapEntry?.map?.height ?? 50;
-    const isBlocked = (x: number, y: number) => {
-      const idx = y * mapW + x;
-      return Boolean(mapEntry?.collisionSet?.has(idx));
+    const rects = Array.isArray(mapEntry?.collisionRects) ? mapEntry!.collisionRects : [];
+
+    const clampN = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+    const circleIntersectsRect = (cx: number, cy: number, r: number, rx: number, ry: number, rw: number, rh: number) => {
+      const closestX = clampN(cx, rx, rx + rw);
+      const closestY = clampN(cy, ry, ry + rh);
+      const dx = cx - closestX;
+      const dy = cy - closestY;
+      return dx * dx + dy * dy < r * r;
+    };
+
+    const collidesAt = (x: number, y: number) => {
+      // Treat actors as a small circle in tile units.
+      const radius = 0.28;
+      for (const r of rects) {
+        if (!r) continue;
+        if (circleIntersectsRect(x, y, radius, r.x, r.y, r.width, r.height)) return true;
+      }
+      return false;
     };
 
     const cur = (await stateSvc.getActor(roomConversationId, actorId).catch(() => null)) ?? {
@@ -352,14 +370,43 @@ router.post('/rooms/:roomId/game/input', jwtAuthMiddleware, async (req: Request,
       label: null,
     };
 
-    const boundedX = Math.max(0, Math.min(Math.max(0, mapW - 1), Math.round((cur.x ?? 0) + body.dx)));
-    const boundedY = Math.max(0, Math.min(Math.max(0, mapH - 1), Math.round((cur.y ?? 0) + body.dy)));
-    const facing = body.dx > 0 ? 'right' : body.dx < 0 ? 'left' : body.dy > 0 ? 'down' : body.dy < 0 ? 'up' : (cur.facing ?? 'down');
-    const wantsMove = body.dx !== 0 || body.dy !== 0;
-    const blocked = wantsMove && isBlocked(boundedX, boundedY);
-    const nextX = blocked ? (cur.x ?? 0) : boundedX;
-    const nextY = blocked ? (cur.y ?? 0) : boundedY;
-    const anim = wantsMove && !blocked ? `walk_${facing}` : `idle_${facing}`;
+    const dx = typeof body.dx === 'number' ? clampN(body.dx, -0.5, 0.5) : 0;
+    const dy = typeof body.dy === 'number' ? clampN(body.dy, -0.5, 0.5) : 0;
+
+    const curX = typeof cur.x === 'number' ? cur.x : 0;
+    const curY = typeof cur.y === 'number' ? cur.y : 0;
+
+    // Keep position within bounds (tile units), leaving a small margin.
+    const margin = 0.35;
+    const minX = margin;
+    const minY = margin;
+    const maxX = Math.max(margin, mapW - 1 - margin);
+    const maxY = Math.max(margin, mapH - 1 - margin);
+
+    const wantsMove = dx !== 0 || dy !== 0;
+
+    // Axis-separated resolution for smooth sliding along obstacles.
+    let nextX = clampN(curX + dx, minX, maxX);
+    if (wantsMove && collidesAt(nextX, curY)) nextX = curX;
+
+    let nextY = clampN(curY + dy, minY, maxY);
+    if (wantsMove && collidesAt(nextX, nextY)) nextY = curY;
+
+    const facing =
+      Math.abs(dx) >= Math.abs(dy)
+        ? dx > 0
+          ? 'right'
+          : dx < 0
+            ? 'left'
+            : (cur.facing ?? 'down')
+        : dy > 0
+          ? 'down'
+          : dy < 0
+            ? 'up'
+            : (cur.facing ?? 'down');
+
+    const moved = wantsMove && (nextX !== curX || nextY !== curY);
+    const anim = moved ? `walk_${facing}` : `idle_${facing}`;
 
     const at = new Date().toISOString();
     const next = {

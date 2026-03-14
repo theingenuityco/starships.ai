@@ -103,16 +103,17 @@ export function RoomGameView(props: {
     onActorLeave: (e) => setActorsById((prev) => applyLeave(prev, e)),
   })
 
-  const lastMoveAtRef = useRef<number>(0)
   useEffect(() => {
     if (props.enabled === false) return
     const roomConversationId = String(props.roomConversationId || '').trim()
     if (!roomConversationId) return
 
+    const pressed = new Set<string>()
+    const inFlightRef = { current: false }
+
     const sendMove = async (dx: number, dy: number) => {
-      const now = Date.now()
-      if (now - lastMoveAtRef.current < 90) return // ~11Hz max
-      lastMoveAtRef.current = now
+      if (inFlightRef.current) return
+      inFlightRef.current = true
       const token = props.getAuthToken ? await props.getAuthToken().catch(() => null) : null
       await fetch(`/api/v1/rooms/${encodeURIComponent(roomConversationId)}/game/input`, {
         method: 'POST',
@@ -122,28 +123,57 @@ export function RoomGameView(props: {
         },
         body: JSON.stringify({ type: 'move', dx, dy }),
       }).catch(() => undefined)
+      inFlightRef.current = false
+    }
+
+    const keyToDir = (k: string) => {
+      if (k === 'ArrowUp' || k === 'w') return 'up'
+      if (k === 'ArrowDown' || k === 's') return 'down'
+      if (k === 'ArrowLeft' || k === 'a') return 'left'
+      if (k === 'ArrowRight' || k === 'd') return 'right'
+      return null
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return
-      const key = e.key
-      if (key === 'ArrowUp' || key === 'w') {
-        e.preventDefault()
-        void sendMove(0, -1)
-      } else if (key === 'ArrowDown' || key === 's') {
-        e.preventDefault()
-        void sendMove(0, 1)
-      } else if (key === 'ArrowLeft' || key === 'a') {
-        e.preventDefault()
-        void sendMove(-1, 0)
-      } else if (key === 'ArrowRight' || key === 'd') {
-        e.preventDefault()
-        void sendMove(1, 0)
-      }
+      const dir = keyToDir(e.key)
+      if (!dir) return
+      e.preventDefault()
+      pressed.add(dir)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      const dir = keyToDir(e.key)
+      if (!dir) return
+      e.preventDefault()
+      pressed.delete(dir)
     }
 
     window.addEventListener('keydown', onKeyDown, { passive: false })
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp, { passive: false })
+
+    // Continuous movement: send small deltas while keys are held.
+    const tickMs = 50
+    const speedTilesPerSecond = 4
+    const dt = tickMs / 1000
+    const id = window.setInterval(() => {
+      if (pressed.size === 0) return
+      let dx = 0
+      let dy = 0
+      if (pressed.has('up')) dy -= 1
+      if (pressed.has('down')) dy += 1
+      if (pressed.has('left')) dx -= 1
+      if (pressed.has('right')) dx += 1
+      if (dx === 0 && dy === 0) return
+      const mag = Math.hypot(dx, dy) || 1
+      dx = (dx / mag) * speedTilesPerSecond * dt
+      dy = (dy / mag) * speedTilesPerSecond * dt
+      void sendMove(dx, dy)
+    }, tickMs)
+
+    return () => {
+      window.clearInterval(id)
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [props.enabled, props.getAuthToken, props.roomConversationId])
 
   // Mount Pixi app
@@ -265,6 +295,48 @@ export function RoomGameView(props: {
       }
     }
 
+    const renderOverlayGrid = (m: { width: number; height: number; gridSize: number; collisions?: number[] }) => {
+      clearPropLayer()
+
+      const g = new Graphics()
+      const cell = m.gridSize
+      const wPx = m.width * cell
+      const hPx = m.height * cell
+
+      // Collision shading (optional)
+      const blocked = new Set<number>(Array.isArray(m.collisions) ? m.collisions : [])
+      if (blocked.size > 0) {
+        for (const i of blocked) {
+          if (!(i >= 0 && i < m.width * m.height)) continue
+          const x = i % m.width
+          const y = Math.floor(i / m.width)
+          g.rect(x * cell, y * cell, cell, cell)
+          g.fill({ color: 0xef4444, alpha: 0.12 })
+        }
+      }
+
+      // Grid lines (map-aligned)
+      g.stroke({ width: 1, color: 0xffffff, alpha: 0.12 })
+      for (let x = 0; x <= m.width; x++) {
+        const px = x * cell
+        g.moveTo(px, 0)
+        g.lineTo(px, hPx)
+      }
+      for (let y = 0; y <= m.height; y++) {
+        const py = y * cell
+        g.moveTo(0, py)
+        g.lineTo(wPx, py)
+      }
+      g.stroke()
+
+      // Outer border
+      g.stroke({ width: 2, color: 0xffffff, alpha: 0.22 })
+      g.rect(0, 0, wPx, hPx)
+      g.stroke()
+
+      propLayer.addChild(g)
+    }
+
     const renderProcedural = () => {
       const cell = gridPxRef.current || 32
       const tilesWide = Math.max(8, Math.ceil(app.renderer.width / cell))
@@ -318,7 +390,6 @@ export function RoomGameView(props: {
 
     const renderMap = async (m: RoomGameMap) => {
       clearTileLayer()
-      clearPropLayer()
 
       const { width, height, gridSize, tilesetImageUrl, layers } = m
       if (!(width > 0 && height > 0 && gridSize > 0 && tilesetImageUrl)) {
@@ -327,6 +398,9 @@ export function RoomGameView(props: {
       }
 
       gridPxRef.current = gridSize
+
+      // Map-aligned debug overlay grid + collision shading.
+      renderOverlayGrid({ width, height, gridSize, collisions: Array.isArray(m.collisions) ? m.collisions : [] })
 
       setMapRenderStatus(`map: loading tileset ${tilesetImageUrl}`)
       let sheet: Texture
@@ -421,8 +495,9 @@ export function RoomGameView(props: {
       g.circle(0, 0, radius)
       g.fill({ color: Number.isFinite(color) ? color : 0x64748b, alpha: 0.95 })
       const cell = gridPxRef.current || 32
-      g.x = Math.round((a.x || 0) * cell + cell)
-      g.y = Math.round((a.y || 0) * cell + cell)
+      // Center actors within the grid cell.
+      g.x = Math.round(((a.x || 0) + 0.5) * cell)
+      g.y = Math.round(((a.y || 0) + 0.5) * cell)
 
       const label = String(a.label || (a.kind === 'agent' ? 'Agent' : 'User'))
       const t = new Text({

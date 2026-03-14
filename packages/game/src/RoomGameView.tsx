@@ -70,6 +70,7 @@ export function RoomGameView(props: {
   const [snapshot, setSnapshot] = useState<RoomGameSnapshot | null>(null)
   const [actorsById, setActorsById] = useState<ActorById>(() => new Map())
   const [pixiReady, setPixiReady] = useState<boolean>(false)
+  const [mapRenderStatus, setMapRenderStatus] = useState<string>('map: (none)')
 
   const seed = useMemo(() => {
     const s = snapshot?.seed
@@ -260,6 +261,7 @@ export function RoomGameView(props: {
 
       clearTileLayer()
       clearPropLayer()
+      setMapRenderStatus(`map: procedural ${tilesWide}x${tilesHigh} cell:${cell}`)
       const g = new Graphics()
       for (let y = 0; y < grid.length; y++) {
         const row = grid[y]
@@ -282,6 +284,26 @@ export function RoomGameView(props: {
       tileLayer.addChild(g)
     }
 
+    const renderDebugGrid = (m: { width: number; height: number; gridSize: number; layers: Array<{ data: number[] }> }, reason: string) => {
+      clearTileLayer()
+      clearPropLayer()
+      setMapRenderStatus(`map: debug (${reason}) ${m.width}x${m.height} cell:${m.gridSize}`)
+
+      const g = new Graphics()
+      g.alpha = 1
+      for (let i = 0; i < m.width * m.height; i++) {
+        const x = i % m.width
+        const y = Math.floor(i / m.width)
+        const gid = Number(m.layers?.[0]?.data?.[i] || 0)
+        const px = x * m.gridSize
+        const py = y * m.gridSize
+        const isWall = gid === 1
+        g.rect(px, py, m.gridSize, m.gridSize)
+        g.fill({ color: isWall ? 0x475569 : 0x0f172a, alpha: 1 })
+      }
+      tileLayer.addChild(g)
+    }
+
     const renderMap = async (m: any) => {
       clearTileLayer()
       clearPropLayer()
@@ -291,13 +313,24 @@ export function RoomGameView(props: {
       const gridSize = typeof m?.gridSize === 'number' ? m.gridSize : 32
       const tilesetImageUrl = typeof m?.tilesetImageUrl === 'string' ? m.tilesetImageUrl : ''
       const layers = Array.isArray(m?.layers) ? m.layers : []
-      if (!(width > 0 && height > 0 && tilesetImageUrl)) return renderProcedural()
+      if (!(width > 0 && height > 0 && tilesetImageUrl)) {
+        setMapRenderStatus('map: invalid (missing width/height/tilesetImageUrl)')
+        return renderProcedural()
+      }
 
       gridPxRef.current = gridSize
 
-      const sheet = (await Assets.load(tilesetImageUrl)) as unknown as Texture
+      setMapRenderStatus(`map: loading tileset ${tilesetImageUrl}`)
+      let sheet: Texture
+      try {
+        sheet = (await Assets.load(tilesetImageUrl)) as unknown as Texture
+      } catch {
+        renderDebugGrid({ width, height, gridSize, layers }, `tileset load failed: ${tilesetImageUrl}`)
+        return
+      }
       if (cancelled) return
 
+      setMapRenderStatus(`map: rendering ${width}x${height} layers:${layers.length} cell:${gridSize}`)
       const baseW =
         (sheet as any).width ??
         (sheet as any).baseTexture?.width ??
@@ -343,7 +376,10 @@ export function RoomGameView(props: {
 
     const map = snapshot?.map as any
     if (map) {
-      void renderMap(map).catch(() => renderProcedural())
+      void renderMap(map).catch(() => {
+        setMapRenderStatus('map: render failed (exception), falling back to procedural')
+        renderProcedural()
+      })
       return () => {
         cancelled = true
         clearTileLayer()
@@ -410,7 +446,7 @@ export function RoomGameView(props: {
     <div className="relative h-full w-full min-h-0">
       <div ref={containerRef} className="absolute inset-0" />
       <div className="absolute left-3 top-3 z-10 rounded-md bg-black/40 backdrop-blur px-2 py-1 text-xs text-white font-mono">
-        RoomGame · {statusLine} · seed:{seed.slice(0, 6)}
+        RoomGame · {statusLine} · {mapRenderStatus} · seed:{seed.slice(0, 6)}
       </div>
     </div>
   )

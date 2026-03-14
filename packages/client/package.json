@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm -C ../game sync-assets && next dev -p 3000",
-    "build": "pnpm -C ../game sync-assets && next build",
+    "sync-assets": "node scripts/sync-room-game-assets.js",
+    "dev": "pnpm sync-assets && next dev -p 3000",
+    "build": "pnpm sync-assets && next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

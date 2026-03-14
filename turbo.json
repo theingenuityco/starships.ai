@@ -58,6 +58,15 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
+    "@starships/client#sync-assets": {
+      "inputs": ["$TURBO_DEFAULT$", "../game/assets/room-game/tilesets/**"],
+      "outputs": ["public/room-game/tilesets/**"]
+    },
+    "@starships/client#build": {
+      "dependsOn": ["^build", "@starships/client#sync-assets"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "../game/assets/room-game/tilesets/**"],
+      "outputs": [".next/**", "build/**"]
+    },
     "@starships/env#build": {
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]

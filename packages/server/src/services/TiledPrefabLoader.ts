@@ -9,6 +9,34 @@ export type TiledTileLayer = {
   data: number[];
 };
 
+export type TiledGroupLayer = {
+  type: 'group';
+  name?: string;
+  layers?: TiledLayer[];
+};
+
+export type TiledObject = {
+  id?: number;
+  name?: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  visible?: boolean;
+};
+
+export type TiledObjectGroupLayer = {
+  type: 'objectgroup';
+  name?: string;
+  objects?: TiledObject[];
+};
+
+export type TiledLayer =
+  | ({ type: 'tilelayer'; name?: string; width?: number; height?: number; data?: number[] } & Partial<TiledTileLayer>)
+  | TiledGroupLayer
+  | TiledObjectGroupLayer
+  | { type: string; name?: string };
+
 export type TiledMapJson = {
   type: 'map';
   orientation?: string;
@@ -17,7 +45,7 @@ export type TiledMapJson = {
   height: number;
   tilewidth: number;
   tileheight: number;
-  layers: Array<{ type: string; name?: string; width?: number; height?: number; data?: number[] }>;
+  layers: TiledLayer[];
   tilesets?: Array<{ firstgid: number; tilecount?: number; columns?: number; image?: string }>;
 };
 
@@ -33,6 +61,26 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 }
 
+function asString(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+function layerNameLower(l: { name?: string } | null | undefined): string {
+  return asString(l?.name).toLowerCase();
+}
+
+function isTileLayer(l: TiledLayer | undefined): l is Extract<TiledLayer, { type: 'tilelayer' }> {
+  return Boolean(l) && typeof l === 'object' && (l as { type?: unknown }).type === 'tilelayer';
+}
+
+function isGroupLayer(l: TiledLayer | undefined): l is TiledGroupLayer {
+  return Boolean(l) && typeof l === 'object' && (l as { type?: unknown }).type === 'group';
+}
+
+function isObjectGroupLayer(l: TiledLayer | undefined): l is TiledObjectGroupLayer {
+  return Boolean(l) && typeof l === 'object' && (l as { type?: unknown }).type === 'objectgroup';
+}
+
 function decodeGid(raw: number): { gid: number; flipX: boolean; flipY: boolean; flipD: boolean } {
   // Tiled encodes flips in the high bits of a 32-bit GID.
   const FLIP_H = 0x80000000;
@@ -43,6 +91,14 @@ function decodeGid(raw: number): { gid: number; flipX: boolean; flipY: boolean; 
   const flipD = (raw & FLIP_D) !== 0;
   const gid = raw & ~(FLIP_H | FLIP_V | FLIP_D);
   return { gid, flipX, flipY, flipD };
+}
+
+function collectTileLayersRecursive(layers: TiledLayer[] | undefined, out: Array<Extract<TiledLayer, { type: 'tilelayer' }>>) {
+  if (!Array.isArray(layers)) return;
+  for (const l of layers) {
+    if (isTileLayer(l)) out.push(l);
+    else if (isGroupLayer(l)) collectTileLayersRecursive(l.layers, out);
+  }
 }
 
 export class TiledPrefabLoader {
@@ -62,28 +118,66 @@ export class TiledPrefabLoader {
     const height = map.height;
     if (!(width > 0 && height > 0)) throw new Error(`[TiledPrefabLoader] Missing width/height: ${filePath}`);
 
-    const firstGid = Array.isArray(map.tilesets) && map.tilesets.length > 0 ? Number(map.tilesets[0].firstgid || 1) : 1;
+    const propsRoot = map.layers.find((l) => layerNameLower(l as { name?: string }) === 'props');
+    const collisionRoot = map.layers.find((l) => layerNameLower(l as { name?: string }) === 'collision');
 
-    const propsLayer = map.layers.find((l) => l && l.type === 'tilelayer' && String(l.name || '').toLowerCase() === 'props');
-    const collisionLayer = map.layers.find((l) => l && l.type === 'tilelayer' && String(l.name || '').toLowerCase() === 'collision');
-    if (!propsLayer || !Array.isArray(propsLayer.data)) throw new Error(`[TiledPrefabLoader] Missing tile layer 'props': ${filePath}`);
-    if (!collisionLayer || !Array.isArray(collisionLayer.data)) throw new Error(`[TiledPrefabLoader] Missing tile layer 'collision': ${filePath}`);
+    // Props: accept either a tilelayer named 'props', or a group named 'props' with tilelayers inside.
+    const propTileLayers: Array<Extract<TiledLayer, { type: 'tilelayer' }>> = [];
+    if (isTileLayer(propsRoot)) propTileLayers.push(propsRoot);
+    else if (isGroupLayer(propsRoot)) collectTileLayersRecursive(propsRoot.layers, propTileLayers);
+    if (propTileLayers.length === 0) throw new Error(`[TiledPrefabLoader] Missing props tilelayer/group: ${filePath}`);
 
     const expectedLen = width * height;
-    if (propsLayer.data.length !== expectedLen) throw new Error(`[TiledPrefabLoader] props.data length mismatch: ${filePath}`);
-    if (collisionLayer.data.length !== expectedLen) throw new Error(`[TiledPrefabLoader] collision.data length mismatch: ${filePath}`);
 
     const props: number[] = new Array(expectedLen);
     const collision: boolean[] = new Array(expectedLen);
+    props.fill(0);
+    collision.fill(false);
 
-    for (let i = 0; i < expectedLen; i++) {
-      const pRaw = Number(propsLayer.data[i] || 0);
-      const { gid: pGid } = decodeGid(pRaw);
-      props[i] = pGid > 0 ? pGid : 0;
+    // Merge props layers in-order; later layers overwrite earlier non-zero cells.
+    for (const l of propTileLayers) {
+      if (!Array.isArray(l.data)) throw new Error(`[TiledPrefabLoader] props layer missing data: ${filePath}`);
+      if (l.data.length !== expectedLen) throw new Error(`[TiledPrefabLoader] props.data length mismatch: ${filePath}`);
+      for (let i = 0; i < expectedLen; i++) {
+        const rawGid = Number(l.data[i] || 0);
+        const { gid } = decodeGid(rawGid);
+        if (gid > 0) props[i] = gid;
+      }
+    }
 
-      const cRaw = Number(collisionLayer.data[i] || 0);
-      const { gid: cGid } = decodeGid(cRaw);
-      collision[i] = cGid > 0;
+    // Collision: accept tilelayer (legacy) or objectgroup (preferred).
+    if (isTileLayer(collisionRoot)) {
+      if (!Array.isArray(collisionRoot.data)) throw new Error(`[TiledPrefabLoader] collision tilelayer missing data: ${filePath}`);
+      if (collisionRoot.data.length !== expectedLen) throw new Error(`[TiledPrefabLoader] collision.data length mismatch: ${filePath}`);
+      for (let i = 0; i < expectedLen; i++) {
+        const rawGid = Number(collisionRoot.data[i] || 0);
+        const { gid } = decodeGid(rawGid);
+        collision[i] = gid > 0;
+      }
+    } else if (isObjectGroupLayer(collisionRoot)) {
+      const tw = map.tilewidth;
+      const th = map.tileheight;
+      const objects = Array.isArray(collisionRoot.objects) ? collisionRoot.objects : [];
+      for (const o of objects) {
+        if (!o || typeof o.x !== 'number' || typeof o.y !== 'number') continue;
+        const wPx = typeof o.width === 'number' ? o.width : 0;
+        const hPx = typeof o.height === 'number' ? o.height : 0;
+        const x0 = Math.floor(o.x / tw);
+        const y0 = Math.floor(o.y / th);
+        const x1 = Math.ceil((o.x + wPx) / tw) - 1;
+        const y1 = Math.ceil((o.y + hPx) / th) - 1;
+        const minX = Math.max(0, Math.min(width - 1, x0));
+        const minY = Math.max(0, Math.min(height - 1, y0));
+        const maxX = Math.max(0, Math.min(width - 1, x1 >= x0 ? x1 : x0));
+        const maxY = Math.max(0, Math.min(height - 1, y1 >= y0 ? y1 : y0));
+        for (let y = minY; y <= maxY; y++) {
+          for (let x = minX; x <= maxX; x++) {
+            collision[y * width + x] = true;
+          }
+        }
+      }
+    } else {
+      throw new Error(`[TiledPrefabLoader] Missing collision tilelayer/objectgroup: ${filePath}`);
     }
 
     return { width, height, props, collision };

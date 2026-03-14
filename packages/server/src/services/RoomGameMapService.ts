@@ -62,8 +62,20 @@ export class RoomGameMapService {
     return RoomGameMapService.instance;
   }
 
-  private mapKey(roomConversationId: string) {
-    return `starships:room_game:map:${roomConversationId}`;
+  private prefabCacheBuster(repoRoot: string): string {
+    // We iterate on prefab shape/layout frequently in dev; include a cheap signature
+    // so Redis/mem caches invalidate when the prefab file changes.
+    try {
+      const p = path.join(repoRoot, 'packages/game/assets/room-game/prefabs/workstations/variantA.tmj');
+      const st = fs.statSync(p);
+      return `variantA:${Math.floor(st.mtimeMs)}:${st.size}`;
+    } catch {
+      return 'variantA:unknown';
+    }
+  }
+
+  private mapKey(roomConversationId: string, cacheBuster: string) {
+    return `starships:room_game:map:v2:${roomConversationId}:${cacheBuster}`;
   }
 
   private static findRepoRoot(): string {
@@ -88,11 +100,8 @@ export class RoomGameMapService {
     if (this.prefabs) return this.prefabs;
     const repoRoot = RoomGameMapService.findRepoRoot();
     const base = path.join(repoRoot, 'packages/game/assets/room-game/prefabs/workstations');
-    const prefabs = [
-      TiledPrefabLoader.loadFromFile(path.join(base, 'variantA.tmj')),
-      TiledPrefabLoader.loadFromFile(path.join(base, 'variantB.tmj')),
-      TiledPrefabLoader.loadFromFile(path.join(base, 'variantC.tmj')),
-    ];
+    // Temporarily lock to variant A while we iterate on the prefab format/layout.
+    const prefabs = [TiledPrefabLoader.loadFromFile(path.join(base, 'variantA.tmj'))];
     this.prefabs = prefabs;
     return prefabs;
   }
@@ -173,8 +182,7 @@ export class RoomGameMapService {
     let candIdx = 0;
     for (const agentId of args.agentIds) {
       if (!prefabsSafe.length) break;
-      const v = shaInt(`${args.roomConversationId}:${agentId}`) % prefabsSafe.length;
-      const prefab = prefabsSafe[v];
+      const prefab = prefabsSafe[0];
       let placed = false;
       for (let tries = 0; tries < candidates.length; tries++) {
         const c = candidates[(candIdx + tries) % candidates.length];
@@ -205,10 +213,14 @@ export class RoomGameMapService {
 
   async getOrBuild(roomConversationId: string, agentIds: string[], opts?: { ttlSeconds?: number }): Promise<CacheEntry> {
     const now = Date.now();
-    const cached = this.mem.get(roomConversationId);
+    const repoRoot = RoomGameMapService.findRepoRoot();
+    const cacheBuster = this.prefabCacheBuster(repoRoot);
+    const memKey = `${roomConversationId}:${cacheBuster}`;
+
+    const cached = this.mem.get(memKey);
     if (cached && cached.expiresAtMs > now) return cached;
 
-    const key = this.mapKey(roomConversationId);
+    const key = this.mapKey(roomConversationId, cacheBuster);
     try {
       const raw = await this.redis.get(key);
       if (raw) {
@@ -216,7 +228,7 @@ export class RoomGameMapService {
         if (map && typeof map.width === 'number' && Array.isArray(map.layers)) {
           const set = new Set<number>(Array.isArray(map.collisions) ? map.collisions : []);
           const entry: CacheEntry = { map, collisionSet: set, expiresAtMs: now + 30_000 };
-          this.mem.set(roomConversationId, entry);
+          this.mem.set(memKey, entry);
           return entry;
         }
       }
@@ -242,7 +254,7 @@ export class RoomGameMapService {
 
     const set = new Set<number>(map.collisions);
     const entry: CacheEntry = { map, collisionSet: set, expiresAtMs: now + 30_000 };
-    this.mem.set(roomConversationId, entry);
+    this.mem.set(memKey, entry);
     return entry;
   }
 }

@@ -48,7 +48,7 @@
     {
       "columns": 16,
       "firstgid": 1,
-      "image": "/room-game/tilesets/Modern_Office_32x32.png",
+      "image": "../../tilesets/Modern_Office_32x32.png",
       "imageheight": 1696,
       "imagewidth": 512,
       "margin": 0,

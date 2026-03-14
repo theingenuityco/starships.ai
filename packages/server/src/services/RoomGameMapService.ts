@@ -119,7 +119,6 @@ export class RoomGameMapService {
     const GID_FLOOR = 45;
 
     const base: number[] = new Array(width * height).fill(0);
-    const props: number[] = new Array(width * height).fill(0);
     const collision = new Array<boolean>(width * height).fill(false);
 
     const idx = (x: number, y: number) => y * width + x;
@@ -134,6 +133,11 @@ export class RoomGameMapService {
 
     // Place workstation prefabs in rows, leaving walkways.
     const prefabs = this.prefabs ?? [];
+    const firstPrefab = prefabs.length ? prefabs[0] : null;
+    const propsLayers: RoomGameMapLayer[] = (firstPrefab?.propsLayers || []).map((l) => ({
+      name: l.name || 'props',
+      data: new Array(width * height).fill(0),
+    }));
     const reserved = new Set<number>();
     for (let i = 0; i < collision.length; i++) if (collision[i]) reserved.add(i);
 
@@ -153,9 +157,14 @@ export class RoomGameMapService {
       for (let py = 0; py < p.height; py++) {
         for (let px = 0; px < p.width; px++) {
           const pIdx = py * p.width + px;
-          const gid = p.props[pIdx] || 0;
           const i = idx(ox + px, oy + py);
-          if (gid) props[i] = gid;
+          for (let li = 0; li < propsLayers.length; li++) {
+            const layer = propsLayers[li];
+            const src = p.propsLayers[li];
+            if (!src) continue;
+            const gid = src.data[pIdx] || 0;
+            if (gid) layer.data[i] = gid;
+          }
           if (p.collision[pIdx]) {
             collision[i] = true;
             reserved.add(i);
@@ -203,10 +212,7 @@ export class RoomGameMapService {
       width,
       height,
       tilesetImageUrl,
-      layers: [
-        { name: 'base', data: base },
-        { name: 'props', data: props },
-      ],
+      layers: [{ name: 'base', data: base }, ...propsLayers],
       collisions,
     };
   }

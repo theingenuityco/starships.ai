@@ -52,8 +52,8 @@ export type TiledMapJson = {
 export type Prefab = {
   width: number;
   height: number;
-  /** Tiled GIDs (0 means empty). */
-  props: number[];
+  /** Props layers in draw order. Each is a Tiled GID grid (0 means empty). */
+  propsLayers: Array<{ name: string; data: number[] }>;
   collision: boolean[];
 };
 
@@ -134,15 +134,18 @@ export class TiledPrefabLoader {
     props.fill(0);
     collision.fill(false);
 
-    // Merge props layers in-order; later layers overwrite earlier non-zero cells.
+    const propsLayers: Array<{ name: string; data: number[] }> = [];
     for (const l of propTileLayers) {
       if (!Array.isArray(l.data)) throw new Error(`[TiledPrefabLoader] props layer missing data: ${filePath}`);
       if (l.data.length !== expectedLen) throw new Error(`[TiledPrefabLoader] props.data length mismatch: ${filePath}`);
+      const decoded = new Array<number>(expectedLen);
       for (let i = 0; i < expectedLen; i++) {
         const rawGid = Number(l.data[i] || 0);
         const { gid } = decodeGid(rawGid);
-        if (gid > 0) props[i] = gid;
+        decoded[i] = gid > 0 ? gid : 0;
       }
+      const nm = asString((l as { name?: unknown }).name) || 'props';
+      propsLayers.push({ name: nm, data: decoded });
     }
 
     // Collision: accept tilelayer (legacy) or objectgroup (preferred).
@@ -180,7 +183,7 @@ export class TiledPrefabLoader {
       throw new Error(`[TiledPrefabLoader] Missing collision tilelayer/objectgroup: ${filePath}`);
     }
 
-    return { width, height, props, collision };
+    return { width, height, propsLayers, collision };
   }
 }
 

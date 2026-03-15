@@ -48,24 +48,22 @@ export class RoomGameMapService {
   private readonly mem: Map<string, CacheEntry> = new Map();
 
   private prefabs: Prefab[] | null = null;
-  private palette:
-    | null
-    | {
-        floor: number;
-        backTopLeft: number;
-        backTop: number;
-        backTopRight: number;
-        backBottomLeft: number;
-        backBottom: number;
-        backBottomRight: number;
-        left: number;
-        right: number;
-        bottomLeft: number;
-        bottom: number;
-        bottomRight: number;
-      } = null;
+  private palette: null | {
+    floor: number;
+    backTopLeft: number;
+    backTop: number;
+    backTopRight: number;
+    backBottomLeft: number;
+    backBottom: number;
+    backBottomRight: number;
+    left: number;
+    right: number;
+    bottomLeft: number;
+    bottom: number;
+    bottomRight: number;
+  } = null;
   private paletteSig: string | null = null;
-  private static readonly MAP_CACHE_VERSION = 'v5_back_wall_2_tiles_1';
+  private static readonly MAP_CACHE_VERSION = 'v6_no_floor_under_walls_1';
 
   private constructor(redis: RedisClient) {
     this.redis = redis;
@@ -167,7 +165,7 @@ export class RoomGameMapService {
     const width = Number(json.width);
     const height = Number(json.height);
     if (width !== 3 || height !== 4) throw new Error('[RoomGameMapService] Palette must be 3x4');
-    const layers = (json.layers as unknown) as Array<{ type?: unknown; name?: unknown; data?: unknown }>;
+    const layers = json.layers as unknown as Array<{ type?: unknown; name?: unknown; data?: unknown }>;
     if (!Array.isArray(layers)) throw new Error('[RoomGameMapService] Palette missing layers');
     const floorLayer = layers.find((l) => String(l?.name || '').toLowerCase() === 'floor' && l?.type === 'tilelayer');
     const wallsLayer = layers.find((l) => String(l?.name || '').toLowerCase() === 'walls' && l?.type === 'tilelayer');
@@ -211,7 +209,10 @@ export class RoomGameMapService {
     return palette;
   }
 
-  private buildDynamicOffice(args: { roomConversationId: string; agentIds: string[] }): { map: RoomGameMap; collisionRects: CollisionRect[] } {
+  private buildDynamicOffice(args: { roomConversationId: string; agentIds: string[] }): {
+    map: RoomGameMap;
+    collisionRects: CollisionRect[];
+  } {
     const gridSize = 32;
     const tilesetImageUrl = '/room-game/tilesets/Room_Builder_32x32.png';
     const propsTilesetImageUrl = '/room-game/tilesets/Modern_Office_32x32.png';
@@ -266,6 +267,11 @@ export class RoomGameMapService {
           walls[idx(x, y)] = pal.right;
         }
       }
+    }
+    // Do not render floor underneath walls (prevents floor showing through
+    // in transparent wall tiles / trims).
+    for (let i = 0; i < walls.length; i++) {
+      if (walls[i] > 0) base[i] = 0;
     }
     // Border collision as rectangles (tile units) for precise movement checks.
     collisionRects.push(
@@ -458,4 +464,3 @@ export class RoomGameMapService {
     return entry;
   }
 }
-

@@ -23,6 +23,11 @@ export type RoomGameMapLayer = {
   name: string
   /** Tiled GIDs (0 = empty). length = width*height */
   data: number[]
+  /**
+   * Optional tileset image URL override for this layer.
+   * If omitted, the renderer uses `map.tilesetImageUrl`.
+   */
+  tilesetImageUrl?: string
 }
 
 export type RoomGameMap = {

@@ -2,10 +2,10 @@
 
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RoomGameActor, RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameMap, RoomGameSnapshot } from '@/types'
-import { useRoomGameStream } from '@/hooks/useRoomGameStream'
-import { colorFromAppearanceKey, deriveRoomSeed } from '@/lib/appearance'
-import { generateTopDownRoom } from '@/procgen/room'
+import type { RoomGameActor, RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameMap, RoomGameSnapshot } from './types'
+import { useRoomGameStream } from './hooks/useRoomGameStream'
+import { colorFromAppearanceKey, deriveRoomSeed } from './lib/appearance'
+import { generateTopDownRoom } from './procgen/room'
 
 type ActorById = Map<string, RoomGameActor>
 
@@ -411,44 +411,61 @@ export function RoomGameView(props: {
         collisionRects: Array.isArray(m.collisionRects) ? m.collisionRects : [],
       })
 
-      setMapRenderStatus(`map: loading tileset ${tilesetImageUrl}`)
-      let sheet: Texture
-      try {
-        sheet = (await Assets.load(tilesetImageUrl)) as Texture
-      } catch {
-        renderDebugGrid({ width, height, gridSize, layers }, `tileset load failed: ${tilesetImageUrl}`)
-        return
+      // Load all tilesets needed by layers (base tileset + optional per-layer overrides).
+      const urls = new Set<string>()
+      for (const layer of layers) {
+        const u = typeof layer?.tilesetImageUrl === 'string' && layer.tilesetImageUrl ? layer.tilesetImageUrl : tilesetImageUrl
+        urls.add(u)
+      }
+      if (urls.size === 0) urls.add(tilesetImageUrl)
+
+      setMapRenderStatus(`map: loading tilesets (${urls.size})`)
+
+      const sheets = new Map<string, { sheet: Texture; cols: number }>()
+      for (const url of urls) {
+        if (cancelled) return
+        try {
+          const sheet = (await Assets.load(url)) as Texture
+          const baseW = sheet.source?.width ?? sheet.width
+          const cols = Math.max(1, Math.floor(Number(baseW) / gridSize) || 1)
+          sheets.set(url, { sheet, cols })
+        } catch {
+          renderDebugGrid({ width, height, gridSize, layers }, `tileset load failed: ${url}`)
+          return
+        }
       }
       if (cancelled) return
 
-      setMapRenderStatus(`map: rendering ${width}x${height} layers:${layers.length} cell:${gridSize}`)
-      const baseW = sheet.source?.width ?? sheet.width
-      const cols = Math.max(1, Math.floor(Number(baseW) / gridSize) || 1)
+      setMapRenderStatus(`map: rendering ${width}x${height} layers:${layers.length} tilesets:${urls.size} cell:${gridSize}`)
 
-      const mkSubTexture = (gid: number) => {
+      const textureCache = new Map<string, Texture>()
+
+      const mkSubTexture = (sheet: Texture, cols: number, gid: number) => {
         const tileIndex = gid - 1
         const sx = (tileIndex % cols) * gridSize
         const sy = Math.floor(tileIndex / cols) * gridSize
-        // Pixi v8: create sub-texture via TextureOptions { source, frame }
         return new Texture({ source: sheet.source, frame: new Rectangle(sx, sy, gridSize, gridSize) })
       }
-
-      const textureCache = new Map<number, Texture>()
 
       for (const layer of layers) {
         if (cancelled) return
         const data = Array.isArray(layer?.data) ? (layer.data as unknown[]) : []
         if (data.length !== width * height) continue
+        const url = typeof layer?.tilesetImageUrl === 'string' && layer.tilesetImageUrl ? layer.tilesetImageUrl : tilesetImageUrl
+        const info = sheets.get(url)
+        if (!info) continue
+
         const layerContainer = new Container()
         tileLayer.addChild(layerContainer)
 
         for (let i = 0; i < data.length; i++) {
           const gid = Number(data[i] || 0)
           if (!(gid > 0)) continue
-          let tex = textureCache.get(gid)
+          const key = `${url}:${gid}`
+          let tex = textureCache.get(key)
           if (!tex) {
-            tex = mkSubTexture(gid)
-            textureCache.set(gid, tex)
+            tex = mkSubTexture(info.sheet, info.cols, gid)
+            textureCache.set(key, tex)
           }
           const x = i % width
           const y = Math.floor(i / width)

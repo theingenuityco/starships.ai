@@ -1,6 +1,6 @@
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { useEffect, useRef, useState } from 'react'
-import type { RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameSnapshot } from '@/types'
+import type { RoomGameActorsJoinLeave, RoomGameActorsPatch, RoomGameSnapshot } from '../types'
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v)

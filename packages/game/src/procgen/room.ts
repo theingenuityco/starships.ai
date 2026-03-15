@@ -1,4 +1,4 @@
-import { cyrb53 } from '@/lib/hash'
+import { cyrb53 } from '../lib/hash'
 
 export type ProcgenRoomTile = 0 | 1 | 2
 // 0 = floor, 1 = wall, 2 = obstacle

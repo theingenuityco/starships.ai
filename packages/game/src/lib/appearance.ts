@@ -1,4 +1,4 @@
-import { cyrb53, hashToHex53 } from '@/lib/hash'
+import { cyrb53, hashToHex53 } from './hash'
 
 export type AppearanceKeyArgs = {
   agentId: string

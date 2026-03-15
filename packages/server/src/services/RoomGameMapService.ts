@@ -9,6 +9,8 @@ export type RoomGameMapLayer = {
   name: string;
   /** Tiled GIDs (0 = empty). Length = width * height */
   data: number[];
+  /** Optional tileset image URL override for this layer. */
+  tilesetImageUrl?: string;
 };
 
 export type RoomGameMap = {
@@ -46,6 +48,24 @@ export class RoomGameMapService {
   private readonly mem: Map<string, CacheEntry> = new Map();
 
   private prefabs: Prefab[] | null = null;
+  private palette:
+    | null
+    | {
+        floor: number;
+        backTopLeft: number;
+        backTop: number;
+        backTopRight: number;
+        backBottomLeft: number;
+        backBottom: number;
+        backBottomRight: number;
+        left: number;
+        right: number;
+        bottomLeft: number;
+        bottom: number;
+        bottomRight: number;
+      } = null;
+  private paletteSig: string | null = null;
+  private static readonly MAP_CACHE_VERSION = 'v5_back_wall_2_tiles_1';
 
   private constructor(redis: RedisClient) {
     this.redis = redis;
@@ -76,14 +96,16 @@ export class RoomGameMapService {
     try {
       const p = path.join(repoRoot, 'packages/game/assets/room-game/prefabs/workstations/variantA.tmj');
       const st = fs.statSync(p);
-      return `variantA:${Math.floor(st.mtimeMs)}:${st.size}`;
+      const pal = path.join(repoRoot, 'packages/game/assets/room-game/prefabs/palettes/dynamic_office_walls_floor.tmj');
+      const stPal = fs.statSync(pal);
+      return `${RoomGameMapService.MAP_CACHE_VERSION}:variantA:${Math.floor(st.mtimeMs)}:${st.size}:palette:${Math.floor(stPal.mtimeMs)}:${stPal.size}`;
     } catch {
-      return 'variantA:unknown';
+      return `${RoomGameMapService.MAP_CACHE_VERSION}:variantA:unknown`;
     }
   }
 
   private mapKey(roomConversationId: string, cacheBuster: string) {
-    return `starships:room_game:map:v2:${roomConversationId}:${cacheBuster}`;
+    return `starships:room_game:map:${RoomGameMapService.MAP_CACHE_VERSION}:${roomConversationId}:${cacheBuster}`;
   }
 
   private static findRepoRoot(): string {
@@ -114,34 +136,140 @@ export class RoomGameMapService {
     return prefabs;
   }
 
+  private static decodeTiledGid(raw: number): number {
+    const FLIP_H = 0x80000000;
+    const FLIP_V = 0x40000000;
+    const FLIP_D = 0x20000000;
+    return raw & ~(FLIP_H | FLIP_V | FLIP_D);
+  }
+
+  private static palettePath(repoRoot: string) {
+    return path.join(repoRoot, 'packages/game/assets/room-game/prefabs/palettes/dynamic_office_walls_floor.tmj');
+  }
+
+  private paletteSignature(repoRoot: string): string {
+    try {
+      const st = fs.statSync(RoomGameMapService.palettePath(repoRoot));
+      return `palette:${Math.floor(st.mtimeMs)}:${st.size}`;
+    } catch {
+      return 'palette:missing';
+    }
+  }
+
+  private async loadPalette(repoRoot: string): Promise<NonNullable<RoomGameMapService['palette']>> {
+    const sig = this.paletteSignature(repoRoot);
+    if (this.palette && this.paletteSig === sig) return this.palette;
+
+    const palettePath = RoomGameMapService.palettePath(repoRoot);
+    const raw = fs.readFileSync(palettePath, 'utf8');
+    const json = JSON.parse(raw) as unknown;
+    if (!isRecord(json)) throw new Error('[RoomGameMapService] Palette JSON invalid');
+    const width = Number(json.width);
+    const height = Number(json.height);
+    if (width !== 3 || height !== 4) throw new Error('[RoomGameMapService] Palette must be 3x4');
+    const layers = (json.layers as unknown) as Array<{ type?: unknown; name?: unknown; data?: unknown }>;
+    if (!Array.isArray(layers)) throw new Error('[RoomGameMapService] Palette missing layers');
+    const floorLayer = layers.find((l) => String(l?.name || '').toLowerCase() === 'floor' && l?.type === 'tilelayer');
+    const wallsLayer = layers.find((l) => String(l?.name || '').toLowerCase() === 'walls' && l?.type === 'tilelayer');
+    if (!floorLayer || !Array.isArray(floorLayer.data)) throw new Error('[RoomGameMapService] Palette missing floor tilelayer');
+    if (!wallsLayer || !Array.isArray(wallsLayer.data)) throw new Error('[RoomGameMapService] Palette missing walls tilelayer');
+    const floorData = floorLayer.data.map((n) => RoomGameMapService.decodeTiledGid(Number(n || 0)));
+    const wallsData = wallsLayer.data.map((n) => RoomGameMapService.decodeTiledGid(Number(n || 0)));
+    if (floorData.length !== 12 || wallsData.length !== 12) throw new Error('[RoomGameMapService] Palette layers must be 3x4');
+
+    const at = (arr: number[], x: number, y: number) => arr[y * 3 + x] || 0;
+
+    const firstNonZero = (arr: number[]) => arr.find((n) => Number(n) > 0) || 0;
+
+    const palette = {
+      // floor: use the first non-zero tile in the `floor` layer so it's easy to edit in Tiled
+      floor: firstNonZero(floorData),
+      // back wall is 2 tiles tall (rows 0 and 1)
+      backTopLeft: at(wallsData, 0, 0),
+      backTop: at(wallsData, 1, 0),
+      backTopRight: at(wallsData, 2, 0),
+      backBottomLeft: at(wallsData, 0, 1),
+      backBottom: at(wallsData, 1, 1),
+      backBottomRight: at(wallsData, 2, 1),
+      // side walls (row 2)
+      left: at(wallsData, 0, 2),
+      right: at(wallsData, 2, 2),
+      // bottom wall (row 3)
+      bottomLeft: at(wallsData, 0, 3),
+      bottom: at(wallsData, 1, 3),
+      bottomRight: at(wallsData, 2, 3),
+    };
+
+    if (!(palette.floor > 0)) throw new Error('[RoomGameMapService] Palette floor gid must be non-zero');
+    for (const [k, v] of Object.entries(palette)) {
+      if (k === 'floor') continue;
+      if (!(v > 0)) throw new Error(`[RoomGameMapService] Palette wall gid missing: ${k}`);
+    }
+
+    this.palette = palette;
+    this.paletteSig = sig;
+    return palette;
+  }
+
   private buildDynamicOffice(args: { roomConversationId: string; agentIds: string[] }): { map: RoomGameMap; collisionRects: CollisionRect[] } {
     const gridSize = 32;
-    const tilesetImageUrl = '/room-game/tilesets/Modern_Office_32x32.png';
+    const tilesetImageUrl = '/room-game/tilesets/Room_Builder_32x32.png';
+    const propsTilesetImageUrl = '/room-game/tilesets/Modern_Office_32x32.png';
 
     const agentCount = args.agentIds.length;
     const width = clamp(20 + agentCount * 3, 20, 70);
     const height = clamp(14 + Math.ceil(agentCount / 4) * 4, 14, 46);
 
-    // Background gids: wall=1 (tile index 0), floor=45 (tile index 44)
-    const GID_WALL = 1;
-    const GID_FLOOR = 45;
+    // Palette is loaded from a small Tiled-authored .tmj (editable in Tiled).
+    const pal = this.palette ?? {
+      // Default floor tile for Room Builder; should be overridden via palette .tmj.
+      floor: 266,
+      backTopLeft: 71,
+      backTop: 72,
+      backTopRight: 73,
+      backBottomLeft: 71,
+      backBottom: 72,
+      backBottomRight: 73,
+      left: 89,
+      right: 87,
+      bottomLeft: 545,
+      bottom: 435,
+      bottomRight: 546,
+    };
 
-    const base: number[] = new Array(width * height).fill(0);
+    const base: number[] = new Array(width * height).fill(pal.floor);
+    const walls: number[] = new Array(width * height).fill(0);
     const collision = new Array<boolean>(width * height).fill(false);
     const collisionRects: CollisionRect[] = [];
 
     const idx = (x: number, y: number) => y * width + x;
 
+    const backWallHeight = 2;
+
+    // Walls (visual) + border collisions (gameplay).
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const isBorder = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-        base[idx(x, y)] = isBorder ? GID_WALL : GID_FLOOR;
-        if (isBorder) collision[idx(x, y)] = true;
+        const isBackWall = y >= 0 && y < backWallHeight;
+        const isBorder = x === 0 || isBackWall || x === width - 1 || y === height - 1;
+        if (!isBorder) continue;
+        collision[idx(x, y)] = true;
+
+        if (y === 0) {
+          walls[idx(x, y)] = x === 0 ? pal.backTopLeft : x === width - 1 ? pal.backTopRight : pal.backTop;
+        } else if (y === 1) {
+          walls[idx(x, y)] = x === 0 ? pal.backBottomLeft : x === width - 1 ? pal.backBottomRight : pal.backBottom;
+        } else if (y === height - 1) {
+          walls[idx(x, y)] = x === 0 ? pal.bottomLeft : x === width - 1 ? pal.bottomRight : pal.bottom;
+        } else if (x === 0) {
+          walls[idx(x, y)] = pal.left;
+        } else if (x === width - 1) {
+          walls[idx(x, y)] = pal.right;
+        }
       }
     }
     // Border collision as rectangles (tile units) for precise movement checks.
     collisionRects.push(
-      { x: 0, y: 0, width, height: 1 },
+      { x: 0, y: 0, width, height: backWallHeight },
       { x: 0, y: height - 1, width, height: 1 },
       { x: 0, y: 0, width: 1, height },
       { x: width - 1, y: 0, width: 1, height }
@@ -153,6 +281,7 @@ export class RoomGameMapService {
     const propsLayers: RoomGameMapLayer[] = (firstPrefab?.propsLayers || []).map((l) => ({
       name: l.name || 'props',
       data: new Array(width * height).fill(0),
+      tilesetImageUrl: propsTilesetImageUrl,
     }));
     const reserved = new Set<number>();
     for (let i = 0; i < collision.length; i++) if (collision[i]) reserved.add(i);
@@ -253,7 +382,7 @@ export class RoomGameMapService {
         width,
         height,
         tilesetImageUrl,
-        layers: [{ name: 'base', data: base }, ...propsLayers],
+        layers: [{ name: 'base', data: base }, { name: 'walls', data: walls }, ...propsLayers],
         collisions,
         collisionRects,
       },
@@ -298,6 +427,13 @@ export class RoomGameMapService {
       } catch {
         this.prefabs = [];
       }
+    }
+    try {
+      this.palette = await this.loadPalette(repoRoot);
+    } catch {
+      // Keep fallback palette.
+      this.palette = null;
+      this.paletteSig = null;
     }
 
     // Build map + collision rects (kept in-memory alongside the map).

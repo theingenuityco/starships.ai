@@ -39,6 +39,7 @@ export function UseCaseHeroPromptInput(props: {
   const [typewriterIndex, setTypewriterIndex] = useState(0)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
 
   const go = useCallback(
     (q: string) => {
@@ -72,7 +73,7 @@ export function UseCaseHeroPromptInput(props: {
   )
 
   useEffect(() => {
-    if (typewriterPrompts.length === 0 || value.length > 0) return
+    if (typewriterPrompts.length === 0 || value.length > 0 || isFocused) return
     const current = typewriterPrompts[typewriterIndex] ?? ''
     if (!current) return
 
@@ -101,9 +102,9 @@ export function UseCaseHeroPromptInput(props: {
 
     const t = setTimeout(() => setTypewriterText(prev => current.slice(0, prev.length + 1)), TYPEWRITER_TYPING_MS)
     return () => clearTimeout(t)
-  }, [typewriterPrompts, typewriterIndex, typewriterText, isDeleting, isPaused, value])
+  }, [typewriterPrompts, typewriterIndex, typewriterText, isDeleting, isPaused, value, isFocused])
 
-  const showTypewriter = typewriterPrompts.length > 0 && value.length === 0
+  const showTypewriter = typewriterPrompts.length > 0 && value.length === 0 && !isFocused
 
   return (
     <div className={cn('max-w-3xl', className)}>
@@ -127,6 +128,8 @@ export function UseCaseHeroPromptInput(props: {
                 ref={inputRef}
                 value={value}
                 onChange={e => setValue(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault()

@@ -833,18 +833,29 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               </span>
             }
             mobileLeftSlot={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
-            titleRightSlot={<NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />}
+            titleRightSlot={
+              <>
+                {canManagePins || hasAnyResources ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Resources"
+                    title="Resources"
+                    onClick={() => setRoomPaneInUrl('resources')}
+                  >
+                    <Icon name="pin" weight="bold" className="h-4 w-4" />
+                  </Button>
+                ) : null}
+                <NotificationMenu type="room" roomId={activeConversationId} starshipId={starshipData.id} />
+              </>
+            }
             rightSlot={
               <div className="flex items-center gap-2">
                 <RoomParticipantsButton
                   onClick={() => setRoomPaneInUrl('participants')}
                 />
-                {canManagePins || hasAnyResources ? (
-                  <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
-                    <Icon name="pin" className="h-4 w-4 mr-1" />
-                    Resources
-                  </Button>
-                ) : null}
               </div>
             }
             hideCloseButton={true}

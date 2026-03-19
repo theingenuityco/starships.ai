@@ -2478,17 +2478,28 @@ export class ConversationService {
     // Room context (used for routing decisions and runtime env injection).
     // Fetch early so we can prefer a room-scoped manager agent as the default fallback.
     const roomCtxForRouting = await resolveRoomConversationContext({ conversationId: data.conversationId }).catch(() => null);
+    const isInRoomContext = Boolean(roomCtxForRouting?.isRoom || roomCtxForRouting?.isRoomThread);
+    const roomConversationId = roomCtxForRouting?.roomConversationId ? String(roomCtxForRouting.roomConversationId).trim() : '';
     const roomManagerAgentId =
-      roomCtxForRouting?.isRoom && roomCtxForRouting.room?.managerAgentId ? String(roomCtxForRouting.room.managerAgentId).trim() : '';
+      isInRoomContext && roomCtxForRouting?.room?.managerAgentId ? String(roomCtxForRouting.room.managerAgentId).trim() : '';
 
     // Mention-only threads:
     // - Threads are child conversations (parentConversationId set).
     // - When a thread has 2+ linked agents, we stop using a default agent fallback.
     //   Only explicit @mentions will trigger agent execution for that message.
     const isThread = Boolean(conversation.parentConversationId);
+    const parentConversationId = typeof conversation.parentConversationId === 'string' ? String(conversation.parentConversationId).trim() : '';
+    // "First conversation level inside a room" = direct child conversation whose parent is the room conversation.
+    const isRoomChildConversation = Boolean(isInRoomContext && roomConversationId && parentConversationId && parentConversationId === roomConversationId);
+    // "Deeper threads" = room descendants that are NOT direct children of the room.
+    const isDeeperRoomThread = Boolean(isInRoomContext && isThread && roomConversationId && parentConversationId && parentConversationId !== roomConversationId);
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
-    let isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
+    // Mention-only multi-agent thread rule:
+    // - For deeper threads: multi-agent threads are mention-only.
+    // - For room child conversations: we allow the room manager to be the default even if multiple agents are linked.
+    // - Elsewhere: keep the existing behavior.
+    let isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2 && !(isInRoomContext && isRoomChildConversation));
 
     let agentQueue: AgentModel[] = [];
     let noAgentToRun = false;
@@ -2548,18 +2559,71 @@ export class ConversationService {
           conversationAgents = await this.getConversationAgents(data.conversationId);
         }
 
-        isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2);
+        isMentionOnlyThread = Boolean(isThread && conversationAgents.length >= 2 && !(isInRoomContext && isRoomChildConversation));
         const initialTargets =
           initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
 
-        const fallbackAgent =
-          (roomManagerAgentId ? conversationAgents.find((a) => String(a?.id || '').trim() === roomManagerAgentId) : null) ||
-          conversationAgents[0];
+        // -------------------------------------------------------------------
+        // Default agent rules (per product spec)
+        //
+        // A) Room child conversations (parent is the room conversation):
+        //    - Default agent is the room manager agent when present in the room allowlist.
+        //    - If manager is absent, tagging is mandatory (no default fallback).
+        //
+        // B) Deeper room threads:
+        //    - If exactly 1 agent is linked to the thread, that agent is the default.
+        //    - If 0 or 2+ agents are linked, tagging is mandatory (mention-only for 2+).
+        //
+        // C) Non-room conversations:
+        //    - Keep existing behavior (fallback to the first linked agent).
+        // -------------------------------------------------------------------
+        const pickManagerAllowed = async (): Promise<boolean> => {
+          if (!isInRoomContext) return false;
+          if (!roomConversationId || !roomManagerAgentId) return false;
+          try {
+            const conn = getConnection();
+            const row = await conn.queryOne<{ ok: number }>(
+              `
+                SELECT 1 AS ok
+                  FROM conversation_participants
+                 WHERE conversation_id = $1
+                   AND agent_id = $2
+                 LIMIT 1
+              `,
+              [roomConversationId, roomManagerAgentId]
+            );
+            return Boolean(row?.ok);
+          } catch {
+            return false;
+          }
+        };
+
+        let fallbackAgent: AgentModel | null = null;
+        if (isInRoomContext && (isRoomChildConversation || roomCtxForRouting?.isRoom)) {
+          const allowed = await pickManagerAllowed();
+          if (allowed) {
+            fallbackAgent = allStarshipAgents.find((a) => String(a?.id || '').trim() === roomManagerAgentId) || null;
+            // Ensure the manager is linked to THIS conversation so subsequent turns have stable agent lists.
+            if (fallbackAgent && !conversationAgents.find((x) => x.id === fallbackAgent!.id)) {
+              try {
+                await this.conversationRepository.linkToAgent(data.conversationId, fallbackAgent.id);
+                conversationAgents = await this.getConversationAgents(data.conversationId);
+              } catch {
+                // best-effort
+              }
+            }
+          }
+        } else if (isInRoomContext && isDeeperRoomThread) {
+          fallbackAgent = conversationAgents.length === 1 ? conversationAgents[0] : null;
+        } else {
+          fallbackAgent = conversationAgents[0] || null;
+        }
+
         // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
         // This allows people to talk to each other in agent-backed threads without triggering an agent run.
         const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
         const allowFallback = !isMentionOnlyThread && Boolean(fallbackAgent) && !blockFallbackDueToUserMentions;
-        agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback ? [fallbackAgent] : [];
+        agentQueue = initialTargets.length > 0 ? initialTargets.slice() : allowFallback && fallbackAgent ? [fallbackAgent] : [];
         // If there's no fallback agent (e.g. a human-started thread with no linked agents), behave like mention-only:
         // persist the message/turn lifecycle but do not run any agent workflow unless explicitly mentioned.
         noAgentToRun =
@@ -2690,7 +2754,7 @@ export class ConversationService {
 
         // Best-effort: update room manager heartbeat when the manager agent runs.
         // Do not bump rooms.updated_at; this is operational metadata only.
-        if (roomCtxForRouting?.isRoom && roomManagerAgentId && agentModel.id === roomManagerAgentId) {
+        if (isInRoomContext && roomConversationId && roomManagerAgentId && agentModel.id === roomManagerAgentId) {
           try {
             const conn = getConnection();
             await conn.query(
@@ -2700,7 +2764,7 @@ export class ConversationService {
                  WHERE conversation_id = $1
                    AND manager_agent_id = $2
               `,
-              [roomCtxForRouting.roomConversationId, roomManagerAgentId]
+              [roomConversationId, roomManagerAgentId]
             );
           } catch {
             // best-effort

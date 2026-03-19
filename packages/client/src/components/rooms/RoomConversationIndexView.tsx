@@ -22,6 +22,7 @@ export function RoomConversationIndexView(props: {
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  roomManagerAgentId?: string | null
   /** Optional provenance tag for bundle-provisioned rooms (e.g. "lead-generation"). */
   roomProvisionedByBundle?: string | null
   starshipOwnerId?: string | null
@@ -91,34 +92,20 @@ export function RoomConversationIndexView(props: {
     setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
   }, [preselectAgentId, starshipAgents])
 
-  // Default the starter agent to Nora in leadgen rooms when available,
+  // Default the starter agent to the room manager when available,
   // so users can send messages without manually selecting an agent.
   useEffect(() => {
-    const slug = String(props.roomSlug || '').trim()
-    const isLeadGenRoom =
-      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
-    if (!isLeadGenRoom) return
+    const mgrId = typeof props.roomManagerAgentId === 'string' ? props.roomManagerAgentId.trim() : ''
+    if (!mgrId) return
     if (!Array.isArray(starshipAgents) || starshipAgents.length === 0) return
 
-    const noraAgent =
-      (starshipAgents as AgentModel[]).find(
-        a =>
-          String((a as any)?.slug || '')
-            .trim()
-            .toLowerCase() === 'nora'
-      ) ??
-      (starshipAgents as AgentModel[]).find(
-        a =>
-          String((a as any)?.name || '')
-            .trim()
-            .toLowerCase() === 'nora'
-      ) ??
+    const mgr =
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.id || '').trim() === mgrId) ??
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.slug || '').trim() === mgrId) ??
       null
-
-    if (!noraAgent) return
-
-    setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
-  }, [props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
+    if (!mgr) return
+    setStarterSelectedAgent(prev => (prev?.id ? prev : mgr))
+  }, [props.roomManagerAgentId, starshipAgents])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -280,6 +267,7 @@ export function RoomConversationIndexView(props: {
               starshipId={props.starshipId}
               roomConversationId={props.roomConversationId}
               roomIsPrivate={Boolean(props.roomIsPrivate)}
+              roomManagerAgentId={props.roomManagerAgentId ?? null}
               starshipOwnerId={props.starshipOwnerId ?? null}
               buttonRef={participantsButtonRef}
               className="sr-only"
@@ -311,6 +299,7 @@ export function RoomConversationIndexView(props: {
               starshipId={props.starshipId}
               conversationId={null}
               roomConversationId={props.roomConversationId}
+              roomManagerAgentId={props.roomManagerAgentId ?? null}
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
               newConversationTitleOverride="New conversation"

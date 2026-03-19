@@ -57,6 +57,8 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   /** Optional: when composing inside a room thread, pass the room conversation id for invite-on-mention. */
   roomConversationId?: string | null
+  /** Optional: room manager agent id (used as default for room child conversations). */
+  roomManagerAgentId?: string | null
   onConversationStart?: (conversationId: string) => void
   /**
    * Optional: when creating a new conversation (conversationId is null), create it as a child of this parent conversation.
@@ -115,6 +117,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       conversationId,
       roomConversationId,
+      roomManagerAgentId,
       onConversationStart,
       newConversationParentConversationId,
       newConversationTitleOverride,
@@ -688,6 +691,22 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Mention-only threads: do not default; only run when an agent is explicitly mentioned.
       if (isMentionOnlyThread) {
         effectiveAgent = null
+      }
+
+      // Room child conversation defaulting:
+      // If this conversation lives directly under a room (parentConversationId === roomConversationId),
+      // prefer the room manager agent as the default when the user didn't pick/mention an agent.
+      // If the manager is not allowlisted for the room, the server will sanitize/ignore it.
+      {
+        const mgrId = typeof roomManagerAgentId === 'string' ? roomManagerAgentId.trim() : ''
+        const roomId = typeof roomConversationId === 'string' ? roomConversationId.trim() : ''
+        const parentId = typeof (conversation as any)?.parentConversationId === 'string' ? String((conversation as any).parentConversationId).trim() : ''
+        const isRoomChildConversation = Boolean(roomId && parentId && parentId === roomId)
+        const managerAllowlisted = mgrId ? Boolean((allowedMentionAgentIds || []).includes(mgrId)) : false
+        if (!effectiveAgent && !hasAgentMentionToken && isRoomChildConversation && mgrId && managerAllowlisted) {
+          const mgr = resolveAgentById(mgrId)
+          if (mgr) effectiveAgent = mgr
+        }
       }
 
       // Threads (non-mention-only): if exactly 1 linked agent, allow it as a fallback.

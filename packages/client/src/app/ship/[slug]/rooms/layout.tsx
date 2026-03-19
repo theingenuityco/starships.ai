@@ -752,6 +752,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             starshipSlug={routeParams.slug}
             conversationId={conversationConversationId}
             roomConversationId={activeConversationId}
+            roomManagerAgentId={activeRoom?.managerAgentId ?? null}
             draftParentConversationId={isDraftConversationOpen ? conversationDraftParentConversationId : null}
             draftTitle={isDraftConversationOpen ? conversationDraftTitle : null}
             selectedAgent={conversationAgent}
@@ -847,6 +848,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             roomSlug={activeRoom?.slug ?? null}
             roomName={activeRoom?.name ?? null}
             roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+            roomManagerAgentId={activeRoom?.managerAgentId ?? null}
             roomProvisionedByBundle={(activeRoom as any)?.provisionedByBundle ?? null}
             starshipOwnerId={starshipOwnerId}
             starshipSlug={routeParams.slug}

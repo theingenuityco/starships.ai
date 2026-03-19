@@ -1,4 +1,8 @@
 import { z } from 'zod';
+// Important: this import loads repo-root `.env` via dotenv (side-effect),
+// matching the rest of the monorepo behavior.
+// It does NOT validate unless callers invoke getEnvConfig().
+import '@starships/env';
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().optional(),

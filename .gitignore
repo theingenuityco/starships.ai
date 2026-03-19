@@ -46,6 +46,9 @@ node_modules/
 # Turborepo cache
 .turbo/
 
+# Local scratch / temp files
+.tmp/
+
 # Misc
 coverage/ 
 .kilocode/

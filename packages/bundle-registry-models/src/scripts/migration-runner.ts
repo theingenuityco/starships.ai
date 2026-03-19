@@ -23,7 +23,8 @@ export class MigrationRunner {
     if (!existsSync(dir)) return [];
     const files = readdirSync(dir);
     return files
-      .filter((f) => /^\d+_.+\.(ts|js)$/.test(f))
+      // Ignore TypeScript declaration outputs like `001_foo.d.ts` (these would otherwise become id `001_foo.d`).
+      .filter((f) => /^\d+_.+\.(ts|js)$/.test(f) && !f.endsWith('.d.ts'))
       .map((f) => f.replace(/\.(ts|js)$/, ''))
       .sort((a, b) => a.localeCompare(b));
   }

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 const EnvSchema = z.object({
-  BUNDLE_REGISTRY_POSTGRES_HOST: z.string().min(1).default('postgres'),
+  // Default to localhost for local dev; k8s sets this explicitly.
+  BUNDLE_REGISTRY_POSTGRES_HOST: z.string().min(1).default('localhost'),
   BUNDLE_REGISTRY_POSTGRES_PORT: z.coerce.number().int().min(1).max(65535).default(5432),
   BUNDLE_REGISTRY_POSTGRES_USER: z.string().min(1).default('postgres'),
   BUNDLE_REGISTRY_POSTGRES_PASSWORD: z.string().min(1),

@@ -857,6 +857,23 @@ router.post(
         createdBy: access.authUserId,
       });
 
+      // If the room has no manager agent yet, set the first allowlisted agent as manager (idempotent).
+      // This keeps behavior stable and avoids "alphabetical first agent" fallback routing.
+      try {
+        const conn = getConnection();
+        await conn.query(
+          `
+            UPDATE rooms
+               SET manager_agent_id = $2
+             WHERE conversation_id = $1
+               AND manager_agent_id IS NULL
+          `,
+          [access.room.conversationId, body.agentId]
+        );
+      } catch {
+        // best-effort; manager can still be set later via room update if needed
+      }
+
       sendSuccess(res, { created: result.created }, 200);
     } catch (error) {
       handleError(error, res, 'adding room agent');
@@ -892,6 +909,21 @@ router.delete(
         params.agentId,
       ]);
       const removed = (result.rowCount ?? 0) > 0;
+
+      // If removing the manager agent, clear the room manager (idempotent).
+      try {
+        await conn.query(
+          `
+            UPDATE rooms
+               SET manager_agent_id = NULL
+             WHERE conversation_id = $1
+               AND manager_agent_id = $2
+          `,
+          [access.room.conversationId, params.agentId]
+        );
+      } catch {
+        // best-effort
+      }
       sendSuccess(res, { removed }, 200);
     } catch (error) {
       handleError(error, res, 'removing room agent');
@@ -927,6 +959,8 @@ router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reques
       name: string;
       is_private: boolean;
       topic: string | null;
+      manager_agent_id: string | null;
+      manager_agent_heartbeat_at: string | null;
       created_at: string;
       updated_at: string;
       conversation_created_at: string;
@@ -962,6 +996,8 @@ router.get('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reques
       name: String(r.name),
       isPrivate: Boolean(r.is_private),
       topic: r.topic ?? null,
+      managerAgentId: r.manager_agent_id ?? null,
+      managerAgentHeartbeatAt: r.manager_agent_heartbeat_at ?? null,
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),
     }));
@@ -1242,6 +1278,7 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
           .optional(),
         isPrivate: z.boolean().optional(),
         topic: z.string().max(2000).optional().nullable(),
+        managerAgentId: IdSchema.optional().nullable(),
       }),
       req.body,
       res,
@@ -1262,6 +1299,7 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
     const nextName = body.name !== undefined ? String(body.name) : undefined;
     const nextIsPrivate = body.isPrivate !== undefined ? Boolean(body.isPrivate) : undefined;
     const nextTopic = body.topic !== undefined ? (body.topic ?? null) : undefined;
+    const nextManagerAgentId = body.managerAgentId !== undefined ? (body.managerAgentId ? String(body.managerAgentId) : null) : undefined;
 
     const setParts: string[] = [];
     const values: Array<string | boolean | null> = [];
@@ -1278,6 +1316,12 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
       setParts.push(`topic = $${i++}`);
       values.push(nextTopic);
     }
+    if (nextManagerAgentId !== undefined) {
+      setParts.push(`manager_agent_id = $${i++}`);
+      values.push(nextManagerAgentId);
+      // Reset heartbeat when switching managers (best-effort operational metadata).
+      setParts.push(`manager_agent_heartbeat_at = NULL`);
+    }
     setParts.push(`updated_at = NOW()`);
 
     const sql = `
@@ -1288,6 +1332,30 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
     `;
     values.push(room.conversationId);
 
+    // Validate manager agent belongs to this starship, and ensure it is allowlisted for the room.
+    if (nextManagerAgentId !== undefined && nextManagerAgentId) {
+      const agentRepo = new AgentRepository();
+      const agent = await agentRepo.findById(nextManagerAgentId);
+      if (!agent) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent not found', 400, { agentId: nextManagerAgentId });
+        return;
+      }
+      if (String(agent.starshipId) !== String(room.starshipId)) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent must belong to the same starship as the room', 400, {
+          agentId: nextManagerAgentId,
+          roomStarshipId: room.starshipId,
+          agentStarshipId: agent.starshipId,
+        });
+        return;
+      }
+      const participantRepo = new ConversationParticipantRepository();
+      try {
+        await participantRepo.addAgentParticipant({ conversationId: room.conversationId, agentId: nextManagerAgentId, createdBy: authUserId });
+      } catch {
+        // best-effort; if this fails, routing may still work if linked elsewhere
+      }
+    }
+
     const updatedRow = await conn.queryOne<{
       conversation_id: string;
       starship_id: string;
@@ -1295,6 +1363,8 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
       name: string;
       is_private: boolean;
       topic: string | null;
+      manager_agent_id: string | null;
+      manager_agent_heartbeat_at: string | null;
       created_at: string;
       updated_at: string;
     }>(sql, values);
@@ -1337,6 +1407,8 @@ router.patch('/rooms/:roomId', jwtAuthMiddleware, async (req: Request, res: Resp
       name: String(updatedRow.name),
       isPrivate: Boolean(updatedRow.is_private),
       topic: updatedRow.topic ?? null,
+      managerAgentId: updatedRow.manager_agent_id ?? null,
+      managerAgentHeartbeatAt: updatedRow.manager_agent_heartbeat_at ?? null,
       createdAt: String(updatedRow.created_at),
       updatedAt: String(updatedRow.updated_at),
     };

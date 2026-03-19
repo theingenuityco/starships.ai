@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
 import { useStarshipAgents } from '@/hooks/useAgents'
@@ -32,6 +33,7 @@ export function RoomParticipantsButton(props: {
   starshipId: string
   roomConversationId: string
   roomIsPrivate: boolean
+  roomManagerAgentId?: string | null
   starshipOwnerId?: string | null
   className?: string
   /** Optional ref to the underlying trigger button (for programmatic open). */
@@ -114,6 +116,21 @@ export function RoomParticipantsButton(props: {
     },
   })
 
+  const setManagerAgent = useMutation({
+    mutationFn: async (managerAgentId: string | null) => {
+      const payload = { managerAgentId: managerAgentId ? String(managerAgentId).trim() : null }
+      const res = await api.patch(`/api/v1/rooms/${encodeURIComponent(props.roomConversationId)}`, payload)
+      return (res as any)?.data?.data ?? null
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(props.starshipId) })
+      toast.success('Manager agent updated')
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to update manager agent', { description: getSafeErrorMessage(error) })
+    },
+  })
+
   const canManagePrivateRoom = useMemo(() => {
     const uid = typeof user?.id === 'string' ? user.id : ''
     const ownerId = typeof props.starshipOwnerId === 'string' ? props.starshipOwnerId.trim() : ''
@@ -162,7 +179,7 @@ export function RoomParticipantsButton(props: {
   const humanCountInRoom = roomParticipants.data?.userIds?.length ?? 0
   const agentCountInRoom = roomParticipants.data?.agentIds?.length ?? 0
 
-  const isBusy = addMember.isPending || removeMember.isPending || addAgent.isPending || removeAgent.isPending
+  const isBusy = addMember.isPending || removeMember.isPending || addAgent.isPending || removeAgent.isPending || setManagerAgent.isPending
 
   return (
     <>
@@ -274,6 +291,40 @@ export function RoomParticipantsButton(props: {
               </TabsContent>
 
               <TabsContent value="agents" className="mt-3">
+                {canManagePrivateRoom ? (
+                  <div className="mb-3 rounded-lg border border-border/60 bg-card px-3 py-2">
+                    <div className="text-xs font-medium text-muted-foreground mb-2">Manager agent (default)</div>
+                    <Select
+                      value={props.roomManagerAgentId ? String(props.roomManagerAgentId) : '__none__'}
+                      onValueChange={v => {
+                        if (isBusy) return
+                        const next = v === '__none__' ? null : String(v)
+                        setManagerAgent.mutate(next)
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a manager agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {agents
+                          .filter(a => roomAgentIdSet.has(String(a.id)))
+                          .map(a => {
+                            const id = String(a.id || '').trim()
+                            if (!id) return null
+                            return (
+                              <SelectItem key={`mgr:${id}`} value={id}>
+                                {formatAgentDisplayName(a)}
+                              </SelectItem>
+                            )
+                          })}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      Used when you don’t @mention an agent in this room.
+                    </div>
+                  </div>
+                ) : null}
                 <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-1">
                   {starshipAgents.isLoading || roomParticipants.isLoading ? (
                     <div className="py-10 text-sm text-muted-foreground text-center">Loading…</div>

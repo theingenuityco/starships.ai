@@ -122,4 +122,3 @@ export async function analyzeRoomMentionsAndAgentAllowlist(args: {
     sanitizedAgentIdForMessage: requestedAgentDisallowed ? null : requestedAgentId || null,
   };
 }
-

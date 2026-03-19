@@ -479,6 +479,15 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Keep Chrome/Safari autofill readable in both themes */
+  input:-webkit-autofill,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
+    box-shadow: 0 0 0px 1000px hsl(var(--background)) inset !important;
+  }
 }
 
 /*

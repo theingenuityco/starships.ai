@@ -22,10 +22,12 @@ export function RoomConversationIndexView(props: {
   roomSlug?: string | null
   roomName?: string | null
   roomIsPrivate?: boolean | null
+  roomManagerAgentId?: string | null
   /** Optional provenance tag for bundle-provisioned rooms (e.g. "lead-generation"). */
   roomProvisionedByBundle?: string | null
   starshipOwnerId?: string | null
   starshipSlug?: string | null
+  onOpenParticipantsPane?: () => void
   /** Optional allowlists to scope @mention and agent selection within room conversations. */
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
@@ -91,34 +93,20 @@ export function RoomConversationIndexView(props: {
     setStarterSelectedAgent(prev => (prev?.id === match.id ? prev : match))
   }, [preselectAgentId, starshipAgents])
 
-  // Default the starter agent to Nora in leadgen rooms when available,
+  // Default the starter agent to the room manager when available,
   // so users can send messages without manually selecting an agent.
   useEffect(() => {
-    const slug = String(props.roomSlug || '').trim()
-    const isLeadGenRoom =
-      String(props.roomProvisionedByBundle || '').trim() === 'lead-generation' || slug === 'leadgen'
-    if (!isLeadGenRoom) return
+    const mgrId = typeof props.roomManagerAgentId === 'string' ? props.roomManagerAgentId.trim() : ''
+    if (!mgrId) return
     if (!Array.isArray(starshipAgents) || starshipAgents.length === 0) return
 
-    const noraAgent =
-      (starshipAgents as AgentModel[]).find(
-        a =>
-          String((a as any)?.slug || '')
-            .trim()
-            .toLowerCase() === 'nora'
-      ) ??
-      (starshipAgents as AgentModel[]).find(
-        a =>
-          String((a as any)?.name || '')
-            .trim()
-            .toLowerCase() === 'nora'
-      ) ??
+    const mgr =
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.id || '').trim() === mgrId) ??
+      (starshipAgents as AgentModel[]).find(a => String((a as any)?.slug || '').trim() === mgrId) ??
       null
-
-    if (!noraAgent) return
-
-    setStarterSelectedAgent(prev => (prev?.id ? prev : noraAgent))
-  }, [props.roomSlug, props.roomProvisionedByBundle, starshipAgents])
+    if (!mgr) return
+    setStarterSelectedAgent(prev => (prev?.id ? prev : mgr))
+  }, [props.roomManagerAgentId, starshipAgents])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -246,7 +234,7 @@ export function RoomConversationIndexView(props: {
       <ConversationSummaryBar
         conversationId={props.roomConversationId}
         starshipId={props.starshipId}
-        onParticipantsClick={() => participantsButtonRef.current?.click()}
+        onParticipantsClick={() => props.onOpenParticipantsPane?.()}
         titleRightSlot={
           <>
             <Button
@@ -260,6 +248,19 @@ export function RoomConversationIndexView(props: {
             >
               <Icon name="clock" weight="bold" className="h-4 w-4" />
             </Button>
+            {props.canManagePins ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+                aria-label="Resources"
+                title="Resources"
+                onClick={() => props.onOpenResourcesPane?.()}
+              >
+                <Icon name="pin" weight="bold" className="h-4 w-4" />
+              </Button>
+            ) : null}
             <NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />
           </>
         }
@@ -274,24 +275,6 @@ export function RoomConversationIndexView(props: {
           </span>
         }
         fallbackTitle={label}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <RoomParticipantsButton
-              starshipId={props.starshipId}
-              roomConversationId={props.roomConversationId}
-              roomIsPrivate={Boolean(props.roomIsPrivate)}
-              starshipOwnerId={props.starshipOwnerId ?? null}
-              buttonRef={participantsButtonRef}
-              className="sr-only"
-            />
-            {props.canManagePins ? (
-              <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
-                <Icon name="pin" className="h-4 w-4 mr-1" />
-                Resources
-              </Button>
-            ) : null}
-          </div>
-        }
       />
 
       {/* Room starter (conversation-starter style) */}
@@ -311,6 +294,7 @@ export function RoomConversationIndexView(props: {
               starshipId={props.starshipId}
               conversationId={null}
               roomConversationId={props.roomConversationId}
+              roomManagerAgentId={props.roomManagerAgentId ?? null}
               starshipSlug={effectiveStarshipSlug}
               newConversationParentConversationId={props.roomConversationId}
               newConversationTitleOverride="New conversation"

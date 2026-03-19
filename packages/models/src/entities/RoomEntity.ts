@@ -48,6 +48,17 @@ export class RoomEntity implements RoomModel {
   provisionedByBundle?: string | null;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  managerAgentId?: string | null;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  managerAgentHeartbeatAt?: string | null;
+
+  @Expose()
   @IsISO8601()
   createdAt!: string;
 
@@ -71,6 +82,8 @@ export class RoomEntity implements RoomModel {
         isPrivate: Boolean(dataRecord.isPrivate),
         topic: (dataRecord.topic as string | null | undefined) ?? null,
         provisionedByBundle: (dataRecord.provisionedByBundle as string | null | undefined) ?? null,
+        managerAgentId: (dataRecord.managerAgentId as string | null | undefined) ?? null,
+        managerAgentHeartbeatAt: (dataRecord.managerAgentHeartbeatAt as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
       });
@@ -90,4 +103,3 @@ export class RoomEntity implements RoomModel {
     }
   }
 }
-

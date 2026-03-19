@@ -232,6 +232,13 @@ export default function RoomsIndexPage(): React.JSX.Element {
 
   const [deleteRoomTarget, setDeleteRoomTarget] = useState<RoomModel | null>(null)
   const [exportingRoomId, setExportingRoomId] = useState<string | null>(null)
+  const [registryPublishOpen, setRegistryPublishOpen] = useState(false)
+  const [registryPublishRoomId, setRegistryPublishRoomId] = useState<string | null>(null)
+  const [registryBundles, setRegistryBundles] = useState<Array<{ id: string; slug: string; displayName: string; kind: string }>>([])
+  const [registryBundlesLoading, setRegistryBundlesLoading] = useState(false)
+  const [registryPublishBundleId, setRegistryPublishBundleId] = useState<string>('')
+  const [registryPublishVersion, setRegistryPublishVersion] = useState<string>('1.0.0')
+  const [registryPublishing, setRegistryPublishing] = useState(false)
 
   const openEdit = (r: RoomModel) => {
     setEditRoomTarget(r)
@@ -246,6 +253,38 @@ export default function RoomsIndexPage(): React.JSX.Element {
     setEditPrivate(false)
     setEditTopic('')
   }
+
+  useEffect(() => {
+    if (!registryPublishOpen || !isInstanceAdmin) return
+    let cancelled = false
+    const run = async () => {
+      setRegistryBundlesLoading(true)
+      try {
+        const token = await getCurrentToken()
+        const res = await fetch('/api/v1/registry/bundles', {
+          method: 'GET',
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+        if (!res.ok) throw new Error(`Failed (${res.status})`)
+        const json = await res.json()
+        const list = (json?.data?.bundles ?? []) as Array<{ id: string; slug: string; displayName: string; kind: string }>
+        const filtered = list.filter(b => b.kind === 'room_bundle')
+        if (!cancelled) {
+          setRegistryBundles(filtered)
+          if (!registryPublishBundleId && filtered[0]?.id) setRegistryPublishBundleId(filtered[0].id)
+        }
+      } catch (e) {
+        toast.error('Failed to load registry bundles', { description: getSafeErrorMessage(e) })
+      } finally {
+        if (!cancelled) setRegistryBundlesLoading(false)
+      }
+    }
+    run()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registryPublishOpen, isInstanceAdmin])
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
@@ -409,6 +448,24 @@ export default function RoomsIndexPage(): React.JSX.Element {
                               <Icon name="download" className="h-4 w-4 mr-1.5" />
                               {isExporting ? 'Exporting…' : 'Export'}
                             </Button>
+                            {isInstanceAdmin ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={registryPublishing}
+                                onClick={() => {
+                                  const roomId = String(r.conversationId || '').trim()
+                                  if (!roomId) return
+                                  setRegistryPublishRoomId(roomId)
+                                  setRegistryPublishVersion('1.0.0')
+                                  setRegistryPublishOpen(true)
+                                }}
+                              >
+                                <Icon name="upload" className="h-4 w-4 mr-1.5" />
+                                Publish
+                              </Button>
+                            ) : null}
                             <Button type="button" variant="outline" size="sm" onClick={() => openEdit(r)}>
                               <Icon name="edit" className="h-4 w-4 mr-1.5" />
                               Edit
@@ -766,6 +823,93 @@ export default function RoomsIndexPage(): React.JSX.Element {
               }}
             >
               {updateRoom.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={registryPublishOpen}
+        onOpenChange={open => {
+          setRegistryPublishOpen(open)
+          if (!open) {
+            setRegistryPublishRoomId(null)
+            setRegistryPublishing(false)
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Publish room bundle</DialogTitle>
+            <DialogDescription>Publish this room (plus pinned resources, agents, tools) as an immutable registry version.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Registry bundle</Label>
+              <select
+                className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm"
+                disabled={registryBundlesLoading || registryPublishing}
+                value={registryPublishBundleId}
+                onChange={e => setRegistryPublishBundleId(e.target.value)}
+              >
+                {registryBundles.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.displayName} ({b.slug})
+                  </option>
+                ))}
+              </select>
+              {registryBundlesLoading ? <div className="text-xs text-muted-foreground">Loading bundles…</div> : null}
+              {!registryBundlesLoading && registryBundles.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No room bundles found in the registry yet. Create one in Admin → Bundle Registry.</div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Version</Label>
+              <Input
+                value={registryPublishVersion}
+                onChange={e => setRegistryPublishVersion(e.target.value)}
+                disabled={registryPublishing}
+                placeholder="1.0.0"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setRegistryPublishOpen(false)} disabled={registryPublishing}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!registryPublishRoomId || !registryPublishBundleId || !registryPublishVersion.trim() || registryPublishing}
+              onClick={async () => {
+                if (!registryPublishRoomId || !registryPublishBundleId) return
+                setRegistryPublishing(true)
+                try {
+                  const token = await getCurrentToken()
+                  const res = await fetch(`/api/v1/registry/publish/room/${encodeURIComponent(registryPublishRoomId)}`, {
+                    method: 'POST',
+                    headers: {
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      bundleId: registryPublishBundleId,
+                      version: registryPublishVersion.trim(),
+                    }),
+                  })
+                  if (!res.ok) throw new Error(`Publish failed (${res.status})`)
+                  toast.success('Published to registry', { description: `Version ${registryPublishVersion.trim()} published.` })
+                  setRegistryPublishOpen(false)
+                } catch (e) {
+                  toast.error('Publish failed', { description: getSafeErrorMessage(e) })
+                } finally {
+                  setRegistryPublishing(false)
+                }
+              }}
+            >
+              {registryPublishing ? 'Publishing…' : 'Publish'}
             </Button>
           </DialogFooter>
         </DialogContent>

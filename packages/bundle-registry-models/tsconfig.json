@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.nodejs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist"],
+  "references": [{ "path": "../env" }]
+}
+

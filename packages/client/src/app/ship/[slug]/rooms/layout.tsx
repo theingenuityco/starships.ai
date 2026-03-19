@@ -7,6 +7,7 @@ import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIn
 import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
+import { RoomParticipantsPane } from '@/components/rooms/RoomParticipantsPane'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -320,8 +321,17 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   }, [searchParams])
   const isResourcesPaneOpen = roomPaneKey === 'resources'
   const isHistoryPaneOpen = roomPaneKey === 'history'
+  const isParticipantsPaneOpen = roomPaneKey === 'participants'
   const threadKey = routeThreadKey
-  const paneKind = (threadKey ? 'thread' : isResourcesPaneOpen ? 'resources' : isHistoryPaneOpen ? 'history' : null) as 'thread' | 'resources' | 'history' | null
+  const paneKind = (threadKey
+    ? 'thread'
+    : isResourcesPaneOpen
+      ? 'resources'
+      : isHistoryPaneOpen
+        ? 'history'
+        : isParticipantsPaneOpen
+          ? 'participants'
+          : null) as 'thread' | 'resources' | 'history' | 'participants' | null
   const isSidePaneOpen = Boolean(paneKind)
   const PANE_ANIM_MS = 300
   const PANE_OPEN_CONTENT_DELAY_MS = 120
@@ -417,6 +427,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     },
     [conversationConversationId, roomBasePath, router, searchParams]
   )
+
+  const closeParticipantsPane = useCallback(() => {
+    setRoomPaneInUrl(null)
+  }, [setRoomPaneInUrl])
 
   // Default parent for draft conversations is the active room conversation id.
   useEffect(() => {
@@ -823,12 +837,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             rightSlot={
               <div className="flex items-center gap-2">
                 <RoomParticipantsButton
-                  starshipId={starshipData.id}
-                  roomConversationId={activeConversationId}
-                  roomIsPrivate={Boolean(activeRoom?.isPrivate)}
-                  roomManagerAgentId={activeRoom?.managerAgentId ?? null}
-                  starshipOwnerId={starshipOwnerId}
-                  className="sr-only"
+                  onClick={() => setRoomPaneInUrl('participants')}
                 />
                 {canManagePins || hasAnyResources ? (
                   <Button type="button" size="sm" variant="outline" onClick={() => setRoomPaneInUrl('resources')}>
@@ -868,6 +877,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             canManagePins={canManagePins}
             onOpenHistoryPane={() => setRoomPaneInUrl('history')}
             onOpenResourcesPane={() => setRoomPaneInUrl('resources')}
+            onOpenParticipantsPane={() => setRoomPaneInUrl('participants')}
             availableViews={availableViews}
             availableDatasets={availableDatasets}
             availableTaskBoards={availableTaskBoards}
@@ -990,10 +1000,70 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   }}
                   onClose={() => setRoomPaneInUrl(null)}
                 />
+              ) : paneKind === 'participants' ? (
+                <div className="flex flex-col h-full min-h-0 w-full min-w-0">
+                  <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
+                    <div className="px-4 pt-3.5 pb-2 md:py-2">
+                      <div className="w-full">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                            <div className="flex min-w-0 w-full gap-2 items-center">
+                              <span className="flex-shrink-0 self-center md:hidden">
+                                <span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />
+                              </span>
+                              <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                                <div className="flex items-center gap-2 min-w-0 w-full">
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                                    onClick={closeParticipantsPane}
+                                    aria-label="Back to room"
+                                    title="Back to room"
+                                  >
+                                    <Icon name="arrow-left" className="h-4 w-4" />
+                                  </button>
+                                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                                    <span className="inline-flex items-center whitespace-nowrap text-foreground">
+                                      <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                                      <span className="mx-1">/</span>
+                                    </span>
+                                    Participants
+                                  </h3>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                                  <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                                    <span className="font-medium leading-none text-muted-foreground">Manage humans and agents</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <RoomParticipantsPane
+                    starshipId={starshipData.id}
+                    roomConversationId={activeConversationId || ''}
+                    roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                    roomManagerAgentId={activeRoom?.managerAgentId ?? null}
+                    starshipOwnerId={starshipOwnerId}
+                  />
+                </div>
               ) : null
             ) : (
               <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
-                {paneKind === 'thread' ? 'Loading thread…' : paneKind === 'history' ? 'Loading history…' : 'Loading resources…'}
+                {paneKind === 'thread'
+                  ? 'Loading thread…'
+                  : paneKind === 'history'
+                    ? 'Loading history…'
+                    : paneKind === 'participants'
+                      ? 'Loading participants…'
+                      : 'Loading resources…'}
               </div>
             )}
           </div>
@@ -1072,10 +1142,70 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               }}
               onClose={() => setRoomPaneInUrl(null)}
             />
+          ) : paneKind === 'participants' ? (
+            <div className="flex flex-col h-full min-h-0 w-full min-w-0">
+              <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
+                <div className="px-4 pt-3.5 pb-2 md:py-2">
+                  <div className="w-full">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                        <div className="flex min-w-0 w-full gap-2 items-center">
+                          <span className="flex-shrink-0 self-center md:hidden">
+                            <span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />
+                          </span>
+                          <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                            <div className="flex items-center gap-2 min-w-0 w-full">
+                              <button
+                                type="button"
+                                className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                                onClick={closeParticipantsPane}
+                                aria-label="Back to room"
+                                title="Back to room"
+                              >
+                                <Icon name="arrow-left" className="h-4 w-4" />
+                              </button>
+                              <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                                <span className="inline-flex items-center whitespace-nowrap text-foreground">
+                                  <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                                  <span className="mx-1">/</span>
+                                </span>
+                                Participants
+                              </h3>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                              <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                                <span className="font-medium leading-none text-muted-foreground">Manage humans and agents</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <RoomParticipantsPane
+                starshipId={starshipData.id}
+                roomConversationId={activeConversationId || ''}
+                roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                roomManagerAgentId={activeRoom?.managerAgentId ?? null}
+                starshipOwnerId={starshipOwnerId}
+              />
+            </div>
           ) : null
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
-            {paneKind === 'thread' ? 'Loading thread…' : paneKind === 'history' ? 'Loading history…' : 'Loading resources…'}
+            {paneKind === 'thread'
+              ? 'Loading thread…'
+              : paneKind === 'history'
+                ? 'Loading history…'
+                : paneKind === 'participants'
+                  ? 'Loading participants…'
+                  : 'Loading resources…'}
           </div>
         )}
       </aside>

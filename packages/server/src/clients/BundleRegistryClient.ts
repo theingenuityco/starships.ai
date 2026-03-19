@@ -170,5 +170,19 @@ export class BundleRegistryClient {
     const res = await fetch(args.uploadUrl, init as RequestInit);
     if (!res.ok) throw new Error(`Presigned PUT failed (${res.status})`);
   }
+
+  async putBufferToPresignedUrl(args: { uploadUrl: string; contentType: string; buffer: Buffer }): Promise<void> {
+    const res = await fetch(args.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': args.contentType,
+        'Content-Length': String(args.buffer.length),
+      },
+      // TS lib.dom types don't always accept Node Buffer as BodyInit.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      body: args.buffer as any,
+    });
+    if (!res.ok) throw new Error(`Presigned PUT failed (${res.status})`);
+  }
 }
 

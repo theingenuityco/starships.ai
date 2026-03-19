@@ -11,11 +11,21 @@ import { ImportExportService } from '@/services/ImportExportService';
 import { AgentService } from '@/services/AgentService';
 import { RoomRepository } from '@starships/models';
 import archiver from 'archiver';
-import { PassThrough, Readable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 import { analyzeAgentBundleImport, applyAgentBundleImport } from '@/services/bundles/agent-bundle-import';
 import { analyzeRoomBundleImport, applyRoomBundleImport, type RoomBundleDecisions } from '@/services/bundles/room-bundle-import';
 
 const router: Router = Router();
+
+async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  return await new Promise<Buffer>((resolve, reject) => {
+    stream.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('close', () => resolve(Buffer.concat(chunks)));
+  });
+}
 
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
@@ -287,12 +297,6 @@ router.post('/registry/publish/agent/:agentId', async (req: Request, res: Respon
     });
     archive.pipe(pass);
 
-    const uploadPromise = registry.putToPresignedUrl({
-      uploadUrl: upload.uploadUrl,
-      contentType: upload.requiredHeaders['Content-Type'] ?? 'application/zip',
-      body: Readable.toWeb(pass) as unknown as ReadableStream<Uint8Array>,
-    });
-
     const safeFilenameSegment = (input: string): string => {
       const raw = String(input || '').trim();
       const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
@@ -347,7 +351,12 @@ router.post('/registry/publish/agent/:agentId', async (req: Request, res: Respon
     archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
 
     await archive.finalize();
-    await uploadPromise;
+    const zipBuffer = await streamToBuffer(pass);
+    await registry.putBufferToPresignedUrl({
+      uploadUrl: upload.uploadUrl,
+      contentType: upload.requiredHeaders['Content-Type'] ?? 'application/zip',
+      buffer: zipBuffer,
+    });
 
     const version = await registry.completeBundleVersionUpload({
       bundleId: body.bundleId,
@@ -393,12 +402,6 @@ router.post('/registry/publish/room/:roomId', async (req: Request, res: Response
       pass.destroy(err);
     });
     archive.pipe(pass);
-
-    const uploadPromise = registry.putToPresignedUrl({
-      uploadUrl: upload.uploadUrl,
-      contentType: upload.requiredHeaders['Content-Type'] ?? 'application/zip',
-      body: Readable.toWeb(pass) as unknown as ReadableStream<Uint8Array>,
-    });
 
     const safeFilenameSegment = (input: string): string => {
       const raw = String(input || '').trim();
@@ -455,7 +458,12 @@ router.post('/registry/publish/room/:roomId', async (req: Request, res: Response
     archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
 
     await archive.finalize();
-    await uploadPromise;
+    const zipBuffer = await streamToBuffer(pass);
+    await registry.putBufferToPresignedUrl({
+      uploadUrl: upload.uploadUrl,
+      contentType: upload.requiredHeaders['Content-Type'] ?? 'application/zip',
+      buffer: zipBuffer,
+    });
 
     const version = await registry.completeBundleVersionUpload({
       bundleId: body.bundleId,

@@ -1,6 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getBundleRegistryEnv } from '@/env';
+import { Readable } from 'node:stream';
 
 let cached: S3Client | null = null;
 
@@ -17,6 +18,19 @@ function getClient(): S3Client {
   return cached;
 }
 
+function asWebReadableStream(body: unknown): ReadableStream<Uint8Array> {
+  if (!body) throw new Error('Missing S3 body');
+  const maybeWeb = body as { getReader?: unknown };
+  if (typeof maybeWeb.getReader === 'function') {
+    return body as ReadableStream<Uint8Array>;
+  }
+  const maybeNode = body as { pipe?: unknown; on?: unknown };
+  if (typeof maybeNode.pipe === 'function' || typeof maybeNode.on === 'function') {
+    return Readable.toWeb(body as any) as ReadableStream<Uint8Array>;
+  }
+  throw new Error('Unsupported S3 body type');
+}
+
 export async function getObjectStream(args: { key: string }): Promise<{ contentType?: string; body: ReadableStream<Uint8Array> }> {
   const env = getBundleRegistryEnv();
   const client = getClient();
@@ -26,10 +40,7 @@ export async function getObjectStream(args: { key: string }): Promise<{ contentT
       Key: args.key,
     })
   );
-  // AWS SDK v3 returns a web ReadableStream in Node 18+.
-  const body = out.Body as unknown as ReadableStream<Uint8Array> | undefined;
-  if (!body) throw new Error('Missing S3 body');
-  return { contentType: out.ContentType, body };
+  return { contentType: out.ContentType, body: asWebReadableStream(out.Body) };
 }
 
 export async function getObjectBuffer(args: { key: string; maxBytes: number }): Promise<{ contentType?: string; buffer: Buffer }> {

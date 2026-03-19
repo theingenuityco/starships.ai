@@ -11,6 +11,18 @@
     "POSTGRES_PASSWORD",
     "POSTGRES_DATABASE",
     "POSTGRES_SSL",
+    "BUNDLE_REGISTRY_URL",
+    "BUNDLE_REGISTRY_AUTH_TOKEN",
+    "BUNDLE_REGISTRY_POSTGRES_HOST",
+    "BUNDLE_REGISTRY_POSTGRES_PORT",
+    "BUNDLE_REGISTRY_POSTGRES_USER",
+    "BUNDLE_REGISTRY_POSTGRES_PASSWORD",
+    "BUNDLE_REGISTRY_POSTGRES_DATABASE",
+    "BUNDLE_REGISTRY_POSTGRES_SSL",
+    "BUNDLE_REGISTRY_S3_BUCKET",
+    "BUNDLE_REGISTRY_S3_REGION",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
     "RUNNER_URL",
@@ -50,6 +62,16 @@
     },
     "@starships/models#build": {
       "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**"]
+    },
+    "@starships/bundle-registry-models#build": {
+      "dependsOn": ["@starships/env#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**"]
+    },
+    "@starships/bundle-registry-server#build": {
+      "dependsOn": ["@starships/env#build", "@starships/bundle-registry-models#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },

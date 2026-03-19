@@ -96,7 +96,9 @@ async function main() {
   app.use(cors({ origin: true, credentials: false }));
 
   // Health should be open (k8s probes).
-  app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
 
   // Internal API (token protected).
   app.use('/api', requireRegistryInternalAuth);

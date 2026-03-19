@@ -61,6 +61,16 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: RUNNER_AUTH_TOKEN
+            - name: BUNDLE_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_URL
+            - name: BUNDLE_REGISTRY_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_AUTH_TOKEN
             - name: SKIP_BUILD
               value: 'true'
             - name: SKIP_INSTALL

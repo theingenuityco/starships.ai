@@ -1,0 +1,132 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bundle-registry
+  namespace: starships-prod
+  labels:
+    app: bundle-registry
+    environment: prod
+spec:
+  type: ClusterIP
+  selector:
+    app: bundle-registry
+    environment: prod
+  ports:
+    - name: http
+      port: 4020
+      targetPort: 4020
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bundle-registry
+  namespace: starships-prod
+  labels:
+    app: bundle-registry
+    environment: prod
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: bundle-registry
+      environment: prod
+  template:
+    metadata:
+      labels:
+        app: bundle-registry
+        environment: prod
+    spec:
+      terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: bundle-registry
+          image: ghcr.io/theingenuityco/starships.ai:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4020
+              name: http
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: BUNDLE_REGISTRY_PORT
+              value: '4020'
+            - name: BUNDLE_REGISTRY_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_AUTH_TOKEN
+            - name: BUNDLE_REGISTRY_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_S3_BUCKET
+            - name: BUNDLE_REGISTRY_S3_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_S3_REGION
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: BUNDLE_REGISTRY_POSTGRES_HOST
+              value: 'bundle-registry-postgres'
+            - name: BUNDLE_REGISTRY_POSTGRES_PORT
+              value: '5432'
+            - name: BUNDLE_REGISTRY_POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_POSTGRES_USER
+            - name: BUNDLE_REGISTRY_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_POSTGRES_PASSWORD
+            - name: BUNDLE_REGISTRY_POSTGRES_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_POSTGRES_DATABASE
+            - name: BUNDLE_REGISTRY_POSTGRES_SSL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: BUNDLE_REGISTRY_POSTGRES_SSL
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              node packages/bundle-registry-server/dist/index.js
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4020
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4020
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: '200m'
+              memory: '512Mi'
+            limits:
+              cpu: '2000m'
+              memory: '2Gi'
+

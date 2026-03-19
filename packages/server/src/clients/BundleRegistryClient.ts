@@ -158,14 +158,16 @@ export class BundleRegistryClient {
   }
 
   async putToPresignedUrl(args: { uploadUrl: string; contentType: string; body: ReadableStream<Uint8Array> }): Promise<void> {
-    const res = await fetch(args.uploadUrl, {
+    // Node's fetch requires `duplex: 'half'` for streaming request bodies,
+    // but TypeScript's RequestInit type doesn't include it.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const init: any = {
       method: 'PUT',
       headers: { 'Content-Type': args.contentType },
       body: args.body,
-      // Required by Node fetch for streaming request bodies.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      duplex: 'half' as any,
-    });
+      duplex: 'half',
+    };
+    const res = await fetch(args.uploadUrl, init as RequestInit);
     if (!res.ok) throw new Error(`Presigned PUT failed (${res.status})`);
   }
 }

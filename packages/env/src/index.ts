@@ -133,6 +133,10 @@ export function getEnvConfig(): EnvironmentConfig {
     RUNNER_PORT: defaultRunnerPort,
     RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
 
+    // Bundle registry (optional; instance-global bundles)
+    BUNDLE_REGISTRY_URL: process.env.BUNDLE_REGISTRY_URL,
+    BUNDLE_REGISTRY_AUTH_TOKEN: process.env.BUNDLE_REGISTRY_AUTH_TOKEN,
+
     // Email Service Configuration (optional; email delivery disabled if not set)
     ENABLE_EMAILS: resolvedEnableEmails,
     EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,

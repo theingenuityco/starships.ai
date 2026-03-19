@@ -248,6 +248,19 @@ export function RoomConversationIndexView(props: {
             >
               <Icon name="clock" weight="bold" className="h-4 w-4" />
             </Button>
+            {props.canManagePins ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+                aria-label="Resources"
+                title="Resources"
+                onClick={() => props.onOpenResourcesPane?.()}
+              >
+                <Icon name="pin" weight="bold" className="h-4 w-4" />
+              </Button>
+            ) : null}
             <NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />
           </>
         }
@@ -262,16 +275,6 @@ export function RoomConversationIndexView(props: {
           </span>
         }
         fallbackTitle={label}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            {props.canManagePins ? (
-              <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
-                <Icon name="pin" className="h-4 w-4 mr-1" />
-                Resources
-              </Button>
-            ) : null}
-          </div>
-        }
       />
 
       {/* Room starter (conversation-starter style) */}

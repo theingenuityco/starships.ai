@@ -182,6 +182,19 @@ export async function resolveRoomConversationContext(args: { conversationId: str
   );
   const roomConversationId = typeof row?.room_conversation_id === 'string' ? String(row.room_conversation_id).trim() : '';
   if (!roomConversationId) return null;
+
+  // Load the full room row so callers (routing, UI policies) can access fields like managerAgentId.
+  const resolvedRoom = await roomRepo.findByConversationId(roomConversationId).catch(() => null);
+  if (resolvedRoom) {
+    return {
+      isRoom: false,
+      isRoomThread: true,
+      roomConversationId,
+      room: resolvedRoom,
+    };
+  }
+
+  // Fallback: if the room row cannot be loaded, at least return basic membership metadata.
   const starshipId = typeof row?.starship_id === 'string' ? String(row.starship_id).trim() : '';
   const isPrivate = Boolean(row?.is_private);
   return {

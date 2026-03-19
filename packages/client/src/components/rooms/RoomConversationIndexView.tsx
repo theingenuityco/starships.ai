@@ -27,6 +27,7 @@ export function RoomConversationIndexView(props: {
   roomProvisionedByBundle?: string | null
   starshipOwnerId?: string | null
   starshipSlug?: string | null
+  onOpenParticipantsPane?: () => void
   /** Optional allowlists to scope @mention and agent selection within room conversations. */
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
@@ -233,7 +234,7 @@ export function RoomConversationIndexView(props: {
       <ConversationSummaryBar
         conversationId={props.roomConversationId}
         starshipId={props.starshipId}
-        onParticipantsClick={() => participantsButtonRef.current?.click()}
+        onParticipantsClick={() => props.onOpenParticipantsPane?.()}
         titleRightSlot={
           <>
             <Button
@@ -263,15 +264,6 @@ export function RoomConversationIndexView(props: {
         fallbackTitle={label}
         rightSlot={
           <div className="flex items-center gap-2">
-            <RoomParticipantsButton
-              starshipId={props.starshipId}
-              roomConversationId={props.roomConversationId}
-              roomIsPrivate={Boolean(props.roomIsPrivate)}
-              roomManagerAgentId={props.roomManagerAgentId ?? null}
-              starshipOwnerId={props.starshipOwnerId ?? null}
-              buttonRef={participantsButtonRef}
-              className="sr-only"
-            />
             {props.canManagePins ? (
               <Button type="button" size="sm" variant="outline" onClick={() => props.onOpenResourcesPane?.()}>
                 <Icon name="pin" className="h-4 w-4 mr-1" />

@@ -2475,6 +2475,12 @@ export class ConversationService {
       throw new NotFoundError('Conversation', data.conversationId);
     }
 
+    // Room context (used for routing decisions and runtime env injection).
+    // Fetch early so we can prefer a room-scoped manager agent as the default fallback.
+    const roomCtxForRouting = await resolveRoomConversationContext({ conversationId: data.conversationId }).catch(() => null);
+    const roomManagerAgentId =
+      roomCtxForRouting?.isRoom && roomCtxForRouting.room?.managerAgentId ? String(roomCtxForRouting.room.managerAgentId).trim() : '';
+
     // Mention-only threads:
     // - Threads are child conversations (parentConversationId set).
     // - When a thread has 2+ linked agents, we stop using a default agent fallback.
@@ -2546,7 +2552,9 @@ export class ConversationService {
         const initialTargets =
           initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
 
-        const fallbackAgent = conversationAgents[0];
+        const fallbackAgent =
+          (roomManagerAgentId ? conversationAgents.find((a) => String(a?.id || '').trim() === roomManagerAgentId) : null) ||
+          conversationAgents[0];
         // If the message mentions any user(s) but no agent(s), do not run a default fallback agent.
         // This allows people to talk to each other in agent-backed threads without triggering an agent run.
         const blockFallbackDueToUserMentions = hasUserMentions && initialTargets.length === 0;
@@ -2644,8 +2652,7 @@ export class ConversationService {
 
       const env = getEnvConfig();
 
-      const roomCtx = await resolveRoomConversationContext({ conversationId: data.conversationId }).catch(() => null);
-      const roomId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+      const roomId = roomCtxForRouting?.roomConversationId ? String(roomCtxForRouting.roomConversationId) : '';
 
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
@@ -2680,6 +2687,25 @@ export class ConversationService {
 
         // Expose current agent id to the blueprint via env("AGENT_ID")
         (runtimeEnv as EngineConfig & { AGENT_ID?: string }).AGENT_ID = agentModel.id;
+
+        // Best-effort: update room manager heartbeat when the manager agent runs.
+        // Do not bump rooms.updated_at; this is operational metadata only.
+        if (roomCtxForRouting?.isRoom && roomManagerAgentId && agentModel.id === roomManagerAgentId) {
+          try {
+            const conn = getConnection();
+            await conn.query(
+              `
+                UPDATE rooms
+                   SET manager_agent_heartbeat_at = NOW()
+                 WHERE conversation_id = $1
+                   AND manager_agent_id = $2
+              `,
+              [roomCtxForRouting.roomConversationId, roomManagerAgentId]
+            );
+          } catch {
+            // best-effort
+          }
+        }
 
         // Guard against NULL/undefined persisted JSONB state
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };

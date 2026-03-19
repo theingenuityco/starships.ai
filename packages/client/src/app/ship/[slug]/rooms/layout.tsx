@@ -825,6 +825,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   starshipId={starshipData.id}
                   roomConversationId={activeConversationId}
                   roomIsPrivate={Boolean(activeRoom?.isPrivate)}
+                  roomManagerAgentId={activeRoom?.managerAgentId ?? null}
                   starshipOwnerId={starshipOwnerId}
                   className="sr-only"
                 />

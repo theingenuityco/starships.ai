@@ -133,7 +133,7 @@ type RoomConversationContext = {
   /** The room's backing conversation id (when isRoom or isRoomThread). */
   roomConversationId: string;
   /** Best-effort: room row, if loaded. */
-  room: { starshipId: string; isPrivate: boolean } | null;
+  room: { starshipId: string; isPrivate: boolean; managerAgentId?: string | null; managerAgentHeartbeatAt?: string | null } | null;
 };
 
 /**

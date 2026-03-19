@@ -398,25 +398,25 @@
   }
 
   .dark {
-    /* Enhanced Dark Theme - Neutral dark workspace (#212121) */
-    --background: 0 0% 13%; /* #212121 */
+    /* Enhanced Dark Theme - Deep neutral workspace */
+    --background: 0 0% 6%; /* ~#0f0f0f */
     --foreground: 0 0% 95%;
-    --card: 0 0% 6%;
+    --card: 0 0% 9%;
     --card-foreground: 0 0% 95%;
     --primary: 38 92% 54%; /* Amber primary in dark */
     --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 5%;
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 5%;
+    --muted: 0 0% 10%;
     --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 5%;
+    --accent: 0 0% 10%;
     --accent-foreground: 0 0% 95%;
-    --border: 0 0% 10%;
-    --input: 0 0% 10%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
     --ring: 38 92% 54%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --popover: 0 0% 3%;
+    --popover: 0 0% 9%;
     --popover-foreground: 0 0% 95%;
 
     /* Command Deck Dark - Deep space gradients */
@@ -549,16 +549,6 @@
 
   .tiptap-content h3 {
     @apply text-base font-medium mt-3 mb-2 first:mt-0;
-  }
-
-  /* Dedicated background for room conversation starter canvas.
-     Uses a neutral light/dark surface independent of the star-theme navy. */
-  .room-conversation-bg {
-    background-color: #f5f5f7;
-  }
-
-  .dark .room-conversation-bg {
-    background-color: #050509;
   }
 
   .app-textured-bg {
@@ -715,25 +705,25 @@
 /* Star Dark Theme - Matches regular dark theme - Always dark regardless of global theme */
 .star-theme-dark {
   /* Use same values as .dark class for consistency, neutral dark workspace */
-  --background: 0 0% 13% !important; /* #212121 */
+  --background: 0 0% 6% !important; /* ~#0f0f0f */
   --foreground: 0 0% 95% !important;
-  --card: 0 0% 6% !important;
+  --card: 0 0% 9% !important;
   --card-foreground: 0 0% 95% !important;
   --primary: 38 92% 54% !important; /* Amber primary in dark */
   --primary-foreground: 0 0% 0% !important;
-  --secondary: 0 0% 5% !important;
+  --secondary: 0 0% 10% !important;
   --secondary-foreground: 0 0% 95% !important;
-  --muted: 0 0% 5% !important;
+  --muted: 0 0% 10% !important;
   --muted-foreground: 0 0% 65% !important;
-  --accent: 0 0% 5% !important;
+  --accent: 0 0% 10% !important;
   --accent-foreground: 0 0% 95% !important;
   /* Lighten borders/inputs in dark star theme */
-  --border: 0 0% 18% !important;
-  --input: 0 0% 18% !important;
+  --border: 0 0% 16% !important;
+  --input: 0 0% 16% !important;
   --ring: 38 92% 54% !important;
   --destructive: 0 62% 50% !important;
   --destructive-foreground: 0 0% 98% !important;
-  --popover: 0 0% 3% !important;
+  --popover: 0 0% 9% !important;
   --popover-foreground: 0 0% 95% !important;
   --primary-rgb: 245 158 11 !important;
 
@@ -970,11 +960,7 @@
 /* Workspace room conversation canvas: force neutral surface for starter area only.
    This is extremely targeted and uses !important so it wins over utilities. */
 .room-conversation-bg {
-  background-color: #f5f5f7 !important;
-}
-
-.dark .room-conversation-bg {
-  background-color: #212121 !important;
+  background-color: hsl(var(--background)) !important;
 }
 
 /* Dark mode adjustments */

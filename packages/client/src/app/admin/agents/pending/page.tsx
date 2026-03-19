@@ -198,6 +198,10 @@ export default function PendingAgentsPage(): React.JSX.Element {
                 <Link href="/admin/llm-models" className="text-sm font-medium underline underline-offset-4">
                   LLM models
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/bundles" className="text-sm font-medium underline underline-offset-4">
+                  Bundle registry
+                </Link>
               </div>
               <p className="text-muted-foreground mt-3">Review pending publishes and manage instance-level encrypted secrets.</p>
             </div>

@@ -398,12 +398,24 @@ export default function AdminBundlesPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">Admin · Bundle Registry</h1>
               </div>
               <div className="flex items-center justify-center gap-3 mt-2 text-sm">
+                <Link href="/admin/connector-templates" className="font-medium underline underline-offset-4">
+                  Connector templates
+                </Link>
+                <span className="text-muted-foreground">·</span>
                 <Link href="/admin/agents/pending" className="font-medium underline underline-offset-4">
                   Agent approvals
                 </Link>
                 <span className="text-muted-foreground">·</span>
-                <Link href="/admin/connector-templates" className="font-medium underline underline-offset-4">
-                  Connector templates
+                <Link href="/admin/platform-secrets" className="font-medium underline underline-offset-4">
+                  Platform secrets
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/llm-models" className="font-medium underline underline-offset-4">
+                  LLM models
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/bundles" className="font-medium underline underline-offset-4">
+                  Bundle registry
                 </Link>
               </div>
             </div>

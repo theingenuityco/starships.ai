@@ -336,7 +336,7 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {
-              href: '/admin/connector-templates',
+              href: '/admin/bundles',
               label: 'Admin',
               icon: 'shield-check',
               isActive: pathname.startsWith('/admin'),

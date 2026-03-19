@@ -156,6 +156,10 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                 <Link href="/admin/llm-models" className="text-sm font-medium underline underline-offset-4">
                   LLM models
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/bundles" className="text-sm font-medium underline underline-offset-4">
+                  Bundle registry
+                </Link>
               </div>
               <p className="text-muted-foreground mt-3">Create a new connector template. Values are stored in `connector_templates`.</p>
             </div>

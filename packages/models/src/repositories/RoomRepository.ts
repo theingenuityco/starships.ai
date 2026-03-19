@@ -60,6 +60,8 @@ export class RoomRepository extends BaseRepository {
       conversationId: string;
       starshipId: string;
       provisionedByBundle?: string | null;
+      managerAgentId?: string | null;
+      managerAgentHeartbeatAt?: string | null;
     }
   ): Promise<RoomModel> {
     return this.executeWithErrorHandling(
@@ -81,6 +83,8 @@ export class RoomRepository extends BaseRepository {
           isPrivate: Boolean(args.isPrivate),
           ...(args.topic !== undefined ? { topic: args.topic } : {}),
           ...(args.provisionedByBundle !== undefined ? { provisionedByBundle: args.provisionedByBundle } : {}),
+          ...(args.managerAgentId !== undefined ? { managerAgentId: args.managerAgentId } : {}),
+          ...(args.managerAgentHeartbeatAt !== undefined ? { managerAgentHeartbeatAt: args.managerAgentHeartbeatAt } : {}),
           createdAt: now,
           updatedAt: now,
         };

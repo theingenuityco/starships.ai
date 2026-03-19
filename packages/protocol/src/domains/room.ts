@@ -18,6 +18,16 @@ export interface RoomModel extends Room {
   conversationId: string;
   starshipId: string;
   /**
+   * Optional room-scoped default/fallback agent.
+   * When set, room conversations can route unmentioned user messages to this agent.
+   */
+  managerAgentId?: string | null;
+  /**
+   * Best-effort "last seen" timestamp for the manager agent (server-managed).
+   * This is updated by runtime execution and should not be treated as a strict SLA signal.
+   */
+  managerAgentHeartbeatAt?: string | null;
+  /**
    * Optional provenance flag recording that this room was provisioned
    * from a specific bundle (e.g. "lead-generation").
    */
@@ -65,4 +75,3 @@ export interface RoomToolAssignment {
   createdAt: string;
   updatedAt: string;
 }
-

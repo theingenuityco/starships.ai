@@ -81,6 +81,7 @@ const map: Record<string, ResolvedIcon> = {
   filter: { type: 'phosphor', component: 'Funnel' },
   compass: { type: 'phosphor', component: 'Compass' },
   workflow: { type: 'phosphor', component: 'FlowArrow' },
+  pin: { type: 'phosphor', component: 'PushPin' },
 
   // Security & system
   'shield-check': { type: 'phosphor', component: 'ShieldCheck' },

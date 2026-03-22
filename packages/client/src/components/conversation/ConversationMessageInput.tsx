@@ -50,6 +50,7 @@ import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -306,6 +307,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       hasMoreBefore: streamHasMoreBefore,
     } = useConversationStreamContext()
     const stopConversation = useConversationStop()
+    const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
+    const setActiveStreamingConversationId = useStarshipUIStore(s => s.setActiveStreamingConversationId)
+    const activeStreamingConversationId = useStarshipUIStore(s => s.activeStreamingConversationId)
     // Track last known conversationId to enable stop during pre-stream window and to bridge route transitions
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
     useEffect(() => {
@@ -332,6 +336,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     useEffect(() => {
       if (!canEditComposer && emojiPickerOpen) setEmojiPickerOpen(false)
     }, [canEditComposer, emojiPickerOpen])
+
+    // Clear store-based streaming id when stream completes (survives unmount/remount for stop button)
+    const prevStreamingRef = useRef(isStreamingEffective)
+    useEffect(() => {
+      if (prevStreamingRef.current && !isStreamingEffective) {
+        setActiveStreamingConversationId(null)
+      }
+      prevStreamingRef.current = isStreamingEffective
+    }, [isStreamingEffective, setActiveStreamingConversationId])
 
     // Context-window usage (mirrors server behavior: last N persisted messages + optional fold message).
     // IMPORTANT: this is **not** lifetime token usage; it's a proxy for how "full" the next-turn context is
@@ -659,6 +672,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
       setSending(true)
+      // Set store immediately for existing conversations (survives unmount during route transition)
+      if (conversationId) {
+        setActiveStreamingConversationId(conversationId)
+      }
 
       // Track the active conversation id within this send attempt (handles "create conversation" path)
       let sendConversationId: string | null = conversationId ?? null
@@ -667,6 +684,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const resetFlags = () => {
         setSending(false)
         streamingRef.current = false
+        setActiveStreamingConversationId(null)
       }
       const rawForRouting = String(messageToSend || '')
       const hasUserMentionToken = rawForRouting.includes('<@u:')
@@ -853,6 +871,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
         lastConversationIdRef.current = currentConversationId!
+        // Store-based fallback survives unmount/remount during route transition
+        setActiveStreamingConversationId(currentConversationId!)
+        setPendingConversationId(currentConversationId!)
 
         // CRITICAL: pre-seed the streamed cache with a temp user message + local turn_started
         // BEFORE uploads / sendMessageFn() so the stream-derived responder state does not
@@ -1049,6 +1070,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       applyPendingWebBrowsing,
       roomConversationId,
       memberUsers,
+      setActiveStreamingConversationId,
+      setPendingConversationId,
     ])
 
     // Keep a stable ref for TipTap's Enter key handler.
@@ -1068,6 +1091,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = true
         // Then set state (async, but ref already blocks)
         setSending(true)
+        if (conversationId) {
+          setActiveStreamingConversationId(conversationId)
+        }
 
         let sendConversationId: string | null = conversationId ?? null
         let createdNewConversation = false
@@ -1076,6 +1102,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const resetFlags = () => {
           setSending(false)
           streamingRef.current = false
+          setActiveStreamingConversationId(null)
         }
 
         // Validation for agent and starship
@@ -1141,6 +1168,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           sendConversationId = currentConversationId!
           // Ensure local ref is updated immediately for stop button usability
           lastConversationIdRef.current = currentConversationId!
+          setActiveStreamingConversationId(currentConversationId!)
+          setPendingConversationId(currentConversationId!)
 
           // Trigger the route transition once the conversation exists.
           if (createdNewConversation) {
@@ -2423,8 +2452,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     <div className="relative h-8 w-8">
                       <Button
                         onClick={() => {
-                          const id = lastConversationIdRef.current
-                          if (!id) return
+                          const id = lastConversationIdRef.current || conversationId || activeStreamingConversationId
+                          if (!id) {
+                            toast.error('Could not stop response', { description: 'Please try again in a moment.' })
+                            return
+                          }
                           void stopConversation(id)
                         }}
                         variant="outline"
@@ -2573,8 +2605,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   <div className="relative h-8 w-8">
                     <Button
                       onClick={() => {
-                        const id = lastConversationIdRef.current
-                        if (!id) return
+                        const id = lastConversationIdRef.current || conversationId || activeStreamingConversationId
+                        if (!id) {
+                          toast.error('Could not stop response', { description: 'Please try again in a moment.' })
+                          return
+                        }
                         void stopConversation(id)
                       }}
                       variant="outline"

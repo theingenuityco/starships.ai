@@ -44,6 +44,9 @@ interface StarshipUIState {
   // Pending conversation id used to bridge route transitions (e.g. /conversations -> /conversations/:id).
   // This is intentionally NOT persisted.
   pendingConversationId: string | null
+  // Active streaming conversation id - set when a message is sent, cleared when stream ends.
+  // Survives component unmount/remount so stop button works during route transitions.
+  activeStreamingConversationId: string | null
 
   // Conversations data (authoritative UI source)
   conversations: Record<string, ConversationData>
@@ -52,6 +55,7 @@ interface StarshipUIState {
   setActiveStarship: (id: string | null) => void
   navigateTo: (route: string) => void
   setPendingConversationId: (id: string | null) => void
+  setActiveStreamingConversationId: (id: string | null) => void
 
   // Conversation data actions (UI-driven from TanStack and SSE)
   setConversationSnapshot: (conversationId: string, data: ConversationData) => void
@@ -72,6 +76,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         activeStarshipId: null,
         currentRoute: '/',
         pendingConversationId: null,
+        activeStreamingConversationId: null,
         conversations: {},
 
         // UI actions
@@ -90,6 +95,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
 
         navigateTo: (route: string) => set({ currentRoute: route }, false, 'ui/navigate'),
         setPendingConversationId: (id: string | null) => set({ pendingConversationId: id }, false, 'ui/setPendingConversationId'),
+        setActiveStreamingConversationId: (id: string | null) => set({ activeStreamingConversationId: id }, false, 'ui/setActiveStreamingConversationId'),
 
         // Conversation data actions
         setConversationSnapshot: (conversationId: string, data: ConversationData) =>

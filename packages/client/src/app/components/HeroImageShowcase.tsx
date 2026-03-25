@@ -9,7 +9,7 @@ const SHOWCASE_IMAGES = [
   '/landing/showcase/gmail.png',
 ]
 
-const SWITCH_INTERVAL_MS = 5000
+const SWITCH_INTERVAL_MS = 8000
 
 export default function HeroImageShowcase() {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -84,7 +84,11 @@ export default function HeroImageShowcase() {
                   alt={`Landing showcase ${activeIndex + 1}`}
                   className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5 will-change-transform"
                   style={{
-                    animation: 'hero-showcase-zoom 1500ms ease-out 1000ms forwards',
+                    animationName: 'hero-showcase-fade-in, hero-showcase-zoom',
+                    animationDuration: '650ms, 1200ms',
+                    animationTimingFunction: 'ease-in-out, ease-out',
+                    animationDelay: '0ms, 1000ms',
+                    animationFillMode: 'both, forwards',
                     transformOrigin: 'center top',
                   }}
                 />
@@ -94,12 +98,21 @@ export default function HeroImageShowcase() {
         </div>
       </div>
       <style jsx>{`
+        @keyframes hero-showcase-fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
         @keyframes hero-showcase-zoom {
           from {
             transform: scale(1);
           }
           to {
-            transform: scale(1.28);
+            transform: scale(1.35);
           }
         }
       `}</style>

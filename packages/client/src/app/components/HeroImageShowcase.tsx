@@ -82,13 +82,27 @@ export default function HeroImageShowcase() {
                   key={SHOWCASE_IMAGES[activeIndex]}
                   src={SHOWCASE_IMAGES[activeIndex]}
                   alt={`Landing showcase ${activeIndex + 1}`}
-                  className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5"
+                  className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5 will-change-transform"
+                  style={{
+                    animation: 'hero-showcase-zoom 1500ms ease-out 1000ms forwards',
+                    transformOrigin: 'center top',
+                  }}
                 />
               </div>
             </div>
           </div>
         </div>
       </div>
+      <style jsx>{`
+        @keyframes hero-showcase-zoom {
+          from {
+            transform: scale(1);
+          }
+          to {
+            transform: scale(1.28);
+          }
+        }
+      `}</style>
     </section>
   )
 }

@@ -153,6 +153,14 @@ export function PublicHeader(): React.JSX.Element {
             Explore
           </Link>
           <Link
+            href="/pricing"
+            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
+            className={`${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            aria-current={pathname.startsWith('/pricing') ? 'page' : undefined}
+          >
+            Pricing
+          </Link>
+          <Link
             href="/login"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
             className={`${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
@@ -242,6 +250,16 @@ export function PublicHeader(): React.JSX.Element {
                 className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
                 Login
+              </Link>
+              <Link
+                href="/pricing"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              >
+                Pricing
               </Link>
               {pathname !== '/' ? (
                 <Link

@@ -47,21 +47,21 @@ export default function FAQ() {
   }
 
   return (
-    <section className="py-14 px-4">
+    <section className="py-14 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-6 text-center">FAQs</h2>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-primary">FAQs</h2>
         <div className="grid sm:grid-cols-2 gap-4">
           {QA.map((item, i) => {
             const isOpen = openIndex === i
             return (
-              <Card key={i} className="bg-white/5 border-white/10 overflow-hidden">
-                <button onClick={() => toggle(i)} className="w-full p-5 text-left hover:bg-white/5 transition-colors flex items-center justify-between gap-2">
-                  <span className="font-medium flex-1">{item.q}</span>
-                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform" />
+              <Card key={i} className="border-slate-200 overflow-hidden" style={{ backgroundColor: '#F8F8FA' }}>
+                <button onClick={() => toggle(i)} className="w-full p-5 text-left hover:bg-slate-100 transition-colors flex items-center justify-between gap-2">
+                  <span className="font-medium flex-1 text-slate-900">{item.q}</span>
+                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="w-4 h-4 text-slate-500 flex-shrink-0 transition-transform" />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                   <div className="px-5 pb-5 pt-0">
-                    <div className="text-sm text-muted-foreground">{item.a}</div>
+                    <div className="text-sm text-slate-700">{item.a}</div>
                   </div>
                 </div>
               </Card>

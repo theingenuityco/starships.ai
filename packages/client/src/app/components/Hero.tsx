@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
@@ -19,6 +18,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
+  const [laptopParallaxX, setLaptopParallaxX] = useState(0)
   const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
   const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -45,6 +45,19 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     return () => {
       if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current)
     }
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY || 0
+      // Move laptop right as user scrolls down, capped to keep it near astronaut.
+      const next = Math.min(120, Math.max(0, y * 0.3))
+      setLaptopParallaxX(next)
+    }
+
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   const runPendingPrimaryAction = useCallback(() => {
@@ -92,7 +105,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
 
   return (
-    <section className="relative min-h-[calc(100dvh-80px)] flex items-center justify-center px-4 sm:px-6 pb-10 sm:pb-12 overflow-hidden">
+    <section className="relative min-h-[calc(100dvh-80px)] flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden">
       {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
@@ -104,10 +117,24 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           backgroundSize: 'cover',
         }}
       />
+      <div
+        className="pointer-events-none absolute z-[2] hidden md:block"
+        style={{
+          bottom: '150px',
+          left: 'calc(50% - 188px)',
+          transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-16deg)`,
+          transformOrigin: 'center center',
+          willChange: 'transform',
+        }}
+      >
+        <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[64px] sm:w-[72px] md:w-[80px] lg:w-[88px] h-auto" />
+      </div>
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0">
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[32ch] mx-auto break-words text-balance">
-            Team chat, powered by{' '}
+            Team chat,
+            <br />
+            powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
               <span className="warp-letter">I</span>
@@ -126,7 +153,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
-            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
+            {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button
               size="lg"
               className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-slate-900 [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900"
@@ -134,11 +161,11 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
               aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
             >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-slate-900">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-white">
                 <StarshipsLogo
                   width={48}
                   height={48}
-                  className="text-slate-900"
+                  className="text-white"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
                   activeStroke="currentColor"
@@ -157,9 +184,10 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   <span className="-mt-0.5 text-xs sm:text-sm font-normal text-slate-600 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
                 </span>
               ) : (
-                'Get Started for free'
+                <span className="text-white">Get Started for free</span>
               )}
             </Button>
+            <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>
         </div>
       </div>

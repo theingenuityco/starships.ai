@@ -23,14 +23,14 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
       <div className="w-full relative px-4 sm:px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="mb-6 md:mb-0 text-center md:text-left">
-            <p className="text-xs text-muted-foreground leading-relaxed mb-1.5">© 2026 Starships.ai - Where Ideas meet Intelligence</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <p className="text-xs text-slate-500 leading-relaxed mb-1.5">© 2026 Starships.ai - Where Ideas meet Intelligence</p>
+            <p className="text-xs text-slate-500 leading-relaxed">
               🪐 Manifested by{' '}
               <a
                 href="https://theingenuity.co"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-primary transition-colors underline"
+                className="hover:text-slate-900 transition-colors underline"
                 onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://theingenuity.co' })}
               >
                 The Ingenuity Co

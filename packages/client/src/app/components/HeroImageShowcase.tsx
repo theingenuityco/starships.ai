@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-const SHOWCASE_IMAGES = [
-  '/landing/showcase/github-gmail.png',
-  '/landing/showcase/lead-v2.png',
-  '/landing/showcase/lin.png',
-  '/landing/showcase/gmail.png',
-]
+const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
-const SWITCH_INTERVAL_MS = 8000
+const SWITCH_INTERVAL_MS = 6000
 
 export default function HeroImageShowcase() {
   const [activeIndex, setActiveIndex] = useState(0)
@@ -45,7 +40,9 @@ export default function HeroImageShowcase() {
     <section className="relative pb-16 sm:pb-20 px-4 bg-white text-slate-900">
       <div className="relative max-w-6xl mx-auto">
         <div className="mb-8 md:mb-10 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-slate-900">See it in action</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-slate-900">
+            See it in <span className="text-primary">action</span>
+          </h2>
           <p className="text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">A simple preview of workflows running across your tools.</p>
         </div>
 
@@ -73,9 +70,7 @@ export default function HeroImageShowcase() {
                     src={SHOWCASE_IMAGES[previousIndex]}
                     alt=""
                     aria-hidden
-                    className={`absolute inset-0 h-full w-full object-contain p-5 sm:p-6 md:p-7 transition-opacity duration-[650ms] ease-in-out ${
-                      isCrossfading ? 'opacity-0' : 'opacity-100'
-                    }`}
+                    className={`absolute inset-0 h-full w-full object-contain p-5 sm:p-6 md:p-7 transition-opacity duration-[650ms] ease-in-out ${isCrossfading ? 'opacity-0' : 'opacity-100'}`}
                   />
                 ) : null}
                 <img
@@ -85,7 +80,7 @@ export default function HeroImageShowcase() {
                   className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5 will-change-transform"
                   style={{
                     animationName: 'hero-showcase-fade-in, hero-showcase-zoom',
-                    animationDuration: '650ms, 1200ms',
+                    animationDuration: '650ms, 380ms',
                     animationTimingFunction: 'ease-in-out, ease-out',
                     animationDelay: '0ms, 1000ms',
                     animationFillMode: 'both, forwards',
@@ -112,7 +107,7 @@ export default function HeroImageShowcase() {
             transform: scale(1);
           }
           to {
-            transform: scale(1.35);
+            transform: scale(1.42);
           }
         }
       `}</style>

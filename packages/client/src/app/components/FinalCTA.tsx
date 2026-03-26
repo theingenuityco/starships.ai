@@ -8,16 +8,23 @@ export default function FinalCTA() {
   return (
     <section className="relative z-20 pt-20 pb-10 sm:pt-24 sm:pb-12 px-4">
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-3 sm:mb-4">Got a wild idea?</h2>
-        <p className="text-sm sm:text-base text-muted-foreground mb-5 sm:mb-6">Beam us a message. Humans are on the other end.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">
+          Got a <span className="text-primary">wild idea?</span>
+        </h2>
+        <p className="text-sm sm:text-base text-slate-600 mb-5 sm:mb-6">Beam us a message. Humans are on the other end.</p>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-          <Button size="lg" variant="outline" className="bg-transparent border-current text-muted-foreground" onClick={() => (window.location.href = 'mailto:tech@theingenuity.co')}>
+          <Button
+            size="lg"
+            variant="outline"
+            className="bg-transparent !border-slate-300 !text-slate-700 [&:hover]:!bg-[#191B1F] [&:hover]:!text-white [&:hover]:!border-[#191B1F] transition-colors duration-200"
+            onClick={() => (window.location.href = 'mailto:tech@theingenuity.co')}
+          >
             <Icon name="chat" className="w-4 h-4 mr-2" /> Contact us
           </Button>
           <Button
             size="lg"
             variant="outline"
-            className="bg-transparent border-current text-muted-foreground"
+            className="bg-transparent !border-slate-300 !text-slate-700 [&:hover]:!bg-[#191B1F] [&:hover]:!text-white [&:hover]:!border-[#191B1F] transition-colors duration-200"
             onClick={() => {
               track({ type: 'discord_cta_clicked' })
               window.open('https://discord.gg/wzF7xfjrKv', '_blank')

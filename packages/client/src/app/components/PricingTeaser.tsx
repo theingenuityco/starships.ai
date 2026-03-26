@@ -20,22 +20,14 @@ export default function PricingTeaser() {
     router.push('/login')
   }
   return (
-    <section className="relative pt-10 pb-14 px-4">
-      {/* Blend the white Security section above into this darker CTA band, without overlapping the CTA card */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-16 sm:h-24 z-0"
-        style={{
-          background: 'linear-gradient(to bottom, #ffffff 0%, #ffffff 55%, rgba(255,255,255,0.65) 80%, rgba(15,23,42,0) 100%)',
-        }}
-        aria-hidden
-      />
-      <div className="relative z-10 max-w-6xl mx-auto mt-32 sm:mt-36">
+    <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4 bg-white">
+      <div className="relative z-10 max-w-6xl mx-auto">
         <div className="relative group">
           <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-          <Card className="relative overflow-hidden px-6 py-10 border-0 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left bg-gradient-to-r from-indigo-500/15 via-fuchsia-500/15 to-amber-500/15">
+          <Card className="relative overflow-hidden px-6 sm:px-8 py-8 sm:py-9 border-0 shadow-lg flex flex-col md:flex-row items-center justify-between gap-5 sm:gap-6 text-center md:text-left bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500">
             <div>
-              <h2 className="text-2xl md:text-3xl font-semibold mb-2">Meet your AI team in minutes</h2>
-              <p className="text-sm text-muted-foreground">Start free, then scale up when you’re ready.</p>
+              <h2 className="text-2xl md:text-3xl font-semibold mb-2 text-white">Meet your AI team in minutes</h2>
+              <p className="text-sm text-white/85">Start free, then scale up when you’re ready.</p>
             </div>
             <div className="flex gap-3">
               <Button

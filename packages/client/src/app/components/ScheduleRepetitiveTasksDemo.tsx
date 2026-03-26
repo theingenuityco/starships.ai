@@ -74,11 +74,11 @@ export default function ScheduleRepetitiveTasksDemo() {
 
     type TaskType = 'inbox' | 'report' | 'research' | 'content'
     const agents = [
-      { name: 'Support Inbox Assistant', prompts: ['Sort inbox, draft replies.', 'Urgent threads and next steps.'], taskType: 'inbox' as TaskType },
-      { name: 'Release Notes Drafter', prompts: ['Slack update from GitHub.', 'PRs and user-facing changes.'], taskType: 'report' as TaskType },
-      { name: 'KPI Analyst', prompts: ['KPI snapshot for standup.', 'Weekly KPIs, flag anomalies.'], taskType: 'report' as TaskType },
-      { name: 'Competitor Researcher', prompts: ['Competitor brief.', 'Brief for planning.'], taskType: 'research' as TaskType },
-      { name: 'Newsletter Writer', prompts: ['Newsletter outline.', 'Content brief for blog.'], taskType: 'content' as TaskType },
+      { name: 'Gmail Assistant', prompts: ['Sort inbox and draft replies.', 'Flag urgent emails and propose responses.'], taskType: 'inbox' as TaskType },
+      { name: 'LinkedIn Assistant', prompts: ['Draft a LinkedIn post for this week.', 'Prepare two LinkedIn post ideas.'], taskType: 'content' as TaskType },
+      { name: 'Market Research Assistant', prompts: ['Quick market research summary.', 'Compare top competitors this week.'], taskType: 'research' as TaskType },
+      { name: 'KPI Analyst', prompts: ['KPI snapshot for standup.', 'Weekly KPI analysis and anomaly check.'], taskType: 'report' as TaskType },
+      { name: 'Insights Analyst', prompts: ['Summarize weekly trends.', 'Top 3 insights from recent activity.'], taskType: 'report' as TaskType },
     ]
 
     const map = new Map<string, MonthCalendarRun[]>()
@@ -105,19 +105,19 @@ export default function ScheduleRepetitiveTasksDemo() {
       if (weekday === 1 && dayOfMonth <= 7) {
         addRun(cursor, 9, 15, 'KPI Analyst', 'KPI snapshot for standup.', 'report')
       } else if (weekday === 2 && weekOfMonth <= 2) {
-        addRun(cursor, 10, 0, 'Competitor Researcher', 'Competitor brief.', 'research')
+        addRun(cursor, 10, 0, 'Market Research Assistant', 'Quick market research summary.', 'research')
       } else if (weekday === 3 && weekOfMonth % 2 === 1) {
-        addRun(cursor, 13, 30, 'Support Inbox Assistant', 'Sort inbox, draft replies.', 'inbox')
+        addRun(cursor, 13, 30, 'Gmail Assistant', 'Sort inbox and draft replies.', 'inbox')
       } else if (weekday === 5 && weekOfMonth % 2 === 0) {
-        addRun(cursor, 16, 0, 'Release Notes Drafter', 'Slack update from GitHub.', 'report')
+        addRun(cursor, 16, 0, 'Insights Analyst', 'Summarize weekly trends.', 'report')
       }
       cursor.setDate(cursor.getDate() + 1)
     }
 
-    addRun(monthStart, 10, 0, 'Competitor Researcher', 'Competitor brief.', 'research')
+    addRun(monthStart, 10, 0, 'Market Research Assistant', 'Quick market research summary.', 'research')
     const midMonth = new Date(monthStart.getFullYear(), monthStart.getMonth(), 15)
     if (midMonth.getMonth() === monthStart.getMonth()) {
-      addRun(midMonth, 11, 0, 'Newsletter Writer', 'Newsletter outline.', 'content')
+      addRun(midMonth, 11, 0, 'LinkedIn Assistant', 'Draft a LinkedIn post for this week.', 'content')
     }
 
     // Random but sensible extra runs (weekdays only, business hours)
@@ -168,6 +168,12 @@ export default function ScheduleRepetitiveTasksDemo() {
         addRun(dayDate, pickHour(), pickMinute(), agent.name, pickOne(agent.prompts), agent.taskType)
         toAdd -= 1
       }
+    }
+
+    // Cap to exactly 2 runs for every day that has tasks.
+    for (const [key, runs] of map.entries()) {
+      if (runs.length <= 2) continue
+      map.set(key, runs.slice(0, 2))
     }
 
     // Sort each day for stable rendering

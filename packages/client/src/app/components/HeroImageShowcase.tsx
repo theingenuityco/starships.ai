@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
-const SWITCH_INTERVAL_MS = 6000
+const SWITCH_INTERVAL_MS = 5000
 
 export default function HeroImageShowcase() {
   const [activeIndex, setActiveIndex] = useState(0)

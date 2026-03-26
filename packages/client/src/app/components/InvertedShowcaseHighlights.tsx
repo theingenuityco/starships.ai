@@ -146,7 +146,6 @@ export default function InvertedShowcaseHighlights() {
             opacity: 1;
           }
         }
-
       `}</style>
     </section>
   )

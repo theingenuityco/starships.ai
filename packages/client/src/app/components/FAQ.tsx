@@ -49,7 +49,9 @@ export default function FAQ() {
   return (
     <section className="py-14 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-primary">FAQs</h2>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-slate-900">
+          FAQ<span className="text-primary">s</span>
+        </h2>
         <div className="grid sm:grid-cols-2 gap-4">
           {QA.map((item, i) => {
             const isOpen = openIndex === i

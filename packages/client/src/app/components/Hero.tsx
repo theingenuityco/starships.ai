@@ -3,8 +3,6 @@
 import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
-import { useAuth } from '@/hooks/useAuth'
-import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -12,34 +10,11 @@ import type { AgentTemplateModel } from '@starships/protocol'
 export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const router = useRouter()
-  const { isAuthenticated, user, isLoading: authLoading, getToken } = useAuth()
-  const { getSelectedStarshipId } = useSelectedStarship()
-  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
-  const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
   const [laptopParallaxX, setLaptopParallaxX] = useState(0)
   const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
   const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // IMPORTANT: Do NOT read localStorage/token during render.
-  // This component is server-rendered, and reading client-only state during render causes hydration mismatches.
-  const [hasClientAuthToken, setHasClientAuthToken] = useState(false)
-  const hasAuthToken = hasClientAuthToken
-
-  // If the user has a token, but auth/starships are still resolving, do NOT let the CTA
-  // behave like a logged-out CTA (push /login). This is the flicker we saw in logs.
-  const shouldBlockCtaWhileResolving = hasAuthToken && (authLoading || starshipsLoading)
-
-  useEffect(() => {
-    let has = false
-    try {
-      has = !!getToken()
-    } catch {
-      has = false
-    }
-    setHasClientAuthToken(has)
-  }, [getToken])
 
   useEffect(() => {
     return () => {
@@ -72,19 +47,11 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [])
 
   const navigatePrimary = useCallback(() => {
-    if (isAuthenticated && primaryStarship?.slug) {
-      router.push(`/ship/${primaryStarship.slug}`)
-      return
-    }
     router.push('/login')
-  }, [isAuthenticated, primaryStarship?.slug, router])
+  }, [router])
 
   const handlePrimaryClick = useCallback(() => {
     if (isPrimaryAnimating) return
-
-    if (shouldBlockCtaWhileResolving) {
-      return
-    }
 
     track({ type: 'hero_cta_clicked' })
 
@@ -102,7 +69,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     fallbackTimeoutRef.current = setTimeout(() => {
       runPendingPrimaryAction()
     }, 1100)
-  }, [authLoading, hasAuthToken, isAuthenticated, isPrimaryAnimating, navigatePrimary, primaryStarship?.slug, runPendingPrimaryAction, shouldBlockCtaWhileResolving, starships, starshipsLoading])
+  }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
     <section className="relative min-h-[calc(100dvh-80px)] flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden">
@@ -158,8 +125,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               size="lg"
               className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-slate-900 [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900"
               onClick={handlePrimaryClick}
-              disabled={isPrimaryAnimating || shouldBlockCtaWhileResolving}
-              aria-busy={isPrimaryAnimating || shouldBlockCtaWhileResolving}
+              disabled={isPrimaryAnimating}
+              aria-busy={isPrimaryAnimating}
             >
               <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-white">
                 <StarshipsLogo
@@ -173,19 +140,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              {shouldBlockCtaWhileResolving ? (
-                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
-                  <span>Loading your starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-slate-600 truncate max-w-[18rem] sm:max-w-[22rem]">Just a moment…</span>
-                </span>
-              ) : isAuthenticated ? (
-                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
-                  <span>Enter my starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-slate-600 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
-                </span>
-              ) : (
-                <span className="text-white">Get Started for free</span>
-              )}
+              <span className="text-white">Get Started for free</span>
             </Button>
             <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>

@@ -31,7 +31,7 @@ const TESTIMONIALS = [
 
 export default function TestimonialsSection() {
   return (
-    <section className="my-8 sm:my-10 md:my-12 py-16 sm:py-20 md:py-24 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
+    <section className="py-16 sm:py-20 md:py-24 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
       <div className="max-w-6xl mx-auto">
         <div className="text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">

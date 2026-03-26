@@ -155,7 +155,7 @@ export default function ConnectorHighlights() {
             <div className="mt-6">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center h-11 px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+                className="inline-flex items-center justify-center h-11 px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
               >
                 Get Started
               </Link>

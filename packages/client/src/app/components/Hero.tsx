@@ -128,11 +128,11 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}
             >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-white">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-slate-900">
                 <StarshipsLogo
                   width={48}
                   height={48}
-                  className="text-white"
+                  className="text-slate-900"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
                   activeStroke="currentColor"
@@ -140,7 +140,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              <span className="text-white">Get Started for free</span>
+              <span className="text-slate-900">Get Started for free</span>
             </Button>
             <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>

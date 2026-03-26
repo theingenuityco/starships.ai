@@ -31,17 +31,36 @@ function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<strin
 }
 
 const TASK_TYPE_DOT: Record<string, string> = {
-  inbox: 'bg-blue-500',
-  report: 'bg-emerald-500',
-  research: 'bg-amber-500',
-  content: 'bg-violet-500',
+  inbox: '#1d4ed8',
+  report: '#047857',
+  research: '#b45309',
+  content: '#6d28d9',
 }
 
-const TASK_TYPE_BG: Record<string, string> = {
-  inbox: 'bg-blue-50 dark:bg-blue-950/60 border-blue-400',
-  report: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-400',
-  research: 'bg-amber-50 dark:bg-amber-950/60 border-amber-400',
-  content: 'bg-violet-50 dark:bg-violet-950/60 border-violet-400',
+const TASK_TYPE_TEXT: Record<string, string> = {
+  inbox: 'text-blue-950',
+  report: 'text-emerald-950',
+  research: 'text-amber-950',
+  content: 'text-violet-950',
+}
+
+const TASK_TYPE_STYLE: Record<string, React.CSSProperties> = {
+  inbox: {
+    background: 'linear-gradient(135deg, rgba(191,219,254,0.36) 0%, rgba(165,243,252,0.36) 100%)',
+    borderColor: 'rgba(59,130,246,0.65)',
+  },
+  report: {
+    background: 'linear-gradient(135deg, rgba(167,243,208,0.36) 0%, rgba(153,246,228,0.36) 100%)',
+    borderColor: 'rgba(16,185,129,0.65)',
+  },
+  research: {
+    background: 'linear-gradient(135deg, rgba(253,230,138,0.36) 0%, rgba(253,186,116,0.36) 100%)',
+    borderColor: 'rgba(245,158,11,0.65)',
+  },
+  content: {
+    background: 'linear-gradient(135deg, rgba(221,214,254,0.36) 0%, rgba(245,208,254,0.36) 100%)',
+    borderColor: 'rgba(139,92,246,0.65)',
+  },
 }
 
 export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runsByDay, onDayClick, className }: MonthScheduleCalendarProps) {
@@ -72,10 +91,7 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                 const tb = b.runAt ? new Date(b.runAt).getTime() : 0
                 return ta - tb
               })
-
-              const latest = sortedDayRuns.length ? sortedDayRuns[sortedDayRuns.length - 1] : null
-              const extraCount = Math.max(0, sortedDayRuns.length - 1)
-              const stackLayers = Math.min(sortedDayRuns.length, 3)
+              const visibleRuns = sortedDayRuns.slice(0, 2)
 
               return (
                 <CellTag
@@ -91,68 +107,28 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                 >
                   <div className="flex items-center justify-between">
                     <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
-                    {sortedDayRuns.length > 0 && (
-                      <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-1 text-[11px] font-semibold">
-                        {sortedDayRuns.length} run{sortedDayRuns.length > 1 ? 's' : ''}
-                      </span>
-                    )}
                   </div>
 
-                  {sortedDayRuns.length > 0 && latest ? (
+                  {visibleRuns.length > 0 ? (
                     <div className="relative mt-1 min-h-[56px]">
-                      {/* Collapsed stacked view */}
-                      <div className="pointer-events-none group-hover:hidden">
-                        {Array.from({ length: stackLayers }).map((_, i) => {
-                          const isTop = i === stackLayers - 1
-                          const depth = stackLayers - 1 - i
-                          const offsetY = depth * 3
-                          const offsetX = depth * 2
-                          const zIndex = 10 + i
-                          const transform = isTop ? 'translate(0, 0)' : `translate(${offsetX}px, ${offsetY}px)`
-
-                          const cardBg = latest.taskType ? (TASK_TYPE_BG[latest.taskType] ?? 'bg-muted border-border/60') : 'bg-muted border-border/60'
-                          return (
-                            <div
-                              // index is fine: purely visual stack
-                              key={i}
-                              className={cn(
-                                'absolute inset-x-0 h-14 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden transition-transform border shadow-sm',
-                                isTop ? cardBg : 'border-border/40 bg-muted/80'
-                              )}
-                              style={{ top: 0, zIndex, transform }}
-                            >
-                              {isTop && (
-                                <>
-                                  <div className="flex items-center gap-1 mb-1">
-                                    {latest.taskType && TASK_TYPE_DOT[latest.taskType] ? (
-                                      <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[latest.taskType])} aria-hidden />
-                                    ) : null}
-                                    <span className="font-medium truncate">{latest.agentName}</span>
-                                    {extraCount > 0 && <span className="ml-auto text-[9px] text-muted-foreground">+{extraCount}</span>}
-                                  </div>
-                                  {latest.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(latest.prompt)}</div>}
-                                </>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Expanded ordered list on hover */}
-                      <div className="hidden group-hover:flex flex-col gap-1 h-full">
-                        {sortedDayRuns.map(run => (
+                      <div className="flex flex-col gap-1 h-full">
+                        {visibleRuns.map((run, runIdx) => (
                           <div
                             key={run.id}
                             className={cn(
                               'w-full h-14 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden',
-                              run.taskType ? TASK_TYPE_BG[run.taskType] : 'bg-muted border-border/60'
+                              run.taskType ? 'border' : 'bg-muted border-border/60',
+                              runIdx === 1 && 'hidden group-hover:block group-focus-within:block'
                             )}
+                            style={run.taskType ? TASK_TYPE_STYLE[run.taskType] : undefined}
                           >
                             <div className="flex items-center gap-1 mb-1">
-                              {run.taskType && TASK_TYPE_DOT[run.taskType] ? <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[run.taskType])} aria-hidden /> : null}
-                              <span className="font-medium truncate">{run.agentName}</span>
+                              {run.taskType && TASK_TYPE_DOT[run.taskType] ? (
+                                <span className="flex-shrink-0 w-1 h-1 rounded-full ring-1 ring-black/10" style={{ backgroundColor: TASK_TYPE_DOT[run.taskType] }} aria-hidden />
+                              ) : null}
+                              <span className={cn('font-semibold truncate', run.taskType ? TASK_TYPE_TEXT[run.taskType] : 'text-slate-900')}>{run.agentName}</span>
                             </div>
-                            {run.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(run.prompt)}</div>}
+                            {run.prompt && <div className={cn('text-[10px] line-clamp-2 opacity-90', run.taskType ? TASK_TYPE_TEXT[run.taskType] : 'text-slate-800')}>{String(run.prompt)}</div>}
                           </div>
                         ))}
                       </div>

@@ -153,6 +153,14 @@ export function PublicHeader(): React.JSX.Element {
             Explore
           </Link>
           <Link
+            href="/pricing"
+            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
+            className={`${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            aria-current={pathname.startsWith('/pricing') ? 'page' : undefined}
+          >
+            Pricing
+          </Link>
+          <Link
             href="/login"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
             className={`${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
@@ -164,7 +172,7 @@ export function PublicHeader(): React.JSX.Element {
             <Link
               href="/login"
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
             >
               Get Started
             </Link>
@@ -243,6 +251,16 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Login
               </Link>
+              <Link
+                href="/pricing"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+              >
+                Pricing
+              </Link>
               {pathname !== '/' ? (
                 <Link
                   href="/login"
@@ -250,7 +268,7 @@ export function PublicHeader(): React.JSX.Element {
                     track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                     setMobileMenuOpen(false)
                   }}
-                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
                 >
                   Get Started
                 </Link>

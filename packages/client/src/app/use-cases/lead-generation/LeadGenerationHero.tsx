@@ -37,7 +37,7 @@ export function LeadGenerationHero(props: { useCase: UseCaseModel }) {
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[42vh] sm:h-[50vh]"
         aria-hidden
         style={{
-          backgroundImage: "url('/landing/astro-base.svg')",
+          backgroundImage: "url('/landing/planet-base.svg')",
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center bottom',
           backgroundSize: 'cover',

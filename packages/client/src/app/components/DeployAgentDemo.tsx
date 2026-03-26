@@ -1,8 +1,77 @@
 'use client'
 
-const DEPLOY_AGENTS_VIDEO_URL = 'https://www.youtube.com/embed/Iuzm9hPpU_w'
+import { useEffect, useRef } from 'react'
+
+const DEPLOY_AGENTS_VIDEO_ID = 'Iuzm9hPpU_w'
+
+declare global {
+  interface Window {
+    YT?: any
+    onYouTubeIframeAPIReady?: () => void
+  }
+}
 
 export default function DeployAgentDemo() {
+  const playerHostRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    let isCancelled = false
+    let player: any = null
+
+    const mountPlayer = () => {
+      if (isCancelled) return
+      if (!playerHostRef.current) return
+      if (!window.YT?.Player) return
+
+      player = new window.YT.Player(playerHostRef.current, {
+        videoId: DEPLOY_AGENTS_VIDEO_ID,
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          rel: 0,
+          playsinline: 1,
+          vq: 'hd1080',
+          loop: 1,
+          playlist: DEPLOY_AGENTS_VIDEO_ID,
+        },
+        events: {
+          onReady: (event: any) => {
+            try {
+              event.target.setPlaybackRate(2)
+              event.target.playVideo()
+            } catch {
+              // no-op
+            }
+          },
+        },
+      })
+    }
+
+    if (window.YT?.Player) {
+      mountPlayer()
+    } else {
+      const existing = document.querySelector<HTMLScriptElement>('script[src="https://www.youtube.com/iframe_api"]')
+      if (!existing) {
+        const script = document.createElement('script')
+        script.src = 'https://www.youtube.com/iframe_api'
+        document.head.appendChild(script)
+      }
+
+      const prevReady = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof prevReady === 'function') prevReady()
+        mountPlayer()
+      }
+    }
+
+    return () => {
+      isCancelled = true
+      if (player && typeof player.destroy === 'function') {
+        player.destroy()
+      }
+    }
+  }, [])
+
   return (
     <div className="w-full">
       <div className="relative max-w-4xl mx-auto">
@@ -25,13 +94,7 @@ export default function DeployAgentDemo() {
 
           {/* Video area */}
           <div className="aspect-video bg-black/90">
-            <iframe
-              src={`${DEPLOY_AGENTS_VIDEO_URL}?autoplay=1&mute=1&rel=0&playsinline=1&vq=hd1080&loop=1&playlist=Iuzm9hPpU_w`}
-              title="Deploy agents demo"
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
+            <div ref={playerHostRef} className="h-full w-full" aria-label="Deploy agents demo video" />
           </div>
         </div>
       </div>

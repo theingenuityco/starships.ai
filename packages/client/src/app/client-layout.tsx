@@ -64,6 +64,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
     pathname === '/' ||
+    pathname === '/pricing' ||
     pathname === '/use-cases' ||
     pathname.startsWith('/use-cases/') ||
     pathname === '/login' ||
@@ -86,6 +87,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path.startsWith('/use-cases/')) return 'Use cases | Starships.ai'
       if (path === '/explore' || path === '/marketplace') return 'Explore | Starships.ai'
       if (path.startsWith('/explore/') || path.startsWith('/marketplace/')) return 'Explore | Starships.ai'
+      if (path === '/pricing') return 'Pricing | Starships.ai'
       if (path === '/login') return 'Login | Starships.ai'
       if (path === '/forgot-password') return 'Forgot Password | Starships.ai'
       if (path === '/reset-password') return 'Reset Password | Starships.ai'

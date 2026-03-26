@@ -1,8 +1,9 @@
 'use client'
 
 import Hero from '@/app/components/Hero'
-import HeroDemoSection from '@/app/components/HeroDemoSection'
+import HeroImageShowcase from '@/app/components/HeroImageShowcase'
 import UseCases from '@/app/components/UseCases'
+import TestimonialsSection from '@/app/components/TestimonialsSection'
 import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
@@ -50,15 +51,18 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
           <div className="overflow-x-hidden">
             {/* New Landing Sections */}
             <Hero initialAgentTemplates={initialAgentTemplates} />
-            <HeroDemoSection initialAgentTemplates={initialAgentTemplates} />
+            <HeroImageShowcase />
             <UseCases />
+            <TestimonialsSection />
             <Security />
             <PricingTeaser />
-            <FAQ />
-            <FinalCTA />
+            <div className="bg-white text-slate-900">
+              <FAQ />
+              <FinalCTA />
 
-            {/* Footer */}
-            <PublicFooter fromPath="/" />
+              {/* Footer */}
+              <PublicFooter fromPath="/" />
+            </div>
           </div>
         </div>
       </div>

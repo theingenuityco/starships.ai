@@ -107,18 +107,18 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
   const accentByClass: Record<string, { ring: string; cardBg: string; stripe: string }> = {
     scout: {
       ring: 'ring-primary/20',
-      cardBg: 'bg-gradient-to-b from-amber-950/40 via-card to-card dark:from-amber-900/20 dark:via-card dark:to-card',
-      stripe: 'from-amber-500/15 via-amber-500/5 to-transparent dark:from-amber-400/10 dark:via-transparent dark:to-transparent',
+      cardBg: 'bg-gradient-to-b from-amber-50/80 via-card to-card dark:from-amber-950/25 dark:via-card dark:to-card',
+      stripe: 'from-amber-400/30 via-amber-300/12 to-transparent dark:from-amber-300/22 dark:via-amber-300/8 dark:to-transparent',
     },
     frigate: {
-      ring: 'ring-violet-500/15 dark:ring-violet-400/10',
-      cardBg: 'bg-gradient-to-b from-violet-950/35 via-card to-card dark:from-violet-900/25 dark:via-card dark:to-card',
-      stripe: 'from-violet-500/12 via-violet-500/4 to-transparent dark:from-violet-400/8 dark:via-transparent dark:to-transparent',
+      ring: 'ring-violet-500/20 dark:ring-violet-400/12',
+      cardBg: 'bg-gradient-to-b from-violet-50/80 via-card to-card dark:from-violet-950/28 dark:via-card dark:to-card',
+      stripe: 'from-violet-400/34 via-violet-300/16 to-transparent dark:from-violet-300/24 dark:via-violet-300/10 dark:to-transparent',
     },
     cruiser: {
-      ring: 'ring-slate-400/15 dark:ring-slate-300/10',
-      cardBg: 'bg-gradient-to-b from-slate-800/50 via-card to-card dark:from-slate-700/30 dark:via-card dark:to-card',
-      stripe: 'from-slate-400/10 via-slate-400/3 to-transparent dark:from-slate-300/8 dark:via-transparent dark:to-transparent',
+      ring: 'ring-slate-400/20 dark:ring-slate-300/12',
+      cardBg: 'bg-gradient-to-b from-slate-100/80 via-card to-card dark:from-slate-900/35 dark:via-card dark:to-card',
+      stripe: 'from-slate-400/30 via-slate-300/14 to-transparent dark:from-slate-300/22 dark:via-slate-200/10 dark:to-transparent',
     },
   }
 
@@ -173,65 +173,68 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                       relative overflow-hidden rounded-2xl border text-left h-full w-full cursor-default transition-all duration-200
                       ${accent.cardBg}
                       ${subscribeMutation.isPending ? 'opacity-70' : ''}
-                      ${isCurrent ? 'border-primary/40 shadow-md ring-1 ring-primary/15' : `border-border hover:border-muted-foreground/40 hover:shadow-sm ring-1 ${accent.ring}`}
+                      ${isCurrent ? 'border-primary/50 shadow-lg ring-2 ring-primary/20' : 'border-border hover:border-muted-foreground/40 hover:shadow-sm'}
                     `}
                     >
-                      <div className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b ${accent.stripe}`} />
+                      <div className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b ${accent.stripe}`} />
+                      {isCurrent ? (
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.08] via-transparent to-transparent" />
+                      ) : null}
 
                       {/* Top meta - no upgrade badge, only Current on current plan */}
-                      <div className="relative p-4 pb-3">
+                      <div className="relative p-5 pb-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold tracking-tight truncate">{plan.displayName}</div>
-                            <div className="mt-2 flex items-baseline gap-2">
-                              <div className="text-2xl font-bold tracking-tight">{price ?? '—'}</div>
-                              <div className="text-xs text-muted-foreground">{cadence}</div>
+                            <div className="text-base font-semibold tracking-tight truncate">{plan.displayName}</div>
+                            <div className="mt-3 flex items-baseline gap-2">
+                              <div className="text-3xl font-bold tracking-tight">{price ?? '—'}</div>
+                              <div className="text-sm text-muted-foreground">{cadence}</div>
                             </div>
                           </div>
                           {isCurrent ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary shrink-0">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-primary shrink-0">
                               <Icon name="check-circle" className="h-3.5 w-3.5" />
                               Current
                             </span>
                           ) : null}
                         </div>
 
-                        <div className="mt-3 text-xs text-muted-foreground">Built-in limits for this class:</div>
+                        <div className="mt-4 border-t border-border/70 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Included in this plan</div>
                       </div>
 
                       <div className="flex flex-col">
-                        <div className="px-4 pb-4 space-y-2">
-                          <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="inline-flex items-center gap-1 text-muted-foreground">
-                              <Icon name="users" className="h-3.5 w-3.5" />
+                        <div className="px-5 pb-5 space-y-3">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="users" className="h-4 w-4 text-primary" />
                               Max agents
                             </span>
                             <span className="font-semibold tabular-nums">{plan.entitlements.maxAgents}</span>
                           </div>
-                          <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="inline-flex items-center gap-1 text-muted-foreground">
-                              <Icon name="zap" className="h-3.5 w-3.5" />
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="zap" className="h-4 w-4 text-primary" />
                               Parallel Tasks
                             </span>
                             <span className="font-semibold tabular-nums">{plan.entitlements.maxConcurrentTurns}</span>
                           </div>
-                          <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="inline-flex items-center gap-1 text-muted-foreground">
-                              <Icon name="coins" className="h-3.5 w-3.5" />
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="coins" className="h-4 w-4 text-primary" />
                               Monthly credits
                             </span>
                             <span className="font-semibold tabular-nums">{plan.entitlements.monthlyCredits}</span>
                           </div>
                         </div>
 
-                        <div className="px-4 pb-4 pt-1">
+                        <div className="px-5 pb-5 pt-1 border-t border-border/70">
                           <Button
                             type="button"
                             size="sm"
                             onClick={() => handleSubscribe(plan.priceId)}
                             disabled={subscribeMutation.isPending || isCurrent}
                             variant={isCurrent ? 'secondary' : 'default'}
-                            className="w-full gap-1.5"
+                            className="w-full gap-1.5 h-10"
                           >
                             {!isCurrent && isUpgrade && <Icon name="arrow-up" className="h-3.5 w-3.5" />}
                             {ctaLabel}

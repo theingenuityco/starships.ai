@@ -200,7 +200,7 @@ export default function PricingPageClient(): React.JSX.Element {
                       <div className="border-t border-border/70 pt-4">
                         <Button asChild type="button" size="sm" variant={isRecommended ? 'default' : 'secondary'} className="w-full gap-1.5 h-10">
                           <Link href={getPlanCtaHref(plan.priceId)}>
-                            {!isAuthenticated && plan.unitAmount === 0 ? 'Login' : 'Choose plan'}
+                            {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
                           </Link>
                         </Button>
                       </div>

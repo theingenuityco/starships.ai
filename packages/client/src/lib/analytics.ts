@@ -9,7 +9,7 @@ export type AnalyticsEvent =
   | { type: 'public_header_logo_clicked'; fromPath: string }
   | { type: 'public_header_nav_clicked'; fromPath: string; destination: '/' | '/use-cases/lead-generation' | '/use-cases/wordpress-site' | '/explore' | '/marketplace' | '/login' | '/pricing'; variant: 'desktop' | 'mobile' }
   | { type: 'public_header_mobile_menu_toggled'; fromPath: string; isOpen: boolean }
-  | { type: 'public_footer_link_clicked'; fromPath: string; destination: '/privacy' | '/terms' | '/docs' | 'https://theingenuity.co' }
+  | { type: 'public_footer_link_clicked'; fromPath: string; destination: string }
   | { type: 'marketplace_category_selected'; category: string }
   | { type: 'marketplace_tab_selected'; tab: 'all' | 'agents' | 'tools' | 'connectors' }
   | { type: 'marketplace_search_used'; query: string }

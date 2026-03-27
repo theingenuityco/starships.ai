@@ -21,13 +21,16 @@ export interface SubscriptionPlan {
 
 export const SUBSCRIPTION_PLANS_QUERY_KEYS = {
   all: ['subscription-plans'] as const,
+  mode: (mode: 'authenticated' | 'public') => [...SUBSCRIPTION_PLANS_QUERY_KEYS.all, mode] as const,
 } as const
 
-export function useSubscriptionPlans(enabled: boolean = true) {
+export function useSubscriptionPlans(enabled: boolean = true, options?: { publicAccess?: boolean }) {
+  const publicAccess = Boolean(options?.publicAccess)
   return useQuery({
-    queryKey: SUBSCRIPTION_PLANS_QUERY_KEYS.all,
+    queryKey: SUBSCRIPTION_PLANS_QUERY_KEYS.mode(publicAccess ? 'public' : 'authenticated'),
     queryFn: async (): Promise<SubscriptionPlan[]> => {
-      const response: FetchResponse<ApiResponse<{ plans: SubscriptionPlan[] }>> = await api.get('/api/v1/subscriptions/plans')
+      const endpoint = publicAccess ? '/api/v1/subscriptions/public-plans' : '/api/v1/subscriptions/plans'
+      const response: FetchResponse<ApiResponse<{ plans: SubscriptionPlan[] }>> = await api.get(endpoint)
       return response.data.data.plans
     },
     enabled,

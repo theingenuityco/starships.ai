@@ -8,6 +8,21 @@ import { SubscriptionPlanCatalogService } from '@/services/SubscriptionPlanCatal
 const router: Router = Router();
 
 /**
+ * GET /subscriptions/public-plans
+ *
+ * Public-safe pricing catalog for marketing pages.
+ */
+router.get('/subscriptions/public-plans', rateLimiters.public, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const plans = await SubscriptionPlanCatalogService.listPlans();
+
+    sendSuccess(res, { plans }, 200);
+  } catch (error) {
+    handleError(error, res, 'listing public subscription plans');
+  }
+});
+
+/**
  * GET /subscriptions/plans
  *
  * Returns active recurring Stripe prices that define ship classes via metadata (Option A).

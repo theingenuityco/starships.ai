@@ -4,7 +4,12 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import Icon from '@/components/primitives/Icon'
 
-const QA = [
+export interface FAQItem {
+  q: string
+  a: string
+}
+
+const QA: FAQItem[] = [
   {
     q: 'What is Starships.ai?',
     a: 'Starships is a workspace where you assemble AI staff: specialists you can brief, equip with tools, and collaborate with to get real work done.',
@@ -39,7 +44,12 @@ const QA = [
   },
 ]
 
-export default function FAQ() {
+interface FAQProps {
+  items?: FAQItem[]
+  title?: string
+}
+
+export default function FAQ({ items = QA, title = 'FAQs' }: FAQProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const toggle = (index: number) => {
@@ -50,10 +60,10 @@ export default function FAQ() {
     <section className="py-14 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-slate-900">
-          FAQ<span className="text-primary">s</span>
+          {title}
         </h2>
         <div className="grid sm:grid-cols-2 gap-4">
-          {QA.map((item, i) => {
+          {items.map((item, i) => {
             const isOpen = openIndex === i
             return (
               <Card key={i} className="border-slate-200 overflow-hidden" style={{ backgroundColor: '#F8F8FA' }}>

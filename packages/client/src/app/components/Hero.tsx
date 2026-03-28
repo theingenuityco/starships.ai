@@ -74,10 +74,10 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
 
   return (
     <section
-      className="relative flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden"
+      className="relative flex items-start justify-center px-4 sm:px-6 pt-10 sm:pt-14 md:pt-16 pb-10 sm:pb-12 overflow-hidden"
       style={{
         // Shorter than 100dvh so the showcase peeks (matches production landing).
-        minHeight: 'calc(100dvh - 80px - clamp(5rem, 10vh, 6.75rem))',
+        minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
       }}
     >
       {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
@@ -106,10 +106,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">
           {/* inline-block + shrink-0: avoid flex min-width:0 collapsing the line and forcing a wrap */}
-          <h1
-            className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center"
-            style={{ fontSize: 'clamp(1.125rem, 2.75vw + 0.35rem, 4.5rem)' }}
-          >
+          <h1 className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center" style={{ fontSize: 'clamp(1.125rem, 2.75vw + 0.35rem, 4.5rem)' }}>
             Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
@@ -130,13 +127,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           </p>
           <div className="flex flex-col items-center gap-5 justify-center w-full min-w-0">
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
-            <Button
-              size="lg"
-              className={landingPrimaryCtaHero}
-              onClick={handlePrimaryClick}
-              disabled={isPrimaryAnimating}
-              aria-busy={isPrimaryAnimating}
-            >
+            <Button size="lg" className={landingPrimaryCtaHero} onClick={handlePrimaryClick} disabled={isPrimaryAnimating} aria-busy={isPrimaryAnimating}>
               <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-slate-900">
                 <StarshipsLogo
                   width={48}

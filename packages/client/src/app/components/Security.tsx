@@ -1,4 +1,3 @@
-import { panelMuted, panelMutedLift } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
 
 export default function Security() {
@@ -36,7 +35,11 @@ export default function Security() {
         <div>
           <ul className="grid gap-5 sm:gap-6 md:gap-8 md:grid-cols-3">
             {items.map((i, idx) => (
-              <li key={idx} className={`text-center p-5 md:p-6 ${panelMuted} ${panelMutedLift}`}>
+              <li
+                key={idx}
+                className="text-center rounded-none border border-slate-200 p-5 md:p-6 shadow-[0_6px_20px_rgba(15,23,42,0.08)]"
+                style={{ backgroundColor: '#F8F8FA' }}
+              >
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-none border-2 border-slate-200 bg-white text-slate-800 shadow-[3px_3px_0_0_rgb(226_232_240)]">
                   <Icon name={i.icon} className="w-6 h-6" />
                 </div>

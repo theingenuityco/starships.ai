@@ -1,5 +1,5 @@
 'use client'
-import { landingSpectacularShadow } from '@/app/components/landing/landingSurface'
+import { landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
@@ -23,23 +23,20 @@ export default function PricingTeaser() {
   return (
     <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4 bg-white">
       <div className="relative z-10 mx-auto max-w-6xl">
-        <Card
-          className={`relative flex flex-col items-center justify-between gap-5 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left ${landingSpectacularShadow}`}
-        >
-          <div>
-            <h2 className="mb-2 text-2xl font-semibold text-white md:text-3xl">Meet your AI team in minutes</h2>
-            <p className="text-sm text-white/85">Start free, then scale up when you’re ready.</p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              size="lg"
-              className="relative h-14 rounded-none px-8 text-center text-base leading-none text-slate-900 sm:text-lg overflow-hidden whitespace-nowrap bg-gradient-to-b from-white via-white to-slate-100 shadow-[4px_4px_0_0_rgba(15,23,42,0.35)] transition-all duration-100 hover:-translate-y-px hover:shadow-[5px_5px_0_0_rgba(15,23,42,0.45)] active:translate-x-0.5 active:translate-y-0 active:shadow-[2px_2px_0_0_rgba(15,23,42,0.3)]"
-              onClick={handleClick}
-            >
-              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get Started Free'}
-            </Button>
-          </div>
-        </Card>
+        <div className="relative group">
+          <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+          <Card className="relative flex flex-col items-center justify-between gap-5 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center shadow-lg sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left">
+            <div>
+              <h2 className="mb-2 text-2xl font-semibold text-white md:text-3xl">Meet your AI team in minutes</h2>
+              <p className="text-sm text-white/85">Start free, then scale up when you’re ready.</p>
+            </div>
+            <div className="flex gap-3">
+              <Button size="lg" className={landingWhiteCtaOnGradientLg} onClick={handleClick}>
+                {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get Started Free'}
+              </Button>
+            </div>
+          </Card>
+        </div>
       </div>
     </section>
   )

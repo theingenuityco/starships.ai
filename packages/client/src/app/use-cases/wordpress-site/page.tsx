@@ -72,8 +72,8 @@ export default function WordPressSiteUseCasePage() {
         <div className="relative z-10">
           <PublicHeader />
 
-          <main className="pb-12 sm:pb-16">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10">
+          <main className="bg-white pb-12 text-slate-900 sm:pb-16">
+            <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
               <UseCaseHero useCase={useCase} />
               <UseCaseSections useCase={useCase} />
             </div>

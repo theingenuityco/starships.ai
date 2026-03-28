@@ -152,9 +152,7 @@ export default function PricingPageClient(): React.JSX.Element {
                     `}
                   >
                     <div className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b ${accent.stripe}`} />
-                    {isRecommended ? (
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.08] via-transparent to-transparent" />
-                    ) : null}
+                    {isRecommended ? <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.08] via-transparent to-transparent" /> : null}
                     <div className="relative p-5 pb-4">
                       <div className="min-w-0">
                         <div className="flex items-center justify-between gap-3">
@@ -199,9 +197,7 @@ export default function PricingPageClient(): React.JSX.Element {
 
                       <div className="border-t border-border/70 pt-4">
                         <Button asChild type="button" size="sm" variant={isRecommended ? 'default' : 'secondary'} className="w-full gap-1.5 h-10">
-                          <Link href={getPlanCtaHref(plan.priceId)}>
-                            {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
-                          </Link>
+                          <Link href={getPlanCtaHref(plan.priceId)}>{!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}</Link>
                         </Button>
                       </div>
                     </div>

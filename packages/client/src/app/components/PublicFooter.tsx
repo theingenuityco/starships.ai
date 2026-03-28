@@ -12,8 +12,6 @@ import {
   footerTopDividerLandingDark,
   footerTopDividerTheme,
   footerVioletArc,
-  panelDark,
-  panelDarkLift,
   socialDark,
 } from '@/app/components/landing/landingSurface'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
@@ -97,84 +95,82 @@ export function PublicFooter(props: {
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-8">
         <div className="grid grid-cols-1 gap-10 pb-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
-            <div className={`${panelDark} ${panelDarkLift} p-4 sm:p-5`}>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#050b24] focus-visible:ring-2 focus-visible:ring-violet-400"
-                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: '/' })}
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#050b24] focus-visible:ring-2 focus-visible:ring-white/40"
+              onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: '/' })}
+            >
+              <span
+                className="flex items-center gap-2"
+                style={
+                  {
+                    '--foreground': '226 232 240',
+                    '--background': '15 23 42',
+                  } as CSSProperties
+                }
               >
-                <span
-                  className="flex items-center gap-2"
-                  style={
-                    {
-                      '--foreground': '226 232 240',
-                      '--background': '15 23 42',
-                    } as CSSProperties
-                  }
-                >
-                  <StarshipsLogo width={30} height={30} className="text-white" gradientId="footer-starships-logo-gradient" idleLoop activeStroke="gradient" />
-                  <span className={`${orbitron.className} text-lg sm:text-xl font-normal tracking-tight leading-none`}>starships.ai</span>
-                </span>
-              </Link>
-              <p className="mt-4 max-w-lg text-sm font-medium leading-relaxed text-white/80">
-                Team chat, powered by AI agents. Collaborate with your team, delegate work to agents, and ship faster.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-2.5">
-                <a
-                  href="mailto:tech@theingenuity.co"
-                  aria-label="Email"
-                  className={socialDark}
-                  onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'mailto:tech@theingenuity.co' })}
-                >
-                  <Icon name="mail" className="h-5 w-5" />
-                </a>
-                <a
-                  href="https://github.com/theingenuityai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="GitHub"
-                  className={socialDark}
-                  onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/theingenuityai' })}
-                >
-                  <Icon name="github" className="h-5 w-5" />
-                </a>
-                <a
-                  href="https://discord.gg/wzF7xfjrKv"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Discord"
-                  className={socialDark}
-                  onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://discord.gg/wzF7xfjrKv' })}
-                >
-                  <Icon name="discord" className="h-5 w-5" />
-                </a>
-                <a
-                  href="https://www.youtube.com/@StarshipsAI"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="YouTube"
-                  className={socialDark}
-                  onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.youtube.com/@StarshipsAI' })}
-                >
-                  <Icon name="youtube" className="h-5 w-5" />
-                </a>
-                <a
-                  href="https://www.instagram.com/starships.ai/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Instagram"
-                  className={socialDark}
-                  onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.instagram.com/starships.ai/' })}
-                >
-                  <Icon name="instagram" className="h-5 w-5" />
-                </a>
-              </div>
+                <StarshipsLogo width={30} height={30} className="text-white" gradientId="footer-starships-logo-gradient" idleLoop activeStroke="gradient" />
+                <span className={`${orbitron.className} text-lg sm:text-xl font-normal tracking-tight leading-none`}>starships.ai</span>
+              </span>
+            </Link>
+            <p className="mt-4 max-w-lg text-sm font-medium leading-relaxed text-white/80">
+              Team chat, powered by AI agents. Collaborate with your team, delegate work to agents, and ship faster.
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
+              <a
+                href="mailto:tech@theingenuity.co"
+                aria-label="Email"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'mailto:tech@theingenuity.co' })}
+              >
+                <Icon name="mail" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://github.com/theingenuityai"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/theingenuityai' })}
+              >
+                <Icon name="github" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://discord.gg/wzF7xfjrKv"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Discord"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://discord.gg/wzF7xfjrKv' })}
+              >
+                <Icon name="discord" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.youtube.com/@StarshipsAI"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.youtube.com/@StarshipsAI' })}
+              >
+                <Icon name="youtube" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.instagram.com/starships.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.instagram.com/starships.ai/' })}
+              >
+                <Icon name="instagram" className="h-5 w-5" />
+              </a>
             </div>
           </div>
 
           <div className="md:col-span-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {footerGroups.map(group => (
-              <div key={group.title} className={`${panelDark} ${panelDarkLift} p-4`}>
+              <div key={group.title}>
                 <div className={footerEyebrowDark}>{group.title}</div>
                 <ul className="mt-4 space-y-0.5">
                   {group.links.map(link => (

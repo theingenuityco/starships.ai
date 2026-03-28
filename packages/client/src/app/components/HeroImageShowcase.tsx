@@ -41,13 +41,6 @@ export default function HeroImageShowcase() {
   return (
     <section className="relative pb-16 sm:pb-20 px-4 bg-white text-slate-900">
       <div className="relative max-w-6xl mx-auto">
-        <div className="mb-8 md:mb-10 text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-slate-900">
-            See it in <span className="text-primary">action</span>
-          </h2>
-          <p className="text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">A simple preview of workflows running across your tools.</p>
-        </div>
-
         <div
           className={`w-full p-3 sm:p-4 md:p-5 ${panelLight} ${panelLightLift}`}
           style={{

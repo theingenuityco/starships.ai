@@ -73,7 +73,13 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
-    <section className="relative min-h-[calc(100dvh-80px)] flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden">
+    <section
+      className="relative flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden"
+      style={{
+        // Shorter than 100dvh so the showcase peeks; overlap+z-index hid it behind opaque astro.
+        minHeight: 'calc(100dvh - 80px - clamp(5rem, 10vh, 6.75rem))',
+      }}
+    >
       {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
@@ -98,11 +104,13 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
         <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[64px] sm:w-[72px] md:w-[80px] lg:w-[88px] h-auto" />
       </div>
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
-        <div className="w-full min-w-0">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[32ch] mx-auto break-words text-balance">
-            Team chat,
-            <br />
-            powered by{' '}
+        <div className="w-full min-w-0 flex flex-col items-center">
+          {/* inline-block + shrink-0: avoid flex min-width:0 collapsing the line and forcing a wrap */}
+          <h1
+            className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center"
+            style={{ fontSize: 'clamp(1.125rem, 2.75vw + 0.35rem, 4.5rem)' }}
+          >
+            Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>
               <span className="warp-letter">I</span>

@@ -203,7 +203,7 @@ export function PublicFooter(props: {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 pt-8 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/55 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 pt-8 text-[11px] font-semibold tracking-[0.1em] text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Starships.ai. All rights reserved.</p>
           <p className="normal-case tracking-normal text-white/70">
             Built by{' '}

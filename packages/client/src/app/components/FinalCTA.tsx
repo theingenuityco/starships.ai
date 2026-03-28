@@ -6,7 +6,7 @@ import { track } from '@/lib/analytics'
 
 export default function FinalCTA() {
   return (
-    <section className="relative z-20 px-4 pb-10 pt-20 sm:pb-12 sm:pt-24">
+    <section className="relative z-20 px-4 py-20 sm:py-24">
       <div className="mx-auto max-w-4xl text-center">
         <h2 className="mb-3 text-2xl font-bold text-slate-900 sm:mb-4 sm:text-3xl md:text-4xl">
           Got a <span className="text-primary">wild idea?</span>

@@ -20,7 +20,7 @@ export const socialDark =
   `${landingMotion} hover:border-white/25 hover:bg-white/[0.1] hover:text-white active:opacity-90`
 
 export const footerNavLinkDark =
-  'inline-flex w-full max-w-full items-center gap-1.5 rounded-none py-1.5 text-sm font-semibold text-white/90 transition-colors duration-100 hover:bg-white/[0.06] hover:text-white'
+  'inline-flex w-full max-w-full items-center gap-1.5 rounded-none py-1.5 text-sm font-semibold text-white/90 transition-colors duration-100 hover:text-white'
 
 export const footerEyebrowDark = 'pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-200'
 

@@ -76,7 +76,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
     <section
       className="relative flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden"
       style={{
-        // Shorter than 100dvh so the showcase peeks; overlap+z-index hid it behind opaque astro.
+        // Shorter than 100dvh so the showcase peeks (matches production landing).
         minHeight: 'calc(100dvh - 80px - clamp(5rem, 10vh, 6.75rem))',
       }}
     >
@@ -128,7 +128,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           <p className="text-base sm:text-lg text-white/80 mb-5 md:mb-7 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
-          <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
+          <div className="flex flex-col items-center gap-5 justify-center w-full min-w-0">
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button
               size="lg"
@@ -151,7 +151,6 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               </span>
               <span className="text-slate-900">Get Started Free</span>
             </Button>
-            <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>
         </div>
       </div>

@@ -132,20 +132,22 @@ export default function ConnectorHighlights() {
                 {displayConnectors.map((iconSrc, idx) => (
                   <div
                     key={iconSrc}
-                    className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] flex items-center justify-center ${
+                    className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] ${
                       pulsingIndex === idx ? 'connector-highlights-tile-pulsing' : ''
                     }`}
                   >
-                    <div
-                      className="connector-highlights-icon relative"
-                    >
-                      <Image src={iconSrc} alt="Connector logo" fill sizes="48px" className="object-contain" />
+                    <div className="connector-highlights-tile-inner">
+                      <div className="connector-highlights-icon relative">
+                        <Image src={iconSrc} alt="Connector logo" fill sizes="48px" className="object-contain" />
+                      </div>
                     </div>
                   </div>
                 ))}
 
-                <div className="connector-highlights-tile rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] flex items-center justify-center">
-                  <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
+                <div className="connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]">
+                  <div className="connector-highlights-tile-inner">
+                    <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -192,22 +194,26 @@ export default function ConnectorHighlights() {
         .connector-highlights-tile {
           aspect-ratio: 1 / 1;
           min-height: 44px;
-          transition:
-            transform 100ms ease-out,
-            box-shadow 100ms ease-out,
-            border-color 100ms ease-out;
+          transform-origin: center center;
+          transition: transform 220ms ease-out;
           will-change: transform;
+        }
+
+        .connector-highlights-tile-inner {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+        }
+
+        .connector-highlights-tile:hover {
+          transform: scale(1.24);
+          z-index: 2;
         }
 
         .connector-highlights-tile-pulsing {
           animation: connector-single-pulse 900ms ease-in-out;
-        }
-
-        .connector-highlights-tile:hover {
-          transform: translate(-2px, -2px);
-          border-color: rgb(99, 102, 241);
-          box-shadow: 4px 4px 0 0 rgb(99, 102, 241);
-          z-index: 2;
         }
 
         .connector-highlights-icon {

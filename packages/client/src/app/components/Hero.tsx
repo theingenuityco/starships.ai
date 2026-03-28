@@ -26,8 +26,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY || 0
-      // Move laptop right as user scrolls down, capped to keep it near astronaut.
-      const next = Math.min(120, Math.max(0, y * 0.3))
+      // Move laptop right as user scrolls down; cap keeps it near the astronaut (not drifting too far right).
+      const next = Math.min(72, Math.max(0, y * 0.22))
       setLaptopParallaxX(next)
     }
 
@@ -95,7 +95,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
         className="pointer-events-none absolute z-[2] hidden md:block"
         style={{
           bottom: '150px',
-          left: 'calc(50% - 188px)',
+          left: 'calc(50% - 158px)',
           transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-16deg)`,
           transformOrigin: 'center center',
           willChange: 'transform',
@@ -106,7 +106,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">
           {/* inline-block + shrink-0: avoid flex min-width:0 collapsing the line and forcing a wrap */}
-          <h1 className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center" style={{ fontSize: 'clamp(1.125rem, 2.75vw + 0.35rem, 4.5rem)' }}>
+          <h1 className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center" style={{ fontSize: 'clamp(1.375rem, 3.25vw + 0.5rem, 5.25rem)' }}>
             Team chat, powered by{' '}
             <span className="warp-word" data-text="ai">
               <span className="warp-letter">A</span>

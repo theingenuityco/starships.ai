@@ -2,6 +2,8 @@
 
 import Image from 'next/image'
 
+import { panelLight, panelLightLift } from '@/app/components/landing/landingSurface'
+
 const TESTIMONIALS = [
   {
     quote: '“In our first month, Starships cut weekly campaign prep from ~9 hours to under 3. The team now spends that time on experiments instead of handoffs.”',
@@ -40,18 +42,20 @@ export default function TestimonialsSection() {
           <p className="mt-3 text-sm md:text-base text-slate-600">From solo builders to cross-functional teams, Starships adapts to your workflow.</p>
         </div>
 
-        <div className="mt-10 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
+        <div className="mt-10 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {TESTIMONIALS.map((item, idx) => (
-            <article key={idx} className={`text-left flex flex-col min-h-[230px] ${idx > 0 ? 'lg:border-l lg:border-slate-200/80 lg:pl-8' : ''}`}>
-              <p className="text-[15px] leading-relaxed text-slate-800 italic"> {item.quote}</p>
-              <div className="mt-6 pt-4 border-t border-slate-300/70 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{item.author}</p>
-                  <p className="text-xs text-slate-600">{item.role}</p>
+            <article key={idx} className={`flex min-h-[230px] flex-col p-4 text-left sm:p-5 ${panelLight} ${panelLightLift}`}>
+              <p className="text-[15px] leading-relaxed text-slate-800 italic">{item.quote}</p>
+              <div className="mt-6 flex flex-1 flex-col justify-end border-t-2 border-slate-200/90 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{item.author}</p>
+                    <p className="text-xs text-slate-600">{item.role}</p>
+                  </div>
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-none border-2 border-slate-200 bg-white shadow-[2px_2px_0_0_rgb(226_232_240)]" aria-hidden>
+                    <Image src={item.sourceLogo} alt="" width={15} height={15} className="object-contain" />
+                  </span>
                 </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white" aria-hidden>
-                  <Image src={item.sourceLogo} alt="" width={15} height={15} className="object-contain" />
-                </span>
               </div>
             </article>
           ))}

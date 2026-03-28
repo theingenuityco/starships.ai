@@ -1,5 +1,6 @@
 'use client'
 
+import { landingPrimaryCtaHero } from '@/app/components/landing/landingSurface'
 import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
@@ -123,7 +124,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button
               size="lg"
-              className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-slate-900 [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900"
+              className={landingPrimaryCtaHero}
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+import { landingFrameInset, panelLight, panelLightLift } from '@/app/components/landing/landingSurface'
+
 const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
 const SWITCH_INTERVAL_MS = 5000
@@ -47,7 +49,7 @@ export default function HeroImageShowcase() {
         </div>
 
         <div
-          className="w-full rounded-2xl border border-slate-200/70 p-3 sm:p-4 md:p-5 shadow-sm"
+          className={`w-full p-3 sm:p-4 md:p-5 ${panelLight} ${panelLightLift}`}
           style={{
             background: [
               'linear-gradient(95deg, rgba(39,24,94,0.95) 0%, rgba(114,47,166,0.92) 42%, rgba(150,70,156,0.9) 68%, rgba(189,126,52,0.92) 100%)',
@@ -56,10 +58,10 @@ export default function HeroImageShowcase() {
             ].join(', '),
           }}
         >
-          <div className="relative w-full aspect-[16/9] overflow-hidden rounded-xl">
+          <div className="relative w-full aspect-[16/9] overflow-hidden rounded-none">
             <div className="absolute inset-0 flex items-center justify-center">
               <div
-                className="relative overflow-hidden rounded-2xl border border-white/55 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]"
+                className={`relative overflow-hidden ${landingFrameInset}`}
                 style={{
                   width: '95%',
                   height: '95%',

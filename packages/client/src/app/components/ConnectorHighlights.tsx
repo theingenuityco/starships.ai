@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+
 const CONNECTOR_ICONS = [
   '/connectors/activecampaign.svg',
   '/connectors/ahrefs.svg',
@@ -113,7 +115,7 @@ export default function ConnectorHighlights() {
 
   return (
     <section className="mb-14 md:mb-16">
-      <div className="rounded-3xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm" style={{ backgroundColor: '#F8F8FA' }}>
+      <div className={`p-4 sm:p-5 md:p-6 ${shellMuted} ${shellMutedLift}`}>
         <div className="connector-layout">
           <div
             className="connector-icons-wrap"
@@ -130,7 +132,7 @@ export default function ConnectorHighlights() {
                 {displayConnectors.map((iconSrc, idx) => (
                   <div
                     key={iconSrc}
-                    className={`connector-highlights-tile relative rounded-xl bg-white border border-slate-200 shadow-[0_4px_12px_rgba(15,23,42,0.14)] flex items-center justify-center ${
+                    className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] flex items-center justify-center ${
                       pulsingIndex === idx ? 'connector-highlights-tile-pulsing' : ''
                     }`}
                   >
@@ -142,21 +144,18 @@ export default function ConnectorHighlights() {
                   </div>
                 ))}
 
-                <div className="connector-highlights-tile rounded-xl bg-white border border-slate-200 shadow-[0_4px_12px_rgba(15,23,42,0.14)] flex items-center justify-center">
+                <div className="connector-highlights-tile rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] flex items-center justify-center">
                   <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="connector-copy text-left rounded-2xl p-5 sm:p-6" style={{ backgroundColor: '#F8F8FA' }}>
+          <div className="connector-copy text-left p-5 sm:p-6">
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-slate-900 leading-tight">Connect the tools your team already runs on</h3>
             <p className="mt-3 text-sm sm:text-base text-slate-700 max-w-md">Unify your stack so agents can take action across your apps, data, and workflows from one place.</p>
             <div className="mt-6">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center h-11 px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
-              >
+              <Link href="/login" className={landingPrimaryCtaSection}>
                 Get Started Free
               </Link>
             </div>
@@ -172,7 +171,7 @@ export default function ConnectorHighlights() {
 
         .connector-icons-wrap {
           flex: 1 1 auto;
-          border-radius: 16px;
+          border-radius: 0;
           padding: 18px;
         }
 
@@ -194,9 +193,9 @@ export default function ConnectorHighlights() {
           aspect-ratio: 1 / 1;
           min-height: 44px;
           transition:
-            transform 180ms ease-out,
-            box-shadow 180ms ease-out,
-            border-color 180ms ease-out;
+            transform 100ms ease-out,
+            box-shadow 100ms ease-out,
+            border-color 100ms ease-out;
           will-change: transform;
         }
 
@@ -205,9 +204,9 @@ export default function ConnectorHighlights() {
         }
 
         .connector-highlights-tile:hover {
-          transform: translateY(-3px) scale(1.1);
-          border-color: rgba(59, 130, 246, 0.45);
-          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.28);
+          transform: translate(-2px, -2px);
+          border-color: rgb(99, 102, 241);
+          box-shadow: 4px 4px 0 0 rgb(99, 102, 241);
           z-index: 2;
         }
 

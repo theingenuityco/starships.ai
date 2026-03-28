@@ -1,3 +1,4 @@
+import { panelMuted, panelMutedLift } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
 
 export default function Security() {
@@ -35,8 +36,8 @@ export default function Security() {
         <div>
           <ul className="grid gap-5 sm:gap-6 md:gap-8 md:grid-cols-3">
             {items.map((i, idx) => (
-              <li key={idx} className="text-center rounded-2xl border border-slate-200 p-5 md:p-6" style={{ backgroundColor: '#F8F8FA' }}>
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 text-slate-800">
+              <li key={idx} className={`text-center p-5 md:p-6 ${panelMuted} ${panelMutedLift}`}>
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-none border-2 border-slate-200 bg-white text-slate-800 shadow-[3px_3px_0_0_rgb(226_232_240)]">
                   <Icon name={i.icon} className="w-6 h-6" />
                 </div>
                 <div className="mt-4 font-bold text-slate-900 text-xl md:text-2xl leading-tight tracking-tight">{i.title}</div>
@@ -45,7 +46,12 @@ export default function Security() {
             ))}
           </ul>
           <div className="mt-10 text-center">
-            <a href="/docs" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors duration-100 hover:bg-violet-50 hover:no-underline"
+            >
               Learn more
               <Icon name="external-link" className="w-3.5 h-3.5" />
             </a>

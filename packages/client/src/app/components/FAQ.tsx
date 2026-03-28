@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+
+import { panelMuted } from '@/app/components/landing/landingSurface'
 import { Card } from '@/components/ui/card'
 import Icon from '@/components/primitives/Icon'
 
@@ -66,10 +68,13 @@ export default function FAQ({ items = QA, title = 'FAQs' }: FAQProps) {
           {items.map((item, i) => {
             const isOpen = openIndex === i
             return (
-              <Card key={i} className="border-slate-200 overflow-hidden" style={{ backgroundColor: '#F8F8FA' }}>
-                <button onClick={() => toggle(i)} className="w-full p-5 text-left hover:bg-slate-100 transition-colors flex items-center justify-between gap-2">
+              <Card key={i} className={`overflow-hidden rounded-none border-0 ${panelMuted}`}>
+                <button
+                  onClick={() => toggle(i)}
+                  className="flex w-full items-center justify-between gap-2 p-5 text-left transition-colors duration-100 hover:bg-slate-200/60"
+                >
                   <span className="font-medium flex-1 text-slate-900">{item.q}</span>
-                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="w-4 h-4 text-slate-500 flex-shrink-0 transition-transform" />
+                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-100" />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                   <div className="px-5 pb-5 pt-0">

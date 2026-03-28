@@ -6,32 +6,25 @@ import { Orbitron } from 'next/font/google'
 
 import Icon from '@/components/primitives/Icon'
 import StarryBackground from '@/app/components/StarryBackground'
+import {
+  footerEyebrowDark,
+  footerNavLinkDark,
+  footerTopDividerLandingDark,
+  footerTopDividerTheme,
+  footerVioletArc,
+  panelDark,
+  panelDarkLift,
+  socialDark,
+} from '@/app/components/landing/landingSurface'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-/*
- * Neo-brutalism tuned to Starships.ai (no box borders):
- * — Navy + stars + violet arc; hard offset shadows for depth, not outlines.
- * — Amber reserved for hover “thrust” on interactive hits.
- */
-const panel =
-  'rounded-none bg-[#060b22]/90 shadow-[4px_4px_0_0_rgb(99_102_241)]'
-const panelLift =
-  'transition-all duration-100 ease-out hover:-translate-y-px hover:shadow-[5px_5px_0_0_rgb(167_139_250)]'
-
-const socialBtn =
-  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-none bg-white/[0.07] text-white shadow-[3px_3px_0_0_rgb(139_92_246)] transition-all duration-100 ease-out hover:-translate-y-px hover:bg-white/[0.12] hover:shadow-[4px_4px_0_0_rgb(250_204_21)] hover:text-white active:translate-x-0.5 active:translate-y-0 active:shadow-[2px_2px_0_0_rgb(99_102_241)]'
-
-const navLinkClass =
-  'inline-flex w-full max-w-full items-center gap-1.5 rounded-none py-1.5 text-sm font-semibold text-white/90 transition-colors duration-100 hover:bg-white/[0.06] hover:text-white'
-
 export function PublicFooter(props: {
   fromPath?: string
   showTopDivider?: boolean
   topDividerVariant?: 'theme' | 'landingDark'
-  /** Softer stars when the page already renders a fixed starfield (e.g. home). */
   continuesLandingBackground?: boolean
 }) {
   const fromPath = props.fromPath ?? '/'
@@ -39,10 +32,7 @@ export function PublicFooter(props: {
   const topDividerVariant = props.topDividerVariant ?? 'theme'
   const continuesLandingBackground = props.continuesLandingBackground ?? false
 
-  const topDividerClassName =
-    topDividerVariant === 'landingDark'
-      ? 'absolute top-0 left-0 right-0 z-[15] h-px bg-gradient-to-r from-transparent via-violet-400/70 to-transparent'
-      : 'absolute top-0 left-0 right-0 z-[15] h-px bg-gradient-to-r from-transparent via-border/80 to-transparent'
+  const topDividerClassName = topDividerVariant === 'landingDark' ? footerTopDividerLandingDark : footerTopDividerTheme
 
   const starLayerClassName = continuesLandingBackground ? 'z-[1] opacity-45' : 'z-[1] opacity-[0.55]'
   const starColor = continuesLandingBackground ? 'rgba(255,255,255,0.78)' : 'rgba(255, 255, 255, 0.92)'
@@ -90,7 +80,7 @@ export function PublicFooter(props: {
         className="pointer-events-none absolute inset-0 z-0"
         aria-hidden
         style={{
-          backgroundImage: 'radial-gradient(ellipse 1200px 650px at 50% 120%, rgba(168,85,247,0.18), transparent 72%)',
+          backgroundImage: footerVioletArc,
         }}
       />
 
@@ -107,7 +97,7 @@ export function PublicFooter(props: {
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-8">
         <div className="grid grid-cols-1 gap-10 pb-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
-            <div className={`${panel} ${panelLift} p-4 sm:p-5`}>
+            <div className={`${panelDark} ${panelDarkLift} p-4 sm:p-5`}>
               <Link
                 href="/"
                 className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#050b24] focus-visible:ring-2 focus-visible:ring-violet-400"
@@ -133,7 +123,7 @@ export function PublicFooter(props: {
                 <a
                   href="mailto:tech@theingenuity.co"
                   aria-label="Email"
-                  className={socialBtn}
+                  className={socialDark}
                   onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'mailto:tech@theingenuity.co' })}
                 >
                   <Icon name="mail" className="h-5 w-5" />
@@ -143,7 +133,7 @@ export function PublicFooter(props: {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="GitHub"
-                  className={socialBtn}
+                  className={socialDark}
                   onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/theingenuityai' })}
                 >
                   <Icon name="github" className="h-5 w-5" />
@@ -153,7 +143,7 @@ export function PublicFooter(props: {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Discord"
-                  className={socialBtn}
+                  className={socialDark}
                   onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://discord.gg/wzF7xfjrKv' })}
                 >
                   <Icon name="discord" className="h-5 w-5" />
@@ -163,7 +153,7 @@ export function PublicFooter(props: {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="YouTube"
-                  className={socialBtn}
+                  className={socialDark}
                   onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.youtube.com/@StarshipsAI' })}
                 >
                   <Icon name="youtube" className="h-5 w-5" />
@@ -173,7 +163,7 @@ export function PublicFooter(props: {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
-                  className={socialBtn}
+                  className={socialDark}
                   onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.instagram.com/starships.ai/' })}
                 >
                   <Icon name="instagram" className="h-5 w-5" />
@@ -184,8 +174,8 @@ export function PublicFooter(props: {
 
           <div className="md:col-span-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {footerGroups.map(group => (
-              <div key={group.title} className={`${panel} ${panelLift} p-4`}>
-                <div className="pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-200">{group.title}</div>
+              <div key={group.title} className={`${panelDark} ${panelDarkLift} p-4`}>
+                <div className={footerEyebrowDark}>{group.title}</div>
                 <ul className="mt-4 space-y-0.5">
                   {group.links.map(link => (
                     <li key={`${group.title}-${link.label}`}>
@@ -194,7 +184,7 @@ export function PublicFooter(props: {
                           href={link.href}
                           target={link.href.startsWith('mailto:') ? undefined : '_blank'}
                           rel={link.href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
-                          className={navLinkClass}
+                          className={footerNavLinkDark}
                           onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: link.href })}
                         >
                           {link.label}
@@ -203,7 +193,7 @@ export function PublicFooter(props: {
                       ) : (
                         <Link
                           href={link.href}
-                          className={navLinkClass}
+                          className={footerNavLinkDark}
                           onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: link.href })}
                         >
                           {link.label}

@@ -1,5 +1,6 @@
 'use client'
 
+import { landingHeaderNavItem, landingPrimaryCtaHeader } from '@/app/components/landing/landingSurface'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -106,8 +107,9 @@ export function PublicHeader(): React.JSX.Element {
               <button
                 type="button"
                 className={[
-                  'inline-flex items-center gap-1.5',
-                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-none transition-colors duration-100',
+                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+                  landingHeaderNavItem,
                 ].join(' ')}
                 aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
               >
@@ -147,7 +149,7 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/explore"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
-            className={`${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/explore') ? 'page' : undefined}
           >
             Explore
@@ -155,7 +157,7 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/pricing"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
-            className={`${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/pricing') ? 'page' : undefined}
           >
             Pricing
@@ -163,7 +165,7 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/login"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-            className={`${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/login') ? 'page' : undefined}
           >
             Login
@@ -172,7 +174,7 @@ export function PublicHeader(): React.JSX.Element {
             <Link
               href="/login"
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+              className={landingPrimaryCtaHeader}
             >
               Get Started Free
             </Link>
@@ -217,7 +219,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Lead generation
               </Link>
@@ -227,7 +229,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 WordPress site
               </Link>
@@ -237,7 +239,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Explore
               </Link>
@@ -247,7 +249,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Login
               </Link>
@@ -257,7 +259,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Pricing
               </Link>
@@ -268,7 +270,7 @@ export function PublicHeader(): React.JSX.Element {
                     track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                     setMobileMenuOpen(false)
                   }}
-                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+                  className={`block w-full text-center ${landingPrimaryCtaHeader} px-3 py-2.5`}
                 >
                   Get Started Free
                 </Link>

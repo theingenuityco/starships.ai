@@ -140,7 +140,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              <span className="text-slate-900">Get Started for free</span>
+              <span className="text-slate-900">Get Started Free</span>
             </Button>
             <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>

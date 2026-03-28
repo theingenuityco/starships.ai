@@ -169,6 +169,8 @@ const map: Record<string, ResolvedIcon> = {
   // Social
   discord: { type: 'phosphor', component: 'DiscordLogo' },
   github: { type: 'phosphor', component: 'GithubLogo' },
+  youtube: { type: 'phosphor', component: 'YoutubeLogo' },
+  instagram: { type: 'phosphor', component: 'InstagramLogo' },
   chrome: { type: 'phosphor', component: 'GoogleChromeLogo' },
 }
 

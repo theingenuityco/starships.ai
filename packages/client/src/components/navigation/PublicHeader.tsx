@@ -174,7 +174,7 @@ export function PublicHeader(): React.JSX.Element {
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
               className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
             >
-              Get Started
+              Get Started Free
             </Link>
           ) : null}
         </nav>
@@ -270,7 +270,7 @@ export function PublicHeader(): React.JSX.Element {
                   }}
                   className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
                 >
-                  Get Started
+                  Get Started Free
                 </Link>
               ) : null}
             </div>

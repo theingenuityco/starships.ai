@@ -59,10 +59,8 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
             <div className="bg-white text-slate-900">
               <FAQ />
               <FinalCTA />
-
-              {/* Footer */}
-              <PublicFooter fromPath="/" />
             </div>
+            <PublicFooter fromPath="/" continuesLandingBackground topDividerVariant="landingDark" />
           </div>
         </div>
       </div>

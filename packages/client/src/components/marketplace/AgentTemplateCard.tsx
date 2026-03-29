@@ -18,6 +18,7 @@ import type { AgentTemplateModel, DeployStarshipOption } from '@starships/protoc
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 import api from '@/lib/api'
+import { cn } from '@/lib/utils'
 import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
 import { toast } from 'sonner'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
@@ -50,6 +51,8 @@ interface AgentTemplateCardProps {
    * Defaults to true.
    */
   showDeployCta?: boolean
+  /** Merged onto the outer card shell (e.g. `rounded-none` on public landing). */
+  cardClassName?: string
 }
 
 function AgentTemplateCardImpl({
@@ -61,6 +64,7 @@ function AgentTemplateCardImpl({
   density = 'default',
   showCategory = true,
   compactAvatarStyle = 'cover',
+  cardClassName,
 }: AgentTemplateCardProps) {
   const compact = density === 'compact'
   const [isDeploying, setIsDeploying] = useState(false)
@@ -221,7 +225,10 @@ function AgentTemplateCardImpl({
             handleCardClick()
           }
         }}
-        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md"
+        className={cn(
+          'group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md',
+          cardClassName
+        )}
       >
         {compact ? (
           <div className="flex min-h-[116px]">

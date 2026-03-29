@@ -92,8 +92,8 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
 
           {!isLeadGeneration ? (
             <div className="group relative mt-12">
-              <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-              <Card className="relative flex flex-col items-start justify-between gap-6 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
+              <div className="pointer-events-none absolute -inset-[2px] rounded-none bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+              <Card className="relative flex flex-col items-start justify-between gap-6 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
                   <p className="mt-2 max-w-[90ch] text-base text-white/90 sm:text-lg">{useCase.nextDescription}</p>
@@ -200,8 +200,8 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
             </div>
 
             <div className="group relative mt-20">
-              <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-              <Card className="relative flex flex-col items-start justify-between gap-6 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
+              <div className="pointer-events-none absolute -inset-[2px] rounded-none bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+              <Card className="relative flex flex-col items-start justify-between gap-6 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
                 <div>
                   <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
                   <p className="mt-2 max-w-[90ch] text-base text-white/90 sm:text-lg">{useCase.nextDescription}</p>

@@ -36,7 +36,7 @@ function pickFeaturedAgents(allAgents: AgentTemplateModel[]): AgentTemplateModel
 
 function AgentCarouselSkeletonItem() {
   return (
-    <div className="h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm overflow-hidden pointer-events-none">
+    <div className="h-full flex flex-col rounded-none bg-card border border-border/40 shadow-sm overflow-hidden pointer-events-none">
       <div className="p-6 pt-5 pb-3 space-y-3">
         <div className="flex items-center gap-4">
           <div className="relative flex-shrink-0">
@@ -112,7 +112,7 @@ function FeaturedAgentsCarousel({ agents, loading, onAgentClick }: FeaturedAgent
             ))
           : agents.map(template => (
               <CarouselItem key={template.id} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                <AgentTemplateCard template={template} onClick={onAgentClick} showDeployCta={false} />
+                <AgentTemplateCard template={template} onClick={onAgentClick} showDeployCta={false} cardClassName="rounded-none" />
               </CarouselItem>
             ))}
       </CarouselContent>

@@ -17,9 +17,9 @@ const softLift = `${landingMotion} hover:-translate-y-px`
 export const panelLight = 'rounded-none border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
 export const panelLightLift = `${softLift} hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]`
 
-/** Outer shells (dense blocks on cream sections) */
-export const shellMuted = 'rounded-none border border-slate-200 bg-[#F8F8FA] shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
-export const shellMutedLift = `${softLift} hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]`
+/** Outer shells (dense blocks on cream sections) — hard offset shadow matches landing icon tiles */
+export const shellMuted = 'rounded-none border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
+export const shellMutedLift = `${softLift} hover:shadow-[4px_4px_0_0_rgb(203_213_225)]`
 
 export const socialDark =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-none border border-white/15 bg-white/[0.06] text-white ' +

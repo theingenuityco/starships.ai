@@ -37,21 +37,21 @@ export default function PricingPageClient(): React.JSX.Element {
   const { data: plans = [], isLoading, isError } = useSubscriptionPlans(true, { publicAccess: !isAuthenticated })
 
   const shipClassOrder: Record<string, number> = { scout: 0, frigate: 1, cruiser: 2 }
-  /** Same flat fill as `CollaborationHighlights` landing cards (`#F8F8FA`). */
-  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
+  /** Same flat fill and hard-offset depth as landing `shellMuted` / Security cards. */
+  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
   /**
    * Top → bottom wash (inline gradient so opacity reads on `#F8F8FA`; Tailwind-only stops were too faint).
    * Subtle under plan title/price; fades out by ~18% height from the top.
    */
   const planCardGlowStyleByClass: Record<string, CSSProperties> = {
     scout: {
-      background: 'linear-gradient(to bottom, rgba(217, 119, 6, 0.3) 0%, rgba(251, 191, 36, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
-    },
-    frigate: {
       background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.28) 0%, rgba(167, 139, 250, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
     },
+    frigate: {
+      background: 'linear-gradient(to bottom, rgba(217, 119, 6, 0.3) 0%, rgba(251, 191, 36, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
+    },
     cruiser: {
-      background: 'linear-gradient(to bottom, rgba(71, 85, 105, 0.26) 0%, rgba(99, 102, 241, 0.12) 7%, rgba(248, 248, 250, 0) 18%)',
+      background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.28) 0%, rgba(167, 139, 250, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
     },
   }
 
@@ -126,18 +126,18 @@ export default function PricingPageClient(): React.JSX.Element {
             {isLoading ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {[0, 1, 2].map(idx => (
-                  <Card key={idx} className="h-72 animate-pulse" />
+                  <Card key={idx} className="h-72 animate-pulse rounded-none" />
                 ))}
               </div>
             ) : isError ? (
-              <Card className="mx-auto max-w-2xl border-destructive/30">
+              <Card className="mx-auto max-w-2xl rounded-none border-destructive/30">
                 <CardHeader>
                   <CardTitle>Couldn&apos;t load plans right now</CardTitle>
                   <CardDescription>Our pricing catalog is temporarily unavailable. Please refresh in a moment.</CardDescription>
                 </CardHeader>
               </Card>
             ) : sortedPlans.length === 0 ? (
-              <Card className="mx-auto max-w-2xl">
+              <Card className="mx-auto max-w-2xl rounded-none">
                 <CardHeader>
                   <CardTitle>No plans available</CardTitle>
                   <CardDescription>There are no active plan entries in the catalog at the moment.</CardDescription>
@@ -157,7 +157,10 @@ export default function PricingPageClient(): React.JSX.Element {
                         /* overflow visible so CTA box-shadow (3D lip) is not clipped */
                         'relative isolate overflow-visible rounded-none text-left h-full w-full transition-all duration-200',
                         planCardSurfaceClass,
-                        isRecommended ? 'border-primary/45 shadow-lg ring-2 ring-primary/20 ring-offset-0' : 'hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]'
+                        isRecommended
+                          ? 'border-primary/45 ring-2 ring-primary/20 ring-offset-0'
+                          : /* Avoid hover translate — it exposes a subpixel “white line” at the top vs Frigate (no lift). */
+                            'hover:shadow-[4px_4px_0_0_rgb(203_213_225)]'
                       )}
                     >
                       <div className="pointer-events-none absolute inset-0 z-0" style={cardGlowStyle} aria-hidden />
@@ -239,8 +242,8 @@ export default function PricingPageClient(): React.JSX.Element {
 
         <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-8 sm:pb-14 sm:pt-8">
           <div className="group relative w-full">
-            <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-            <Card className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
+            <div className="pointer-events-none absolute -inset-[2px] rounded-none bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+            <Card className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 flex-1 text-left">
                 <h3 className="text-2xl font-semibold text-white md:text-3xl">Request a custom quote</h3>
                 <p className="mt-2 max-w-2xl text-sm text-white/90">Looking for enterprise solutions? Email us what you need.</p>

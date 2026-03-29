@@ -22,7 +22,7 @@ const PricingTeaser = dynamic(() => import('@/app/components/PricingTeaser'), {
   loading: () => (
     <section className="relative bg-white pt-8 pb-12 sm:pt-10 sm:pb-14 px-4" aria-busy>
       <div className="relative z-10 mx-auto max-w-6xl">
-        <div className="min-h-[148px] rounded-xl bg-slate-100/80 sm:min-h-[160px]" />
+        <div className="min-h-[148px] rounded-none bg-slate-100/80 sm:min-h-[160px]" />
       </div>
     </section>
   ),

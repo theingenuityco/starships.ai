@@ -24,8 +24,8 @@ export default function PricingTeaser() {
     <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4 bg-white">
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="relative group">
-          <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-          <Card className="relative flex flex-col items-center justify-between gap-5 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center shadow-lg sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left">
+          <div className="pointer-events-none absolute -inset-[2px] rounded-none bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+          <Card className="relative flex flex-col items-center justify-between gap-5 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center shadow-lg sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left">
             <div>
               <h2 className="mb-2 text-2xl font-semibold text-white md:text-3xl">Meet your AI team in minutes</h2>
               <p className="text-sm text-white/85">Start free, then scale up when you’re ready.</p>

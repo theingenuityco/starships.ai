@@ -8,7 +8,7 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 import { Orbitron } from 'next/font/google'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -117,31 +117,42 @@ export function PublicHeader(): React.JSX.Element {
                 <Icon name="chevron-down" className="h-4 w-4 opacity-80" aria-hidden />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Use cases</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+            <DropdownMenuContent
+              align="start"
+              sideOffset={8}
+              className="w-80 overflow-hidden rounded-none border border-border bg-card p-0 text-card-foreground shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+            >
+              <div className="border-b border-border px-3 py-2.5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Use cases</p>
+              </div>
               <DropdownMenuItem
+                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
                   router.push('/use-cases/lead-generation')
                 }}
               >
-                <Icon name="sparkles" />
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-foreground">Lead generation</div>
-                  <div className="text-xs text-muted-foreground truncate">Research → personalize → follow up → improve</div>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                  <Icon name="sparkles" className="h-4 w-4 text-primary" weight="regular" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-foreground">Lead generation</div>
+                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Research → personalize → follow up → improve</div>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
+                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
                   router.push('/use-cases/wordpress-site')
                 }}
               >
-                <Icon name="globe" />
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-foreground">WordPress site</div>
-                  <div className="text-xs text-muted-foreground truncate">Plan → write → SEO → launch checklist</div>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                  <Icon name="globe" className="h-4 w-4 text-primary" weight="regular" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-foreground">WordPress site</div>
+                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Plan → write → SEO → launch checklist</div>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -170,7 +181,7 @@ export function PublicHeader(): React.JSX.Element {
           >
             Login
           </Link>
-          {pathname !== '/' ? (
+          {pathname !== '/' && !pathname.startsWith('/pricing') ? (
             <Link
               href="/login"
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
@@ -263,7 +274,7 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Pricing
               </Link>
-              {pathname !== '/' ? (
+              {pathname !== '/' && !pathname.startsWith('/pricing') ? (
                 <Link
                   href="/login"
                   onClick={() => {

@@ -6,6 +6,7 @@ import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
+import { marketingPublicPageWash } from '@/app/components/landing/landingSurface'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 import { NotificationSoundBootstrap } from '@/components/global/NotificationSoundBootstrap'
 
@@ -200,13 +201,20 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   if (isPublicSimplePage) {
     // Public pages - no authentication required
+    const isPricing = pathname === '/pricing'
     return (
       <div className="h-full w-full">
         <NotificationSoundBootstrap />
         <Suspense fallback={null}>
           <EmailChangeToastHandler />
         </Suspense>
-        {children}
+        {isPricing ? (
+          <StarTheme theme="light" className="min-h-[100dvh] w-full bg-white text-slate-900">
+            {children}
+          </StarTheme>
+        ) : (
+          children
+        )}
       </div>
     )
   }
@@ -236,10 +244,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       // in the "inner container" chrome unless authenticated.
       if (isExploreRoute) {
         return (
-          <StarTheme>
+          <StarTheme theme="light">
             <NotificationSoundBootstrap />
             <EmailChangeToastHandler />
-            <div className="min-h-[100dvh] w-full bg-background">{children}</div>
+            <div className={`min-h-[100dvh] w-full ${marketingPublicPageWash} text-slate-900`}>{children}</div>
           </StarTheme>
         )
       }

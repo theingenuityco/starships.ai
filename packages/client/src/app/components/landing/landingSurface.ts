@@ -3,6 +3,12 @@
  * Amber stays on primary propulsion CTAs.
  */
 
+/**
+ * Public marketing page floor — warmer than `bg-background` (97.5% L) so it visibly reads as cream.
+ * Pair with `StarTheme theme="light"` (Pricing, Explore, etc.).
+ */
+export const marketingPublicPageWash = 'bg-[hsl(39_42%_96%)]'
+
 export const landingMotion = 'transition-all duration-100 ease-out'
 
 const softLift = `${landingMotion} hover:-translate-y-px`
@@ -43,6 +49,27 @@ export const landingPrimaryCtaHero =
   'disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900'
 
 export const landingPrimaryCtaSection = `${landingPrimaryCta} h-11 px-6 text-sm sm:text-base`
+
+/** White face only — same amber plate + hover state as `landingPrimaryCta`, but default fill is white. */
+export const landingPrimaryWhiteFaceCtaSection =
+  'inline-flex items-center justify-center font-semibold leading-none rounded-lg whitespace-nowrap text-slate-900 ' +
+  // Default: white face on amber plate
+  'border border-slate-200/90 bg-gradient-to-b from-white via-white to-white shadow-[0_4px_0_0_rgba(180,83,9,1)] ' +
+  // Hover: adopt the same amber gradient + brightness as Frigate primary CTA
+  'hover:bg-gradient-to-b hover:from-amber-300 hover:via-amber-400 hover:to-amber-500 hover:brightness-110 ' +
+  // Active: same pressed plate as primary
+  'active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] active:brightness-110 transition ' +
+  'h-11 px-6 text-sm sm:text-base'
+
+/**
+ * White CTA at section size — same extruded plate as `landingWhiteOnGradientCore`: hard 6px slate “lip” (no blur),
+ * so it reads on tinted surfaces (amber plan-card wash was swallowing an amber-colored lip).
+ */
+export const landingWhiteCtaSection =
+  'relative z-10 inline-flex items-center justify-center font-semibold leading-none rounded-lg whitespace-nowrap text-slate-900 ' +
+  'border border-slate-200/90 bg-gradient-to-b from-white via-white to-slate-100 ' +
+  'shadow-[0_6px_0_0_rgba(15,23,42,0.22)] active:translate-y-[1px] active:shadow-[0_3px_0_0_rgba(15,23,42,0.26)] ' +
+  'h-11 px-6 text-sm sm:text-base transition-transform transition-shadow'
 
 export const landingPrimaryCtaHeader = `${landingPrimaryCta} h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base`
 

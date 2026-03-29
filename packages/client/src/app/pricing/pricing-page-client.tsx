@@ -1,29 +1,35 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import FAQ, { type FAQItem } from '@/app/components/FAQ'
 import TestimonialsSection from '@/app/components/TestimonialsSection'
+import { landingPrimaryCtaSection, landingPrimaryWhiteFaceCtaSection, landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
+import { cn } from '@/lib/utils'
 
-function formatPlanPrice(unitAmount: number | null, currency: string, interval: string | null): string {
-  if (unitAmount === null) return 'Custom'
-  if (unitAmount === 0) return 'Free'
+type PlanPriceLine = { mode: 'plain'; text: string } | { mode: 'withInterval'; amount: string; intervalTail: string }
+
+function getPlanPriceLine(unitAmount: number | null, currency: string, interval: string | null): PlanPriceLine {
+  if (unitAmount === null) return { mode: 'plain', text: 'Custom' }
+  if (unitAmount === 0) return { mode: 'plain', text: 'Free' }
 
   const amount = unitAmount / 100
-  const intervalLabel = interval === 'month' ? '/mo' : interval === 'year' ? '/yr' : interval ? `/${interval}` : '/mo'
+  const intervalTail = interval === 'month' ? 'mo' : interval === 'year' ? 'yr' : interval ? interval.replace(/^\//, '') : 'mo'
 
-  return `${new Intl.NumberFormat(undefined, {
+  const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),
     maximumFractionDigits: 0,
-  }).format(amount)}${intervalLabel}`
+    currencyDisplay: 'narrowSymbol',
+  }).format(amount)
+
+  return { mode: 'withInterval', amount: formattedAmount, intervalTail }
 }
 
 export default function PricingPageClient(): React.JSX.Element {
@@ -31,21 +37,21 @@ export default function PricingPageClient(): React.JSX.Element {
   const { data: plans = [], isLoading, isError } = useSubscriptionPlans(true, { publicAccess: !isAuthenticated })
 
   const shipClassOrder: Record<string, number> = { scout: 0, frigate: 1, cruiser: 2 }
-  const accentByClass: Record<string, { ring: string; cardBg: string; stripe: string }> = {
+  /** Same flat fill as `CollaborationHighlights` landing cards (`#F8F8FA`). */
+  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
+  /**
+   * Top → bottom wash (inline gradient so opacity reads on `#F8F8FA`; Tailwind-only stops were too faint).
+   * Strong under plan title/price, fades out by ~26% height from the top.
+   */
+  const planCardGlowStyleByClass: Record<string, CSSProperties> = {
     scout: {
-      ring: 'ring-primary/20',
-      cardBg: 'bg-gradient-to-b from-amber-50/80 via-card to-card dark:from-amber-950/25 dark:via-card dark:to-card',
-      stripe: 'from-amber-400/30 via-amber-300/12 to-transparent dark:from-amber-300/22 dark:via-amber-300/8 dark:to-transparent',
+      background: 'linear-gradient(to bottom, rgba(217, 119, 6, 0.42) 0%, rgba(251, 191, 36, 0.22) 9%, rgba(248, 248, 250, 0) 26%)',
     },
     frigate: {
-      ring: 'ring-violet-500/20 dark:ring-violet-400/12',
-      cardBg: 'bg-gradient-to-b from-violet-50/80 via-card to-card dark:from-violet-950/28 dark:via-card dark:to-card',
-      stripe: 'from-violet-400/34 via-violet-300/16 to-transparent dark:from-violet-300/24 dark:via-violet-300/10 dark:to-transparent',
+      background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.4) 0%, rgba(167, 139, 250, 0.22) 10%, rgba(248, 248, 250, 0) 26%)',
     },
     cruiser: {
-      ring: 'ring-slate-400/20 dark:ring-slate-300/12',
-      cardBg: 'bg-gradient-to-b from-slate-100/80 via-card to-card dark:from-slate-900/35 dark:via-card dark:to-card',
-      stripe: 'from-slate-400/30 via-slate-300/14 to-transparent dark:from-slate-300/22 dark:via-slate-200/10 dark:to-transparent',
+      background: 'linear-gradient(to bottom, rgba(71, 85, 105, 0.38) 0%, rgba(99, 102, 241, 0.2) 10%, rgba(248, 248, 250, 0) 26%)',
     },
   }
 
@@ -84,7 +90,7 @@ export default function PricingPageClient(): React.JSX.Element {
     },
     {
       q: 'Do you offer a custom enterprise plan?',
-      a: 'Yes. Use the Custom section on this page to contact us for tailored limits, rollout support, and account-specific requirements.',
+      a: 'Yes. Use the Contact us section on this page to email us with what you need.',
     },
     {
       q: 'Where do I manage billing and plan changes?',
@@ -93,150 +99,153 @@ export default function PricingPageClient(): React.JSX.Element {
   ]
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="flex min-h-[100dvh] flex-col">
       <PublicHeader />
 
-      <main>
-        <section className="mx-auto max-w-6xl px-4 pb-6 pt-8 text-center sm:px-8 sm:pt-14">
-          <Badge variant="secondary" className="mb-4">
-            Pricing
-          </Badge>
-          <h1 className="text-balance text-3xl sm:text-5xl font-bold tracking-tight text-foreground">
-            Simple plans that <span className="text-primary">scale with your automation</span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-3xl text-pretty text-sm text-muted-foreground sm:text-base">
-            Pick the ship class that matches your workload. Each plan includes limits for deployed agents, parallel tasks, and monthly credits with transparent billing.
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground sm:text-sm">
-            <Icon name="shield-check" className="h-4 w-4 text-primary" />
-            <span>No hidden fees.</span>
-            <span className="text-border">•</span>
-            <span>Upgrade or downgrade anytime.</span>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 pb-12 sm:px-8">
-          {isLoading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {[0, 1, 2].map(idx => (
-                <Card key={idx} className="h-72 animate-pulse" />
-              ))}
+      <main className="flex flex-1 flex-col">
+        <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-8 px-4 pt-12 pb-10 sm:gap-10 sm:px-8 sm:pt-20 sm:pb-16 min-h-[calc(100svh-9rem)] md:min-h-[calc(100svh-9.5rem)]">
+          <section className="shrink-0 text-center">
+            <h1 className="text-balance text-3xl sm:text-5xl font-bold tracking-tight text-foreground">
+              Simple plans that <span className="text-primary">scale with your automation</span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-3xl text-pretty text-sm text-muted-foreground sm:text-base">Every plan lists your agent limit, parallel-task cap, and monthly credits.</p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground sm:gap-x-2.5 sm:text-sm">
+              <span className="inline-flex items-center gap-1.5 sm:gap-2">
+                <Icon name="shield-check" className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                <span className="whitespace-nowrap">No hidden fees.</span>
+              </span>
+              <span className="select-none px-0.5 text-muted-foreground/40 sm:px-1" aria-hidden></span>
+              <span className="inline-flex items-center gap-1.5 sm:gap-2">
+                <Icon name="arrows-down-up" className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                <span>Upgrade or downgrade anytime.</span>
+              </span>
             </div>
-          ) : isError ? (
-            <Card className="mx-auto max-w-2xl border-destructive/30">
-              <CardHeader>
-                <CardTitle>Couldn&apos;t load plans right now</CardTitle>
-                <CardDescription>Our pricing catalog is temporarily unavailable. Please refresh in a moment.</CardDescription>
-              </CardHeader>
-            </Card>
-          ) : sortedPlans.length === 0 ? (
-            <Card className="mx-auto max-w-2xl">
-              <CardHeader>
-                <CardTitle>No plans available</CardTitle>
-                <CardDescription>There are no active plan entries in the catalog at the moment.</CardDescription>
-              </CardHeader>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {sortedPlans.map((plan, idx) => {
-                const accent = accentByClass[plan.shipClass] ?? accentByClass.scout
-                const isRecommended = idx === recommendedIndex
+          </section>
 
-                return (
-                  <div
-                    key={plan.priceId}
-                    className={`
-                      relative overflow-hidden rounded-2xl border text-left h-full w-full transition-all duration-200
-                      ${accent.cardBg}
-                      ${isRecommended ? 'border-primary/50 shadow-lg ring-2 ring-primary/20 md:-translate-y-1' : 'border-border hover:border-muted-foreground/40 hover:shadow-sm'}
-                    `}
-                  >
-                    <div className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b ${accent.stripe}`} />
-                    {isRecommended ? <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.08] via-transparent to-transparent" /> : null}
-                    <div className="relative p-5 pb-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-base font-semibold tracking-tight truncate">{plan.displayName}</div>
-                          {isRecommended ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-primary">
-                              <Icon name="sparkles" className="h-3 w-3" />
-                              Recommended
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-3 flex items-baseline gap-1.5">
-                          <div className="text-3xl font-bold tracking-tight">{formatPlanPrice(plan.unitAmount, plan.currency, plan.interval)}</div>
-                        </div>
-                        <div className="mt-2 text-sm text-muted-foreground">{plan.description || `Built for ${plan.displayName.toLowerCase()} teams`}</div>
-                      </div>
-                      <div className="mt-4 border-t border-border/70 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Included in this plan</div>
-                    </div>
-
-                    <div className="px-5 pb-5 space-y-3">
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                          <Icon name="users" className="h-4 w-4 text-primary" />
-                          Max agents
-                        </span>
-                        <span className="font-semibold tabular-nums">{plan.entitlements.maxAgents}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                          <Icon name="zap" className="h-4 w-4 text-primary" />
-                          Parallel Tasks
-                        </span>
-                        <span className="font-semibold tabular-nums">{plan.entitlements.maxConcurrentTurns}</span>
-                      </div>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="inline-flex items-center gap-2 text-muted-foreground">
-                          <Icon name="coins" className="h-4 w-4 text-primary" />
-                          Monthly credits
-                        </span>
-                        <span className="font-semibold tabular-nums">{plan.entitlements.monthlyCredits}</span>
-                      </div>
-
-                      <div className="border-t border-border/70 pt-4">
-                        <Button asChild type="button" size="sm" variant={isRecommended ? 'default' : 'secondary'} className="w-full gap-1.5 h-10">
-                          <Link href={getPlanCtaHref(plan.priceId)}>{!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}</Link>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 pb-12 sm:px-8">
-          <div className="relative group">
-            <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-            <Card className="relative overflow-hidden px-6 sm:px-8 py-8 sm:py-9 border-0 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500">
-              <div className="max-w-2xl text-left">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/40 bg-black/10 px-2.5 py-1 text-[11px] font-medium text-white">
-                    <Icon name="shield-check" className="h-3.5 w-3.5 text-white" />
-                    SLA-ready
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/40 bg-black/10 px-2.5 py-1 text-[11px] font-medium text-white">
-                    <Icon name="sparkles" className="h-3.5 w-3.5 text-white" />
-                    Custom limits
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/40 bg-black/10 px-2.5 py-1 text-[11px] font-medium text-white">
-                    <Icon name="users" className="h-3.5 w-3.5 text-white" />
-                    Team rollout support
-                  </span>
-                </div>
-                <div className="text-xs uppercase tracking-wide text-white/90">Custom</div>
-                <h3 className="mt-1 text-2xl md:text-3xl font-semibold text-white">Perfect for scale</h3>
-                <p className="mt-2 text-sm text-white" style={{ color: '#fff' }}>
-                  Need higher limits, dedicated support, or enterprise rollout planning? Let&apos;s tailor a plan for your workload and team.
-                </p>
+          <section className="w-full shrink-0 pb-2">
+            {isLoading ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {[0, 1, 2].map(idx => (
+                  <Card key={idx} className="h-72 animate-pulse" />
+                ))}
               </div>
-              <a
-                href="mailto:tech@theingenuity.co"
-                className="relative inline-flex h-14 px-8 items-center justify-center text-base sm:text-lg leading-none overflow-hidden rounded-full whitespace-nowrap text-center text-slate-900 bg-gradient-to-b from-white via-white to-slate-100 shadow-[0_6px_0_0_rgba(15,23,42,0.18)] hover:shadow-[0_4px_0_0_rgba(15,23,42,0.22)] hover:-translate-y-[1px] active:shadow-[0_0px_0_0_rgba(15,23,42,0.22)] active:translate-y-[2px] transition self-center"
-              >
+            ) : isError ? (
+              <Card className="mx-auto max-w-2xl border-destructive/30">
+                <CardHeader>
+                  <CardTitle>Couldn&apos;t load plans right now</CardTitle>
+                  <CardDescription>Our pricing catalog is temporarily unavailable. Please refresh in a moment.</CardDescription>
+                </CardHeader>
+              </Card>
+            ) : sortedPlans.length === 0 ? (
+              <Card className="mx-auto max-w-2xl">
+                <CardHeader>
+                  <CardTitle>No plans available</CardTitle>
+                  <CardDescription>There are no active plan entries in the catalog at the moment.</CardDescription>
+                </CardHeader>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                {sortedPlans.map((plan, idx) => {
+                  const cardGlowStyle = planCardGlowStyleByClass[plan.shipClass] ?? planCardGlowStyleByClass.scout
+                  const isRecommended = idx === recommendedIndex
+                  const priceLine = getPlanPriceLine(plan.unitAmount, plan.currency, plan.interval)
+
+                  return (
+                    <div
+                      key={plan.priceId}
+                      className={cn(
+                        /* overflow visible so CTA box-shadow (3D lip) is not clipped */
+                        'relative isolate overflow-visible rounded-none text-left h-full w-full transition-all duration-200',
+                        planCardSurfaceClass,
+                        isRecommended ? 'border-primary/45 shadow-lg ring-2 ring-primary/20 ring-offset-0' : 'hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]'
+                      )}
+                    >
+                      <div className="pointer-events-none absolute inset-0 z-0" style={cardGlowStyle} aria-hidden />
+                      {isRecommended ? (
+                        <div
+                          className="pointer-events-none absolute inset-0 z-0"
+                          style={{
+                            background: 'linear-gradient(to bottom, rgba(245, 158, 11, 0.28) 0%, rgba(251, 191, 36, 0.12) 10%, rgba(248, 248, 250, 0) 26%)',
+                          }}
+                          aria-hidden
+                        />
+                      ) : null}
+                      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+                        <div className="relative p-5 pb-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-base font-semibold tracking-tight truncate">{plan.displayName}</div>
+                              {isRecommended ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-primary">
+                                  <Icon name="sparkles" className="h-3 w-3" />
+                                  Recommended
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-baseline gap-0 font-bold tracking-tight">
+                              {priceLine.mode === 'plain' ? (
+                                <span className="text-3xl">{priceLine.text}</span>
+                              ) : (
+                                <>
+                                  <span className="text-3xl tabular-nums leading-none">{priceLine.amount}</span>
+                                  <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine.intervalTail}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-4 border-t border-border/70 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Included in this plan</div>
+                        </div>
+
+                        <div className="mt-auto px-5 pb-5 space-y-3">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="users" className="h-4 w-4 text-primary" />
+                              Max agents
+                            </span>
+                            <span className="font-semibold tabular-nums">{plan.entitlements.maxAgents}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="zap" className="h-4 w-4 text-primary" />
+                              Parallel Tasks
+                            </span>
+                            <span className="font-semibold tabular-nums">{plan.entitlements.maxConcurrentTurns}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Icon name="coins" className="h-4 w-4 text-primary" />
+                              Monthly credits
+                            </span>
+                            <span className="font-semibold tabular-nums">{plan.entitlements.monthlyCredits}</span>
+                          </div>
+
+                          <div className="border-t border-border/70 pt-4 pb-1.5">
+                            <Link
+                              href={getPlanCtaHref(plan.priceId)}
+                              className={cn(isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection, 'relative z-10 w-full justify-center')}
+                            >
+                              {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-8 sm:pb-14 sm:pt-8">
+          <div className="group relative w-full">
+            <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+            <Card className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0 flex-1 text-left">
+                <h3 className="text-2xl font-semibold text-white md:text-3xl">Request a custom quote</h3>
+                <p className="mt-2 max-w-2xl text-sm text-white/90">Looking for enterprise solutions? Email us what you need.</p>
+              </div>
+              <a href="mailto:tech@theingenuity.co" className={`${landingWhiteCtaOnGradientLg} shrink-0 self-center md:self-center`}>
                 Contact us
               </a>
             </Card>
@@ -245,10 +254,12 @@ export default function PricingPageClient(): React.JSX.Element {
 
         <TestimonialsSection />
 
-        <FAQ items={pricingFaqItems} title="Pricing FAQs" />
+        <div className="pb-16 sm:pb-24 md:pb-28">
+          <FAQ items={pricingFaqItems} title="Pricing FAQs" sectionTone="white" />
+        </div>
       </main>
 
-      <PublicFooter fromPath="/pricing" showTopDivider={false} />
+      <PublicFooter fromPath="/pricing" showTopDivider={true} topDividerVariant="theme" />
     </div>
   )
 }

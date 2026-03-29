@@ -21,7 +21,7 @@ const GoogleOAuthButton = ({ onClick, disabled, className }: Omit<OAuthButtonPro
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'w-full h-12 bg-white hover:bg-gray-50 border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-800 font-medium transition-all duration-200 flex items-center justify-center gap-3 shadow-sm hover:shadow-md',
+        'w-full h-12 rounded-lg bg-white hover:bg-gray-50 border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-800 font-medium transition-all duration-200 flex items-center justify-center gap-3 shadow-sm hover:shadow-md',
         className
       )}
     >
@@ -48,7 +48,7 @@ const GitHubOAuthButton = ({ onClick, disabled, className }: Omit<OAuthButtonPro
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'w-full h-12 bg-white hover:bg-gray-50 border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-800 font-medium transition-all duration-200 flex items-center justify-center gap-3 shadow-sm hover:shadow-md',
+        'w-full h-12 rounded-lg bg-white hover:bg-gray-50 border-gray-300 hover:border-gray-400 text-gray-700 hover:text-gray-800 font-medium transition-all duration-200 flex items-center justify-center gap-3 shadow-sm hover:shadow-md',
         className
       )}
     >

@@ -11,6 +11,7 @@ import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { useConnectorCatalog, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { useExploreSearch } from '@/hooks/useExploreSearch'
 import PublicHeader from '@/components/navigation/PublicHeader'
+import { StarTheme } from '@/components/theme-context'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 import { motion } from 'motion/react'
@@ -577,65 +578,74 @@ export default function MarketplacePageClient(props: {
     [connectedProviderSet, connectingProvider, isAuthenticated, pathname, primaryStarshipSlug, router, searchParams, startOAuth, starshipId]
   )
 
-  return (
-    <div className="relative">
-      {/* Pseudo hero background (clipped by the rounded main pane wrapper) */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[620px] overflow-hidden"
-        aria-hidden
-        style={{
-          backgroundImage: [
-            'radial-gradient(900px 360px at 50% 0%, rgba(124,58,237,0.22), transparent 60%)',
-            'radial-gradient(700px 300px at 15% 30%, rgba(59,130,246,0.14), transparent 62%)',
-            'radial-gradient(720px 320px at 85% 22%, rgba(245,158,11,0.14), transparent 62%)',
-          ].join(', '),
-        }}
-      />
+  /** Public /explore (logged out): white page shell, light listing band (same tokens as marketplace cards). */
+  const landingExploreChrome = Boolean(pathname?.startsWith('/explore')) && !isAuthenticated
 
-      <div className="relative z-10">
+  const heroTitleClass = 'mt-0 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]'
+  const heroSubtitleClass = 'mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl'
+  const searchShellClass =
+    'relative transition-all overflow-visible bg-card shadow-sm border border-border/80 rounded-full focus-within:border-primary/70'
+  const searchIconClass = 'flex flex-shrink-0 items-center justify-center p-1.5 rounded-lg text-muted-foreground'
+  const searchInputClass =
+    'h-auto border-0 bg-transparent shadow-none p-0 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0'
+
+  const tabBtnClass = (isActive: boolean) =>
+    ['inline-flex items-center gap-2 text-sm font-medium transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'].join(' ')
+
+  const tabCountClass = (isActive: boolean) =>
+    ['tabular-nums', isActive ? 'text-foreground/80' : 'text-muted-foreground'].join(' ')
+
+  return (
+    <div className={landingExploreChrome ? 'relative min-h-[100dvh] flex flex-col' : 'relative'}>
+      {!landingExploreChrome ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[620px] overflow-hidden"
+          aria-hidden
+          style={{
+            backgroundImage: [
+              'radial-gradient(900px 360px at 50% 0%, rgba(124,58,237,0.22), transparent 60%)',
+              'radial-gradient(700px 300px at 15% 30%, rgba(59,130,246,0.14), transparent 62%)',
+              'radial-gradient(720px 320px at 85% 22%, rgba(245,158,11,0.14), transparent 62%)',
+            ].join(', '),
+          }}
+        />
+      ) : null}
+
+      <div className={`relative z-10 flex flex-col ${landingExploreChrome ? 'min-h-0 flex-1' : ''}`}>
         <PublicHeader />
 
-        <main className="marketplace-main pb-12 sm:pb-16">
-          <div className="relative">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6">
-              {/* Hero (transparent, normal container width) */}
-              <div className="pt-4 sm:pt-6 pb-3">
-                <div className="flex flex-col items-center text-center">
-                  <h1 className="mt-0 text-3xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">{hero.title}</h1>
-                  <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-2xl">{hero.subtitle}</p>
-
-                  <div className="mt-4 max-w-2xl mx-auto w-full">
-                    <div
-                      className={
-                        // Match ConversationMessageInput "minimal/compact" composer styling:
-                        // bg + border + shadow + focus border. Keep rounded edges on all breakpoints.
-                        'relative transition-all overflow-visible bg-card shadow-sm border border-border/80 rounded-full focus-within:border-primary/70'
-                      }
-                    >
-                      <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">
-                        <span className="flex flex-shrink-0 items-center justify-center p-1.5 rounded-lg text-muted-foreground">
-                          <Icon name="search" className="h-5 w-5" />
-                        </span>
-                          <Input
-                          value={searchText}
-                          onChange={e => setSearchText(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              const q = searchText.trim()
-                              if (q) track({ type: 'marketplace_search_used', query: q })
-                            }
-                          }}
-                          placeholder={hero.placeholder}
-                          aria-label="Search Explore"
-                          className="h-auto border-0 bg-transparent shadow-none p-0 text-[14px] focus-visible:ring-0 focus-visible:ring-offset-0"
-                        />
-                      </div>
+        {landingExploreChrome ? (
+          <>
+            <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden">
+            <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-8 text-center">
+              <div className="flex flex-col items-center">
+                <h1 className={heroTitleClass}>{hero.title}</h1>
+                <p className={heroSubtitleClass}>{hero.subtitle}</p>
+                <div className="mt-4 max-w-2xl mx-auto w-full">
+                  <div className={searchShellClass}>
+                    <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">
+                      <span className={searchIconClass}>
+                        <Icon name="search" className="h-5 w-5" />
+                      </span>
+                      <Input
+                        value={searchText}
+                        onChange={e => setSearchText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const q = searchText.trim()
+                            if (q) track({ type: 'marketplace_search_used', query: q })
+                          }
+                        }}
+                        placeholder={hero.placeholder}
+                        aria-label="Search Explore"
+                        className={searchInputClass}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-0 pb-2">
+              <div className="pt-4 pb-2">
                 {tab !== 'all' ? (
                   <nav aria-label="Explore categories" className="flex justify-center">
                     <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
@@ -652,15 +662,11 @@ export default function MarketplacePageClient(props: {
                                 track({ type: 'marketplace_tab_selected', tab: t })
                                 router.push(TAB_TO_ROUTE[t])
                               }}
-                              className={['inline-flex items-center gap-2 text-sm font-medium transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'].join(' ')}
+                              className={tabBtnClass(isActive)}
                             >
                               <span className={['inline-flex items-baseline gap-2 pb-1 border-b-2', isActive ? 'border-primary' : 'border-transparent'].join(' ')}>
                                 <span>{label}</span>
-                                {!isLoading ? (
-                                  <span className={['tabular-nums', isActive ? 'text-foreground/80' : 'text-muted-foreground'].join(' ')}>
-                                    ({countsByTab[t]})
-                                  </span>
-                                ) : null}
+                                {!isLoading ? <span className={tabCountClass(isActive)}>({countsByTab[t]})</span> : null}
                               </span>
                             </button>
                           )
@@ -670,9 +676,13 @@ export default function MarketplacePageClient(props: {
                   </nav>
                 ) : null}
               </div>
+            </div>
 
-              {/* Results */}
-              <div className="mt-8">
+            <StarTheme theme="light">
+              <main className="marketplace-main flex-1 px-4 pb-12 pt-6 text-slate-900 sm:px-6 sm:pb-16 sm:pt-8">
+                <div className="relative mx-auto max-w-6xl">
+                  {/* Results */}
+                  <div className="mt-0 sm:mt-1">
                 {isSearching ? (
                   renderCenteredState(`Searching “${q}”…`)
                 ) : activeLoading ? (
@@ -819,14 +829,243 @@ export default function MarketplacePageClient(props: {
                             : 'No results found.'
                   )
                 )}
-              </div>
+                  </div>
+                </div>
+              </main>
+            </StarTheme>
             </div>
-          </div>
-        </main>
 
-        <ExploreCTA kind={tab === 'all' ? 'anything' : tab === 'agents' ? 'agent' : tab === 'connectors' ? 'connector' : 'automation'} />
-        <div suppressHydrationWarning className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent" aria-hidden />
-        <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={false} />
+            <ExploreCTA
+              kind={tab === 'all' ? 'anything' : tab === 'agents' ? 'agent' : tab === 'connectors' ? 'connector' : 'automation'}
+            />
+            <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={true} topDividerVariant="theme" />
+          </>
+        ) : (
+          <>
+            <main className="marketplace-main pb-12 sm:pb-16">
+              <div className="relative">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6">
+                  <div className="pt-4 sm:pt-6 pb-3">
+                    <div className="flex flex-col items-center text-center">
+                      <h1 className={heroTitleClass}>{hero.title}</h1>
+                      <p className={heroSubtitleClass}>{hero.subtitle}</p>
+
+                      <div className="mt-4 max-w-2xl mx-auto w-full">
+                        <div className={searchShellClass}>
+                          <div className="flex items-center gap-2 pl-3 pr-2 py-2.5">
+                            <span className={searchIconClass}>
+                              <Icon name="search" className="h-5 w-5" />
+                            </span>
+                            <Input
+                              value={searchText}
+                              onChange={e => setSearchText(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  const q = searchText.trim()
+                                  if (q) track({ type: 'marketplace_search_used', query: q })
+                                }
+                              }}
+                              placeholder={hero.placeholder}
+                              aria-label="Search Explore"
+                              className={searchInputClass}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-0 pb-2">
+                    {tab !== 'all' ? (
+                      <nav aria-label="Explore categories" className="flex justify-center">
+                        <div className="w-full sm:w-auto overflow-x-auto custom-scrollbar">
+                          <div className="inline-flex items-center justify-center gap-5 whitespace-nowrap px-1">
+                            {(showConnectors ? MARKETPLACE_TABS : (['agents'] as MarketplaceTab[])).map(t => {
+                              const label = t === 'agents' ? 'Agents' : 'Connectors'
+                              const isActive = tab === t
+                              const isLoading = t === 'agents' ? agentTemplatesLoading : connectorsLoading
+                              return (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => {
+                                    track({ type: 'marketplace_tab_selected', tab: t })
+                                    router.push(TAB_TO_ROUTE[t])
+                                  }}
+                                  className={tabBtnClass(isActive)}
+                                >
+                                  <span className={['inline-flex items-baseline gap-2 pb-1 border-b-2', isActive ? 'border-primary' : 'border-transparent'].join(' ')}>
+                                    <span>{label}</span>
+                                    {!isLoading ? <span className={tabCountClass(isActive)}>({countsByTab[t]})</span> : null}
+                                  </span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </nav>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-8">
+                    {isSearching ? (
+                      renderCenteredState(`Searching “${q}”…`)
+                    ) : activeLoading ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        {[...Array(6)].map((_, i) => (
+                          <div key={i} className="h-56 rounded-lg border border-border/60 bg-card animate-pulse" />
+                        ))}
+                      </div>
+                    ) : activeCount > 0 ? (
+                      tab === 'all' ? (
+                        agentsOnlyLanding ? (
+                          <section>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                              {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                                <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                                  <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                                </motion.div>
+                              ))}
+                            </div>
+                            {renderPaginationNav()}
+                          </section>
+                        ) : (
+                          <div className="space-y-10">
+                            {agentsVisible.length > 0 ? (
+                              <section>
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                  <div className="min-w-0 flex items-center gap-3">
+                                    <h2 className="text-lg font-semibold leading-tight text-foreground">Popular agents</h2>
+                                    <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                      {agentsVisible.length}
+                                    </Badge>
+                                  </div>
+                                  <button type="button" className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2" onClick={() => router.push(TAB_TO_ROUTE.agents)}>
+                                    <span>Explore all agents</span>
+                                    <Icon name="chevron-right" className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                  {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                                    <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                                      <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {showConnectors && connectorsVisible.length > 0 ? (
+                              <section>
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                  <div className="min-w-0 flex items-center gap-3">
+                                    <h2 className="text-lg font-semibold leading-tight text-foreground">Popular connectors</h2>
+                                    <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                      {connectorsVisibleFiltered.length}
+                                    </Badge>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline underline-offset-2"
+                                    onClick={() => router.push(TAB_TO_ROUTE.connectors)}
+                                  >
+                                    <span>Explore all connectors</span>
+                                    <Icon name="chevron-right" className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
+                              </section>
+                            ) : null}
+                          </div>
+                        )
+                      ) : tab === 'agents' ? (
+                        <section>
+                          <div className="mb-4 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Agents</h2>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {activeCount}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                            {agentsVisible.map((template: AgentTemplateModel, idx: number) => (
+                              <motion.div key={template.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}>
+                                <AgentTemplateCard template={template} density="compact" showCategory={false} showDeployCta={true} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
+                              </motion.div>
+                            ))}
+                          </div>
+                          {renderPaginationNav()}
+                        </section>
+                      ) : tab === 'tools' ? (
+                        <section>
+                          <div className="mb-4 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Automations</h2>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {activeCount}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                            {toolsVisible.map((template: ToolTemplateModel, idx: number) => (
+                              <motion.div
+                                key={template.id || `${idx}`}
+                                initial={{ opacity: 0, y: 14 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: idx * 0.04 }}
+                              >
+                                <ToolTemplateCard template={template} density="compact" showCategory={false} showInstallCta={true} />
+                              </motion.div>
+                            ))}
+                          </div>
+                          {renderPaginationNav()}
+                        </section>
+                      ) : (
+                        <section>
+                          <div className="mb-4 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex items-center gap-3">
+                              <h2 className="text-lg font-semibold leading-tight text-foreground">Connectors</h2>
+                              <Badge variant="secondary" className="tabular-nums h-5 px-1.5 py-0 text-[11px] leading-none">
+                                {activeCount}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">{connectorsVisibleFiltered.map(renderConnectorCard)}</div>
+                          {renderPaginationNav()}
+                        </section>
+                      )
+                    ) : (
+                      renderCenteredState(
+                        shouldUseServerSearch
+                          ? tab === 'agents'
+                            ? `No agents match “${q}”.`
+                            : tab === 'tools'
+                              ? `No automations match “${q}”.`
+                              : tab === 'connectors'
+                                ? `No connectors match “${q}”.`
+                                : `No results match “${q}”.`
+                          : tab === 'agents'
+                            ? 'No agents found.'
+                            : tab === 'tools'
+                              ? 'No automations found.'
+                              : tab === 'connectors'
+                                ? 'No connectors found.'
+                                : 'No results found.'
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            </main>
+
+            <ExploreCTA
+              kind={tab === 'all' ? 'anything' : tab === 'agents' ? 'agent' : tab === 'connectors' ? 'connector' : 'automation'}
+            />
+            <div suppressHydrationWarning className="h-px w-full bg-gradient-to-r from-transparent via-border/70 to-transparent" aria-hidden />
+            <PublicFooter fromPath={pathname ?? '/explore'} showTopDivider={false} />
+          </>
+        )}
       </div>
     </div>
   )

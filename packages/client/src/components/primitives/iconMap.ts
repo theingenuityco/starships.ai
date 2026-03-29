@@ -117,6 +117,7 @@ const map: Record<string, ResolvedIcon> = {
   edit: { type: 'phosphor', component: 'Pencil' },
   pencil: { type: 'phosphor', component: 'PencilSimple' },
   split: { type: 'phosphor', component: 'ArrowsSplit' },
+  'arrows-down-up': { type: 'phosphor', component: 'ArrowsDownUp' },
   play: { type: 'phosphor', component: 'Play' },
   pause: { type: 'phosphor', component: 'Pause' },
   zap: { type: 'phosphor', component: 'Lightning' },

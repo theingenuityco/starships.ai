@@ -94,12 +94,11 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
             <div className="group relative mt-12">
               <div className="pointer-events-none absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
               <Card className="relative flex flex-col items-start justify-between gap-6 overflow-hidden border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
-                <div>
-                  <div className="text-xs font-semibold text-white/90">Next step</div>
-                  <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
                   <p className="mt-2 max-w-[90ch] text-base text-white/90 sm:text-lg">{useCase.nextDescription}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex shrink-0 flex-wrap items-center gap-3">
                   {useCase.nextLinks.map(l => (
                     <Link
                       key={l.href}
@@ -131,7 +130,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
               </p>
               <div className="mt-6">
                 <Link href="/login" className={cn(landingPrimaryCtaSection, 'inline-flex items-center gap-2')}>
-                  Sign up free
+                  Sign up Free
                   <Icon name="chevron-right" className="h-4 w-4" />
                 </Link>
               </div>
@@ -152,7 +151,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
       ) : null}
 
       {isLeadGeneration ? (
-        <section className="mt-20 bg-white text-slate-900" style={fullBleed}>
+        <section className="bg-white text-slate-900" style={fullBleed}>
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
             <div>
               <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl text-slate-900">

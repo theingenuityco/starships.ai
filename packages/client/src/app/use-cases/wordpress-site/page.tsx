@@ -4,8 +4,8 @@ import PublicHeader from '@/components/navigation/PublicHeader'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import { StarTheme } from '@/components/theme-context'
 import { USE_CASES_BY_SLUG } from '@/app/use-cases/use-cases.data'
-import { UseCaseHero } from '@/app/use-cases/components/UseCaseHero'
 import { UseCaseSections } from '@/app/use-cases/components/UseCaseSections'
+import { WordPressSiteHero } from '@/app/use-cases/wordpress-site/WordPressSiteHero'
 
 export const dynamic = 'force-static'
 export const revalidate = 3600 // 1 hour
@@ -45,36 +45,19 @@ export const metadata: Metadata = {
 export default function WordPressSiteUseCasePage() {
   return (
     <StarTheme theme="light">
-      <div className="min-h-[100dvh] bg-background relative">
-        <div
-          className="absolute inset-x-0 top-0 h-[620px] pointer-events-none z-[1]"
-          aria-hidden
-          style={{
-            backgroundImage: [
-              'radial-gradient(900px 360px at 50% 0%, rgba(124,58,237,0.18), transparent 60%)',
-              'radial-gradient(700px 300px at 15% 30%, rgba(59,130,246,0.12), transparent 62%)',
-              'radial-gradient(720px 320px at 85% 22%, rgba(245,158,11,0.10), transparent 62%)',
-            ].join(', '),
-          }}
-        />
-        <div
-          className="absolute inset-x-0 bottom-0 h-[120vh] pointer-events-none z-[1]"
-          style={{
-            backgroundImage: [
-              'radial-gradient(ellipse 1000px 700px at 50% 100%, rgba(168,85,247,0.20), transparent 65%)',
-              'radial-gradient(ellipse 1200px 850px at 50% 102%, rgba(139,92,246,0.14), transparent 70%)',
-              'radial-gradient(ellipse 1400px 1000px at 50% 105%, rgba(99,102,241,0.10), transparent 75%)',
-            ].join(', '),
-          }}
-          aria-hidden
-        />
-
+      <div className="relative min-h-screen bg-background">
         <div className="relative z-10">
-          <PublicHeader />
+          <div className="star-theme-dark dark">
+            <div className="fixed left-0 right-0 top-0 z-50">
+              <PublicHeader />
+            </div>
+            <div className="overflow-x-hidden">
+              <WordPressSiteHero useCase={useCase} />
+            </div>
+          </div>
 
-          <main className="bg-white pb-12 text-slate-900 sm:pb-16">
-            <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 sm:pt-10">
-              <UseCaseHero useCase={useCase} />
+          <main className="overflow-x-hidden bg-white text-slate-900">
+            <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6 sm:pb-16">
               <UseCaseSections useCase={useCase} />
             </div>
           </main>
@@ -86,4 +69,3 @@ export default function WordPressSiteUseCasePage() {
     </StarTheme>
   )
 }
-

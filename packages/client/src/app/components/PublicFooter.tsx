@@ -126,16 +126,6 @@ export function PublicFooter(props: {
                 <Icon name="mail" className="h-5 w-5" />
               </a>
               <a
-                href="https://github.com/theingenuityai"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-                className={socialDark}
-                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/theingenuityai' })}
-              >
-                <Icon name="github" className="h-5 w-5" />
-              </a>
-              <a
                 href="https://discord.gg/wzF7xfjrKv"
                 target="_blank"
                 rel="noopener noreferrer"

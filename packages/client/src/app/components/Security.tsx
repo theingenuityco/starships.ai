@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import Icon from '@/components/primitives/Icon'
 
 export default function Security() {
@@ -49,15 +51,13 @@ export default function Security() {
             ))}
           </ul>
           <div className="mt-10 text-center">
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/privacy"
               className="inline-flex items-center gap-1 text-sm font-semibold text-primary transition-colors duration-100 hover:bg-violet-50 hover:no-underline"
             >
               Learn more
-              <Icon name="external-link" className="w-3.5 h-3.5" />
-            </a>
+              <Icon name="arrow-right" className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       </div>

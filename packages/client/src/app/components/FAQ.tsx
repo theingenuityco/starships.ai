@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
+import { cn } from '@/lib/utils'
 
 export interface FAQItem {
   q: string
@@ -47,9 +48,11 @@ const QA: FAQItem[] = [
 interface FAQProps {
   items?: FAQItem[]
   title?: string
+  /** Outer section wash — landing FAQ uses cream; pricing uses white. */
+  sectionTone?: 'cream' | 'white'
 }
 
-export default function FAQ({ items = QA, title = 'FAQs' }: FAQProps) {
+export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'cream' }: FAQProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const toggle = (index: number) => {
@@ -57,7 +60,10 @@ export default function FAQ({ items = QA, title = 'FAQs' }: FAQProps) {
   }
 
   return (
-    <section className="py-14 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
+    <section
+      className={cn('py-14 px-4 text-slate-900', sectionTone === 'white' && 'bg-white')}
+      style={sectionTone === 'white' ? undefined : { backgroundColor: 'hsl(38 30% 97.5%)' }}
+    >
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-slate-900">
           {title.endsWith('FAQs') ? (

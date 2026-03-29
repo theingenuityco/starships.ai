@@ -1,5 +1,6 @@
 'use client'
 
+import { landingHeaderNavItem, landingPrimaryCtaHeader } from '@/app/components/landing/landingSurface'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -7,7 +8,7 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 import { Orbitron } from 'next/font/google'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -106,8 +107,9 @@ export function PublicHeader(): React.JSX.Element {
               <button
                 type="button"
                 className={[
-                  'inline-flex items-center gap-1.5',
-                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-none transition-colors duration-100',
+                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
+                  landingHeaderNavItem,
                 ].join(' ')}
                 aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
               >
@@ -115,31 +117,42 @@ export function PublicHeader(): React.JSX.Element {
                 <Icon name="chevron-down" className="h-4 w-4 opacity-80" aria-hidden />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Use cases</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+            <DropdownMenuContent
+              align="start"
+              sideOffset={8}
+              className="w-80 overflow-hidden rounded-none border border-border bg-card p-0 text-card-foreground shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+            >
+              <div className="border-b border-border px-3 py-2.5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Use cases</p>
+              </div>
               <DropdownMenuItem
+                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
                   router.push('/use-cases/lead-generation')
                 }}
               >
-                <Icon name="sparkles" />
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-foreground">Lead generation</div>
-                  <div className="text-xs text-muted-foreground truncate">Research → personalize → follow up → improve</div>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                  <Icon name="sparkles" className="h-4 w-4 text-primary" weight="regular" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-foreground">Lead generation</div>
+                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Research → personalize → follow up → improve</div>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
+                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
                   router.push('/use-cases/wordpress-site')
                 }}
               >
-                <Icon name="globe" />
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-foreground">WordPress site</div>
-                  <div className="text-xs text-muted-foreground truncate">Plan → write → SEO → launch checklist</div>
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                  <Icon name="globe" className="h-4 w-4 text-primary" weight="regular" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-foreground">WordPress site</div>
+                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Plan → write → SEO → launch checklist</div>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -147,7 +160,7 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/explore"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
-            className={`${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/explore') ? 'page' : undefined}
           >
             Explore
@@ -155,7 +168,7 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/pricing"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
-            className={`${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/pricing') ? 'page' : undefined}
           >
             Pricing
@@ -163,18 +176,18 @@ export function PublicHeader(): React.JSX.Element {
           <Link
             href="/login"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-            className={`${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
             aria-current={pathname.startsWith('/login') ? 'page' : undefined}
           >
             Login
           </Link>
-          {pathname !== '/' ? (
+          {pathname !== '/' && !pathname.startsWith('/pricing') ? (
             <Link
               href="/login"
               onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
-              className="relative inline-flex items-center justify-center h-10 sm:h-11 px-5 sm:px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+              className={landingPrimaryCtaHeader}
             >
-              Get Started
+              Get Started Free
             </Link>
           ) : null}
         </nav>
@@ -217,7 +230,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Lead generation
               </Link>
@@ -227,7 +240,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 WordPress site
               </Link>
@@ -237,7 +250,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Explore
               </Link>
@@ -247,7 +260,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Login
               </Link>
@@ -257,20 +270,20 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Pricing
               </Link>
-              {pathname !== '/' ? (
+              {pathname !== '/' && !pathname.startsWith('/pricing') ? (
                 <Link
                   href="/login"
                   onClick={() => {
                     track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                     setMobileMenuOpen(false)
                   }}
-                  className="block px-3 py-2.5 rounded-full text-sm font-semibold text-center text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
+                  className={`block w-full text-center ${landingPrimaryCtaHeader} px-3 py-2.5`}
                 >
-                  Get Started
+                  Get Started Free
                 </Link>
               ) : null}
             </div>

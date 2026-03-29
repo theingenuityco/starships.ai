@@ -49,6 +49,8 @@ export function StarshipsLogo({
       strokeWidth="1"
       strokeLinecap="round"
       strokeLinejoin="round"
+      /* Inline size beats parent utilities like Button's `[&_svg]:size-4`, which override SVG width/height attributes. */
+      style={{ width, height }}
       className={className}
     >
       {shouldUseGradient ? (

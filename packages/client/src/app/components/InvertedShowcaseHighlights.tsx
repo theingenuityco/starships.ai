@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+
 const SHOWCASE_IMAGES = ['/landing/usecases/people.png', '/landing/usecases/ai-members.png']
 const SWITCH_INTERVAL_MS = 3000
 const CROSSFADE_MS = 650
@@ -36,17 +38,14 @@ export default function InvertedShowcaseHighlights() {
 
   return (
     <section className="mb-14 md:mb-16">
-      <div className="rounded-3xl border border-slate-200 p-4 sm:p-5 md:p-6 shadow-sm" style={{ backgroundColor: '#F8F8FA' }}>
+      <div className={`p-4 sm:p-5 md:p-6 ${shellMuted} ${shellMutedLift}`}>
         <div className="inverse-layout">
-          <div className="inverse-copy text-left rounded-2xl p-5 sm:p-6" style={{ backgroundColor: '#F8F8FA' }}>
+          <div className="inverse-copy text-left p-5 sm:p-6">
             <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-slate-900 leading-tight">Collaborative AI Workspaces</h3>
             <p className="mt-3 text-sm sm:text-base text-slate-700 max-w-md">Shared agent sessions let your team plan, execute, and follow through together without losing context.</p>
             <div className="mt-6">
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center h-11 px-6 text-sm sm:text-base font-semibold leading-none rounded-full whitespace-nowrap text-slate-900 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition"
-              >
-                Get Started
+              <Link href="/login" className={landingPrimaryCtaSection}>
+                Get Started Free
               </Link>
             </div>
           </div>
@@ -100,7 +99,7 @@ export default function InvertedShowcaseHighlights() {
 
         .inverse-visual-wrap {
           flex: 1 1 auto;
-          border-radius: 16px;
+          border-radius: 0;
           padding: 18px;
         }
 
@@ -108,7 +107,7 @@ export default function InvertedShowcaseHighlights() {
           position: relative;
           width: 100%;
           min-height: 280px;
-          border-radius: 14px;
+          border-radius: 0;
           overflow: hidden;
         }
 

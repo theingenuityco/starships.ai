@@ -117,6 +117,7 @@ const map: Record<string, ResolvedIcon> = {
   edit: { type: 'phosphor', component: 'Pencil' },
   pencil: { type: 'phosphor', component: 'PencilSimple' },
   split: { type: 'phosphor', component: 'ArrowsSplit' },
+  'arrows-down-up': { type: 'phosphor', component: 'ArrowsDownUp' },
   play: { type: 'phosphor', component: 'Play' },
   pause: { type: 'phosphor', component: 'Pause' },
   zap: { type: 'phosphor', component: 'Lightning' },
@@ -169,6 +170,8 @@ const map: Record<string, ResolvedIcon> = {
   // Social
   discord: { type: 'phosphor', component: 'DiscordLogo' },
   github: { type: 'phosphor', component: 'GithubLogo' },
+  youtube: { type: 'phosphor', component: 'YoutubeLogo' },
+  instagram: { type: 'phosphor', component: 'InstagramLogo' },
   chrome: { type: 'phosphor', component: 'GoogleChromeLogo' },
 }
 

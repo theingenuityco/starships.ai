@@ -1,5 +1,6 @@
 'use client'
 
+import { landingPrimaryCtaHero } from '@/app/components/landing/landingSurface'
 import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
@@ -25,8 +26,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY || 0
-      // Move laptop right as user scrolls down, capped to keep it near astronaut.
-      const next = Math.min(120, Math.max(0, y * 0.3))
+      // Move laptop right as user scrolls down; cap keeps it near the astronaut (not drifting too far right).
+      const next = Math.min(72, Math.max(0, y * 0.22))
       setLaptopParallaxX(next)
     }
 
@@ -72,8 +73,14 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
   }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
-    <section className="relative min-h-[calc(100dvh-80px)] flex items-start justify-center px-4 sm:px-6 pt-16 sm:pt-20 md:pt-24 pb-10 sm:pb-12 overflow-hidden">
-      {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
+    <section
+      className="relative flex items-start justify-center px-4 sm:px-6 pt-5 sm:pt-8 md:pt-10 pb-10 sm:pb-12 overflow-hidden"
+      style={{
+        // Shorter than 100dvh so the showcase peeks (matches production landing).
+        minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
+      }}
+    >
+      {/* Astro landscape: full-width background (`100% auto`) keeps the SVG uniform; `84%` left side gaps. */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
         aria-hidden
@@ -81,57 +88,55 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           backgroundImage: "url('/landing/astro-base.svg')",
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center bottom',
-          backgroundSize: 'cover',
+          backgroundSize: '100% auto',
         }}
       />
       <div
         className="pointer-events-none absolute z-[2] hidden md:block"
         style={{
-          bottom: '150px',
-          left: 'calc(50% - 188px)',
-          transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-16deg)`,
+          /* Laptop sits above BG layer; tune if illustration size changes. */
+          bottom: 'clamp(124px, 14.5vh, 152px)',
+          left: 'calc(50% - 132px)',
+          transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-15deg)`,
           transformOrigin: 'center center',
           willChange: 'transform',
         }}
       >
-        <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[64px] sm:w-[72px] md:w-[80px] lg:w-[88px] h-auto" />
+        <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[58px] sm:w-[66px] md:w-[74px] lg:w-[82px] h-auto" />
       </div>
-      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
-        <div className="w-full min-w-0">
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[32ch] mx-auto break-words text-balance">
-            Team chat,
-            <br />
-            powered by{' '}
-            <span className="warp-word" data-text="ai">
-              <span className="warp-letter">A</span>
-              <span className="warp-letter">I</span>
-            </span>{' '}
-            <span className="warp-word" data-text="agents">
-              <span className="warp-letter">a</span>
-              <span className="warp-letter">g</span>
-              <span className="warp-letter">e</span>
-              <span className="warp-letter">n</span>
-              <span className="warp-letter">t</span>
-              <span className="warp-letter">s</span>
-            </span>
-            .
-          </h1>
-          <p className="text-base sm:text-lg text-white/80 mb-5 md:mb-7 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-6 sm:gap-8 items-center text-center relative z-10">
+        <div className="w-full min-w-0 flex flex-col items-center">
+          {/* Shared fluid size so “Starships AI” matches the headline; nowrap keeps the H1 on one line. */}
+          <div
+            className="mb-3 flex w-full min-w-0 flex-col items-center gap-2 sm:gap-3 text-center"
+            style={{ fontSize: 'clamp(0.62rem, 2.55vw + 0.42rem, 5.25rem)' }}
+          >
+            <p className="m-0 shrink-0 font-bold tracking-tight leading-tight text-white whitespace-nowrap">
+              Starships AI
+            </p>
+            <h1 className="m-0 max-w-full min-w-0 font-bold tracking-tight leading-tight text-white whitespace-nowrap">
+              <span className="warp-word" data-text="agentic">
+                <span className="warp-letter">A</span>
+                <span className="warp-letter">g</span>
+                <span className="warp-letter">e</span>
+                <span className="warp-letter">n</span>
+                <span className="warp-letter">t</span>
+                <span className="warp-letter">i</span>
+                <span className="warp-letter">c</span>
+              </span>{' '}
+              orchestration for zero-human teams.
+            </h1>
+          </div>
+          <p className="text-base sm:text-lg text-white/65 mb-4 md:mb-5 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
-          <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
+          <div className="mt-1 sm:mt-2 flex flex-col items-center gap-5 justify-center w-full min-w-0">
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
-            <Button
-              size="lg"
-              className="relative h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center text-slate-900 [&_svg]:!w-12 [&_svg]:!h-12 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900"
-              onClick={handlePrimaryClick}
-              disabled={isPrimaryAnimating}
-              aria-busy={isPrimaryAnimating}
-            >
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-slate-900">
+            <Button size="lg" className={landingPrimaryCtaHero} onClick={handlePrimaryClick} disabled={isPrimaryAnimating} aria-busy={isPrimaryAnimating}>
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center mr-1.5 text-slate-900">
                 <StarshipsLogo
-                  width={48}
-                  height={48}
+                  width={36}
+                  height={36}
                   className="text-slate-900"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
@@ -140,9 +145,8 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              <span className="text-slate-900">Get Started for free</span>
+              <span className="text-slate-900">Get Started Free</span>
             </Button>
-            <p className="text-xs sm:text-sm text-white/70">No credit card required.</p>
           </div>
         </div>
       </div>

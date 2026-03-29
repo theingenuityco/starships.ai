@@ -23,6 +23,8 @@ export type MonthScheduleCalendarProps = {
   runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>
   onDayClick?: (date: Date) => void
   className?: string
+  /** Landing / neo-brutalist: square corners on grid, cells, and task chips */
+  squareEdges?: boolean
 }
 
 function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>, key: string): MonthCalendarRun[] {
@@ -63,17 +65,30 @@ const TASK_TYPE_STYLE: Record<string, React.CSSProperties> = {
   },
 }
 
-export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runsByDay, onDayClick, className }: MonthScheduleCalendarProps) {
+export function MonthScheduleCalendar({
+  currentMonth,
+  monthCells,
+  todayKey,
+  runsByDay,
+  onDayClick,
+  className,
+  squareEdges = false,
+}: MonthScheduleCalendarProps) {
   const CellTag: any = onDayClick ? 'button' : 'div'
+  const frameRadius = squareEdges ? 'rounded-none' : 'rounded-xl'
+  const headerCellRadius = squareEdges ? 'rounded-none' : 'rounded-md'
+  const dayCellRadius = squareEdges ? 'rounded-none' : 'rounded-lg'
+  const chipRadius = squareEdges ? 'rounded-none' : 'rounded-md'
+  const dotRadius = squareEdges ? 'rounded-none' : 'rounded-full'
 
   return (
     <div className={cn('space-y-3', className)}>
       {/* Mobile: allow horizontal scrolling like responsive tables */}
       <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
-        <div className="min-w-[640px] sm:min-w-0 rounded-xl border border-slate-200 bg-[#F3F4F6] shadow-sm p-2">
+        <div className={cn('min-w-[640px] sm:min-w-0 border border-slate-200 bg-[#F3F4F6] shadow-sm p-2', frameRadius)}>
           <div className="grid grid-cols-7 gap-1 text-[11px] text-slate-600 font-medium mb-2">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="px-2 py-1.5 text-center rounded-md bg-slate-100 text-slate-600">
+              <div key={d} className={cn('px-2 py-1.5 text-center bg-slate-100 text-slate-600', headerCellRadius)}>
                 {d}
               </div>
             ))}
@@ -99,7 +114,8 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                   type={onDayClick ? 'button' : undefined}
                   onClick={onDayClick ? () => onDayClick(cell.date) : undefined}
                   className={cn(
-                    'relative group min-h-[104px] rounded-lg border p-2 flex flex-col gap-1 bg-white text-left shadow-sm transition-colors',
+                    'relative group min-h-[104px] border p-2 flex flex-col gap-1 bg-white text-left shadow-sm transition-colors',
+                    dayCellRadius,
                     onDayClick && 'hover:border-primary/60 hover:bg-primary/5 cursor-pointer',
                     inCurrentMonth ? 'border-slate-300' : 'border-dashed border-slate-300/70 opacity-70',
                     isToday && 'ring-1 ring-amber-400 border-amber-400 bg-amber-50'
@@ -116,7 +132,8 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                           <div
                             key={run.id}
                             className={cn(
-                              'w-full h-14 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden',
+                              'w-full h-14 border px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden',
+                              chipRadius,
                               run.taskType ? 'border' : 'bg-muted border-border/60',
                               runIdx === 1 && 'hidden group-hover:block group-focus-within:block'
                             )}
@@ -124,7 +141,11 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                           >
                             <div className="flex items-center gap-1 mb-1">
                               {run.taskType && TASK_TYPE_DOT[run.taskType] ? (
-                                <span className="flex-shrink-0 w-1 h-1 rounded-full ring-1 ring-black/10" style={{ backgroundColor: TASK_TYPE_DOT[run.taskType] }} aria-hidden />
+                                <span
+                                  className={cn('flex-shrink-0 w-1 h-1 ring-1 ring-black/10', dotRadius)}
+                                  style={{ backgroundColor: TASK_TYPE_DOT[run.taskType] }}
+                                  aria-hidden
+                                />
                               ) : null}
                               <span className={cn('font-semibold truncate', run.taskType ? TASK_TYPE_TEXT[run.taskType] : 'text-slate-900')}>{run.agentName}</span>
                             </div>

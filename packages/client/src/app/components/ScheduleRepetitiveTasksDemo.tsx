@@ -194,18 +194,24 @@ export default function ScheduleRepetitiveTasksDemo() {
   return (
     <div className="w-full">
       {/* Use bright chat theme inside the calendar card to match the hero demo */}
-      <div className="star-theme-light relative z-10 rounded-3xl overflow-hidden border-2 border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.12)]">
+      <div className="star-theme-light relative z-10 overflow-hidden rounded-none border-2 border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.12)]">
         <div className="px-4 sm:px-6 py-3.5 border-b-2 border-slate-200 bg-slate-100">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex items-center gap-2">
               <div className="text-sm font-medium leading-none truncate text-slate-900">This month</div>
-              <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-700 bg-amber-100">Demo</div>
+              <div className="rounded-none border border-amber-400/40 bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700">Demo</div>
             </div>
           </div>
         </div>
 
         <div className="p-2 sm:p-3">
-          <MonthScheduleCalendar currentMonth={currentMonth} monthCells={monthCells} todayKey={todayKey} runsByDay={runsByDay} />
+          <MonthScheduleCalendar
+            currentMonth={currentMonth}
+            monthCells={monthCells}
+            todayKey={todayKey}
+            runsByDay={runsByDay}
+            squareEdges
+          />
         </div>
       </div>
     </div>

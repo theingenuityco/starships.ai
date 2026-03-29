@@ -115,8 +115,7 @@ export function UseCaseHeroPromptInput(props: {
         }}
       >
         <div className="relative">
-          <div className="pointer-events-none absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-white/40 via-white/60 to-white/40 opacity-80 blur-md" aria-hidden />
-          <div className="relative rounded-2xl bg-white shadow-sm border border-slate-200 px-4 py-3 transition-colors focus-within:border-amber-400/80">
+          <div className="relative rounded-none border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition-colors focus-within:border-amber-400/80">
             <div className="relative text-left">
               {showTypewriter && (
                 <div className="pointer-events-none absolute inset-0 p-0 pr-14 text-left text-base sm:text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap break-words" aria-hidden>
@@ -149,7 +148,7 @@ export function UseCaseHeroPromptInput(props: {
             <Button
               type="submit"
               size="icon"
-              className="absolute bottom-3 right-3 h-10 w-10 rounded-full text-white bg-gradient-to-b from-amber-300 to-amber-500 shadow-md hover:shadow-lg transition-colors transition-shadow [&_svg]:text-white"
+              className="absolute bottom-3 right-3 h-10 w-10 rounded-lg border-0 bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 text-white shadow-[0_4px_0_0_rgba(180,83,9,1)] transition hover:brightness-110 active:-translate-y-px active:shadow-[0_2px_0_0_rgba(180,83,9,1)] [&_svg]:text-white"
             >
               <Icon name="arrow-up" className="h-4 w-4" />
             </Button>
@@ -174,13 +173,10 @@ export function UseCaseHeroPromptInput(props: {
                     inputRef.current?.focus()
                   }}
                   className={cn(
-                    'inline-flex items-center rounded-full px-5 py-2 text-sm font-semibold whitespace-nowrap',
-                    // Default: white pill with subtle border/shadow
-                    'text-slate-900 bg-white border border-slate-200 shadow-sm',
-                    // Hover/active: switch to 3D amber CTA style
-                    'hover:text-white hover:bg-gradient-to-b hover:from-amber-300 hover:via-amber-400 hover:to-amber-500 hover:border-transparent hover:shadow-[0_4px_0_0_rgba(180,83,9,1)]',
-                    'active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px]',
-                    'transition-colors transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    'inline-flex items-center rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-semibold whitespace-nowrap text-slate-900 shadow-sm',
+                    'hover:border-transparent hover:bg-gradient-to-b hover:from-amber-300 hover:via-amber-400 hover:to-amber-500 hover:text-white hover:shadow-[0_4px_0_0_rgba(180,83,9,1)]',
+                    'active:-translate-y-px active:shadow-[0_2px_0_0_rgba(180,83,9,1)]',
+                    'transition-colors transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050b24]'
                   )}
                 >
                   {label}

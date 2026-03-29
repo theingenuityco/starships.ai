@@ -41,17 +41,17 @@ export default function PricingPageClient(): React.JSX.Element {
   const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
   /**
    * Top → bottom wash (inline gradient so opacity reads on `#F8F8FA`; Tailwind-only stops were too faint).
-   * Strong under plan title/price, fades out by ~26% height from the top.
+   * Subtle under plan title/price; fades out by ~18% height from the top.
    */
   const planCardGlowStyleByClass: Record<string, CSSProperties> = {
     scout: {
-      background: 'linear-gradient(to bottom, rgba(217, 119, 6, 0.42) 0%, rgba(251, 191, 36, 0.22) 9%, rgba(248, 248, 250, 0) 26%)',
+      background: 'linear-gradient(to bottom, rgba(217, 119, 6, 0.3) 0%, rgba(251, 191, 36, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
     },
     frigate: {
-      background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.4) 0%, rgba(167, 139, 250, 0.22) 10%, rgba(248, 248, 250, 0) 26%)',
+      background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.28) 0%, rgba(167, 139, 250, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
     },
     cruiser: {
-      background: 'linear-gradient(to bottom, rgba(71, 85, 105, 0.38) 0%, rgba(99, 102, 241, 0.2) 10%, rgba(248, 248, 250, 0) 26%)',
+      background: 'linear-gradient(to bottom, rgba(71, 85, 105, 0.26) 0%, rgba(99, 102, 241, 0.12) 7%, rgba(248, 248, 250, 0) 18%)',
     },
   }
 
@@ -165,7 +165,7 @@ export default function PricingPageClient(): React.JSX.Element {
                         <div
                           className="pointer-events-none absolute inset-0 z-0"
                           style={{
-                            background: 'linear-gradient(to bottom, rgba(245, 158, 11, 0.28) 0%, rgba(251, 191, 36, 0.12) 10%, rgba(248, 248, 250, 0) 26%)',
+                            background: 'linear-gradient(to bottom, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.08) 7%, rgba(248, 248, 250, 0) 18%)',
                           }}
                           aria-hidden
                         />

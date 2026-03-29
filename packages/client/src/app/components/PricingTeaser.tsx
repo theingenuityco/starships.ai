@@ -2,13 +2,13 @@
 import { landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuthContext } from '@/providers/auth-provider'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 
 export default function PricingTeaser() {
   const router = useRouter()
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user } = useAuthContext()
   const { getSelectedStarshipId } = useSelectedStarship()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, getSelectedStarshipId())

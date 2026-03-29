@@ -127,7 +127,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               orchestration for zero-human teams.
             </h1>
           </div>
-          <p className="text-base sm:text-lg text-white/80 mb-4 md:mb-5 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+          <p className="text-base sm:text-lg text-white/65 mb-4 md:mb-5 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="mt-3 sm:mt-4 flex flex-col items-center gap-5 justify-center w-full min-w-0">

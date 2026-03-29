@@ -129,7 +129,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           <div className="flex flex-col items-center gap-5 justify-center w-full min-w-0">
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button size="lg" className={landingPrimaryCtaHero} onClick={handlePrimaryClick} disabled={isPrimaryAnimating} aria-busy={isPrimaryAnimating}>
-              <span className="inline-flex w-12 h-12 items-center justify-center mr-2 text-slate-900">
+              <span className="inline-flex h-[3rem] w-[3rem] shrink-0 items-center justify-center mr-1.5 text-slate-900">
                 <StarshipsLogo
                   width={48}
                   height={48}

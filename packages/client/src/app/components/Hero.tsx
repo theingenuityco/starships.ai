@@ -80,7 +80,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
         minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
       }}
     >
-      {/* Astro landscape at the base of the hero (inspired by Dewang landing). */}
+      {/* Astro landscape: full-width background (`100% auto`) keeps the SVG uniform; `84%` left side gaps. */}
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[50vh] sm:h-[60vh]"
         aria-hidden
@@ -88,20 +88,21 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
           backgroundImage: "url('/landing/astro-base.svg')",
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center bottom',
-          backgroundSize: 'cover',
+          backgroundSize: '100% auto',
         }}
       />
       <div
         className="pointer-events-none absolute z-[2] hidden md:block"
         style={{
-          bottom: '150px',
-          left: 'calc(50% - 158px)',
-          transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-16deg)`,
+          /* Laptop sits above BG layer; tune if illustration size changes. */
+          bottom: 'clamp(124px, 14.5vh, 152px)',
+          left: 'calc(50% - 132px)',
+          transform: `translate3d(${laptopParallaxX}px, 0, 0) rotate(-15deg)`,
           transformOrigin: 'center center',
           willChange: 'transform',
         }}
       >
-        <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[64px] sm:w-[72px] md:w-[80px] lg:w-[88px] h-auto" />
+        <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[58px] sm:w-[66px] md:w-[74px] lg:w-[82px] h-auto" />
       </div>
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">

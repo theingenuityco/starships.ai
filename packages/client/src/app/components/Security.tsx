@@ -39,7 +39,7 @@ export default function Security() {
             {items.map((i, idx) => (
               <li
                 key={idx}
-                className="text-center rounded-none border border-slate-200 p-5 md:p-6 shadow-[0_6px_20px_rgba(15,23,42,0.08)]"
+                className="text-center rounded-none border border-slate-200 p-5 md:p-6 shadow-[3px_3px_0_0_rgb(226_232_240)]"
                 style={{ backgroundColor: '#F8F8FA' }}
               >
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-none border-2 border-slate-200 bg-white text-slate-800 shadow-[3px_3px_0_0_rgb(226_232_240)]">

@@ -30,7 +30,7 @@ export default function CollaborationHighlights() {
         {HIGHLIGHTS.map(item => (
           <article
             key={item.title}
-            className="rounded-none border border-slate-200 p-4 md:p-5 shadow-[0_6px_20px_rgba(15,23,42,0.08)]"
+            className="rounded-none border border-slate-200 p-4 md:p-5 shadow-[3px_3px_0_0_rgb(226_232_240)]"
             style={{ backgroundColor: '#F8F8FA' }}
           >
             <h4 className="text-base font-semibold text-slate-900 md:text-lg">{item.title}</h4>

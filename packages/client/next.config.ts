@@ -10,6 +10,8 @@ const isDev = process.env.NODE_ENV !== 'production'
 loadEnvConfig(monorepoRoot, isDev)
 
 const PUBLIC_HTML_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
+/** Home document: avoid edge caches serving an old HTML shell against new `_next/static` chunks (hydration mismatch). */
+const HOME_DOCUMENT_CACHE_CONTROL = 'public, max-age=0, s-maxage=0, must-revalidate'
 const PRIVATE_NO_STORE = 'private, no-store'
 const IMMUTABLE_STATIC = 'public, max-age=31536000, immutable'
 
@@ -61,7 +63,7 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: IMMUTABLE_STATIC }],
       },
       // Public pages (cache at edge; browsers revalidate)
-      { source: '/', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      { source: '/', headers: [{ key: 'Cache-Control', value: HOME_DOCUMENT_CACHE_CONTROL }] },
       { source: '/use-cases', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/use-cases/:path*', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/explore', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },

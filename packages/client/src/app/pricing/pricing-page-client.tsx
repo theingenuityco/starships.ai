@@ -254,9 +254,7 @@ export default function PricingPageClient(): React.JSX.Element {
 
         <TestimonialsSection />
 
-        <div className="pb-16 sm:pb-24 md:pb-28">
-          <FAQ items={pricingFaqItems} title="Pricing FAQs" sectionTone="white" />
-        </div>
+        <FAQ items={pricingFaqItems} title="Pricing FAQs" sectionTone="white" />
       </main>
 
       <PublicFooter fromPath="/pricing" showTopDivider={true} topDividerVariant="theme" />

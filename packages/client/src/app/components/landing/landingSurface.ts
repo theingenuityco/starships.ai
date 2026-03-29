@@ -43,7 +43,7 @@ export const landingPrimaryCta =
 
 /** Hero primary — larger plate (6px extrusion lip #b45309; active compresses to 4px). */
 export const landingPrimaryCtaHero =
-  'relative h-12 sm:h-14 w-full sm:w-auto max-w-[20rem] sm:max-w-none px-5 sm:px-8 text-base sm:text-lg leading-none overflow-hidden rounded-lg whitespace-normal break-words text-center text-slate-900 ' +
+  'relative h-11 sm:h-12 w-full sm:w-auto max-w-[18rem] sm:max-w-none px-4 sm:px-6 text-sm sm:text-base leading-none overflow-hidden rounded-lg whitespace-normal break-words text-center text-slate-900 ' +
   'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_6px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_4px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition-transform transition-shadow ' +
   'disabled:opacity-100 disabled:bg-amber-400 disabled:text-slate-900'
 

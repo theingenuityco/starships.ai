@@ -74,7 +74,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
 
   return (
     <section
-      className="relative flex items-start justify-center px-4 sm:px-6 pt-10 sm:pt-14 md:pt-16 pb-10 sm:pb-12 overflow-hidden"
+      className="relative flex items-start justify-center px-4 sm:px-6 pt-5 sm:pt-8 md:pt-10 pb-10 sm:pb-12 overflow-hidden"
       style={{
         // Shorter than 100dvh so the showcase peeks (matches production landing).
         minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
@@ -104,35 +104,39 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       >
         <img src="/landing/laptop-hover.svg" alt="" aria-hidden className="w-[58px] sm:w-[66px] md:w-[74px] lg:w-[82px] h-auto" />
       </div>
-      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center relative z-10">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-6 sm:gap-8 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">
-          {/* inline-block + shrink-0: avoid flex min-width:0 collapsing the line and forcing a wrap */}
-          <h1 className="inline-block max-w-none shrink-0 font-bold tracking-tight leading-tight mb-4 whitespace-nowrap text-center" style={{ fontSize: 'clamp(1.375rem, 3.25vw + 0.5rem, 5.25rem)' }}>
-            Team chat, powered by{' '}
-            <span className="warp-word" data-text="ai">
-              <span className="warp-letter">A</span>
-              <span className="warp-letter">I</span>
-            </span>{' '}
-            <span className="warp-word" data-text="agents">
-              <span className="warp-letter">a</span>
-              <span className="warp-letter">g</span>
-              <span className="warp-letter">e</span>
-              <span className="warp-letter">n</span>
-              <span className="warp-letter">t</span>
-              <span className="warp-letter">s</span>
-            </span>
-            .
-          </h1>
-          <p className="text-base sm:text-lg text-white/80 mb-5 md:mb-7 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+          {/* Shared fluid size so “Starships AI” matches the headline; nowrap keeps the H1 on one line. */}
+          <div
+            className="mb-3 flex w-full min-w-0 flex-col items-center gap-2 sm:gap-3 text-center"
+            style={{ fontSize: 'clamp(0.62rem, 2.55vw + 0.42rem, 5.25rem)' }}
+          >
+            <p className="m-0 shrink-0 font-bold tracking-tight leading-tight text-white whitespace-nowrap">
+              Starships AI
+            </p>
+            <h1 className="m-0 max-w-full min-w-0 font-bold tracking-tight leading-tight text-white whitespace-nowrap">
+              <span className="warp-word" data-text="agentic">
+                <span className="warp-letter">A</span>
+                <span className="warp-letter">g</span>
+                <span className="warp-letter">e</span>
+                <span className="warp-letter">n</span>
+                <span className="warp-letter">t</span>
+                <span className="warp-letter">i</span>
+                <span className="warp-letter">c</span>
+              </span>{' '}
+              orchestration for zero-human teams.
+            </h1>
+          </div>
+          <p className="text-base sm:text-lg text-white/80 mb-4 md:mb-5 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Chat with your team, delegate work to agents, and ship faster.
           </p>
-          <div className="flex flex-col items-center gap-5 justify-center w-full min-w-0">
+          <div className="mt-3 sm:mt-4 flex flex-col items-center gap-5 justify-center w-full min-w-0">
             {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button size="lg" className={landingPrimaryCtaHero} onClick={handlePrimaryClick} disabled={isPrimaryAnimating} aria-busy={isPrimaryAnimating}>
-              <span className="inline-flex h-[3rem] w-[3rem] shrink-0 items-center justify-center mr-1.5 text-slate-900">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center mr-1.5 text-slate-900">
                 <StarshipsLogo
-                  width={48}
-                  height={48}
+                  width={36}
+                  height={36}
                   className="text-slate-900"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}

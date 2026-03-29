@@ -61,7 +61,11 @@ export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'cream' 
 
   return (
     <section
-      className={cn('py-14 px-4 text-slate-900', sectionTone === 'white' && 'bg-white')}
+      className={cn(
+        'px-4 text-slate-900',
+        sectionTone === 'white' ? 'py-20 sm:py-24 md:py-28' : 'py-14',
+        sectionTone === 'white' && 'bg-white',
+      )}
       style={sectionTone === 'white' ? undefined : { backgroundColor: 'hsl(38 30% 97.5%)' }}
     >
       <div className="max-w-6xl mx-auto">
@@ -79,15 +83,8 @@ export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'cream' 
           {items.map((item, i) => {
             const isOpen = openIndex === i
             return (
-              <div
-                key={i}
-                className="overflow-hidden rounded-none border border-slate-200 shadow-[0_6px_20px_rgba(15,23,42,0.08)]"
-                style={{ backgroundColor: '#F8F8FA' }}
-              >
-                <button
-                  onClick={() => toggle(i)}
-                  className="flex w-full items-center justify-between gap-2 p-5 text-left transition-colors duration-100 hover:bg-slate-100"
-                >
+              <div key={i} className="overflow-hidden rounded-none border border-slate-200 shadow-[0_6px_20px_rgba(15,23,42,0.08)]" style={{ backgroundColor: '#F8F8FA' }}>
+                <button onClick={() => toggle(i)} className="flex w-full items-center justify-between gap-2 p-5 text-left transition-colors duration-100 hover:bg-slate-100">
                   <span className="flex-1 font-medium text-slate-900">{item.q}</span>
                   <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-100" />
                 </button>

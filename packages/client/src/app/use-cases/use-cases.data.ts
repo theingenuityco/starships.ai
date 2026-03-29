@@ -92,7 +92,7 @@ export const USE_CASES: UseCaseModel[] = [
     ],
     nextTitle: 'Ready for better leads?',
     nextDescription: 'Run this workflow on repeat with agents and automations. Start free upgrade as your team grows.',
-    nextLinks: [{ href: '/login', label: 'Sign up free' }],
+    nextLinks: [{ href: '/login', label: 'Sign up Free' }],
     seo: {
       title: 'Lead generation | Use cases | Starships.ai',
       description: 'A practical lead generation workflow: research, personalize outreach, follow up, and keep a clean pipeline with agents + automations.',

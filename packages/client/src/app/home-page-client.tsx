@@ -5,7 +5,6 @@ import HeroImageShowcase from '@/app/components/HeroImageShowcase'
 import UseCases from '@/app/components/UseCases'
 import TestimonialsSection from '@/app/components/TestimonialsSection'
 import Security from '@/app/components/Security'
-import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
 import StarryBackground from '@/app/components/StarryBackground'
@@ -14,6 +13,20 @@ import { PublicFooter } from '@/app/components/PublicFooter'
 import { StarTheme } from '@/components/theme-context'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
+import dynamic from 'next/dynamic'
+
+// `useAuth` / `useUserStarships` need TanStack Query. Some SSR paths (e.g. Next 16 + Turbopack)
+// do not see `QueryClientProvider` for this segment; load after mount so hooks run on the client only.
+const PricingTeaser = dynamic(() => import('@/app/components/PricingTeaser'), {
+  ssr: false,
+  loading: () => (
+    <section className="relative bg-white pt-8 pb-12 sm:pt-10 sm:pb-14 px-4" aria-busy>
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <div className="min-h-[148px] rounded-xl bg-slate-100/80 sm:min-h-[160px]" />
+      </div>
+    </section>
+  ),
+})
 
 export default function HomePageClient(props: { initialAgentTemplates?: AgentTemplateModel[]; initialToolTemplates?: ToolTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
@@ -59,10 +72,8 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
             <div className="bg-white text-slate-900">
               <FAQ />
               <FinalCTA />
-
-              {/* Footer */}
-              <PublicFooter fromPath="/" />
             </div>
+            <PublicFooter fromPath="/" continuesLandingBackground topDividerVariant="landingDark" />
           </div>
         </div>
       </div>

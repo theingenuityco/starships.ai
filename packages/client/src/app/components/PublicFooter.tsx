@@ -6,20 +6,34 @@ import { Orbitron } from 'next/font/google'
 
 import Icon from '@/components/primitives/Icon'
 import StarryBackground from '@/app/components/StarryBackground'
+import {
+  footerEyebrowDark,
+  footerNavLinkDark,
+  footerTopDividerLandingDark,
+  footerTopDividerTheme,
+  footerVioletArc,
+  socialDark,
+} from '@/app/components/landing/landingSurface'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolean; topDividerVariant?: 'theme' | 'landingDark' }) {
+export function PublicFooter(props: {
+  fromPath?: string
+  showTopDivider?: boolean
+  topDividerVariant?: 'theme' | 'landingDark'
+  continuesLandingBackground?: boolean
+}) {
   const fromPath = props.fromPath ?? '/'
   const showTopDivider = props.showTopDivider ?? true
   const topDividerVariant = props.topDividerVariant ?? 'theme'
+  const continuesLandingBackground = props.continuesLandingBackground ?? false
 
-  const topDividerClassName =
-    topDividerVariant === 'landingDark'
-      ? 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent'
-      : 'absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent'
+  const topDividerClassName = topDividerVariant === 'landingDark' ? footerTopDividerLandingDark : footerTopDividerTheme
+
+  const starLayerClassName = continuesLandingBackground ? 'z-[1] opacity-45' : 'z-[1] opacity-[0.55]'
+  const starColor = continuesLandingBackground ? 'rgba(255,255,255,0.78)' : 'rgba(255, 255, 255, 0.92)'
 
   const footerGroups: Array<{ title: string; links: Array<{ label: string; href: string; external?: boolean }> }> = [
     {
@@ -57,42 +71,39 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
   ]
 
   return (
-    <footer className="relative overflow-hidden border-t border-white/10 bg-[#050b24] pt-16 pb-8 text-white sm:pt-20">
-      {/* Gradient horizontal line */}
+    <footer className="relative isolate overflow-hidden border-t border-white/10 bg-[#050b24] pt-10 pb-8 text-white sm:pt-14">
       {showTopDivider ? <div suppressHydrationWarning className={topDividerClassName} /> : null}
-      <StarryBackground
-        position="absolute"
-        className="z-0 opacity-60"
-        style={
-          {
-            '--star-color': 'rgba(255,255,255,0.65)',
-          } as CSSProperties
-        }
-      />
+
       <div
         className="pointer-events-none absolute inset-0 z-0"
         aria-hidden
         style={{
-          backgroundImage: [
-            'radial-gradient(ellipse 900px 500px at 10% 0%, rgba(59,130,246,0.16), transparent 65%)',
-            'radial-gradient(ellipse 900px 500px at 90% 0%, rgba(139,92,246,0.18), transparent 65%)',
-            'radial-gradient(ellipse 1200px 650px at 50% 120%, rgba(168,85,247,0.2), transparent 72%)',
-          ].join(', '),
+          backgroundImage: footerVioletArc,
         }}
       />
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-8">
-        <div className="relative z-10 grid grid-cols-1 gap-12 border-b border-white/15 pb-10 md:grid-cols-12 md:gap-8">
+
+      <StarryBackground
+        position="absolute"
+        className={starLayerClassName}
+        style={
+          {
+            '--star-color': starColor,
+          } as CSSProperties
+        }
+      />
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-8">
+        <div className="grid grid-cols-1 gap-10 pb-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-white"
+              className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#050b24] focus-visible:ring-2 focus-visible:ring-white/40"
               onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: '/' })}
             >
               <span
                 className="flex items-center gap-2"
                 style={
                   {
-                    // Make the logo gradient bright and legible on dark footer + light pages.
                     '--foreground': '226 232 240',
                     '--background': '15 23 42',
                   } as CSSProperties
@@ -102,46 +113,47 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
                 <span className={`${orbitron.className} text-lg sm:text-xl font-normal tracking-tight leading-none`}>starships.ai</span>
               </span>
             </Link>
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/70">
+            <p className="mt-4 max-w-lg text-sm font-medium leading-relaxed text-white/80">
               Team chat, powered by AI agents. Collaborate with your team, delegate work to agents, and ship faster.
             </p>
-            <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/65">
-              Deploy agents, add tools, and run repeatable workflows in one workspace with clear approvals and accountable execution.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/75">Deploy agents + tools</span>
-              <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/75">Schedule repetitive tasks</span>
-              <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/75">Isolation + encryption</span>
-              <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs text-white/75">Live observability</span>
-            </div>
-            <div className="mt-5 flex items-center gap-4">
+            <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <a
                 href="mailto:tech@theingenuity.co"
                 aria-label="Email"
-                className="text-white/70 transition-colors hover:text-white"
+                className={socialDark}
                 onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'mailto:tech@theingenuity.co' })}
               >
-                <Icon name="mail" className="h-4 w-4" />
-              </a>
-              <a
-                href="https://github.com/theingenuityai"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="GitHub"
-                className="text-white/70 transition-colors hover:text-white"
-                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/theingenuityai' })}
-              >
-                <Icon name="github" className="h-4 w-4" />
+                <Icon name="mail" className="h-5 w-5" />
               </a>
               <a
                 href="https://discord.gg/wzF7xfjrKv"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Discord"
-                className="text-white/70 transition-colors hover:text-white"
+                className={socialDark}
                 onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://discord.gg/wzF7xfjrKv' })}
               >
-                <Icon name="discord" className="h-4 w-4" />
+                <Icon name="discord" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.youtube.com/@StarshipsAI"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="YouTube"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.youtube.com/@StarshipsAI' })}
+              >
+                <Icon name="youtube" className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.instagram.com/starships.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
+                className={socialDark}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://www.instagram.com/starships.ai/' })}
+              >
+                <Icon name="instagram" className="h-5 w-5" />
               </a>
             </div>
           </div>
@@ -149,8 +161,8 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
           <div className="md:col-span-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {footerGroups.map(group => (
               <div key={group.title}>
-                <div className="text-[11px] uppercase tracking-[0.08em] text-white/60">{group.title}</div>
-                <ul className="mt-4 space-y-2.5">
+                <div className={footerEyebrowDark}>{group.title}</div>
+                <ul className="mt-4 space-y-0.5">
                   {group.links.map(link => (
                     <li key={`${group.title}-${link.label}`}>
                       {link.external ? (
@@ -158,16 +170,16 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
                           href={link.href}
                           target={link.href.startsWith('mailto:') ? undefined : '_blank'}
                           rel={link.href.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
-                          className="inline-flex items-center gap-1.5 text-sm text-white/85 transition-colors hover:text-white"
+                          className={footerNavLinkDark}
                           onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: link.href })}
                         >
                           {link.label}
-                          {!link.href.startsWith('mailto:') ? <Icon name="external-link" className="h-3.5 w-3.5" /> : null}
+                          {!link.href.startsWith('mailto:') ? <Icon name="external-link" className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
                         </a>
                       ) : (
                         <Link
                           href={link.href}
-                          className="inline-flex items-center gap-1.5 text-sm text-white/85 transition-colors hover:text-white"
+                          className={footerNavLinkDark}
                           onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: link.href })}
                         >
                           {link.label}
@@ -181,15 +193,15 @@ export function PublicFooter(props: { fromPath?: string; showTopDivider?: boolea
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col gap-3 pt-6 text-xs text-white/60 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 pt-8 text-[11px] font-semibold tracking-[0.1em] text-white/55 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Starships.ai. All rights reserved.</p>
-          <p>
+          <p className="normal-case tracking-normal text-white/70">
             Built by{' '}
             <a
               href="https://theingenuity.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/85 hover:text-white underline underline-offset-4 transition-colors"
+              className="rounded-none px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
               onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://theingenuity.co' })}
             >
               The Ingenuity Co

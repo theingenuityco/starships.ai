@@ -57,9 +57,9 @@ export default async function LeadGenerationUseCasePage() {
             </div>
           </div>
 
-          {/* Everything below stays on the original light / cream palette */}
-          <main className="overflow-x-hidden">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-12 sm:pb-16">
+          {/* Light page: white bands; cream only on the “See how it works” strip inside UseCaseSections */}
+          <main className="overflow-x-hidden bg-white text-slate-900">
+            <div className="mx-auto max-w-6xl px-4 pb-12 sm:px-6 sm:pb-16">
               <UseCaseSections useCase={useCase} />
             </div>
           </main>

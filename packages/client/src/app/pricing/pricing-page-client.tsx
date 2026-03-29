@@ -242,8 +242,10 @@ export default function PricingPageClient(): React.JSX.Element {
 
         <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-8 sm:pb-14 sm:pt-8">
           <div className="group relative w-full">
-            <div className="pointer-events-none absolute -inset-[2px] rounded-none bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
-            <Card className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+              <div className="absolute -inset-[2px] bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
+            </div>
+            <div className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden !rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-white shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 flex-1 text-left">
                 <h3 className="text-2xl font-semibold text-white md:text-3xl">Request a custom quote</h3>
                 <p className="mt-2 max-w-2xl text-sm text-white/90">Looking for enterprise solutions? Email us what you need.</p>
@@ -251,7 +253,7 @@ export default function PricingPageClient(): React.JSX.Element {
               <a href="mailto:tech@theingenuity.co" className={`${landingWhiteCtaOnGradientLg} shrink-0 self-center md:self-center`}>
                 Contact us
               </a>
-            </Card>
+            </div>
           </div>
         </section>
 

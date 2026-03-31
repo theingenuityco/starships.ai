@@ -12,6 +12,8 @@
     "schedule:scheduler": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduleScheduler.ts",
     "autopilot:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationWorker.ts",
     "autopilot:resume-worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/autopilotAutomationResumeWorker.ts",
+    "heartbeat:scheduler": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/heartbeatScheduler.ts",
+    "heartbeat:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/heartbeatWorker.ts",
     "avatars:optimize-existing": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/optimize-existing-avatars.ts",
     "connectors:backfill-webhook-bindings": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/backfill-connector-webhook-bindings.ts",
     "type-check": "tsc --noEmit",

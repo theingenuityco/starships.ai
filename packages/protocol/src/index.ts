@@ -50,6 +50,7 @@ export * from './domains/marketing-content';
 export * from './domains/openrouter';
 export * from './domains/promo';
 export * from './domains/schedule';
+export * from './domains/heartbeat';
 export * from './domains/task-board';
 export * from './domains/dataset';
 export * from './domains/widget';

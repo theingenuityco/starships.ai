@@ -335,8 +335,8 @@ export default function PricingPageClient(): React.JSX.Element {
                                     <Link
                                       href={ctaHref}
                                       className={cn(
-                                        isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection,
-                                      'relative z-10 mt-2 mb-1 w-full justify-center px-2.5 py-1 text-[10px] leading-none font-semibold h-9'
+                                        landingPrimaryCtaSection,
+                                        'relative z-10 mt-2 mb-1 w-full justify-center px-2.5 py-1 text-[10px] leading-none font-semibold h-9'
                                       )}
                                     >
                                     {ctaText}

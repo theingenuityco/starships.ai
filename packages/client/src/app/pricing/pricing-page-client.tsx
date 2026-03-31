@@ -265,7 +265,7 @@ export default function PricingPageClient(): React.JSX.Element {
             <section className="w-full shrink-0">
               <div className="overflow-hidden rounded-none bg-[#F8F8FA]">
                 <div className="overflow-x-auto overflow-y-hidden">
-                  <table className="w-full table-fixed border-collapse text-left">
+                  <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
                     <colgroup>
                       <col style={{ width: '20%' }} />
                       <col style={{ width: '26.66%' }} />
@@ -292,12 +292,12 @@ export default function PricingPageClient(): React.JSX.Element {
                           return (
                             <th
                               key={isEnterprise ? 'comparison-header-enterprise' : `comparison-header-${column.plan.priceId}`}
-                              className="px-4 py-4 text-center align-top sm:px-5"
+                              className="min-w-[200px] px-4 py-4 text-center align-top sm:min-w-[220px] sm:px-5"
                               style={getPlanColumnStyle(shipClass)}
                             >
                               <div
                                 className={cn(
-                                  'mx-auto h-[20px] w-full rounded-none py-[2px] text-[11px] font-semibold tracking-[0.08em]',
+                                  'mx-auto flex min-h-[32px] w-full items-center justify-center rounded-none py-2 text-[11px] font-semibold leading-none tracking-[0.08em]',
                                   isRecommended ? 'bg-amber-400 text-slate-900' : 'bg-transparent text-transparent'
                                 )}
                               >
@@ -306,17 +306,19 @@ export default function PricingPageClient(): React.JSX.Element {
                               <div className="relative isolate mx-auto w-full">
                                 <div
                                   className={cn(
-                                    'relative z-10 flex h-[174px] w-full flex-col overflow-visible rounded-none border bg-[#F8F8FA]',
+                                    'relative z-10 flex h-[174px] w-full min-w-0 flex-col overflow-x-hidden overflow-y-visible rounded-none border bg-[#F8F8FA]',
                                     shipClass === 'frigate'
                                       ? 'border-amber-300 shadow-[3px_3px_0_0_rgb(226_232_240)]'
                                       : 'border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]'
                                   )}
                                 >
                                   <div className="pointer-events-none absolute inset-0 z-0 rounded-none" style={cardGlowStyle} aria-hidden />
-                                  <div className="relative z-10 flex flex-1 flex-col px-5 pb-4 pt-4">
-                                    <div className="shrink-0 space-y-2 text-center">
-                                      <div className="text-[30px] leading-[1] font-semibold tracking-tight text-foreground">{displayName}</div>
-                                      <div className="mx-auto max-w-[20ch] truncate whitespace-nowrap text-[11px] leading-[1.28] text-muted-foreground">
+                                  <div className="relative z-10 box-border flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5">
+                                    <div className="min-w-0 shrink-0 space-y-1.5 text-center sm:space-y-2">
+                                      <div className="text-balance text-base font-semibold leading-tight tracking-tight text-foreground break-words sm:text-lg">
+                                        {displayName}
+                                      </div>
+                                      <div className="mx-auto max-w-full truncate whitespace-nowrap px-0.5 text-[11px] font-normal leading-[1.28] text-muted-foreground">
                                         {subtitle}
                                       </div>
                                     </div>
@@ -329,7 +331,9 @@ export default function PricingPageClient(): React.JSX.Element {
                                         ) : (
                                           <>
                                             <span className="text-3xl tabular-nums leading-none">{priceLine?.amount}</span>
-                                            <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine?.intervalTail}</span>
+                                            <span className="text-sm font-normal tabular-nums leading-none text-muted-foreground sm:text-base">
+                                              /{priceLine?.intervalTail}
+                                            </span>
                                           </>
                                         )}
                                       </div>

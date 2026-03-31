@@ -66,11 +66,16 @@ export default function PricingPageClient(): React.JSX.Element {
     if (au !== bu) return au - bu
     return a.displayName.localeCompare(b.displayName)
   })
+  const selfServePlans = sortedPlans.filter(plan => plan.shipClass !== 'scout')
+  const tableColumns = [
+    ...selfServePlans.map(plan => ({ kind: 'plan' as const, plan })),
+    { kind: 'enterprise' as const },
+  ]
 
-  const recommendedIndex = sortedPlans.length >= 3 ? 1 : sortedPlans.length === 2 ? 1 : 0
+  const recommendedIndex = 0
   const getPlanColumnStyle = (shipClass: string): CSSProperties => {
     if (shipClass === 'frigate') return { backgroundColor: '#FFF6E8' }
-    if (shipClass === 'scout' || shipClass === 'cruiser') return { backgroundColor: '#FEF6FD' }
+    if (shipClass === 'scout' || shipClass === 'cruiser' || shipClass === 'enterprise') return { backgroundColor: '#FEF6FD' }
     return {}
   }
 
@@ -109,8 +114,14 @@ export default function PricingPageClient(): React.JSX.Element {
     },
     {
       type: 'check',
-      label: 'Automations',
+      label: 'Schedule tasks',
       help: 'Create recurring and rule-based automated runs.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Unlimited Storage',
+      help: 'Store unlimited project assets and run data.',
       includes: planIndex => planIndex >= 0,
     },
     {
@@ -118,6 +129,18 @@ export default function PricingPageClient(): React.JSX.Element {
       label: 'AI Credits',
       help: 'Credits included each month for model and automation usage.',
       getValue: plan => `${plan.entitlements.monthlyCredits.toLocaleString()} credits`,
+    },
+    {
+      type: 'value',
+      label: 'AI agents',
+      help: 'Maximum number of agents supported by the plan.',
+      getValue: plan => `${plan.entitlements.maxAgents.toLocaleString()} agents`,
+    },
+    {
+      type: 'value',
+      label: 'Parallel task capacity',
+      help: 'Maximum concurrent task turns supported by the plan.',
+      getValue: plan => `${plan.entitlements.maxConcurrentTurns.toLocaleString()} tasks`,
     },
     {
       type: 'check',
@@ -135,49 +158,37 @@ export default function PricingPageClient(): React.JSX.Element {
       type: 'check',
       label: 'Multi-agent delegation',
       help: 'Delegate work across specialist agents in the same flow.',
-      includes: planIndex => planIndex >= 1,
-    },
-    {
-      type: 'check',
-      label: 'Parallel task capacity',
-      help: 'Run more tasks concurrently as your plan scales.',
-      includes: planIndex => planIndex >= 1,
+      includes: planIndex => planIndex >= 0,
     },
     {
       type: 'check',
       label: 'Custom limits',
       help: 'Adjust plan limits for larger usage and operational requirements.',
-      includes: planIndex => planIndex >= 2,
+      includes: planIndex => planIndex >= 1,
     },
     {
       type: 'check',
       label: 'Team Capacity Planning',
       help: 'Plan team growth and resource allocation with capacity planning tools.',
-      includes: planIndex => planIndex === 2,
+      includes: planIndex => planIndex >= 1,
     },
     {
       type: 'check',
       label: 'Advanced Dashboards & Reports',
       help: 'Access advanced analytics dashboards and reporting capabilities.',
-      includes: planIndex => planIndex === 2,
-    },
-    {
-      type: 'check',
-      label: 'Timeline & Gantt Charts',
-      help: 'Visualize execution timelines and dependencies with Gantt charts.',
-      includes: planIndex => planIndex === 2,
+      includes: planIndex => planIndex >= 1,
     },
     {
       type: 'check',
       label: 'Direct support channel',
       help: 'Access a direct support path for faster issue handling.',
-      includes: planIndex => planIndex >= 2,
+      includes: planIndex => planIndex >= 1,
     },
     {
       type: 'check',
       label: 'Priority business support',
       help: 'Priority support for business-critical workflows and escalations.',
-      includes: planIndex => planIndex === 2,
+      includes: planIndex => planIndex >= 1,
     },
   ]
   const getPlanCtaHref = (_priceId: string): string => {
@@ -236,7 +247,7 @@ export default function PricingPageClient(): React.JSX.Element {
             </div>
           </section>
 
-          {(isLoading || isError || sortedPlans.length === 0) ? (
+          {(isLoading || isError || selfServePlans.length === 0) ? (
             <section className="w-full shrink-0 pb-2">
               {isLoading ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -251,7 +262,7 @@ export default function PricingPageClient(): React.JSX.Element {
                   <CardDescription>Our pricing catalog is temporarily unavailable. Please refresh in a moment.</CardDescription>
                 </CardHeader>
               </Card>
-            ) : sortedPlans.length === 0 ? (
+            ) : selfServePlans.length === 0 ? (
               <Card className="mx-auto max-w-2xl rounded-none">
                 <CardHeader>
                   <CardTitle>No plans available</CardTitle>
@@ -262,11 +273,11 @@ export default function PricingPageClient(): React.JSX.Element {
             </section>
           ) : null}
 
-          {!isLoading && !isError && sortedPlans.length > 0 ? (
+          {!isLoading && !isError && selfServePlans.length > 0 ? (
             <section className="w-full shrink-0">
-              <div className="overflow-visible rounded-none bg-[#F8F8FA]">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1180px] table-fixed border-collapse text-left">
+              <div className="overflow-hidden rounded-none bg-[#F8F8FA]">
+                <div className="overflow-x-auto overflow-y-hidden">
+                  <table className="w-full table-fixed border-collapse text-left">
                     <colgroup>
                       <col style={{ width: '20%' }} />
                       <col style={{ width: '26.66%' }} />
@@ -276,15 +287,29 @@ export default function PricingPageClient(): React.JSX.Element {
                     <thead>
                       <tr className="bg-white">
                         <th className="px-3 py-4 sm:px-4" />
-                        {sortedPlans.map((plan, idx) => {
-                          const isRecommended = idx === recommendedIndex
-                          const priceLine = getPlanPriceLine(plan.unitAmount, plan.currency, plan.interval)
-                          const cardGlowStyle = planCardGlowStyleByClass[plan.shipClass] ?? planCardGlowStyleByClass.scout
+                        {tableColumns.map((column, idx) => {
+                          const isEnterprise = column.kind === 'enterprise'
+                          const isRecommended = !isEnterprise && idx === recommendedIndex
+                          const shipClass = isEnterprise ? 'enterprise' : column.plan.shipClass
+                          const priceLine = isEnterprise ? null : getPlanPriceLine(column.plan.unitAmount, column.plan.currency, column.plan.interval)
+                          const cardGlowStyle = planCardGlowStyleByClass[shipClass] ?? planCardGlowStyleByClass.scout
+                          const displayName = isEnterprise ? 'Enterprise' : column.plan.displayName
+                          const subtitle = isEnterprise
+                            ? 'Best for complex teams'
+                            : column.plan.shipClass === 'frigate'
+                              ? 'Best for growing teams'
+                              : 'Best for scaled operations'
+                          const ctaHref = isEnterprise ? 'mailto:tech@theingenuity.co' : getPlanCtaHref(column.plan.priceId)
+                          const ctaText = isEnterprise ? 'Talk to us' : 'Choose plan'
                           return (
-                            <th key={`comparison-header-${plan.priceId}`} className="px-4 py-4 text-center align-top sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                            <th
+                              key={isEnterprise ? 'comparison-header-enterprise' : `comparison-header-${column.plan.priceId}`}
+                              className="px-4 py-4 text-center align-top sm:px-5"
+                              style={getPlanColumnStyle(shipClass)}
+                            >
                               <div
                                 className={cn(
-                                  'mx-auto h-[20px] w-full rounded-t-[10px] py-[2px] text-[11px] font-semibold tracking-[0.08em]',
+                                  'mx-auto h-[20px] w-full rounded-none py-[2px] text-[11px] font-semibold tracking-[0.08em]',
                                   isRecommended ? 'bg-amber-400 text-slate-900' : 'bg-transparent text-transparent'
                                 )}
                               >
@@ -293,38 +318,40 @@ export default function PricingPageClient(): React.JSX.Element {
                               <div className="relative isolate mx-auto w-full">
                                 <div
                                   className={cn(
-                                    'relative z-10 flex h-[174px] w-full flex-col overflow-visible rounded-[10px] border bg-[#F8F8FA]',
-                                    plan.shipClass === 'frigate'
+                                    'relative z-10 flex h-[174px] w-full flex-col overflow-visible rounded-none border bg-[#F8F8FA]',
+                                    shipClass === 'frigate'
                                       ? 'border-amber-300 shadow-[3px_3px_0_0_rgb(226_232_240)]'
                                       : 'border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]'
                                   )}
                                 >
-                                  <div className="pointer-events-none absolute inset-0 z-0 rounded-[10px]" style={cardGlowStyle} aria-hidden />
+                                  <div className="pointer-events-none absolute inset-0 z-0 rounded-none" style={cardGlowStyle} aria-hidden />
                                   <div className="relative z-10 flex flex-1 flex-col justify-between px-5 pb-4 pt-4">
                                   <div className="space-y-2">
-                                    <div className="text-[35px] leading-[1] font-semibold tracking-tight text-foreground">{plan.displayName}</div>
-                                    <div className="mx-auto max-w-[20ch] text-[11px] leading-[1.28] text-muted-foreground">
-                                      {plan.shipClass === 'scout' ? 'Best for getting started' : plan.shipClass === 'frigate' ? 'Best for growing teams' : 'Best for scaled operations'}
+                                    <div className="text-[30px] leading-[1] font-semibold tracking-tight text-foreground">{displayName}</div>
+                                    <div className="mx-auto max-w-[20ch] truncate whitespace-nowrap text-[11px] leading-[1.28] text-muted-foreground">
+                                      {subtitle}
                                     </div>
-                                    <div className="mt-4 flex items-baseline justify-center gap-0 font-bold tracking-tight text-foreground">
-                                      {priceLine.mode === 'plain' ? (
+                                    <div className="mt-6 flex items-baseline justify-center gap-0 font-bold tracking-tight text-foreground">
+                                      {isEnterprise ? (
+                                        <span className="text-3xl">Custom</span>
+                                      ) : priceLine?.mode === 'plain' ? (
                                         <span className="text-3xl">{priceLine.text}</span>
                                       ) : (
                                         <>
-                                          <span className="text-3xl tabular-nums leading-none">{priceLine.amount}</span>
-                                          <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine.intervalTail}</span>
+                                          <span className="text-3xl tabular-nums leading-none">{priceLine?.amount}</span>
+                                          <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine?.intervalTail}</span>
                                         </>
                                       )}
                                     </div>
                                   </div>
                                     <Link
-                                      href={getPlanCtaHref(plan.priceId)}
+                                      href={ctaHref}
                                       className={cn(
                                         isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection,
-                                        'relative z-10 mt-4 mb-2 w-full justify-center px-3 py-1.5 text-[12px] leading-none font-semibold'
+                                      'relative z-10 mt-2 mb-1 w-full justify-center px-2.5 py-1 text-[10px] leading-none font-semibold h-9'
                                       )}
                                     >
-                                      {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
+                                    {ctaText}
                                     </Link>
                                   </div>
                                 </div>
@@ -355,20 +382,29 @@ export default function PricingPageClient(): React.JSX.Element {
                                 </Tooltip>
                               </div>
                             </td>
-                            {sortedPlans.map((plan, planIdx) => {
+                            {tableColumns.map((column, planIdx) => {
+                              const isEnterprise = column.kind === 'enterprise'
+                              const shipClass = isEnterprise ? 'enterprise' : column.plan.shipClass
+                              const cellKey = isEnterprise ? `${row.label}-enterprise` : `${row.label}-${column.plan.priceId}`
                               if (row.type === 'value') {
+                                const detailText =
+                                  row.label === 'AI Credits'
+                                    ? (isEnterprise ? 'contact sales' : 'included / month')
+                                    : row.label === 'AI agents' || row.label === 'Parallel task capacity'
+                                      ? (isEnterprise ? 'contact sales' : '')
+                                      : ''
                                 return (
-                                  <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                                  <td key={cellKey} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(shipClass)}>
                                     <div className="flex flex-col items-center gap-0.5">
-                                      <span className="text-[14px] font-semibold tabular-nums text-foreground">{row.getValue(plan)}</span>
-                                      <span className="text-[11px] text-muted-foreground">included / month</span>
+                                      <span className="text-[14px] font-semibold tabular-nums text-foreground">{isEnterprise ? 'Custom' : row.getValue(column.plan)}</span>
+                                      {detailText ? <span className="text-[11px] text-muted-foreground">{detailText}</span> : null}
                                     </div>
                                   </td>
                                 )
                               }
                               const included = row.includes(planIdx)
                               return (
-                                <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                                <td key={cellKey} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(shipClass)}>
                                   <span
                                     className={cn(
                                       'inline-flex h-5 w-5 items-center justify-center rounded-[4px] border text-[11px] font-bold transition-colors',

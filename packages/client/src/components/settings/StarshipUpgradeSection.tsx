@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
+import { landingPrimaryCtaSection, landingPrimaryWhiteFaceCtaSection } from '@/app/components/landing/landingSurface'
 
 import { useStarship, STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
@@ -104,22 +105,12 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d)
   }
 
-  const accentByClass: Record<string, { ring: string; cardBg: string; stripe: string }> = {
-    scout: {
-      ring: 'ring-primary/20',
-      cardBg: 'bg-gradient-to-b from-amber-50/80 via-card to-card dark:from-amber-950/25 dark:via-card dark:to-card',
-      stripe: 'from-amber-400/30 via-amber-300/12 to-transparent dark:from-amber-300/22 dark:via-amber-300/8 dark:to-transparent',
-    },
-    frigate: {
-      ring: 'ring-violet-500/20 dark:ring-violet-400/12',
-      cardBg: 'bg-gradient-to-b from-violet-50/80 via-card to-card dark:from-violet-950/28 dark:via-card dark:to-card',
-      stripe: 'from-violet-400/34 via-violet-300/16 to-transparent dark:from-violet-300/24 dark:via-violet-300/10 dark:to-transparent',
-    },
-    cruiser: {
-      ring: 'ring-slate-400/20 dark:ring-slate-300/12',
-      cardBg: 'bg-gradient-to-b from-slate-100/80 via-card to-card dark:from-slate-900/35 dark:via-card dark:to-card',
-      stripe: 'from-slate-400/30 via-slate-300/14 to-transparent dark:from-slate-300/22 dark:via-slate-200/10 dark:to-transparent',
-    },
+  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
+  const regularPlanGlowStyle: CSSProperties = {
+    background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.28) 0%, rgba(167, 139, 250, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
+  }
+  const currentPlanGlowStyle: CSSProperties = {
+    background: 'linear-gradient(to bottom, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.08) 7%, rgba(248, 248, 250, 0) 18%)',
   }
 
   return (
@@ -152,7 +143,7 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                   const planRank = shipClassOrder[plan.shipClass] ?? 0
                   const isUpgrade = !isCurrent && planRank > currentRank
                   const isDowngrade = !isCurrent && planRank < currentRank
-                  const accent = accentByClass[plan.shipClass] ?? accentByClass.scout
+                  const cardGlowStyle = isCurrent ? currentPlanGlowStyle : regularPlanGlowStyle
 
                   const price = plan.unitAmount === null ? null : plan.unitAmount === 0 ? 'Free' : `$${(plan.unitAmount / 100).toFixed(2)}`
                   const cadence = plan.unitAmount === null ? '' : plan.unitAmount === 0 ? '' : `${plan.currency.toUpperCase()}/${plan.interval ?? 'mo'}`
@@ -169,20 +160,16 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                   return (
                     <div
                       key={plan.priceId}
-                      className={`
-                      relative overflow-hidden rounded-2xl border text-left h-full w-full cursor-default transition-all duration-200
-                      ${accent.cardBg}
-                      ${subscribeMutation.isPending ? 'opacity-70' : ''}
-                      ${isCurrent ? 'border-primary/50 shadow-lg ring-2 ring-primary/20' : 'border-border hover:border-muted-foreground/40 hover:shadow-sm'}
-                    `}
+                      className={cn(
+                        'relative isolate overflow-visible rounded-none text-left h-full w-full cursor-default transition-all duration-200',
+                        planCardSurfaceClass,
+                        subscribeMutation.isPending && 'opacity-70',
+                        isCurrent ? 'border-primary/45 ring-2 ring-primary/20' : 'hover:shadow-[4px_4px_0_0_rgb(203_213_225)]'
+                      )}
                     >
-                      <div className={`pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b ${accent.stripe}`} />
-                      {isCurrent ? (
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.08] via-transparent to-transparent" />
-                      ) : null}
-
+                      <div className="pointer-events-none absolute inset-0 z-0" style={cardGlowStyle} aria-hidden />
                       {/* Top meta - no upgrade badge, only Current on current plan */}
-                      <div className="relative p-5 pb-4">
+                      <div className="relative z-10 p-5 pb-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-base font-semibold tracking-tight truncate">{plan.displayName}</div>
@@ -202,7 +189,7 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                         <div className="mt-4 border-t border-border/70 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Included in this plan</div>
                       </div>
 
-                      <div className="flex flex-col">
+                      <div className="relative z-10 flex flex-col">
                         <div className="px-5 pb-5 space-y-3">
                           <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="inline-flex items-center gap-2 text-muted-foreground">
@@ -233,8 +220,11 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                             size="sm"
                             onClick={() => handleSubscribe(plan.priceId)}
                             disabled={subscribeMutation.isPending || isCurrent}
-                            variant={isCurrent ? 'secondary' : 'default'}
-                            className="w-full gap-1.5 h-10"
+                            variant="ghost"
+                            className={cn(
+                              'w-full gap-1.5 h-10',
+                              isCurrent ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection
+                            )}
                           >
                             {!isCurrent && isUpgrade && <Icon name="arrow-up" className="h-3.5 w-3.5" />}
                             {ctaLabel}

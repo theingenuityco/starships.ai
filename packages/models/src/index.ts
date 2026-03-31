@@ -109,6 +109,8 @@ export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepos
 export { TurnRepository } from './repositories/TurnRepository';
 export { LlmModelRepository } from './repositories/LlmModelRepository';
 export { MarketingContentRepository } from './repositories/MarketingContentRepository';
+export { HeartbeatConfigRepository } from './repositories/HeartbeatConfigRepository';
+export { HeartbeatRunRepository } from './repositories/HeartbeatRunRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

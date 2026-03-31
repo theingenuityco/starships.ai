@@ -6,9 +6,11 @@ import PublicHeader from '@/components/navigation/PublicHeader'
 import { PublicFooter } from '@/app/components/PublicFooter'
 import FAQ, { type FAQItem } from '@/app/components/FAQ'
 import TestimonialsSection from '@/app/components/TestimonialsSection'
+import Security from '@/app/components/Security'
 import { landingPrimaryCtaSection, landingPrimaryWhiteFaceCtaSection, landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
 import { cn } from '@/lib/utils'
@@ -67,7 +69,7 @@ export default function PricingPageClient(): React.JSX.Element {
 
   const recommendedIndex = sortedPlans.length >= 3 ? 1 : sortedPlans.length === 2 ? 1 : 0
   const getPlanColumnStyle = (shipClass: string): CSSProperties => {
-    if (shipClass === 'frigate') return { backgroundColor: '#FFF1CC' }
+    if (shipClass === 'frigate') return { backgroundColor: '#FFF6E8' }
     if (shipClass === 'scout' || shipClass === 'cruiser') return { backgroundColor: '#FEF6FD' }
     return {}
   }
@@ -89,80 +91,92 @@ export default function PricingPageClient(): React.JSX.Element {
   const comparisonRows: ComparisonRow[] = [
     {
       type: 'check',
-      label: 'Specialist agents for recurring operations',
-      help: 'Build role-specific agents that repeatedly handle operational work.',
+      label: 'AI Chat',
+      help: 'Chat-driven execution with your agents and team context.',
       includes: planIndex => planIndex >= 0,
     },
     {
       type: 'check',
-      label: 'Connectors for tool actions across your stack',
-      help: 'Let agents take actions through connected tools and external apps.',
+      label: 'AI Agents Marketplace',
+      help: 'Discover and deploy ready-made agents and tools from the marketplace.',
       includes: planIndex => planIndex >= 0,
     },
     {
       type: 'check',
-      label: 'Scheduled recurring automations',
-      help: 'Set recurring schedules so agents run automatically on defined intervals.',
+      label: 'Integrations',
+      help: 'Connect external apps and services so agents can take actions.',
       includes: planIndex => planIndex >= 0,
     },
     {
       type: 'check',
-      label: 'Live run visibility and execution trace',
-      help: 'Track execution progress and review run-level history for each workflow.',
+      label: 'Automations',
+      help: 'Create recurring and rule-based automated runs.',
       includes: planIndex => planIndex >= 0,
-    },
-    {
-      type: 'check',
-      label: 'Tool approvals and control (allow / ask / deny)',
-      help: 'Control agent tool behavior with explicit approval and policy settings.',
-      includes: planIndex => planIndex >= 0,
-    },
-    {
-      type: 'check',
-      label: 'Multi-agent delegation in one flow',
-      help: 'Route work across specialist agents inside the same operational flow.',
-      includes: planIndex => planIndex >= 1,
-    },
-    {
-      type: 'check',
-      label: 'Higher parallel task capacity',
-      help: 'Run more agent tasks concurrently for higher throughput.',
-      includes: planIndex => planIndex >= 1,
     },
     {
       type: 'value',
-      label: 'Monthly credits included',
-      help: 'Credits included in each billing cycle for model and automation usage.',
+      label: 'AI Credits',
+      help: 'Credits included each month for model and automation usage.',
       getValue: plan => `${plan.entitlements.monthlyCredits.toLocaleString()} credits`,
     },
     {
       type: 'check',
-      label: 'Custom limits for volume and operating model',
+      label: 'Live run history',
+      help: 'See execution status and run history in real time.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Approval controls',
+      help: 'Choose allow, ask, or deny behavior for tool calls.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Multi-agent delegation',
+      help: 'Delegate work across specialist agents in the same flow.',
+      includes: planIndex => planIndex >= 1,
+    },
+    {
+      type: 'check',
+      label: 'Parallel task capacity',
+      help: 'Run more tasks concurrently as your plan scales.',
+      includes: planIndex => planIndex >= 1,
+    },
+    {
+      type: 'check',
+      label: 'Custom limits',
       help: 'Adjust plan limits for larger usage and operational requirements.',
       includes: planIndex => planIndex >= 2,
     },
     {
       type: 'check',
-      label: 'Direct high-touch support channel',
+      label: 'Team Capacity Planning',
+      help: 'Plan team growth and resource allocation with capacity planning tools.',
+      includes: planIndex => planIndex === 2,
+    },
+    {
+      type: 'check',
+      label: 'Advanced Dashboards & Reports',
+      help: 'Access advanced analytics dashboards and reporting capabilities.',
+      includes: planIndex => planIndex === 2,
+    },
+    {
+      type: 'check',
+      label: 'Timeline & Gantt Charts',
+      help: 'Visualize execution timelines and dependencies with Gantt charts.',
+      includes: planIndex => planIndex === 2,
+    },
+    {
+      type: 'check',
+      label: 'Direct support channel',
       help: 'Access a direct support path for faster issue handling.',
       includes: planIndex => planIndex >= 2,
     },
     {
       type: 'check',
-      label: 'Fast email support (business days)',
-      help: 'Business-day support with quick email turnaround.',
-      includes: planIndex => planIndex === 0,
-    },
-    {
-      type: 'check',
-      label: 'Priority email support (faster responses)',
-      help: 'Accelerated support response times for active production teams.',
-      includes: planIndex => planIndex === 1,
-    },
-    {
-      type: 'check',
-      label: 'Dedicated enterprise support with rapid response',
-      help: 'High-touch enterprise support for complex deployments.',
+      label: 'Priority business support',
+      help: 'Priority support for business-critical workflows and escalations.',
       includes: planIndex => planIndex === 2,
     },
   ]
@@ -203,7 +217,7 @@ export default function PricingPageClient(): React.JSX.Element {
       <PublicHeader />
 
       <main className="flex flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-6xl flex-col justify-between gap-8 px-4 pt-12 pb-10 sm:gap-10 sm:px-8 sm:pt-20 sm:pb-16 min-h-[calc(100svh-9rem)] md:min-h-[calc(100svh-9.5rem)]">
+        <div className="mx-auto flex w-full max-w-6xl flex-col justify-start gap-8 px-4 pt-10 pb-10 sm:gap-10 sm:px-8 sm:pt-16 sm:pb-16 min-h-[calc(100svh-9rem)] md:min-h-[calc(100svh-9.5rem)]">
           <section className="shrink-0 text-center">
             <h1 className="text-balance text-3xl sm:text-5xl font-bold tracking-tight text-foreground">
               Simple plans that <span className="text-primary">scale with your automation</span>
@@ -222,8 +236,9 @@ export default function PricingPageClient(): React.JSX.Element {
             </div>
           </section>
 
-          <section className="w-full shrink-0 pb-2">
-            {isLoading ? (
+          {(isLoading || isError || sortedPlans.length === 0) ? (
+            <section className="w-full shrink-0 pb-2">
+              {isLoading ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {[0, 1, 2].map(idx => (
                   <Card key={idx} className="h-72 animate-pulse rounded-none" />
@@ -243,153 +258,75 @@ export default function PricingPageClient(): React.JSX.Element {
                   <CardDescription>There are no active plan entries in the catalog at the moment.</CardDescription>
                 </CardHeader>
               </Card>
-            ) : (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                {sortedPlans.map((plan, idx) => {
-                  const cardGlowStyle = planCardGlowStyleByClass[plan.shipClass] ?? planCardGlowStyleByClass.scout
-                  const isRecommended = idx === recommendedIndex
-                  const priceLine = getPlanPriceLine(plan.unitAmount, plan.currency, plan.interval)
-
-                  return (
-                    <div
-                      key={plan.priceId}
-                      className={cn(
-                        /* overflow visible so CTA box-shadow (3D lip) is not clipped */
-                        'relative isolate overflow-visible rounded-none text-left h-full w-full transition-all duration-200',
-                        planCardSurfaceClass,
-                        isRecommended
-                          ? 'border-primary/45 ring-2 ring-primary/20 ring-offset-0'
-                          : /* Avoid hover translate — it exposes a subpixel “white line” at the top vs Frigate (no lift). */
-                            'hover:shadow-[4px_4px_0_0_rgb(203_213_225)]'
-                      )}
-                    >
-                      <div className="pointer-events-none absolute inset-0 z-0" style={cardGlowStyle} aria-hidden />
-                      {isRecommended ? (
-                        <div
-                          className="pointer-events-none absolute inset-0 z-0"
-                          style={{
-                            background: 'linear-gradient(to bottom, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.08) 7%, rgba(248, 248, 250, 0) 18%)',
-                          }}
-                          aria-hidden
-                        />
-                      ) : null}
-                      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-                        <div className="relative p-5 pb-4">
-                          <div className="min-w-0">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="text-base font-semibold tracking-tight truncate">{plan.displayName}</div>
-                              {isRecommended ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.02em] text-primary">
-                                  <Icon name="sparkles" className="h-3 w-3" />
-                                  Recommended
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-3 flex flex-wrap items-baseline gap-0 font-bold tracking-tight">
-                              {priceLine.mode === 'plain' ? (
-                                <span className="text-3xl">{priceLine.text}</span>
-                              ) : (
-                                <>
-                                  <span className="text-3xl tabular-nums leading-none">{priceLine.amount}</span>
-                                  <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine.intervalTail}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mt-4 border-t border-border/70 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Included in this plan</div>
-                        </div>
-
-                        <div className="mt-auto px-5 pb-5 space-y-3">
-                          <div className="flex items-center justify-between gap-3 text-sm">
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Icon name="users" className="h-4 w-4 text-primary" />
-                              Max agents
-                            </span>
-                            <span className="font-semibold tabular-nums">{plan.entitlements.maxAgents}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 text-sm">
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Icon name="zap" className="h-4 w-4 text-primary" />
-                              Parallel Tasks
-                            </span>
-                            <span className="font-semibold tabular-nums">{plan.entitlements.maxConcurrentTurns}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 text-sm">
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Icon name="coins" className="h-4 w-4 text-primary" />
-                              Monthly credits
-                            </span>
-                            <span className="font-semibold tabular-nums">{plan.entitlements.monthlyCredits}</span>
-                          </div>
-
-                          <div className="border-t border-border/70 pt-4 pb-1.5">
-                            <Link
-                              href={getPlanCtaHref(plan.priceId)}
-                              className={cn(isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection, 'relative z-10 w-full justify-center')}
-                            >
-                              {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </section>
+              ) : null}
+            </section>
+          ) : null}
 
           {!isLoading && !isError && sortedPlans.length > 0 ? (
             <section className="w-full shrink-0">
-              <div className="overflow-hidden rounded-none border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]">
+              <div className="overflow-visible rounded-none bg-[#F8F8FA]">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+                  <table className="w-full min-w-[1180px] table-fixed border-collapse text-left">
                     <colgroup>
-                      <col className="w-[40%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
-                      <col className="w-[20%]" />
+                      <col style={{ width: '20%' }} />
+                      <col style={{ width: '26.66%' }} />
+                      <col style={{ width: '26.66%' }} />
+                      <col style={{ width: '26.66%' }} />
                     </colgroup>
                     <thead>
-                      <tr className="border-b border-border/70 bg-white">
-                        <th className="px-5 py-4 sm:px-6" />
+                      <tr className="bg-white">
+                        <th className="px-3 py-4 sm:px-4" />
                         {sortedPlans.map((plan, idx) => {
                           const isRecommended = idx === recommendedIndex
                           const priceLine = getPlanPriceLine(plan.unitAmount, plan.currency, plan.interval)
+                          const cardGlowStyle = planCardGlowStyleByClass[plan.shipClass] ?? planCardGlowStyleByClass.scout
                           return (
                             <th key={`comparison-header-${plan.priceId}`} className="px-4 py-4 text-center align-top sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
                               <div
                                 className={cn(
-                                  'mx-auto flex h-[200px] w-full max-w-[260px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm',
-                                  isRecommended && 'border-fuchsia-300 shadow-[0_0_0_1px_rgba(217,70,239,0.15)]'
+                                  'mx-auto h-[20px] w-full rounded-t-[10px] py-[2px] text-[11px] font-semibold tracking-[0.08em]',
+                                  isRecommended ? 'bg-amber-400 text-slate-900' : 'bg-transparent text-transparent'
                                 )}
                               >
-                                <div className={cn('py-1 text-[10px] font-semibold uppercase tracking-wide', isRecommended ? 'bg-fuchsia-500 text-white' : 'bg-transparent text-transparent')}>
-                                  Most Popular
-                                </div>
-                                <div className="flex flex-1 flex-col justify-between px-6 py-5">
+                                Most popular
+                              </div>
+                              <div className="relative isolate mx-auto w-full">
+                                <div
+                                  className={cn(
+                                    'relative z-10 flex h-[174px] w-full flex-col overflow-visible rounded-[10px] border bg-[#F8F8FA]',
+                                    plan.shipClass === 'frigate'
+                                      ? 'border-amber-300 shadow-[3px_3px_0_0_rgb(226_232_240)]'
+                                      : 'border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]'
+                                  )}
+                                >
+                                  <div className="pointer-events-none absolute inset-0 z-0 rounded-[10px]" style={cardGlowStyle} aria-hidden />
+                                  <div className="relative z-10 flex flex-1 flex-col justify-between px-5 pb-4 pt-4">
                                   <div className="space-y-2">
-                                    <div className="text-[28px] leading-none font-semibold tracking-tight text-foreground">{plan.displayName}</div>
-                                    <div className="flex items-baseline justify-center gap-0.5 font-bold text-foreground">
-                                    {priceLine.mode === 'plain' ? (
-                                      <span className="text-[2rem] leading-none">{priceLine.text}</span>
-                                    ) : (
-                                      <>
-                                        <span className="text-[2rem] tabular-nums leading-none">{priceLine.amount}</span>
-                                        <span className="text-xs font-semibold text-muted-foreground">/{priceLine.intervalTail}</span>
-                                      </>
-                                    )}
+                                    <div className="text-[35px] leading-[1] font-semibold tracking-tight text-foreground">{plan.displayName}</div>
+                                    <div className="mx-auto max-w-[20ch] text-[11px] leading-[1.28] text-muted-foreground">
+                                      {plan.shipClass === 'scout' ? 'Best for getting started' : plan.shipClass === 'frigate' ? 'Best for growing teams' : 'Best for scaled operations'}
+                                    </div>
+                                    <div className="mt-4 flex items-baseline justify-center gap-0 font-bold tracking-tight text-foreground">
+                                      {priceLine.mode === 'plain' ? (
+                                        <span className="text-3xl">{priceLine.text}</span>
+                                      ) : (
+                                        <>
+                                          <span className="text-3xl tabular-nums leading-none">{priceLine.amount}</span>
+                                          <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine.intervalTail}</span>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
+                                    <Link
+                                      href={getPlanCtaHref(plan.priceId)}
+                                      className={cn(
+                                        isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection,
+                                        'relative z-10 mt-4 mb-2 w-full justify-center px-3 py-1.5 text-[12px] leading-none font-semibold'
+                                      )}
+                                    >
+                                      {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
+                                    </Link>
                                   </div>
-                                  <Link
-                                    href={getPlanCtaHref(plan.priceId)}
-                                    className={cn(
-                                      isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection,
-                                      'relative z-10 w-full justify-center px-3 py-2 text-sm'
-                                    )}
-                                  >
-                                    {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
-                                  </Link>
                                 </div>
                               </div>
                             </th>
@@ -398,48 +335,55 @@ export default function PricingPageClient(): React.JSX.Element {
                       </tr>
                     </thead>
                     <tbody>
-                      {comparisonRows.map((row, idx) => (
-                        <tr key={row.label} className="border-b border-border/60 bg-white">
-                          <td className="px-5 py-3 text-[15px] text-foreground sm:px-6">
-                            <div className="flex items-center gap-2">
-                              <span className="leading-snug">{row.label}</span>
-                              <span
-                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border/80 bg-white text-[10px] font-semibold text-muted-foreground cursor-help"
-                                title={row.help}
-                                aria-label={`About ${row.label}`}
-                              >
-                                i
-                              </span>
-                            </div>
-                          </td>
-                          {sortedPlans.map((plan, planIdx) => {
-                            if (row.type === 'value') {
+                      <TooltipProvider delayDuration={120}>
+                        {comparisonRows.map((row, idx) => (
+                          <tr key={row.label} className={cn('bg-white', idx !== comparisonRows.length - 1 && 'border-b border-border/60')}>
+                            <td className="px-3 py-3 text-[14px] text-foreground sm:px-4">
+                              <div className="flex items-center gap-2">
+                                <span className="leading-snug">{row.label}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border/80 bg-white text-[10px] font-semibold text-muted-foreground cursor-help"
+                                      aria-label={`About ${row.label}`}
+                                    >
+                                      i
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs text-xs leading-relaxed">{row.help}</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </td>
+                            {sortedPlans.map((plan, planIdx) => {
+                              if (row.type === 'value') {
+                                return (
+                                  <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="text-[14px] font-semibold tabular-nums text-foreground">{row.getValue(plan)}</span>
+                                      <span className="text-[11px] text-muted-foreground">included / month</span>
+                                    </div>
+                                  </td>
+                                )
+                              }
+                              const included = row.includes(planIdx)
                               return (
                                 <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="text-[15px] font-semibold tabular-nums text-foreground">{row.getValue(plan)}</span>
-                                    <span className="text-[11px] text-muted-foreground">included / month</span>
-                                  </div>
+                                  <span
+                                    className={cn(
+                                      'inline-flex h-5 w-5 items-center justify-center rounded-[4px] border text-[11px] font-bold transition-colors',
+                                      included ? 'border-primary bg-primary text-primary-foreground' : 'border-slate-300 bg-white text-slate-300'
+                                    )}
+                                    aria-label={included ? 'Included' : 'Not included'}
+                                  >
+                                    {included ? '✓' : ''}
+                                  </span>
                                 </td>
                               )
-                            }
-                            const included = row.includes(planIdx)
-                            return (
-                              <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
-                                <span
-                                  className={cn(
-                                    'inline-flex h-5 w-5 items-center justify-center rounded-[4px] border text-[11px] font-bold transition-colors',
-                                    included ? 'border-primary bg-primary text-primary-foreground' : 'border-slate-300 bg-white text-slate-300'
-                                  )}
-                                  aria-label={included ? 'Included' : 'Not included'}
-                                >
-                                  {included ? '✓' : ''}
-                                </span>
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      ))}
+                            })}
+                          </tr>
+                        ))}
+                      </TooltipProvider>
                     </tbody>
                   </table>
                 </div>
@@ -466,6 +410,7 @@ export default function PricingPageClient(): React.JSX.Element {
         </section>
 
         <TestimonialsSection />
+        <Security />
 
         <FAQ items={pricingFaqItems} title="Pricing FAQs" sectionTone="white" />
       </main>

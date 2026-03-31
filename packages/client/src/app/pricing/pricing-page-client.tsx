@@ -119,12 +119,6 @@ export default function PricingPageClient(): React.JSX.Element {
       includes: planIndex => planIndex >= 0,
     },
     {
-      type: 'check',
-      label: 'Unlimited Storage',
-      help: 'Store unlimited project assets and run data.',
-      includes: planIndex => planIndex >= 0,
-    },
-    {
       type: 'value',
       label: 'AI Credits',
       help: 'Credits included each month for model and automation usage.',
@@ -162,33 +156,27 @@ export default function PricingPageClient(): React.JSX.Element {
     },
     {
       type: 'check',
-      label: 'Custom limits',
-      help: 'Adjust plan limits for larger usage and operational requirements.',
+      label: 'Unlimited Storage',
+      help: 'Store unlimited project assets and run data.',
       includes: planIndex => planIndex >= 1,
     },
     {
       type: 'check',
-      label: 'Team Capacity Planning',
-      help: 'Plan team growth and resource allocation with capacity planning tools.',
-      includes: planIndex => planIndex >= 1,
-    },
-    {
-      type: 'check',
-      label: 'Advanced Dashboards & Reports',
-      help: 'Access advanced analytics dashboards and reporting capabilities.',
-      includes: planIndex => planIndex >= 1,
-    },
-    {
-      type: 'check',
-      label: 'Direct support channel',
-      help: 'Access a direct support path for faster issue handling.',
-      includes: planIndex => planIndex >= 1,
-    },
-    {
-      type: 'check',
-      label: 'Priority business support',
+      label: 'Business support',
       help: 'Priority support for business-critical workflows and escalations.',
       includes: planIndex => planIndex >= 1,
+    },
+    {
+      type: 'check',
+      label: 'Plan customization',
+      help: 'Tailor limits and configuration to your operating needs.',
+      includes: planIndex => planIndex >= 2,
+    },
+    {
+      type: 'check',
+      label: 'Deployment scope',
+      help: 'Support for broader rollout and implementation requirements.',
+      includes: planIndex => planIndex >= 2,
     },
   ]
   const getPlanCtaHref = (_priceId: string): string => {

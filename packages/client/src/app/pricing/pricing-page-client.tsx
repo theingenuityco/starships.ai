@@ -7,7 +7,7 @@ import { PublicFooter } from '@/app/components/PublicFooter'
 import FAQ, { type FAQItem } from '@/app/components/FAQ'
 import TestimonialsSection from '@/app/components/TestimonialsSection'
 import Security from '@/app/components/Security'
-import { landingPrimaryCtaSection, landingPrimaryWhiteFaceCtaSection, landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
+import { landingPrimaryCtaHero, landingWhiteCtaOnGradientLg } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -313,33 +313,35 @@ export default function PricingPageClient(): React.JSX.Element {
                                   )}
                                 >
                                   <div className="pointer-events-none absolute inset-0 z-0 rounded-none" style={cardGlowStyle} aria-hidden />
-                                  <div className="relative z-10 flex flex-1 flex-col justify-between px-5 pb-4 pt-4">
-                                  <div className="space-y-2">
-                                    <div className="text-[30px] leading-[1] font-semibold tracking-tight text-foreground">{displayName}</div>
-                                    <div className="mx-auto max-w-[20ch] truncate whitespace-nowrap text-[11px] leading-[1.28] text-muted-foreground">
-                                      {subtitle}
+                                  <div className="relative z-10 flex flex-1 flex-col px-5 pb-4 pt-4">
+                                    <div className="shrink-0 space-y-2 text-center">
+                                      <div className="text-[30px] leading-[1] font-semibold tracking-tight text-foreground">{displayName}</div>
+                                      <div className="mx-auto max-w-[20ch] truncate whitespace-nowrap text-[11px] leading-[1.28] text-muted-foreground">
+                                        {subtitle}
+                                      </div>
                                     </div>
-                                    <div className="mt-6 flex items-baseline justify-center gap-0 font-bold tracking-tight text-foreground">
-                                      {isEnterprise ? (
-                                        <span className="text-3xl">Custom</span>
-                                      ) : priceLine?.mode === 'plain' ? (
-                                        <span className="text-3xl">{priceLine.text}</span>
-                                      ) : (
-                                        <>
-                                          <span className="text-3xl tabular-nums leading-none">{priceLine?.amount}</span>
-                                          <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine?.intervalTail}</span>
-                                        </>
-                                      )}
+                                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3">
+                                      <div className="flex items-baseline justify-center gap-0 font-bold tracking-tight text-foreground">
+                                        {isEnterprise ? (
+                                          <span className="text-3xl">Custom</span>
+                                        ) : priceLine?.mode === 'plain' ? (
+                                          <span className="text-3xl">{priceLine.text}</span>
+                                        ) : (
+                                          <>
+                                            <span className="text-3xl tabular-nums leading-none">{priceLine?.amount}</span>
+                                            <span className="text-sm sm:text-base font-bold tabular-nums leading-none">/{priceLine?.intervalTail}</span>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
                                     <Link
                                       href={ctaHref}
                                       className={cn(
-                                        landingPrimaryCtaSection,
-                                        'relative z-10 mt-2 mb-1 w-full justify-center px-2.5 py-1 text-[10px] leading-none font-semibold h-9'
+                                        landingPrimaryCtaHero,
+                                        'relative z-10 mt-auto inline-flex h-9 w-full max-w-none shrink-0 items-center justify-center px-3 text-sm font-medium shadow-[0_4px_0_0_rgba(180,83,9,1)] active:shadow-[0_2px_0_0_rgba(180,83,9,1)] sm:h-10 sm:px-4 sm:text-sm sm:w-full'
                                       )}
                                     >
-                                    {ctaText}
+                                      {ctaText}
                                     </Link>
                                   </div>
                                 </div>

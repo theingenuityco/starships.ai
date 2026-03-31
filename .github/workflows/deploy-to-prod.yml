@@ -73,6 +73,8 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/12-redis-statefulset.yaml
           kubectl apply --dry-run=client -f k8s/prod/10-schedule-scheduler-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/11-schedule-worker-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/prod/14-heartbeat-scheduler-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/prod/15-heartbeat-worker-deployment.yaml
           echo "✅ Kubernetes manifests validated successfully."
 
       - name: Apply manifests
@@ -93,6 +95,8 @@ jobs:
           kubectl apply -f k8s/prod/12-redis-statefulset.yaml
           kubectl apply -f k8s/prod/10-schedule-scheduler-deployment.yaml
           kubectl apply -f k8s/prod/11-schedule-worker-deployment.yaml
+          kubectl apply -f k8s/prod/14-heartbeat-scheduler-deployment.yaml
+          kubectl apply -f k8s/prod/15-heartbeat-worker-deployment.yaml
           echo "✅ Applied manifests to prod cluster."
 
       - name: Update secrets
@@ -242,6 +246,12 @@ jobs:
           kubectl set image deployment/starships-schedule-worker \
             schedule-worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n ${{ env.NAMESPACE }}
+          kubectl set image deployment/starships-heartbeat-scheduler \
+            heartbeat-scheduler=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+          kubectl set image deployment/starships-heartbeat-worker \
+            heartbeat-worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
 
           # Keep Autopilot Runner in sync with the same tag (built in the same pipeline).
           kubectl set image deployment/autopilot-runner \
@@ -252,11 +262,15 @@ jobs:
           kubectl rollout restart deployment/starships-app -n ${{ env.NAMESPACE }}
           kubectl rollout restart deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }}
           kubectl rollout restart deployment/starships-schedule-worker -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/starships-heartbeat-scheduler -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/starships-heartbeat-worker -n ${{ env.NAMESPACE }}
           kubectl rollout restart deployment/autopilot-runner -n ${{ env.NAMESPACE }}
 
           kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
           kubectl rollout status deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }} --timeout=600s
           kubectl rollout status deployment/starships-schedule-worker -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-heartbeat-scheduler -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-heartbeat-worker -n ${{ env.NAMESPACE }} --timeout=600s
           kubectl rollout status deployment/autopilot-runner -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 

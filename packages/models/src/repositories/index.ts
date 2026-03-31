@@ -21,3 +21,5 @@ export { StarshipDatasetRowRepository } from './StarshipDatasetRowRepository';
 export { LlmModelRepository } from './LlmModelRepository';
 export { AutopilotAwaitRepository } from './AutopilotAwaitRepository';
 export { AutopilotAwaitFiringRepository } from './AutopilotAwaitFiringRepository';
+export { HeartbeatConfigRepository } from './HeartbeatConfigRepository';
+export { HeartbeatRunRepository } from './HeartbeatRunRepository';

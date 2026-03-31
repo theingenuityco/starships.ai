@@ -107,10 +107,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-6 sm:gap-8 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">
           {/* Fluid type scale; nowrap keeps the H1 on one line. */}
-          <div
-            className="mb-3 w-full min-w-0 text-center"
-            style={{ fontSize: 'clamp(0.62rem, 2.55vw + 0.42rem, 5.25rem)' }}
-          >
+          <div className="mb-3 w-full min-w-0 text-center" style={{ fontSize: 'clamp(0.62rem, 2.55vw + 0.42rem, 5.25rem)' }}>
             <h1 className="m-0 max-w-full min-w-0 font-bold tracking-tight leading-tight text-white whitespace-nowrap">
               <span className="warp-word" data-text="agentic">
                 <span className="warp-letter">A</span>

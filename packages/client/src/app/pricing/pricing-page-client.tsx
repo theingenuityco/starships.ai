@@ -66,6 +66,106 @@ export default function PricingPageClient(): React.JSX.Element {
   })
 
   const recommendedIndex = sortedPlans.length >= 3 ? 1 : sortedPlans.length === 2 ? 1 : 0
+  const getPlanColumnStyle = (shipClass: string): CSSProperties => {
+    if (shipClass === 'frigate') return { backgroundColor: '#FFF1CC' }
+    if (shipClass === 'scout' || shipClass === 'cruiser') return { backgroundColor: '#FEF6FD' }
+    return {}
+  }
+
+  type ComparisonRow =
+    | {
+        type: 'check'
+        label: string
+        help: string
+        includes: (planIndex: number) => boolean
+      }
+    | {
+        type: 'value'
+        label: string
+        help: string
+        getValue: (plan: (typeof sortedPlans)[number]) => string
+      }
+
+  const comparisonRows: ComparisonRow[] = [
+    {
+      type: 'check',
+      label: 'Specialist agents for recurring operations',
+      help: 'Build role-specific agents that repeatedly handle operational work.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Connectors for tool actions across your stack',
+      help: 'Let agents take actions through connected tools and external apps.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Scheduled recurring automations',
+      help: 'Set recurring schedules so agents run automatically on defined intervals.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Live run visibility and execution trace',
+      help: 'Track execution progress and review run-level history for each workflow.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Tool approvals and control (allow / ask / deny)',
+      help: 'Control agent tool behavior with explicit approval and policy settings.',
+      includes: planIndex => planIndex >= 0,
+    },
+    {
+      type: 'check',
+      label: 'Multi-agent delegation in one flow',
+      help: 'Route work across specialist agents inside the same operational flow.',
+      includes: planIndex => planIndex >= 1,
+    },
+    {
+      type: 'check',
+      label: 'Higher parallel task capacity',
+      help: 'Run more agent tasks concurrently for higher throughput.',
+      includes: planIndex => planIndex >= 1,
+    },
+    {
+      type: 'value',
+      label: 'Monthly credits included',
+      help: 'Credits included in each billing cycle for model and automation usage.',
+      getValue: plan => `${plan.entitlements.monthlyCredits.toLocaleString()} credits`,
+    },
+    {
+      type: 'check',
+      label: 'Custom limits for volume and operating model',
+      help: 'Adjust plan limits for larger usage and operational requirements.',
+      includes: planIndex => planIndex >= 2,
+    },
+    {
+      type: 'check',
+      label: 'Direct high-touch support channel',
+      help: 'Access a direct support path for faster issue handling.',
+      includes: planIndex => planIndex >= 2,
+    },
+    {
+      type: 'check',
+      label: 'Fast email support (business days)',
+      help: 'Business-day support with quick email turnaround.',
+      includes: planIndex => planIndex === 0,
+    },
+    {
+      type: 'check',
+      label: 'Priority email support (faster responses)',
+      help: 'Accelerated support response times for active production teams.',
+      includes: planIndex => planIndex === 1,
+    },
+    {
+      type: 'check',
+      label: 'Dedicated enterprise support with rapid response',
+      help: 'High-touch enterprise support for complex deployments.',
+      includes: planIndex => planIndex === 2,
+    },
+  ]
   const getPlanCtaHref = (_priceId: string): string => {
     if (!isAuthenticated) return '/login?returnUrl=%2Fupgrade'
     return '/upgrade'
@@ -238,6 +338,114 @@ export default function PricingPageClient(): React.JSX.Element {
               </div>
             )}
           </section>
+
+          {!isLoading && !isError && sortedPlans.length > 0 ? (
+            <section className="w-full shrink-0">
+              <div className="overflow-hidden rounded-none border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+                    <colgroup>
+                      <col className="w-[40%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                      <col className="w-[20%]" />
+                    </colgroup>
+                    <thead>
+                      <tr className="border-b border-border/70 bg-white">
+                        <th className="px-5 py-4 sm:px-6" />
+                        {sortedPlans.map((plan, idx) => {
+                          const isRecommended = idx === recommendedIndex
+                          const priceLine = getPlanPriceLine(plan.unitAmount, plan.currency, plan.interval)
+                          return (
+                            <th key={`comparison-header-${plan.priceId}`} className="px-4 py-4 text-center align-top sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                              <div
+                                className={cn(
+                                  'mx-auto flex h-[200px] w-full max-w-[260px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm',
+                                  isRecommended && 'border-fuchsia-300 shadow-[0_0_0_1px_rgba(217,70,239,0.15)]'
+                                )}
+                              >
+                                <div className={cn('py-1 text-[10px] font-semibold uppercase tracking-wide', isRecommended ? 'bg-fuchsia-500 text-white' : 'bg-transparent text-transparent')}>
+                                  Most Popular
+                                </div>
+                                <div className="flex flex-1 flex-col justify-between px-6 py-5">
+                                  <div className="space-y-2">
+                                    <div className="text-[28px] leading-none font-semibold tracking-tight text-foreground">{plan.displayName}</div>
+                                    <div className="flex items-baseline justify-center gap-0.5 font-bold text-foreground">
+                                    {priceLine.mode === 'plain' ? (
+                                      <span className="text-[2rem] leading-none">{priceLine.text}</span>
+                                    ) : (
+                                      <>
+                                        <span className="text-[2rem] tabular-nums leading-none">{priceLine.amount}</span>
+                                        <span className="text-xs font-semibold text-muted-foreground">/{priceLine.intervalTail}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  </div>
+                                  <Link
+                                    href={getPlanCtaHref(plan.priceId)}
+                                    className={cn(
+                                      isRecommended ? landingPrimaryCtaSection : landingPrimaryWhiteFaceCtaSection,
+                                      'relative z-10 w-full justify-center px-3 py-2 text-sm'
+                                    )}
+                                  >
+                                    {!isAuthenticated && plan.unitAmount === 0 ? 'Get Started Free' : 'Choose plan'}
+                                  </Link>
+                                </div>
+                              </div>
+                            </th>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonRows.map((row, idx) => (
+                        <tr key={row.label} className="border-b border-border/60 bg-white">
+                          <td className="px-5 py-3 text-[15px] text-foreground sm:px-6">
+                            <div className="flex items-center gap-2">
+                              <span className="leading-snug">{row.label}</span>
+                              <span
+                                className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border/80 bg-white text-[10px] font-semibold text-muted-foreground cursor-help"
+                                title={row.help}
+                                aria-label={`About ${row.label}`}
+                              >
+                                i
+                              </span>
+                            </div>
+                          </td>
+                          {sortedPlans.map((plan, planIdx) => {
+                            if (row.type === 'value') {
+                              return (
+                                <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span className="text-[15px] font-semibold tabular-nums text-foreground">{row.getValue(plan)}</span>
+                                    <span className="text-[11px] text-muted-foreground">included / month</span>
+                                  </div>
+                                </td>
+                              )
+                            }
+                            const included = row.includes(planIdx)
+                            return (
+                              <td key={`${row.label}-${plan.priceId}`} className="px-4 py-3 text-center sm:px-5" style={getPlanColumnStyle(plan.shipClass)}>
+                                <span
+                                  className={cn(
+                                    'inline-flex h-5 w-5 items-center justify-center rounded-[4px] border text-[11px] font-bold transition-colors',
+                                    included ? 'border-primary bg-primary text-primary-foreground' : 'border-slate-300 bg-white text-slate-300'
+                                  )}
+                                  aria-label={included ? 'Included' : 'Not included'}
+                                >
+                                  {included ? '✓' : ''}
+                                </span>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          ) : null}
         </div>
 
         <section className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-8 sm:pb-14 sm:pt-8">

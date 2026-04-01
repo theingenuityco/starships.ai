@@ -62,8 +62,6 @@ jobs:
           kubectl apply --dry-run=client -f k8s/prod/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/04-service.yaml
           kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
-          # Postgres NodePort access (used by Metabase)
-          kubectl apply --dry-run=client -f k8s/prod/06-nodeport-service.yaml
           # RBAC for k8s job runner was removed
           kubectl apply --dry-run=client -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply --dry-run=client -f k8s/prod/08-autopilot-runner-deployment.yaml
@@ -84,8 +82,6 @@ jobs:
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml
-          # Postgres NodePort access (used by Metabase)
-          kubectl apply -f k8s/prod/06-nodeport-service.yaml
           # RBAC for k8s job runner was removed
           kubectl apply -f k8s/prod/07-autopilot-runner-networkpolicy.yaml
           kubectl apply -f k8s/prod/08-autopilot-runner-deployment.yaml

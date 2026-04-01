@@ -37,18 +37,22 @@ const TESTIMONIALS = [
   },
 ]
 
-export default function TestimonialsSection() {
+export default function TestimonialsSection(props: { showIntro?: boolean }) {
+  const showIntro = props.showIntro ?? true
+
   return (
     <section className="py-16 sm:py-20 md:py-24 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
       <div className="max-w-6xl mx-auto">
-        <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
-            Built for <span className="text-primary">individuals and teams</span> of all sizes
-          </h2>
-          <p className="mt-3 text-sm md:text-base text-slate-600">From solo builders to cross-functional teams, Starships adapts to your workflow.</p>
-        </div>
+        {showIntro ? (
+          <div className="text-center">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+              Built for <span className="text-primary">individuals and teams</span> of all sizes
+            </h2>
+            <p className="mt-3 text-sm md:text-base text-slate-600">From solo builders to cross-functional teams, Starships adapts to your workflow.</p>
+          </div>
+        ) : null}
 
-        <div className="mt-10 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
+        <div className={`${showIntro ? 'mt-10 md:mt-12' : 'mt-0'} grid grid-cols-1 gap-8 md:gap-10 sm:grid-cols-2 lg:grid-cols-4`}>
           {TESTIMONIALS.map((item, idx) => (
             <article key={idx} className={`text-left flex flex-col min-h-[230px] ${idx > 0 ? 'lg:border-l lg:border-slate-200/80 lg:pl-8' : ''}`}>
               <p className="text-[15px] leading-relaxed text-slate-800 italic">{item.quote}</p>

@@ -49,6 +49,7 @@ export function PublicFooter(props: {
       title: 'Resources',
       links: [
         { label: 'Documentation', href: '/docs', external: true },
+        { label: 'Compare: Starships vs Motion', href: '/compare/motion' },
         { label: 'Lead generation', href: '/use-cases/lead-generation' },
         { label: 'WordPress site', href: '/use-cases/wordpress-site' },
         { label: 'Marketplace', href: '/marketplace' },

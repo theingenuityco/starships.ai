@@ -35,7 +35,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-[#050b24] relative">
-        <StarryBackground />
+        <StarryBackground className="opacity-70" style={{ '--star-color': 'rgba(255,255,255,0.9)' } as any} />
         {/* Bottom glow for the whole landing page (decorative background, never above content).
             NOTE: This is the original footer glow – kept as-is. */}
         <div
@@ -61,10 +61,13 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
         <div className="relative z-10">
           <PublicHeader />
 
+          {/* Hero alone: keep horizontal clip without forcing overflow-y (which would clip the showcase overlap). */}
           <div className="overflow-x-hidden">
-            {/* New Landing Sections */}
             <Hero initialAgentTemplates={initialAgentTemplates} />
-            <HeroImageShowcase />
+          </div>
+          <HeroImageShowcase />
+          <div className="overflow-x-hidden">
+            {/* Remaining landing sections */}
             <UseCases />
             <TestimonialsSection />
             <Security />

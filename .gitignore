@@ -6,6 +6,7 @@ CLAUDE.md
 
 # Node / pnpm workspace
 node_modules/
+.pnpm-store/
 .pnpm-debug.log*
 
 # Build outputs

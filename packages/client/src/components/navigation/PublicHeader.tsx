@@ -174,6 +174,14 @@ export function PublicHeader(): React.JSX.Element {
             Pricing
           </Link>
           <Link
+            href="/compare/motion"
+            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/compare/motion', variant: 'desktop' })}
+            className={`${landingHeaderNavItem} ${pathname.startsWith('/compare') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+            aria-current={pathname.startsWith('/compare') ? 'page' : undefined}
+          >
+            Compare
+          </Link>
+          <Link
             href="/login"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'desktop' })}
             className={`${landingHeaderNavItem} ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
@@ -263,6 +271,16 @@ export function PublicHeader(): React.JSX.Element {
                 className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Login
+              </Link>
+              <Link
+                href="/compare/motion"
+                onClick={() => {
+                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/compare/motion', variant: 'mobile' })
+                  setMobileMenuOpen(false)
+                }}
+                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/compare') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+              >
+                Compare
               </Link>
               <Link
                 href="/pricing"

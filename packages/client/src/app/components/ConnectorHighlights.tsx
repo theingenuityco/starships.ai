@@ -1,10 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+import { shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
 
 const CONNECTOR_ICONS = [
   '/connectors/activecampaign.svg',
@@ -93,9 +92,8 @@ const CONNECTOR_ICONS = [
 ]
 
 export default function ConnectorHighlights() {
-  // Keep the grid visually complete on desktop: 10 columns x 7 rows = 70 tiles.
-  // We reserve one tile for "99+", so render 69 connector icons.
-  const displayConnectors = CONNECTOR_ICONS.slice(0, 69)
+  // Use the full connector set so edge-to-edge layouts remain dense without oversized tiles.
+  const displayConnectors = CONNECTOR_ICONS
   const [pulsingIndex, setPulsingIndex] = useState(0)
 
   useEffect(() => {
@@ -114,75 +112,52 @@ export default function ConnectorHighlights() {
   }, [displayConnectors.length])
 
   return (
-    <section className="mb-14 md:mb-16">
-      <div className={`p-4 sm:p-5 md:p-6 ${shellMuted} ${shellMutedLift}`}>
-        <div className="connector-layout">
-          <div
-            className="connector-icons-wrap"
-            style={{
-              background: [
-                'linear-gradient(95deg, rgba(189,126,52,0.92) 0%, rgba(150,70,156,0.90) 32%, rgba(114,47,166,0.92) 58%, rgba(39,24,94,0.95) 100%)',
-                'radial-gradient(circle at 6% 50%, rgba(251,191,36,0.28) 0%, transparent 34%)',
-                'radial-gradient(circle at 96% 52%, rgba(99,102,241,0.30) 0%, transparent 34%)',
-              ].join(', '),
-            }}
-          >
-            <div className="connector-highlights-grid-shell">
-              <div className="connector-highlights-grid">
-                {displayConnectors.map((iconSrc, idx) => (
-                  <div
-                    key={iconSrc}
-                    className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] ${
-                      pulsingIndex === idx ? 'connector-highlights-tile-pulsing' : ''
-                    }`}
-                  >
-                    <div className="connector-highlights-tile-inner">
-                      <div className="connector-highlights-icon relative">
-                        <Image src={iconSrc} alt="Connector logo" fill sizes="48px" className="object-contain" />
-                      </div>
+    <section className="mb-14 md:mb-16" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)', marginRight: 'calc(-50vw + 50%)' }}>
+      <div className={`p-0 ${shellMuted} ${shellMutedLift}`}>
+        <div
+          className="connector-icons-wrap"
+          style={{
+            background: [
+              'linear-gradient(95deg, rgba(189,126,52,0.92) 0%, rgba(150,70,156,0.90) 32%, rgba(114,47,166,0.92) 58%, rgba(39,24,94,0.95) 100%)',
+              'radial-gradient(circle at 6% 50%, rgba(251,191,36,0.28) 0%, transparent 34%)',
+              'radial-gradient(circle at 96% 52%, rgba(99,102,241,0.30) 0%, transparent 34%)',
+            ].join(', '),
+          }}
+        >
+          <div className="connector-highlights-grid-shell">
+            <div className="connector-highlights-grid">
+              {displayConnectors.map((iconSrc, idx) => (
+                <div
+                  key={iconSrc}
+                  className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] ${
+                    pulsingIndex === idx ? 'connector-highlights-tile-pulsing' : ''
+                  }`}
+                >
+                  <div className="connector-highlights-tile-inner">
+                    <div className="connector-highlights-icon relative">
+                      <Image src={iconSrc} alt="Connector logo" fill sizes="48px" className="object-contain" />
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
 
-                <div className="connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]">
-                  <div className="connector-highlights-tile-inner">
-                    <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
-                  </div>
+              <div className="connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]">
+                <div className="connector-highlights-tile-inner">
+                  <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="connector-copy text-left p-5 sm:p-6">
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-slate-900 leading-tight">Connect the tools your team already runs on</h3>
-            <p className="mt-3 text-sm sm:text-base text-slate-700 max-w-md">Unify your stack so agents can take action across your apps, data, and workflows from one place.</p>
-            <div className="mt-6">
-              <Link href="/login" className={landingPrimaryCtaSection}>
-                Get Started Free
-              </Link>
             </div>
           </div>
         </div>
       </div>
       <style jsx>{`
-        .connector-layout {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
         .connector-icons-wrap {
-          flex: 1 1 auto;
           border-radius: 0;
           padding: 18px;
         }
 
         .connector-highlights-grid-shell {
           padding: 14px;
-        }
-
-        .connector-copy {
-          flex: 0 0 320px;
         }
 
         .connector-highlights-grid {
@@ -193,7 +168,7 @@ export default function ConnectorHighlights() {
 
         .connector-highlights-tile {
           aspect-ratio: 1 / 1;
-          min-height: 44px;
+          min-height: 0;
           transform-origin: center center;
           transition: transform 220ms ease-out;
           will-change: transform;
@@ -232,16 +207,12 @@ export default function ConnectorHighlights() {
         }
 
         @media (min-width: 640px) {
-          .connector-layout {
-            gap: 20px;
-          }
-
           .connector-highlights-grid {
             grid-template-columns: repeat(8, minmax(0, 1fr));
-            gap: 20px;
+            gap: 18px;
           }
           .connector-highlights-tile {
-            min-height: 46px;
+            min-height: 0;
           }
           .connector-icons-wrap {
             padding: 20px;
@@ -252,24 +223,30 @@ export default function ConnectorHighlights() {
         }
 
         @media (min-width: 1024px) {
-          .connector-layout {
-            flex-direction: row;
-            align-items: center;
-            gap: 28px;
-          }
-
           .connector-highlights-grid {
-            grid-template-columns: repeat(10, minmax(0, 1fr));
-            gap: 22px;
+            grid-template-columns: repeat(20, minmax(0, 1fr));
+            gap: 16px;
           }
           .connector-highlights-tile {
-            min-height: 48px;
+            min-height: 0;
           }
           .connector-icons-wrap {
             padding: 22px;
           }
           .connector-highlights-grid-shell {
             padding: 18px;
+          }
+        }
+
+        @media (min-width: 1280px) {
+          .connector-highlights-grid {
+            grid-template-columns: repeat(22, minmax(0, 1fr));
+          }
+        }
+
+        @media (min-width: 1536px) {
+          .connector-highlights-grid {
+            grid-template-columns: repeat(24, minmax(0, 1fr));
           }
         }
       `}</style>

@@ -2,15 +2,9 @@
 
 import { useEffect, useState } from 'react'
 
-import { landingFrameInset, panelLight, panelLightLift } from '@/app/components/landing/landingSurface'
+import { landingFrameInset, panelLightLift } from '@/app/components/landing/landingSurface'
 
-const SHOWCASE_IMAGES = [
-  '/landing/showcase/github-gmail.png',
-  '/landing/showcase/lead.png',
-  '/landing/showcase/lead-generation.png',
-  '/landing/showcase/lin.png',
-  '/landing/showcase/gmail.png',
-]
+const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead-generation.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
 const SWITCH_INTERVAL_MS = 5000
 
@@ -66,45 +60,42 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
       {/* White band stays flush under hero; only the framed mockup lifts (wrapper transform, not section margin). */}
       <div className="relative z-[12] mx-auto max-w-6xl">
         <div className="relative" style={overlapHero ? overlapHeroFrameStyle : undefined}>
-          <div
-            className={`w-full p-3 sm:p-4 md:p-5 ${panelLight} ${panelLightLift}`}
-            style={gradientSurfaceStyle}
-          >
-          <div className="relative w-full aspect-[16/9] overflow-hidden rounded-none">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className={`relative overflow-hidden ${landingFrameInset}`}
-                style={{
-                  width: '95%',
-                  height: '95%',
-                }}
-              >
-                {previousIndex !== null ? (
-                  <img
-                    src={SHOWCASE_IMAGES[previousIndex]}
-                    alt=""
-                    aria-hidden
-                    className={`absolute inset-0 h-full w-full object-contain p-5 sm:p-6 md:p-7 transition-opacity duration-[650ms] ease-in-out ${isCrossfading ? 'opacity-0' : 'opacity-100'}`}
-                  />
-                ) : null}
-                <img
-                  key={SHOWCASE_IMAGES[activeIndex]}
-                  src={SHOWCASE_IMAGES[activeIndex]}
-                  alt={`Landing showcase ${activeIndex + 1}`}
-                  className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5 will-change-transform"
+          <div className={`w-full p-3 sm:p-4 md:p-5 ${panelLightLift}`} style={gradientSurfaceStyle}>
+            <div className="relative w-full aspect-[16/9] overflow-hidden rounded-none">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                  className={`relative overflow-hidden ${landingFrameInset}`}
                   style={{
-                    animationName: 'hero-showcase-fade-in, hero-showcase-zoom',
-                    animationDuration: '650ms, 380ms',
-                    animationTimingFunction: 'ease-in-out, ease-out',
-                    animationDelay: '0ms, 1000ms',
-                    animationFillMode: 'both, forwards',
-                    transformOrigin: 'center top',
+                    width: '95%',
+                    height: '95%',
                   }}
-                />
+                >
+                  {previousIndex !== null ? (
+                    <img
+                      src={SHOWCASE_IMAGES[previousIndex]}
+                      alt=""
+                      aria-hidden
+                      className={`absolute inset-0 h-full w-full object-contain p-5 sm:p-6 md:p-7 transition-opacity duration-[650ms] ease-in-out ${isCrossfading ? 'opacity-0' : 'opacity-100'}`}
+                    />
+                  ) : null}
+                  <img
+                    key={SHOWCASE_IMAGES[activeIndex]}
+                    src={SHOWCASE_IMAGES[activeIndex]}
+                    alt={`Landing showcase ${activeIndex + 1}`}
+                    className="absolute inset-0 h-full w-full object-contain p-3 sm:p-4 md:p-5 will-change-transform"
+                    style={{
+                      animationName: 'hero-showcase-fade-in, hero-showcase-zoom',
+                      animationDuration: '650ms, 380ms',
+                      animationTimingFunction: 'ease-in-out, ease-out',
+                      animationDelay: '0ms, 1000ms',
+                      animationFillMode: 'both, forwards',
+                      transformOrigin: 'center top',
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
       <style jsx>{`

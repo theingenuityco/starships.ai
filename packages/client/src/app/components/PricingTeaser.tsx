@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthContext } from '@/providers/auth-provider'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
+import Icon from '@/components/primitives/Icon'
 
 export default function PricingTeaser() {
   const router = useRouter()
@@ -33,7 +34,14 @@ export default function PricingTeaser() {
             </div>
             <div className="flex gap-3">
               <Button size="lg" className={landingWhiteCtaOnGradientLg} onClick={handleClick}>
-                {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get Started Free'}
+                {isAuthenticated ? (
+                  `Enter ${primaryStarship?.name || 'your starship'}`
+                ) : (
+                  <>
+                    <span>Get Started Free</span>
+                    <Icon name="chevron-right" className="ml-1 h-4 w-4" aria-hidden />
+                  </>
+                )}
               </Button>
             </div>
           </div>

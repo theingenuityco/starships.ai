@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { LandingUseCasesSection } from '@/app/components/UseCases'
 import type { UseCaseModel } from '@/app/use-cases/use-cases.data'
 import { LEAD_GEN_PROMPT_CARDS } from '@/app/use-cases/lead-gen-prompts'
 import Icon from '@/components/primitives/Icon'
@@ -150,6 +151,8 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
           </div>
         </section>
       ) : null}
+
+      {isLeadGeneration ? <LandingUseCasesSection /> : null}
 
       {isLeadGeneration ? (
         <section className="bg-white text-slate-900" style={fullBleed}>

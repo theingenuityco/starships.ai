@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+import Icon from '@/components/primitives/Icon'
 
 const SHOWCASE_IMAGES = ['/landing/usecases/people.png', '/landing/usecases/ai-members.png']
 const SWITCH_INTERVAL_MS = 3000
@@ -41,11 +42,17 @@ export default function InvertedShowcaseHighlights() {
       <div className={`p-4 sm:p-5 md:p-6 ${shellMuted} ${shellMutedLift}`}>
         <div className="inverse-layout">
           <div className="inverse-copy text-left p-5 sm:p-6">
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-slate-900 leading-tight">Collaborative AI Workspaces</h3>
-            <p className="mt-3 text-sm sm:text-base text-slate-700 max-w-md">Shared agent sessions let your team plan, execute, and follow through together without losing context.</p>
+            <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+              <span className="inline-flex items-center justify-center text-primary">
+                <Icon name="users" size={22} />
+              </span>
+              Collaborative AI Workspaces
+            </h3>
+            <p className="mt-2 text-sm md:text-base text-slate-700 max-w-md">Shared agent sessions let your team plan, execute, and follow through together without losing context.</p>
             <div className="mt-6">
               <Link href="/login" className={landingPrimaryCtaSection}>
-                Get Started Free
+                <span>Get Started Free</span>
+                <Icon name="chevron-right" className="ml-1 h-4 w-4" aria-hidden />
               </Link>
             </div>
           </div>

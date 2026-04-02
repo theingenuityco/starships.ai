@@ -37,7 +37,7 @@ export const footerVioletArc = 'radial-gradient(ellipse 1200px 650px at 50% 120%
 
 /** Primary CTA — amber + vertical plate; modest radius (4px / 2px shadow). */
 export const landingPrimaryCta =
-  'inline-flex items-center justify-center font-semibold leading-none rounded-lg whitespace-nowrap text-slate-900 ' +
+  'inline-flex items-center justify-center font-medium leading-none rounded-lg whitespace-nowrap text-slate-900 ' +
   'bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] ' +
   'hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition'
 

@@ -1,13 +1,23 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import type React from 'react'
 
-// Generate random star positions
-function generateStars(count: number, maxWidth: number, maxHeight: number) {
+/** Deterministic PRNG so SSR and client paint identical star fields (avoids hydration + useId drift). */
+function mulberry32(seed: number) {
+  return function next() {
+    let t = (seed += 0x6d2b79f5)
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function generateStars(count: number, maxWidth: number, maxHeight: number, seed: number) {
+  const rnd = mulberry32(seed)
   return Array.from({ length: count }, () => ({
-    x: Math.floor(Math.random() * maxWidth),
-    y: Math.floor(Math.random() * maxHeight),
+    x: Math.floor(rnd() * maxWidth),
+    y: Math.floor(rnd() * maxHeight),
   }))
 }
 
@@ -18,18 +28,11 @@ type StarryBackgroundProps = {
 }
 
 export default function StarryBackground(props: StarryBackgroundProps) {
-  const [isClient, setIsClient] = useState(false)
+  // Separate seeds per layer so patterns don’t correlate; values are fixed for stable SSR.
+  const smallStars = useMemo(() => generateStars(80, 2000, 2000, 0x51d40032), [])
+  const mediumStars = useMemo(() => generateStars(40, 2000, 2000, 0xa2e81f09), [])
+  const largeStars = useMemo(() => generateStars(20, 2000, 2000, 0x7c3b12c4), [])
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  // Generate stars once on mount - always call hooks in same order
-  const smallStars = useMemo(() => generateStars(80, 2000, 2000), [])
-  const mediumStars = useMemo(() => generateStars(40, 2000, 2000), [])
-  const largeStars = useMemo(() => generateStars(20, 2000, 2000), [])
-
-  // Create box-shadow strings for each layer
   const smallStarsShadow = useMemo(
     () => smallStars.map(star => `${star.x}px ${star.y}px var(--star-color)`).join(', '),
     [smallStars]
@@ -42,11 +45,6 @@ export default function StarryBackground(props: StarryBackgroundProps) {
     () => largeStars.map(star => `${star.x}px ${star.y}px var(--star-color)`).join(', '),
     [largeStars]
   )
-
-  // Don't render stars on server to avoid hydration mismatch
-  if (!isClient) {
-    return null
-  }
 
   const positionClass = props.position === 'absolute' ? 'absolute' : 'fixed'
 

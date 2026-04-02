@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react'
 
 import { landingFrameInset, panelLight, panelLightLift } from '@/app/components/landing/landingSurface'
 
-const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
+const SHOWCASE_IMAGES = [
+  '/landing/showcase/github-gmail.png',
+  '/landing/showcase/lead.png',
+  '/landing/showcase/lead-generation.png',
+  '/landing/showcase/lin.png',
+  '/landing/showcase/gmail.png',
+]
 
 const SWITCH_INTERVAL_MS = 5000
 

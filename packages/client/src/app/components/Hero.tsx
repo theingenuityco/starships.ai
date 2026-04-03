@@ -1,6 +1,10 @@
 'use client'
 
-import { landingPrimaryCtaHero } from '@/app/components/landing/landingSurface'
+import {
+  landingHeroShowcaseCtaClearance,
+  landingHeroShowcaseOverlapLift,
+  landingPrimaryCtaHero,
+} from '@/app/components/landing/landingSurface'
 import { Button } from '@/components/ui/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
@@ -60,7 +64,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
 
   return (
     <section
-      className="relative flex items-start justify-center px-4 sm:px-6 pt-10 sm:pt-14 md:pt-16 pb-10 sm:pb-12 overflow-hidden"
+      className="relative flex items-start justify-center px-4 sm:px-6 pt-10 sm:pt-14 md:pt-16 pb-4 sm:pb-6 overflow-hidden"
       style={{
         // Shorter than 100dvh so the showcase peeks (matches production landing).
         minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
@@ -115,6 +119,17 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
               <span className="text-slate-900">Get Started Free</span>
             </Button>
           </div>
+          {/*
+            Reserve vertical room matching HeroImageShowcase's translateY overlap so the mockup (z-11)
+            never covers the CTA when min-height pins the hero tall. Flow-space, not padding-only.
+          */}
+          <div
+            aria-hidden
+            className="w-full shrink-0 pointer-events-none"
+            style={{
+              minHeight: `calc(${landingHeroShowcaseOverlapLift} + ${landingHeroShowcaseCtaClearance})`,
+            }}
+          />
         </div>
       </div>
       <style jsx>{`

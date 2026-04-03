@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from 'react'
 
-import { landingFrameInset, panelLightLift } from '@/app/components/landing/landingSurface'
+import { landingFrameInset, landingHeroShowcaseOverlapLift, panelLightLift } from '@/app/components/landing/landingSurface'
 
 const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead-generation.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
 const SWITCH_INTERVAL_MS = 5000
 
 /** Half of ~16:9 frame at content width — lift only the card, not the white section (see flow-root + wrapper). */
-const OVERLAP_LIFT = 'clamp(5.5rem, min(72rem, calc(100vw - 2rem)) * 9 / 32, 21rem)'
-
 const overlapHeroFrameStyle = {
-  transform: `translateY(calc(-1 * (${OVERLAP_LIFT})))`,
-  marginBottom: `calc(-1 * (${OVERLAP_LIFT}))`,
+  transform: `translateY(calc(-1 * (${landingHeroShowcaseOverlapLift})))`,
+  marginBottom: `calc(-1 * (${landingHeroShowcaseOverlapLift}))`,
 } as const
 
 export default function HeroImageShowcase(props: { overlapHero?: boolean }) {

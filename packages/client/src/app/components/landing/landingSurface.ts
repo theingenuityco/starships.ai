@@ -90,3 +90,14 @@ export const landingHeaderNavItem = 'transition-colors duration-100 rounded-none
 
 /** Inline image / screenshot frame */
 export const landingFrameInset = 'rounded-none border-2 border-slate-200/80 bg-white shadow-[3px_3px_0_0_rgb(226_232_240)]'
+
+/**
+ * Vertical lift of `HeroImageShowcase` into the hero (16:9 frame math).
+ * Hero must reserve ≥ this below the primary CTA (plus `landingHeroShowcaseCtaClearance`) or the
+ * stacked mockup (z-11) will paint over the button on common viewports.
+ */
+export const landingHeroShowcaseOverlapLift =
+  'min(clamp(5.5rem, calc(min(72rem, 100vw - 2rem) * 9 / 32), 21rem), max(5.5rem, calc(40dvh - 3rem)))'
+
+/** Extra space below the CTA beyond the raw overlap (legibility / hit target). */
+export const landingHeroShowcaseCtaClearance = '1.5rem'

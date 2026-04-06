@@ -266,6 +266,110 @@ async function handleLeadGenPostAuth(args: {
   return false
 }
 
+const AUTOMATE_SESSION_KEY = 'automate_pending_data'
+
+interface AutomatePendingData {
+  companyName: string
+  icp: {
+    id: string
+    name: string
+    description: string
+    traits: { industry: string; roles: string[]; companySize: string; geography: string }
+    estimatedAccountCount: number
+  }
+  accounts: Array<{ company: string; role: string; industry: string; size: string; location: string }>
+  createdAt: number
+}
+
+async function handleAutomatePostAuth(args: {
+  token: string
+  starship?: { slug: string; id?: string; name?: string }
+  queryClient: ReturnType<typeof useQueryClient>
+  router: { push: (url: string) => void }
+}): Promise<boolean> {
+  const { token, starship, queryClient, router } = args
+
+  if (typeof window === 'undefined') return false
+
+  try {
+    const raw = window.sessionStorage.getItem(AUTOMATE_SESSION_KEY)
+    if (!raw || !starship?.slug || !starship.id) return false
+
+    const pending = JSON.parse(raw) as AutomatePendingData
+
+    // Optimistically mark wizard as complete
+    queryClient.setQueryData(AUTH_QUERY_KEYS.me(), (prev: AuthUser | null | undefined) =>
+      prev ? { ...prev, wizardOnboardingCompleted: true } : prev
+    )
+
+    // Best-effort server-side wizard completion
+    try {
+      await fetch('/api/v1/users/me/onboarding/wizard/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      })
+    } catch {
+      // Ignore; proceed anyway
+    }
+
+    // Create the dataset
+    const datasetRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/datasets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        starshipId: starship.id,
+        name: `${pending.icp.name} Accounts`,
+        description: pending.icp.description,
+        primaryKey: 'company',
+        columns: [
+          { name: 'company', label: 'Company', type: 'string' },
+          { name: 'role', label: 'Role', type: 'string' },
+          { name: 'industry', label: 'Industry', type: 'string' },
+          { name: 'size', label: 'Size', type: 'string' },
+          { name: 'location', label: 'Location', type: 'string' },
+        ],
+      }),
+    })
+
+    if (!datasetRes.ok) return false
+
+    const datasetJson = (await datasetRes.json()) as { data?: { dataset?: { id: string } } }
+    const datasetId = datasetJson.data?.dataset?.id
+    if (!datasetId) return false
+
+    // Upsert the preview rows
+    if (pending.accounts?.length > 0) {
+      try {
+        await fetch(
+          `/api/v1/starships/${encodeURIComponent(starship.id)}/datasets/${encodeURIComponent(datasetId)}/rows`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ rows: pending.accounts, mode: 'append' }),
+          }
+        )
+      } catch {
+        // Rows are best-effort; still redirect to the dataset
+      }
+    }
+
+    // Clear session storage
+    try {
+      window.sessionStorage.removeItem(AUTOMATE_SESSION_KEY)
+    } catch {
+      // Ignore
+    }
+
+    router.push(`/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`)
+    queryClient.invalidateQueries()
+    return true
+  } catch {
+    // Fall back to default redirect
+  }
+
+  return false
+}
+
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -314,6 +418,11 @@ export function useLogin() {
         router,
       })
       if (didHandleLeadGen) {
+        return
+      }
+
+      const didHandleAutomate = await handleAutomatePostAuth({ token, starship, queryClient, router })
+      if (didHandleAutomate) {
         return
       }
 
@@ -385,6 +494,11 @@ export function useRegister() {
       // Embedded connector install flow should remain on the install page and let the UI advance.
       if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
         queryClient.invalidateQueries()
+        return
+      }
+
+      const didHandleAutomate = await handleAutomatePostAuth({ token, starship, queryClient, router })
+      if (didHandleAutomate) {
         return
       }
 
@@ -460,6 +574,11 @@ export function useOAuthLogin() {
         router,
       })
       if (didHandleLeadGen) {
+        return
+      }
+
+      const didHandleAutomate = await handleAutomatePostAuth({ token, starship, queryClient, router })
+      if (didHandleAutomate) {
         return
       }
 

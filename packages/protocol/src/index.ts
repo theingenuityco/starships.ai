@@ -56,6 +56,7 @@ export * from './domains/dataset';
 export * from './domains/widget';
 export * from './domains/view';
 export * from './domains/room';
+export * from './domains/automate';
 
 // Export API contracts
 export * from './contracts/api-response';

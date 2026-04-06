@@ -68,6 +68,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     pathname === '/pricing' ||
     pathname === '/use-cases' ||
     pathname.startsWith('/use-cases/') ||
+    pathname === '/automate' ||
     pathname === '/login' ||
     pathname === '/accept-invite' ||
     pathname === '/forgot-password' ||

@@ -54,6 +54,7 @@ import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
 import notificationRoutes from '@/routes/notifications';
 import heartbeatRoutes from '@/routes/heartbeats';
+import automateRoutes from '@/routes/automate';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -140,6 +141,7 @@ app.use('/api/v1', starshipInvitesRoutes);
 app.use('/api/v1', presenceRoutes);
 app.use('/api/v1', notificationRoutes);
 app.use('/api/v1', heartbeatRoutes);
+app.use('/api/v1', automateRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

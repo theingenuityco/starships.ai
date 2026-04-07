@@ -227,7 +227,7 @@ export class ConversationRepository extends BaseRepository {
    *
    * This is used to avoid client-side N+1 fetches when rendering conversation lists.
    */
-  async findByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[] }>> {
+  async findByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[]; hasActiveTurn?: boolean }>> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -240,7 +240,7 @@ export class ConversationRepository extends BaseRepository {
         const conversationIds = conversations.map((c) => c.id).filter((id) => typeof id === 'string' && id.trim().length > 0);
 
         if (conversationIds.length === 0) {
-          return conversations.map((c) => ({ ...c, agents: [] }));
+          return conversations.map((c) => ({ ...c, agents: [], hasActiveTurn: false }));
         }
 
         // Fetch all linked agents for these conversations in one query.
@@ -269,9 +269,20 @@ export class ConversationRepository extends BaseRepository {
           agentsByConversationId.set(conversationId, list);
         }
 
+        // Fetch which conversations have an in-progress turn (active or waiting_for_tools).
+        const activeTurnRows = await connection.query<{ conversation_id: string }>(
+          `SELECT DISTINCT conversation_id
+           FROM turns
+           WHERE conversation_id = ANY($1::text[])
+             AND status IN ('active', 'waiting_for_tools')`,
+          [conversationIds]
+        );
+        const activeConversationIds = new Set(activeTurnRows.map((r) => r.conversation_id));
+
         return conversations.map((c) => ({
           ...c,
           agents: agentsByConversationId.get(c.id) || [],
+          hasActiveTurn: activeConversationIds.has(c.id),
         }));
       },
       'findByStarshipWithAgents',

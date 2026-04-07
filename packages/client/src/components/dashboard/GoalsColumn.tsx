@@ -88,7 +88,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
 
   const totalActiveCards = useMemo(() => {
     return cardQueries.reduce((sum, q) => {
-      return sum + (q.data ?? []).filter(c => c.archivedAt == null).length
+      return sum + (q.data ?? []).filter(c => !c.archived).length
     }, 0)
   }, [cardQueries])
 
@@ -152,7 +152,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
           ) : (
             boards.map((board, boardIdx) => {
               const cards = cardQueries[boardIdx]?.data ?? []
-              const activeCards = cards.filter(c => c.archivedAt == null)
+              const activeCards = cards.filter(c => !c.archived)
               const colNames = columnNamesByBoard[board.id] ?? {}
               const doneCards = activeCards.filter(c => isDoneColumn(colNames[c.columnId] ?? ''))
               const total = activeCards.length

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
@@ -10,22 +10,13 @@ import { cn } from '@/lib/utils'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import type { AgentModel, ConversationModel, ConversationStatus } from '@starships/protocol'
+import { relativeTime, avatarColour } from './utils'
 
 interface AgentActivityColumnProps {
   starshipId: string | undefined
 }
 
-function relativeTime(dateStr: string | undefined): string {
-  if (!dateStr) return ''
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days}d ago`
-}
+type TypedConv = ConversationModel & { agents: AgentModel[] }
 
 type TimeBucket = 'hour' | 'today' | 'yesterday' | 'older'
 
@@ -55,23 +46,6 @@ const STATUS_BADGE: Partial<Record<ConversationStatus, { label: string; classNam
     label: 'Paused',
     className: 'text-amber-600 bg-amber-500/10 border-amber-400/30 dark:text-amber-400',
   },
-}
-
-const AVATAR_COLOURS = [
-  'bg-violet-500',
-  'bg-blue-500',
-  'bg-cyan-500',
-  'bg-teal-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-rose-500',
-  'bg-pink-500',
-]
-
-function avatarColour(name: string): string {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_COLOURS[h % AVATAR_COLOURS.length]!
 }
 
 function AgentAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
@@ -114,7 +88,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
     return m
   }, [conversationsData])
 
-  function resolveRoomConvId(convId: string): string | undefined {
+  const resolveRoomConvId = useCallback((convId: string): string | undefined => {
     let current: string | undefined = convId
     const visited = new Set<string>()
     while (current && !visited.has(current)) {
@@ -123,12 +97,10 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
       current = convParentMap[current]
     }
     return undefined
-  }
+  }, [roomConvIdToName, convParentMap])
 
   const { runningConvs, recentConvs } = useMemo(() => {
-    const convs = (conversationsData?.conversations ?? []) as Array<
-      ConversationModel & { agents: AgentModel[] }
-    >
+    const convs = (conversationsData?.conversations ?? []) as TypedConv[]
     const sorted = convs
       .filter(c => c.status !== 'archived')
       .sort(
@@ -145,7 +117,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
 
   const grouped = useMemo(() => {
     const order: TimeBucket[] = ['hour', 'today', 'yesterday', 'older']
-    const map = new Map<TimeBucket, typeof recentConvs>()
+    const map = new Map<TimeBucket, TypedConv[]>()
     for (const conv of recentConvs) {
       const bucket = timeBucket(conv.updatedAt ?? conv.createdAt)
       if (!map.has(bucket)) map.set(bucket, [])
@@ -156,14 +128,14 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
 
   const totalConvs = runningConvs.length + recentConvs.length
 
-  function convHref(conv: ConversationModel): string {
+  const convHref = useCallback((conv: ConversationModel): string => {
     const roomConvId = resolveRoomConvId(conv.parentConversationId ?? conv.id)
     const roomSlug = roomConvId ? roomConvIdToSlug[roomConvId] : undefined
     if (!roomSlug) return `/ship/${slug}/rooms`
     return conv.parentConversationId
       ? `/ship/${slug}/rooms/${roomSlug}/conversation/${conv.id}`
       : `/ship/${slug}/rooms/${roomSlug}`
-  }
+  }, [resolveRoomConvId, roomConvIdToSlug, slug])
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -222,7 +194,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                     </div>
                     <div className="divide-y divide-green-500/10">
                       {runningConvs.map(conv => {
-                        const agent = (conv as any).agents?.[0]
+                        const agent = conv.agents?.[0]
                         const agentName = agent?.name ?? 'Agent'
                         const roomConvId = resolveRoomConvId(conv.parentConversationId ?? conv.id)
                         const roomName = roomConvId ? roomConvIdToName[roomConvId] : undefined
@@ -264,7 +236,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
 
                   <div className="px-3 space-y-0.5">
                     {items.map(conv => {
-                      const agent = (conv as any).agents?.[0]
+                      const agent = conv.agents?.[0]
                       const agentName = agent?.name ?? 'Agent'
                       const badge = STATUS_BADGE[conv.status] ?? null
                       const roomConvId = resolveRoomConvId(conv.parentConversationId ?? conv.id)

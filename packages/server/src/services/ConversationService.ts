@@ -1190,7 +1190,7 @@ export class ConversationService {
    * Get conversations by starship (includes linked agents)
    */
   async getConversationsByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[]; hasActiveTurn?: boolean }>> {
-    return this.conversationRepository.findByStarshipWithAgents(starshipId);
+    return this.conversationRepository.findByStarshipWithAgents(starshipId, { includeActiveTurn: true });
   }
 
   async getChildConversationsPage(args: {

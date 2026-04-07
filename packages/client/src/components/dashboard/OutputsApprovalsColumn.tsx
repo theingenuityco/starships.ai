@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { useQueries, useQueryClient } from '@tanstack/react-query'
@@ -14,38 +14,10 @@ import { useStarshipRooms } from '@/hooks/useRooms'
 import { usePendingToolApprovalsMulti, useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
 import { ToolApprovalCallout } from '@/components/conversation/ToolApprovalCallout'
 import type { AgentModel, ConversationModel, RoomModel } from '@starships/protocol'
+import { relativeTime, avatarColour } from './utils'
 
 interface OutputsApprovalsColumnProps {
   starshipId: string | undefined
-}
-
-function relativeTime(dateStr: string | undefined): string {
-  if (!dateStr) return ''
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days}d ago`
-}
-
-const AVATAR_COLOURS = [
-  'bg-violet-500',
-  'bg-blue-500',
-  'bg-cyan-500',
-  'bg-teal-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-rose-500',
-  'bg-pink-500',
-]
-
-function avatarColour(name: string): string {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_COLOURS[h % AVATAR_COLOURS.length]!
 }
 
 export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnProps) {
@@ -59,11 +31,36 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
   const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipId ?? '', !!starshipId)
   const rooms: RoomModel[] = useMemo(() => roomsData?.rooms ?? [], [roomsData])
 
-  const roomConvIdToSlug = useMemo(() => {
-    const m: Record<string, string> = {}
-    for (const room of rooms) m[room.conversationId] = room.slug
-    return m
+  const { roomConvIdToSlug, roomConvIdToName } = useMemo(() => {
+    const slugMap: Record<string, string> = {}
+    const nameMap: Record<string, string> = {}
+    for (const room of rooms) {
+      slugMap[room.conversationId] = room.slug
+      nameMap[room.conversationId] = room.name
+    }
+    return { roomConvIdToSlug: slugMap, roomConvIdToName: nameMap }
   }, [rooms])
+
+  const { data: conversationsData, isLoading: convsLoading } = useStarshipConversations(starshipId ?? '', !!starshipId)
+
+  const convParentMap = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const c of (conversationsData?.conversations ?? []) as ConversationModel[]) {
+      if (c.parentConversationId) m[c.id] = c.parentConversationId
+    }
+    return m
+  }, [conversationsData])
+
+  const resolveRoomConvId = useCallback((convId: string): string | undefined => {
+    let current: string | undefined = convId
+    const visited = new Set<string>()
+    while (current && !visited.has(current)) {
+      if (roomConvIdToName[current]) return current
+      visited.add(current)
+      current = convParentMap[current]
+    }
+    return undefined
+  }, [roomConvIdToName, convParentMap])
 
   const pendingApprovalSummaryQueries = useQueries({
     queries: rooms.map(room => ({
@@ -132,10 +129,6 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
     return list
   }, [pendingApprovalSummaryQueries, byConversationId, dismissedIds])
 
-  const { data: conversationsData, isLoading: convsLoading } = useStarshipConversations(
-    starshipId ?? '',
-    !!starshipId
-  )
   const recentOutputs = useMemo(() => {
     const convs = (conversationsData?.conversations ?? []) as Array<ConversationModel & { agents: AgentModel[] }>
     return convs
@@ -148,9 +141,9 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
     if (submittingId === approval.id) return
     setSubmittingId(approval.id)
     setDismissedIds(prev => new Set(prev).add(approval.id))
-    toast.success('Tool approved')
     try {
       await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approval.id}/approve`)
+      toast.success('Tool approved')
       void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId) })
       if (parentConvId) {
         void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.childrenPendingApprovals(parentConvId) })
@@ -173,10 +166,10 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
     }
     setSubmittingId(approval.id)
     setDismissedIds(prev => new Set(prev).add(approval.id))
-    toast.success('Tool always allowed')
     try {
       await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
       await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approval.id}/approve`)
+      toast.success('Tool always allowed')
       void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId) })
       if (parentConvId) {
         void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.childrenPendingApprovals(parentConvId) })
@@ -193,9 +186,9 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
     if (submittingId === approval.id) return
     setSubmittingId(approval.id)
     setDismissedIds(prev => new Set(prev).add(approval.id))
-    toast.message('Tool denied')
     try {
       await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approval.id}/deny`)
+      toast.message('Tool denied')
       void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId) })
       if (parentConvId) {
         void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.childrenPendingApprovals(parentConvId) })
@@ -320,9 +313,8 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
               const agentName = agent?.name ?? 'Agent'
               const colour = avatarColour(agentName)
               const initial = agentName.charAt(0).toUpperCase()
-              const roomSlug = conv.parentConversationId
-                ? roomConvIdToSlug[conv.parentConversationId]
-                : null
+              const roomConvId = resolveRoomConvId(conv.parentConversationId ?? conv.id)
+              const roomSlug = roomConvId ? roomConvIdToSlug[roomConvId] : null
               const href = roomSlug
                 ? `/ship/${slug}/rooms/${roomSlug}/conversation/${conv.id}`
                 : `/ship/${slug}/rooms`

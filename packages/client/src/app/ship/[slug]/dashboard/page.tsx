@@ -14,7 +14,7 @@ export default function DashboardPage(): React.JSX.Element {
   const slug = typeof slugParam === 'string' ? slugParam : ''
 
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
-  const starshipId = starship?.id || undefined
+  const starshipId = starship?.id
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0 bg-background">

@@ -159,6 +159,8 @@ const map: Record<string, ResolvedIcon> = {
   lifebuoy: { type: 'phosphor', component: 'Lifebuoy' },
   'id-card': { type: 'phosphor', component: 'IdentificationCard' },
 
+  dashboard: { type: 'phosphor', component: 'SquaresFour' },
+
   // Animated affordances → Iconify line-md
   loading: { type: 'iconify', icon: 'line-md:loading-twotone-loop' },
 

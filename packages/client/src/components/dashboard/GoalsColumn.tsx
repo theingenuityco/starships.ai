@@ -11,30 +11,25 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
-import type { TaskBoardModel, TaskBoardDetailsResponse, TaskCardModel } from '@starships/protocol'
+import type { ApiResponse } from '@starships/protocol'
+import type { TaskBoardModel, TaskBoardDetailsResponse, TaskCardModel, TaskColumnModel } from '@starships/protocol'
 
 interface GoalsColumnProps {
   starshipId: string | undefined
 }
 
-function unwrapApiData<T>(response: unknown): T {
-  return ((response as any)?.data?.data ?? (response as any)?.data) as T
-}
-
 const taskBoardsClient = {
   listBoardsByStarship: async (starshipId: string): Promise<TaskBoardModel[]> => {
-    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards`)
-    const data = unwrapApiData<{ boards: TaskBoardModel[] }>(res)
-    return Array.isArray(data?.boards) ? data.boards : []
+    const res = await api.get<ApiResponse<{ boards: TaskBoardModel[] }>>(`/api/v1/starships/${starshipId}/task-boards`)
+    return res.data.data?.boards ?? []
   },
   getBoard: async (starshipId: string, boardId: string): Promise<TaskBoardDetailsResponse> => {
-    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}`)
-    return unwrapApiData<TaskBoardDetailsResponse>(res)
+    const res = await api.get<ApiResponse<TaskBoardDetailsResponse>>(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}`)
+    return res.data.data
   },
   listCards: async (starshipId: string, boardId: string): Promise<TaskCardModel[]> => {
-    const res = await api.get(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}/cards`)
-    const data = unwrapApiData<{ cards: TaskCardModel[] }>(res)
-    return Array.isArray(data?.cards) ? data.cards : []
+    const res = await api.get<ApiResponse<{ cards: TaskCardModel[] }>>(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}/cards`)
+    return res.data.data?.cards ?? []
   },
 }
 
@@ -53,7 +48,8 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
     queryKey: ['task-boards', starshipId],
     queryFn: () => taskBoardsClient.listBoardsByStarship(starshipId!),
     enabled: !!starshipId,
-    staleTime: 15_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 
   const boardDetailQueries = useQueries({
@@ -61,7 +57,8 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
       queryKey: ['task-board', starshipId, board.id],
       queryFn: () => taskBoardsClient.getBoard(starshipId!, board.id),
       enabled: !!starshipId && !!board.id,
-      staleTime: 15_000,
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
     })),
   })
 
@@ -70,18 +67,19 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
       queryKey: ['task-cards', starshipId, board.id],
       queryFn: () => taskBoardsClient.listCards(starshipId!, board.id),
       enabled: !!starshipId && !!board.id,
-      staleTime: 10_000,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
     })),
   })
 
   const columnNamesByBoard = useMemo(() => {
     const map: Record<string, Record<string, string>> = {}
     boards.forEach((board, idx) => {
-      const details = boardDetailQueries[idx]?.data as TaskBoardDetailsResponse | undefined
+      const details = boardDetailQueries[idx]?.data
       map[board.id] = {}
       if (Array.isArray(details?.columns)) {
-        for (const col of details!.columns) {
-          map[board.id][(col as any).id] = (col as any).name ?? (col as any).title ?? ''
+        for (const col of details!.columns as TaskColumnModel[]) {
+          map[board.id][col.id] = col.title
         }
       }
     })
@@ -90,8 +88,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
 
   const totalActiveCards = useMemo(() => {
     return cardQueries.reduce((sum, q) => {
-      const cards = (q.data ?? []) as TaskCardModel[]
-      return sum + cards.filter((c: any) => c.archivedAt == null).length
+      return sum + (q.data ?? []).filter(c => c.archivedAt == null).length
     }, 0)
   }, [cardQueries])
 
@@ -154,10 +151,10 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
             </div>
           ) : (
             boards.map((board, boardIdx) => {
-              const cards = (cardQueries[boardIdx]?.data ?? []) as TaskCardModel[]
-              const activeCards = cards.filter((c: any) => c.archivedAt == null)
+              const cards = cardQueries[boardIdx]?.data ?? []
+              const activeCards = cards.filter(c => c.archivedAt == null)
               const colNames = columnNamesByBoard[board.id] ?? {}
-              const doneCards = activeCards.filter((c: any) => isDoneColumn(colNames[(c as any).columnId] ?? ''))
+              const doneCards = activeCards.filter(c => isDoneColumn(colNames[c.columnId] ?? ''))
               const total = activeCards.length
               const done = doneCards.length
               const progressPct = total > 0 ? Math.round((done / total) * 100) : 0
@@ -177,10 +174,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
                       </span>
                     </div>
                     {total > 0 && (
-                      <Progress
-                        value={progressPct}
-                        className="h-1 bg-blue-500/10"
-                      />
+                      <Progress value={progressPct} className="h-1 bg-blue-500/10" />
                     )}
                   </div>
 
@@ -195,8 +189,8 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
                       <p className="text-xs text-muted-foreground px-2 py-2">No tasks yet</p>
                     ) : (
                       <>
-                        {activeCards.slice(0, 6).map((card: any) => {
-                          const colName = colNames[(card as any).columnId] || null
+                        {activeCards.slice(0, 6).map(card => {
+                          const colName = colNames[card.columnId] ?? null
                           const isDone = colName ? isDoneColumn(colName) : false
                           return (
                             <div

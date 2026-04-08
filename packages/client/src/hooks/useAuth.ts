@@ -292,10 +292,17 @@ async function handleAutomatePostAuth(args: {
   if (typeof window === 'undefined') return false
 
   try {
-    const raw = window.sessionStorage.getItem(AUTOMATE_SESSION_KEY)
+    const raw = window.localStorage.getItem(AUTOMATE_SESSION_KEY)
     if (!raw || !starship?.slug || !starship.id) return false
 
     const pending = JSON.parse(raw) as AutomatePendingData
+
+    // Discard stale data (older than 24 hours)
+    const AGE_LIMIT_MS = 24 * 60 * 60 * 1000
+    if (!pending.createdAt || Date.now() - pending.createdAt > AGE_LIMIT_MS) {
+      window.localStorage.removeItem(AUTOMATE_SESSION_KEY)
+      return false
+    }
 
     // Optimistically mark wizard as complete
     queryClient.setQueryData(AUTH_QUERY_KEYS.me(), (prev: AuthUser | null | undefined) =>
@@ -317,16 +324,15 @@ async function handleAutomatePostAuth(args: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        starshipId: starship.id,
         name: `${pending.icp.name} Accounts`,
         description: pending.icp.description,
         primaryKey: 'company',
         columns: [
-          { name: 'company', label: 'Company', type: 'string' },
-          { name: 'role', label: 'Role', type: 'string' },
-          { name: 'industry', label: 'Industry', type: 'string' },
-          { name: 'size', label: 'Size', type: 'string' },
-          { name: 'location', label: 'Location', type: 'string' },
+          { name: 'company', type: 'string' },
+          { name: 'role', type: 'string' },
+          { name: 'industry', type: 'string' },
+          { name: 'size', type: 'string' },
+          { name: 'location', type: 'string' },
         ],
       }),
     })
@@ -353,14 +359,26 @@ async function handleAutomatePostAuth(args: {
       }
     }
 
-    // Clear session storage
+    // Clear storage
     try {
-      window.sessionStorage.removeItem(AUTOMATE_SESSION_KEY)
+      window.localStorage.removeItem(AUTOMATE_SESSION_KEY)
     } catch {
       // Ignore
     }
 
-    router.push(`/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`)
+    const datasetTarget = `/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`
+
+    // Prevent LoginPageClient's "already authenticated" redirect effect from overriding
+    // the dataset redirect on OAuth flows (where the auth_code param is quickly removed),
+    // and provide a fallback target in case navigation is delayed.
+    try {
+      window.sessionStorage.setItem('automate_post_auth_redirect', String(Date.now()))
+      window.sessionStorage.setItem('automate_post_auth_target', datasetTarget)
+    } catch {
+      // Ignore
+    }
+
+    router.push(datasetTarget)
     queryClient.invalidateQueries()
     return true
   } catch {

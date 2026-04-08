@@ -319,45 +319,19 @@ async function handleAutomatePostAuth(args: {
       // Ignore; proceed anyway
     }
 
-    // Create the dataset
-    const datasetRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/datasets`, {
+    // Provision the leadgen room and seed it with the ICP profile + preview accounts
+    const provisionRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/automate/provision-leadgen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        name: `${pending.icp.name} Accounts`,
-        description: pending.icp.description,
-        primaryKey: 'company',
-        columns: [
-          { name: 'company', type: 'string' },
-          { name: 'role', type: 'string' },
-          { name: 'industry', type: 'string' },
-          { name: 'size', type: 'string' },
-          { name: 'location', type: 'string' },
-        ],
-      }),
+      body: JSON.stringify({ icp: pending.icp, accounts: pending.accounts }),
     })
 
-    if (!datasetRes.ok) return false
+    if (!provisionRes.ok) return false
 
-    const datasetJson = (await datasetRes.json()) as { data?: { dataset?: { id: string } } }
-    const datasetId = datasetJson.data?.dataset?.id
-    if (!datasetId) return false
-
-    // Upsert the preview rows
-    if (pending.accounts?.length > 0) {
-      try {
-        await fetch(
-          `/api/v1/starships/${encodeURIComponent(starship.id)}/datasets/${encodeURIComponent(datasetId)}/rows`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ rows: pending.accounts, mode: 'append' }),
-          }
-        )
-      } catch {
-        // Rows are best-effort; still redirect to the dataset
-      }
-    }
+    const provisionJson = (await provisionRes.json()) as { data?: { room?: { slug: string }; accountsDatasetId?: string | null } }
+    const roomSlug = provisionJson.data?.room?.slug
+    const accountsDatasetId = provisionJson.data?.accountsDatasetId
+    if (!roomSlug) return false
 
     // Clear storage
     try {
@@ -366,19 +340,22 @@ async function handleAutomatePostAuth(args: {
       // Ignore
     }
 
-    const datasetTarget = `/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`
+    // Redirect to the Accounts dataset if we have its ID, otherwise fall back to the room.
+    const target = accountsDatasetId
+      ? `/ship/${starship.slug}/datasets/${encodeURIComponent(accountsDatasetId)}`
+      : `/ship/${starship.slug}/rooms/${encodeURIComponent(roomSlug)}`
 
     // Prevent LoginPageClient's "already authenticated" redirect effect from overriding
-    // the dataset redirect on OAuth flows (where the auth_code param is quickly removed),
+    // the redirect on OAuth flows (where the auth_code param is quickly removed),
     // and provide a fallback target in case navigation is delayed.
     try {
       window.sessionStorage.setItem('automate_post_auth_redirect', String(Date.now()))
-      window.sessionStorage.setItem('automate_post_auth_target', datasetTarget)
+      window.sessionStorage.setItem('automate_post_auth_target', target)
     } catch {
       // Ignore
     }
 
-    router.push(datasetTarget)
+    router.push(target)
     queryClient.invalidateQueries()
     return true
   } catch {

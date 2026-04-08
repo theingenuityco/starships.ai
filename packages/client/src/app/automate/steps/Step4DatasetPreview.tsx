@@ -26,9 +26,10 @@ export function Step4DatasetPreview({
   const overlayRef = useRef<HTMLDivElement>(null)
 
   function handleExport() {
-    // Store the full flow data in sessionStorage so post-auth can provision the dataset
+    // Store the full flow data in localStorage so post-auth can provision the dataset
+    // (localStorage survives new-tab navigations, e.g. email verification links)
     try {
-      window.sessionStorage.setItem(
+      window.localStorage.setItem(
         AUTOMATE_SESSION_KEY,
         JSON.stringify({
           companyName,

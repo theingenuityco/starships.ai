@@ -26,18 +26,17 @@ export function Step4DatasetPreview({
   const overlayRef = useRef<HTMLDivElement>(null)
 
   function handleExport() {
-    // Store the full flow data in sessionStorage so post-auth can provision the dataset
+    // Store the full flow data in localStorage so post-auth can provision the dataset
+    // (localStorage survives new-tab navigations, e.g. email verification links)
     try {
-      window.sessionStorage.setItem(
-        AUTOMATE_SESSION_KEY,
-        JSON.stringify({
-          companyName,
-          icp,
-          accounts,
-          createdAt: Date.now(),
-        })
-      )
-    } catch {
+      const payload = {
+        companyName,
+        icp,
+        accounts,
+        createdAt: Date.now(),
+      }
+      window.localStorage.setItem(AUTOMATE_SESSION_KEY, JSON.stringify(payload))
+    } catch (e: any) {
       // Ignore storage errors; redirect still proceeds
     }
     setShowGate(true)

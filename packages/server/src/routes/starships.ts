@@ -10,7 +10,15 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
 import { verifyResourceAccess, verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
-import type { StarshipModel, UpdateAgentRequest, UpdateToolRequest } from '@starships/protocol';
+import type {
+  StarshipModel,
+  UpdateAgentRequest,
+  UpdateToolRequest,
+  WidgetInstanceNodeInput,
+  ViewRuntimeConfig,
+  StarshipDatasetColumn,
+  CreateStarshipDatasetRequest,
+} from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
@@ -69,8 +77,6 @@ const openRouterClient =
         },
       })
     : null;
-
-const LEADGEN_ROOM_SLUG = 'leadgen';
 
 const ImportExportContainerSchemaV1 = z.object({
   schemaVersion: z.literal('1'),
@@ -479,7 +485,7 @@ async function applyRoomBundleToStarship(opts: {
       if (result?.warnings?.length) warnings.push(...result.warnings);
       if (result?.kind === 'tool' && result.tool) {
         imported.tools += 1;
-        indexTool(result.tool as any);
+        indexTool(result.tool);
         if (sourceSlug && result.tool.slug) toolSlugMap.set(sourceSlug, result.tool.slug);
       }
     }
@@ -548,7 +554,6 @@ async function applyRoomBundleToStarship(opts: {
         (decision.targetId ? existingAgents.find((x) => x.id === decision.targetId) : null) ??
         (agentNameKey ? agentsByName.get(agentNameKey) : null);
 
-      // eslint-disable-next-line no-console
       console.debug('[leadgen] Agent bundle decision', {
         starshipId,
         fromSlug: sourceSlug,
@@ -559,7 +564,6 @@ async function applyRoomBundleToStarship(opts: {
 
       if (decision.action === 'skip') {
         if (sourceSlug && target?.id) agentIdMap.set(sourceSlug, target.id);
-        // eslint-disable-next-line no-console
         console.debug('[leadgen] Agent import skipped', {
           starshipId,
           fromSlug: sourceSlug,
@@ -587,8 +591,8 @@ async function applyRoomBundleToStarship(opts: {
           systemPrompt: typeof agentPayload?.systemPrompt === 'string' ? agentPayload.systemPrompt : undefined,
           state: agentPayload?.state as UpdateAgentRequest['state'],
           blueprint: agentPayload?.blueprint as UpdateAgentRequest['blueprint'],
-          category: typeof agentPayload?.category === 'string' ? (agentPayload.category as any) : undefined,
-          previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as any) : undefined,
+          category: typeof agentPayload?.category === 'string' ? (agentPayload.category as UpdateAgentRequest['category']) : undefined,
+          previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as UpdateAgentRequest['previewPrompts']) : undefined,
         };
         const updated = await agentService.updateAgent(targetId, updateReq);
         if (updated) {
@@ -596,12 +600,11 @@ async function applyRoomBundleToStarship(opts: {
             await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
           } catch (err) {
             warnings.push(
-              `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+              `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
             );
           }
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
-          // eslint-disable-next-line no-console
           console.debug('[leadgen] Agent overwritten from bundle', {
             starshipId,
             fromSlug: sourceSlug,
@@ -626,7 +629,6 @@ async function applyRoomBundleToStarship(opts: {
         if (result?.kind === 'agent' && result.agent) {
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, result.agent.id);
-          // eslint-disable-next-line no-console
           console.debug('[leadgen] Agent imported from bundle', {
             starshipId,
             fromSlug: sourceSlug,
@@ -635,9 +637,8 @@ async function applyRoomBundleToStarship(opts: {
           });
         }
       } catch (err) {
-        const message = (err as any)?.message || String(err);
+        const message = (err as Error)?.message || String(err);
         warnings.push(`Agent import failed for ${String(agentPayload?.name || a.file)}: ${message}`);
-        // eslint-disable-next-line no-console
         console.error('[leadgen] Agent import failed from bundle', {
           starshipId,
           fromSlug: sourceSlug,
@@ -710,8 +711,8 @@ async function applyRoomBundleToStarship(opts: {
         const updated = await viewRepo.update(targetId, {
           name: typeof viewPayload?.name === 'string' ? String(viewPayload.name) : undefined,
           description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : undefined,
-          root: viewPayload?.root as any,
-          runtimeConfig: viewPayload?.runtimeConfig as any,
+          root: viewPayload?.root as WidgetInstanceNodeInput | undefined,
+          runtimeConfig: viewPayload?.runtimeConfig as ViewRuntimeConfig | undefined,
         });
         imported.views += 1;
         if (sourceSlug) viewSlugMap.set(sourceSlug, updated.slug);
@@ -722,8 +723,8 @@ async function applyRoomBundleToStarship(opts: {
         starshipId,
         name: String(viewPayload?.name || 'View'),
         description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : '',
-        root: viewPayload?.root as any,
-        runtimeConfig: viewPayload?.runtimeConfig as any,
+        root: viewPayload?.root as WidgetInstanceNodeInput | undefined,
+        runtimeConfig: viewPayload?.runtimeConfig as ViewRuntimeConfig | undefined,
       });
       imported.views += 1;
       if (sourceSlug) viewSlugMap.set(sourceSlug, created.slug);
@@ -766,13 +767,16 @@ async function applyRoomBundleToStarship(opts: {
       const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
       const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown>; rows?: unknown };
       const datasetPayload = payload?.dataset ?? {};
-      const rowsRaw = Array.isArray((payload as any)?.rows) ? ((payload as any).rows as unknown[]) : [];
+      const rowsRaw = Array.isArray(payload?.rows) ? (payload.rows as unknown[]) : [];
       const rows = rowsRaw
-        .map((r: any) => ({
-          ...(typeof r?.rowKey === 'string' ? { rowKey: String(r.rowKey) } : r?.rowKey === null ? { rowKey: null } : {}),
-          data: isPlainObject(r?.data) ? (r.data as Record<string, unknown>) : {},
-        }))
-        .filter((r: any) => isPlainObject(r?.data));
+        .map((r: unknown) => {
+          const row = r as Record<string, unknown>;
+          return {
+            ...(typeof row?.rowKey === 'string' ? { rowKey: String(row.rowKey) } : row?.rowKey === null ? { rowKey: null } : {}),
+            data: isPlainObject(row?.data) ? (row.data as Record<string, unknown>) : {},
+          };
+        })
+        .filter((r) => isPlainObject(r?.data));
 
       const bundleHash = computeBundleHash({
         name: datasetPayload?.name,
@@ -797,11 +801,11 @@ async function applyRoomBundleToStarship(opts: {
         starshipId,
         name: String(datasetPayload?.name || 'Dataset'),
         description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-        columns: Array.isArray((datasetPayload as any)?.columns) ? ((datasetPayload as any).columns as any[]) : [],
+        columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipDatasetColumn[]) : [],
         primaryKey:
-          typeof (datasetPayload as any)?.primaryKey === 'string'
-            ? String((datasetPayload as any).primaryKey)
-            : (datasetPayload as any)?.primaryKey === null
+          typeof datasetPayload?.primaryKey === 'string'
+            ? String(datasetPayload.primaryKey)
+            : datasetPayload?.primaryKey === null
               ? null
               : undefined,
       };
@@ -815,8 +819,8 @@ async function applyRoomBundleToStarship(opts: {
         const updated = await datasetRepo.update(targetId, {
           name: normalizedCreate.name,
           description: normalizedCreate.description,
-          columns: normalizedCreate.columns as any,
-          primaryKey: normalizedCreate.primaryKey as any,
+          columns: normalizedCreate.columns,
+          primaryKey: normalizedCreate.primaryKey,
           archived: false,
         });
         if (updated) {
@@ -830,7 +834,7 @@ async function applyRoomBundleToStarship(opts: {
         continue;
       }
 
-      const created = await datasetRepo.create(normalizedCreate as any);
+      const created = await datasetRepo.create(normalizedCreate as CreateStarshipDatasetRequest);
       if (rows.length > 0) {
         await datasetRowRepo.appendMany(created.id, rows);
       }
@@ -868,8 +872,8 @@ async function applyRoomBundleToStarship(opts: {
       }
       const fromSlug = containerParsed.data.metadata?.fromSlug;
       const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-      const payload = containerParsed.data.payload as any;
-      const boardPayload = payload?.taskBoard ?? {};
+      const payload = containerParsed.data.payload as Record<string, unknown>;
+      const boardPayload = (payload?.taskBoard ?? {}) as Record<string, unknown>;
       const name = String(boardPayload?.name || '').trim();
       const bundleHash = computeBundleHash({ name: boardPayload?.name, description: boardPayload?.description });
       const decision = decisions.taskBoards[bundleHash] ?? { action: 'copy' as const };
@@ -887,7 +891,7 @@ async function applyRoomBundleToStarship(opts: {
         pos: typeof boardPayload?.pos === 'number' ? boardPayload.pos : undefined,
       });
 
-      const columnsRaw = Array.isArray(payload?.columns) ? (payload.columns as any[]) : [];
+      const columnsRaw = Array.isArray(payload?.columns) ? (payload.columns as Record<string, unknown>[]) : [];
       const createdColumnByTitle = new Map<string, string>();
       for (const c of columnsRaw) {
         const title = String(c?.title || '').trim();
@@ -902,7 +906,7 @@ async function applyRoomBundleToStarship(opts: {
         createdColumnByTitle.set(title, createdCol.id);
       }
 
-      const cardsRaw = Array.isArray(payload?.cards) ? (payload.cards as any[]) : [];
+      const cardsRaw = Array.isArray(payload?.cards) ? (payload.cards as Record<string, unknown>[]) : [];
       for (const c of cardsRaw) {
         const colTitle = String(c?.columnTitle || '').trim();
         const colId = createdColumnByTitle.get(colTitle);
@@ -950,8 +954,8 @@ async function applyRoomBundleToStarship(opts: {
         continue;
       }
 
-      const payload = containerParsed.data.payload as any;
-      const roomPayload = payload?.room ?? {};
+      const payload = containerParsed.data.payload as Record<string, unknown>;
+      const roomPayload = (payload?.room ?? {}) as Record<string, unknown>;
       const bundleHash = computeBundleHash({
         name: roomPayload?.name,
         isPrivate: roomPayload?.isPrivate,
@@ -970,7 +974,7 @@ async function applyRoomBundleToStarship(opts: {
         starshipId,
         name: String(roomPayload?.name || 'Room'),
         isPrivate: Boolean(roomPayload?.isPrivate),
-        topic: roomPayload?.topic ?? null,
+        topic: (roomPayload?.topic ?? null) as string | null,
         provisionedByBundle: provisionedByBundleTag ?? null,
       });
 
@@ -996,7 +1000,7 @@ async function applyRoomBundleToStarship(opts: {
       }
 
       // Tool assignments (map source tool slug -> created tool slug -> tool id)
-      const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as any[]) : [];
+      const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as Record<string, unknown>[]) : [];
       if (toolAssignments.length > 0) {
         for (const ta of toolAssignments) {
           const sourceToolSlug = typeof ta?.toolSlug === 'string' ? ta.toolSlug.trim() : '';
@@ -1015,7 +1019,7 @@ async function applyRoomBundleToStarship(opts: {
       }
 
       // Pins (views/datasets/task boards)
-      const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as any[]) : [];
+      const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
       for (const p of viewPins) {
         const sourceViewSlug = typeof p?.viewSlug === 'string' ? p.viewSlug.trim() : '';
         if (!sourceViewSlug) continue;
@@ -1033,7 +1037,7 @@ async function applyRoomBundleToStarship(opts: {
         });
       }
 
-      const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as any[]) : [];
+      const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as Record<string, unknown>[]) : [];
       for (const p of datasetPins) {
         const sourceDatasetSlug = typeof p?.datasetSlug === 'string' ? p.datasetSlug.trim() : '';
         if (!sourceDatasetSlug) continue;
@@ -1051,7 +1055,7 @@ async function applyRoomBundleToStarship(opts: {
         });
       }
 
-      const taskBoardPins = Array.isArray(payload?.taskBoardPins) ? (payload.taskBoardPins as any[]) : [];
+      const taskBoardPins = Array.isArray(payload?.taskBoardPins) ? (payload.taskBoardPins as Record<string, unknown>[]) : [];
       for (const p of taskBoardPins) {
         const sourceBoardSlug = typeof p?.taskBoardSlug === 'string' ? p.taskBoardSlug.trim() : '';
         if (!sourceBoardSlug) continue;
@@ -2265,16 +2269,17 @@ router.post(
         const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingToolsByHash.set(storedHash, t);
         // Also index a freshly computed hash to remain robust if the hashing algorithm evolves.
+        const tRec = t as unknown as Record<string, unknown>;
         const computedHash = computeToolContentHash({
           name: t.name,
           description: t.description,
-          parameters: (t as any).parameters,
-          blueprint: (t as any).blueprint,
-          transforms: (t as any).transforms,
-          mutations: (t as any).mutations,
-          condition: (t as any).condition,
-          isEnabled: (t as any).isEnabled,
-          status: (t as any).status,
+          parameters: tRec.parameters,
+          blueprint: tRec.blueprint,
+          transforms: tRec.transforms,
+          mutations: tRec.mutations,
+          condition: tRec.condition,
+          isEnabled: tRec.isEnabled,
+          status: tRec.status,
         });
         existingToolsByHash.set(computedHash, t);
       }
@@ -2465,7 +2470,7 @@ router.post(
       const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
       if (!paramValidation) return;
 
-      const decisionsRaw = (req.body as any)?.decisions;
+      const decisionsRaw = (req.body as Record<string, unknown>)?.decisions;
       if (typeof decisionsRaw !== 'string' || decisionsRaw.trim().length === 0) {
         sendError(res, 'VALIDATION_ERROR', 'Missing decisions', 400);
         return;
@@ -2756,8 +2761,8 @@ router.post(
               systemPrompt: typeof agentPayload?.systemPrompt === 'string' ? agentPayload.systemPrompt : undefined,
               state: agentPayload?.state as UpdateAgentRequest['state'],
               blueprint: agentPayload?.blueprint as UpdateAgentRequest['blueprint'],
-              category: typeof agentPayload?.category === 'string' ? (agentPayload.category as any) : undefined,
-              previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as any) : undefined,
+              category: typeof agentPayload?.category === 'string' ? (agentPayload.category as UpdateAgentRequest['category']) : undefined,
+              previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as UpdateAgentRequest['previewPrompts']) : undefined,
             };
             const updated = await agentService.updateAgent(targetId, updateReq);
             if (updated) {
@@ -2765,7 +2770,7 @@ router.post(
                 await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
               } catch (err) {
                 warnings.push(
-                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
                 );
               }
               importedAgents.push(updated);
@@ -2884,16 +2889,17 @@ router.post(
         if (nameKey) existingToolsByName.set(nameKey, t);
         const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingToolsByHash.set(storedHash, t);
+        const tRec = t as unknown as Record<string, unknown>;
         const computedHash = computeToolContentHash({
           name: t.name,
           description: t.description,
-          parameters: (t as any).parameters,
-          blueprint: (t as any).blueprint,
-          transforms: (t as any).transforms,
-          mutations: (t as any).mutations,
-          condition: (t as any).condition,
-          isEnabled: (t as any).isEnabled,
-          status: (t as any).status,
+          parameters: tRec.parameters,
+          blueprint: tRec.blueprint,
+          transforms: tRec.transforms,
+          mutations: tRec.mutations,
+          condition: tRec.condition,
+          isEnabled: tRec.isEnabled,
+          status: tRec.status,
         });
         existingToolsByHash.set(computedHash, t);
       }
@@ -3285,6 +3291,176 @@ router.post(
 );
 
 /**
+ * Internal helper: map a human-readable employee size string from the /automate preview
+ * to the `employee_range` enum used by the Accounts dataset in the leadgen room bundle.
+ */
+function mapSizeToEmployeeRange(size: string): string | null {
+  const s = (size ?? '').replace(/\s/g, '');
+  if (/^1[-–]10$/.test(s)) return '1_10';
+  if (/^11[-–]50$/.test(s)) return '11_50';
+  if (/^51[-–]200$/.test(s)) return '51_200';
+  if (/^201[-–]500$/.test(s)) return '201_500';
+  if (/^501[-–]1000$/.test(s)) return '501_1000';
+  if (/1000\+/.test(s) || /^1001/.test(s)) return '1000_plus';
+  return null;
+}
+
+/**
+ * Internal helper: ensure the lead-generation room bundle is applied for a starship
+ * and return the resulting room model. Throws on unrecoverable errors.
+ *
+ * Shared by the `ensure-leadgen-room` HTTP handler and the `provision-leadgen` endpoint.
+ */
+async function ensureLeadGenRoomInternal(opts: {
+  starshipId: string;
+  userId: string;
+}): Promise<{ room: Awaited<ReturnType<RoomRepository['findLeadGenBundleRoom']>> & {}; importSummary?: { imported: Record<string, number>; warnings?: string[] } }> {
+  const { starshipId, userId } = opts;
+  const roomRepo = new RoomRepository();
+
+  // Reuse existing room if one already exists.
+  const existingRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
+  if (existingRoom) {
+    try {
+      const participantRepo = new ConversationParticipantRepository();
+      await participantRepo.addUserParticipant({
+        conversationId: existingRoom.conversationId,
+        userId,
+        role: 'admin',
+        createdBy: userId,
+      });
+    } catch {
+      // Ignore if already a participant or if a constraint is hit.
+    }
+
+    try {
+      const agentRepo = new AgentRepository();
+      const participantRepo = new ConversationParticipantRepository();
+      const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+      for (const slug of leadgenAgentSlugs) {
+        const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+        if (!agent?.id) continue;
+        try {
+          await participantRepo.addAgentParticipant({
+            conversationId: existingRoom.conversationId,
+            agentId: agent.id,
+            createdBy: userId,
+          });
+        } catch {
+          // Ignore if agent is already a participant or if a constraint is hit.
+        }
+      }
+    } catch {
+      // Best-effort only.
+    }
+
+    console.debug('[leadgen] Reusing existing leadgen room', {
+      starshipId,
+      roomSlug: existingRoom.slug,
+      conversationId: existingRoom.conversationId,
+    });
+
+    return { room: existingRoom };
+  }
+
+  // No existing room; apply the lead-generation bundle from disk.
+  const docsRoot = resolvePublicDocsRoot();
+  const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
+  if (!fs.existsSync(zipPath)) {
+    console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
+    throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
+  }
+
+  let zip: AdmZip;
+  try {
+    const buffer = fs.readFileSync(zipPath);
+    zip = new AdmZip(buffer);
+  } catch (err) {
+    console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
+    throw Object.assign(new Error('Failed to read lead generation room bundle'), { code: 'BUNDLE_READ_ERROR' });
+  }
+
+  let manifestEntry = zip.getEntry('manifest.json');
+  if (!manifestEntry) {
+    const entries = zip.getEntries();
+    const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
+    if (alt) manifestEntry = alt;
+  }
+  if (!manifestEntry) {
+    console.error('[leadgen] manifest.json missing from bundle', { zipPath, entries: zip.getEntries().map((e) => e.entryName) });
+    throw Object.assign(new Error('Lead generation room bundle is missing manifest.json'), { code: 'MANIFEST_MISSING' });
+  }
+
+  let manifestRaw: unknown;
+  try {
+    manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+  } catch {
+    console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
+    throw Object.assign(new Error('Lead generation room bundle manifest.json is not valid JSON'), { code: 'MANIFEST_INVALID_JSON' });
+  }
+
+  const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+  if (!manifestParsed.success) {
+    console.error('[leadgen] manifest.json shape is invalid', { zipPath, issues: manifestParsed.error.issues });
+    throw Object.assign(new Error('Lead generation room bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
+  }
+
+  try {
+    assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+  } catch (err) {
+    console.error('[leadgen] manifest.json contains invalid file paths', { zipPath, error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+
+  const importSummary = await applyRoomBundleToStarship({
+    starshipId,
+    userId,
+    zip,
+    manifest: manifestParsed.data,
+    decisions: emptyDecisions,
+    provisionedByBundleTag: 'lead-generation',
+  });
+
+  const createdRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
+  if (!createdRoom) {
+    console.error('[leadgen] Leadgen room not found after import', { starshipId, imported: importSummary.imported });
+    throw Object.assign(new Error('Lead generation room was not created from bundle'), { code: 'ROOM_MISSING_POST_IMPORT' });
+  }
+
+  try {
+    const agentRepo = new AgentRepository();
+    const participantRepo = new ConversationParticipantRepository();
+    const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
+    for (const slug of leadgenAgentSlugs) {
+      const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+      if (!agent?.id) continue;
+      try {
+        await participantRepo.addAgentParticipant({
+          conversationId: createdRoom.conversationId,
+          agentId: agent.id,
+          createdBy: userId,
+        });
+      } catch {
+        // Ignore if agent is already a participant or if a constraint is hit.
+      }
+    }
+  } catch {
+    // Best-effort only; room provisioning should still succeed even if this step fails.
+  }
+
+  console.debug('[leadgen] Leadgen room created from bundle', {
+    starshipId,
+    roomSlug: createdRoom.slug,
+    conversationId: createdRoom.conversationId,
+    imported: importSummary.imported,
+  });
+
+  return { room: createdRoom, importSummary };
+}
+
+/**
  * POST /starships/:id/ensure-leadgen-room
  *
  * Ensure that the lead generation room bundle is applied for the given starship and return the room.
@@ -3301,203 +3477,132 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
     if (!user) return;
     if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
 
-    const roomRepo = new RoomRepository();
-    const starshipId = paramValidation.id;
-
-    // If a leadgen bundle-provisioned room already exists for this starship, reuse it,
-    // regardless of its slug. This prevents collisions with user-created rooms that
-    // happen to use the same slug.
-    const existingRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
-    if (existingRoom) {
-      // Best-effort: ensure caller is a participant.
-      try {
-        const participantRepo = new ConversationParticipantRepository();
-        await participantRepo.addUserParticipant({
-          conversationId: existingRoom.conversationId,
-          userId: user.id,
-          role: 'admin',
-          createdBy: user.id,
-        });
-      } catch {
-        // Ignore if already a participant or if a constraint is hit.
-      }
-
-      // Best-effort: ensure all leadgen bundle agents are already room participants so that
-      // mentions like <@a:nora> do not trigger an "Add to room" approval banner.
-      try {
-        const agentRepo = new AgentRepository();
-        const participantRepo = new ConversationParticipantRepository();
-        const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
-        for (const slug of leadgenAgentSlugs) {
-          const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
-          if (!agent?.id) continue;
-          try {
-            await participantRepo.addAgentParticipant({
-              conversationId: existingRoom.conversationId,
-              agentId: agent.id,
-              createdBy: user.id,
-            });
-          } catch {
-            // Ignore if agent is already a participant or if a constraint is hit.
-          }
-        }
-      } catch {
-        // Best-effort only; if this fails we still return the room.
-      }
-
-      // eslint-disable-next-line no-console
-      console.debug('[leadgen] Reusing existing leadgen room', {
-        starshipId,
-        roomSlug: existingRoom.slug,
-        conversationId: existingRoom.conversationId,
-      });
-
-      sendSuccess(res, { room: existingRoom });
-      return;
-    }
-
-    // No existing room; apply the lead-generation bundle from disk.
-    const docsRoot = resolvePublicDocsRoot();
-    const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
-    if (!fs.existsSync(zipPath)) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room bundle is not available on the server', 500);
-      return;
-    }
-
-    let zip: AdmZip;
-    try {
-      const buffer = fs.readFileSync(zipPath);
-      zip = new AdmZip(buffer);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to read lead generation room bundle', 500);
-      return;
-    }
-
-    let manifestEntry = zip.getEntry('manifest.json');
-    if (!manifestEntry) {
-      // Some bundles may be zipped with a top-level folder (e.g. "lead-generation/manifest.json").
-      const entries = zip.getEntries();
-      const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
-      if (alt) {
-        manifestEntry = alt;
-      }
-    }
-    if (!manifestEntry) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] manifest.json missing from bundle', {
-        zipPath,
-        entries: zip.getEntries().map((e) => e.entryName),
-      });
-      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle is missing manifest.json', 500);
-      return;
-    }
-
-    let manifestRaw: unknown;
-    try {
-      manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
-    } catch {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
-      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json is not valid JSON', 500);
-      return;
-    }
-
-    const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
-    if (!manifestParsed.success) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] manifest.json shape is invalid', {
-        zipPath,
-        issues: manifestParsed.error.issues,
-      });
-      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest.json has an unexpected shape', 500, {
-        issues: manifestParsed.error.issues,
-      });
-      return;
-    }
-
-    try {
-      assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] manifest.json contains invalid file paths', {
-        zipPath,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      sendError(res, 'VALIDATION_ERROR', 'Lead generation room bundle manifest contains invalid file paths', 500, {
-        message: err instanceof Error ? err.message : String(err),
-      });
-      return;
-    }
-
-    const emptyDecisions: RoomBundleDecisions = {
-      rooms: {},
-      views: {},
-      datasets: {},
-      taskBoards: {},
-      tools: {},
-      agents: {},
-    };
-
-    const importSummary = await applyRoomBundleToStarship({
-      starshipId,
-      userId: user.id,
-      zip,
-      manifest: manifestParsed.data,
-      decisions: emptyDecisions,
-      provisionedByBundleTag: 'lead-generation',
-    });
-
-    const createdRoom = await roomRepo.findLeadGenBundleRoom(starshipId);
-    if (!createdRoom) {
-      // eslint-disable-next-line no-console
-      console.error('[leadgen] Leadgen room not found after import', {
-        starshipId,
-        imported: importSummary.imported,
-      });
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Lead generation room was not created from bundle', 500, {
-        imported: importSummary.imported,
-      });
-      return;
-    }
-
-    // Best-effort: ensure all leadgen bundle agents are added as room participants for the
-    // newly created room so user messages mentioning them do not require manual approval.
-    try {
-      const agentRepo = new AgentRepository();
-      const participantRepo = new ConversationParticipantRepository();
-      const leadgenAgentSlugs = ['atlas', 'vera', 'hunter', 'mira', 'nora'];
-      for (const slug of leadgenAgentSlugs) {
-        const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
-        if (!agent?.id) continue;
-        try {
-          await participantRepo.addAgentParticipant({
-            conversationId: createdRoom.conversationId,
-            agentId: agent.id,
-            createdBy: user.id,
-          });
-        } catch {
-          // Ignore if agent is already a participant or if a constraint is hit.
-        }
-      }
-    } catch {
-      // Best-effort only; room provisioning should still succeed even if this step fails.
-    }
-
-    // eslint-disable-next-line no-console
-    console.debug('[leadgen] Leadgen room created from bundle', {
-      starshipId,
-      roomSlug: createdRoom.slug,
-      conversationId: createdRoom.conversationId,
-      imported: importSummary.imported,
-    });
-
-    sendSuccess(res, { room: createdRoom, importSummary });
+    const { room, importSummary } = await ensureLeadGenRoomInternal({ starshipId: paramValidation.id, userId: user.id });
+    sendSuccess(res, importSummary ? { room, importSummary } : { room });
   } catch (error) {
     handleError(error, res, 'ensuring leadgen room for starship');
+  }
+});
+
+/**
+ * POST /starships/:id/automate/provision-leadgen
+ *
+ * Called by the /automate onboarding flow post-auth. Ensures the leadgen room exists for the
+ * starship, then seeds the ICP Profiles and Accounts datasets with the data collected during
+ * onboarding (ICP profile + preview accounts).
+ *
+ * Starship owner / instance-admin only.
+ */
+const ProvisionLeadgenBodySchema = z.object({
+  icp: z.object({
+    id: z.string().min(1).max(200),
+    name: z.string().min(1).max(200),
+    description: z.string().max(2000).default(''),
+    traits: z.object({
+      industry: z.string().max(200).default(''),
+      roles: z.array(z.string().max(100)).max(20).default([]),
+      companySize: z.string().max(100).default(''),
+      geography: z.string().max(200).default(''),
+    }),
+    estimatedAccountCount: z.number().int().min(0).default(0),
+  }),
+  accounts: z
+    .array(
+      z.object({
+        company: z.string().max(500),
+        role: z.string().max(300).default(''),
+        industry: z.string().max(300).default(''),
+        size: z.string().max(100).default(''),
+        location: z.string().max(500).default(''),
+      })
+    )
+    .max(50)
+    .default([]),
+});
+
+router.post('/starships/:id/automate/provision-leadgen', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+
+    const bodyValidation = validateData(ProvisionLeadgenBodySchema, req.body, res, 'provision-leadgen body');
+    if (!bodyValidation) return;
+
+    const starshipId = paramValidation.id;
+    const { icp, accounts } = bodyValidation;
+
+    // 1. Ensure the leadgen room exists (idempotent).
+    //    importSummary is only present when the room was freshly created; it is absent when an
+    //    existing room was reused. We only seed datasets on a fresh creation so that returning
+    //    users who already have a leadgen room are not affected.
+    const { room } = await ensureLeadGenRoomInternal({ starshipId, userId: user.id });
+
+    // 2. Resolve the Accounts dataset pinned to the room (needed for the redirect URL regardless).
+    const roomDatasetsRepo = new RoomDatasetsRepository();
+    const datasetRepo = new StarshipDatasetRepository();
+
+    const pins = await roomDatasetsRepo.list(room.conversationId);
+
+    let icpProfilesDatasetId: string | null = null;
+    let accountsDatasetId: string | null = null;
+
+    for (const pin of pins) {
+      const dataset = await datasetRepo.findById(pin.datasetId);
+      if (!dataset) continue;
+      if (dataset.slug === 'icp-profiles') icpProfilesDatasetId = dataset.id;
+      if (dataset.slug === 'accounts') accountsDatasetId = dataset.id;
+    }
+
+    // 3. Seed datasets with the onboarding data.
+    //    This always runs — ensureLeadGenRoomInternal already guarantees the room structure is
+    //    not redeployed when one exists, so seeding here is safe for both first-time and repeat
+    //    /automate runs.
+    const rowRepo = new StarshipDatasetRowRepository();
+
+    if (icpProfilesDatasetId) {
+      const icpRow: Record<string, unknown> = {
+        icp_name: icp.name,
+        target_industries: icp.traits.industry || null,
+        target_geos: icp.traits.geography || null,
+        target_employee_ranges: icp.traits.companySize || null,
+        buyer_personas: icp.traits.roles?.length ? icp.traits.roles.join(', ') : null,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        notes: icp.description || null,
+      };
+      await rowRepo.appendMany(icpProfilesDatasetId, [{ data: icpRow }]);
+    }
+
+    if (accountsDatasetId && accounts.length > 0) {
+      const accountRows = accounts.map((a) => {
+        const parts = a.location ? a.location.split(',') : [];
+        const city = parts[0]?.trim() || null;
+        const country = parts.length > 1 ? parts[parts.length - 1].trim() : null;
+        const employeeRange = mapSizeToEmployeeRange(a.size);
+
+        const data: Record<string, unknown> = {
+          account_name: a.company,
+          industry: a.industry || null,
+          status: 'new',
+          source: 'onboarding',
+          created_at: new Date().toISOString(),
+        };
+        if (employeeRange) data.employee_range = employeeRange;
+        if (city) data.city = city;
+        if (country) data.country = country;
+
+        return { data };
+      });
+      await rowRepo.appendMany(accountsDatasetId, accountRows);
+    }
+
+    sendSuccess(res, { room, accountsDatasetId });
+  } catch (error) {
+    handleError(error, res, 'provisioning leadgen room from automate onboarding');
   }
 });
 
@@ -3521,7 +3626,7 @@ router.post(
       if (!user) return;
       if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
 
-      const decisionsRaw = (req.body as any)?.decisions;
+      const decisionsRaw = (req.body as Record<string, unknown>)?.decisions;
       if (typeof decisionsRaw !== 'string' || decisionsRaw.trim().length === 0) {
         sendError(res, 'VALIDATION_ERROR', 'Missing decisions', 400);
         return;
@@ -3534,19 +3639,7 @@ router.post(
         return;
       }
 
-      const DecisionSchema = z.object({
-        action: z.enum(['skip', 'copy', 'overwrite']),
-        targetId: z.string().optional(),
-      });
-      const DecisionsSchema = z.object({
-        rooms: z.record(z.string().min(1), DecisionSchema).default({}),
-        views: z.record(z.string().min(1), DecisionSchema).default({}),
-        datasets: z.record(z.string().min(1), DecisionSchema).default({}),
-        taskBoards: z.record(z.string().min(1), DecisionSchema).default({}),
-        tools: z.record(z.string().min(1), DecisionSchema).default({}),
-        agents: z.record(z.string().min(1), DecisionSchema).default({}),
-      });
-      const decisionsParsed = DecisionsSchema.safeParse(decisionsJson);
+      const decisionsParsed = RoomBundleDecisionsSchema.safeParse(decisionsJson);
       if (!decisionsParsed.success) {
         sendError(res, 'VALIDATION_ERROR', 'Decisions have an unexpected shape', 400, { issues: decisionsParsed.error.issues });
         return;
@@ -3719,7 +3812,7 @@ router.post(
           if (result?.warnings?.length) warnings.push(...result.warnings);
           if (result?.kind === 'tool' && result.tool) {
             imported.tools += 1;
-            indexTool(result.tool as any);
+            indexTool(result.tool);
             if (sourceSlug && result.tool.slug) toolSlugMap.set(sourceSlug, result.tool.slug);
           }
         }
@@ -3812,8 +3905,8 @@ router.post(
               systemPrompt: typeof agentPayload?.systemPrompt === 'string' ? agentPayload.systemPrompt : undefined,
               state: agentPayload?.state as UpdateAgentRequest['state'],
               blueprint: agentPayload?.blueprint as UpdateAgentRequest['blueprint'],
-              category: typeof agentPayload?.category === 'string' ? (agentPayload.category as any) : undefined,
-              previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as any) : undefined,
+              category: typeof agentPayload?.category === 'string' ? (agentPayload.category as UpdateAgentRequest['category']) : undefined,
+              previewPrompts: Array.isArray(agentPayload?.previewPrompts) ? (agentPayload.previewPrompts as UpdateAgentRequest['previewPrompts']) : undefined,
             };
             const updated = await agentService.updateAgent(targetId, updateReq);
             if (updated) {
@@ -3821,7 +3914,7 @@ router.post(
                 await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
               } catch (err) {
                 warnings.push(
-                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as any)?.message || err)}`
+                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
                 );
               }
               imported.agents += 1;
@@ -3908,8 +4001,8 @@ router.post(
             const updated = await viewRepo.update(targetId, {
               name: typeof viewPayload?.name === 'string' ? String(viewPayload.name) : undefined,
               description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : undefined,
-              root: viewPayload?.root as any,
-              runtimeConfig: viewPayload?.runtimeConfig as any,
+              root: viewPayload?.root as WidgetInstanceNodeInput | undefined,
+              runtimeConfig: viewPayload?.runtimeConfig as ViewRuntimeConfig | undefined,
             });
             imported.views += 1;
             if (sourceSlug) viewSlugMap.set(sourceSlug, updated.slug);
@@ -3920,8 +4013,8 @@ router.post(
             starshipId,
             name: String(viewPayload?.name || 'View'),
             description: typeof viewPayload?.description === 'string' ? String(viewPayload.description) : '',
-            root: viewPayload?.root as any,
-            runtimeConfig: viewPayload?.runtimeConfig as any,
+            root: viewPayload?.root as WidgetInstanceNodeInput | undefined,
+            runtimeConfig: viewPayload?.runtimeConfig as ViewRuntimeConfig | undefined,
           });
           imported.views += 1;
           if (sourceSlug) viewSlugMap.set(sourceSlug, created.slug);
@@ -3964,13 +4057,16 @@ router.post(
           const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
           const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown>; rows?: unknown };
           const datasetPayload = payload?.dataset ?? {};
-          const rowsRaw = Array.isArray((payload as any)?.rows) ? ((payload as any).rows as unknown[]) : [];
+          const rowsRaw = Array.isArray(payload?.rows) ? (payload.rows as unknown[]) : [];
           const rows = rowsRaw
-            .map((r: any) => ({
-              ...(typeof r?.rowKey === 'string' ? { rowKey: String(r.rowKey) } : r?.rowKey === null ? { rowKey: null } : {}),
-              data: isPlainObject(r?.data) ? (r.data as Record<string, unknown>) : {},
-            }))
-            .filter((r: any) => isPlainObject(r?.data));
+            .map((r: unknown) => {
+              const row = r as Record<string, unknown>;
+              return {
+                ...(typeof row?.rowKey === 'string' ? { rowKey: String(row.rowKey) } : row?.rowKey === null ? { rowKey: null } : {}),
+                data: isPlainObject(row?.data) ? (row.data as Record<string, unknown>) : {},
+              };
+            })
+            .filter((r) => isPlainObject(r?.data));
 
           const bundleHash = computeBundleHash({
             name: datasetPayload?.name,
@@ -3995,11 +4091,11 @@ router.post(
             starshipId,
             name: String(datasetPayload?.name || 'Dataset'),
             description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-            columns: Array.isArray((datasetPayload as any)?.columns) ? ((datasetPayload as any).columns as any[]) : [],
+            columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipDatasetColumn[]) : [],
             primaryKey:
-              typeof (datasetPayload as any)?.primaryKey === 'string'
-                ? String((datasetPayload as any).primaryKey)
-                : (datasetPayload as any)?.primaryKey === null
+              typeof datasetPayload?.primaryKey === 'string'
+                ? String(datasetPayload.primaryKey)
+                : datasetPayload?.primaryKey === null
                   ? null
                   : undefined,
           };
@@ -4013,8 +4109,8 @@ router.post(
             const updated = await datasetRepo.update(targetId, {
               name: normalizedCreate.name,
               description: normalizedCreate.description,
-              columns: normalizedCreate.columns as any,
-              primaryKey: normalizedCreate.primaryKey as any,
+              columns: normalizedCreate.columns,
+              primaryKey: normalizedCreate.primaryKey,
               archived: false,
             });
             if (updated) {
@@ -4028,7 +4124,7 @@ router.post(
             continue;
           }
 
-          const created = await datasetRepo.create(normalizedCreate as any);
+          const created = await datasetRepo.create(normalizedCreate as CreateStarshipDatasetRequest);
           if (rows.length > 0) {
             await datasetRowRepo.appendMany(created.id, rows);
           }
@@ -4066,8 +4162,8 @@ router.post(
           }
           const fromSlug = containerParsed.data.metadata?.fromSlug;
           const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-          const payload = containerParsed.data.payload as any;
-          const boardPayload = payload?.taskBoard ?? {};
+          const payload = containerParsed.data.payload as Record<string, unknown>;
+          const boardPayload = (payload?.taskBoard ?? {}) as Record<string, unknown>;
           const name = String(boardPayload?.name || '').trim();
           const bundleHash = computeBundleHash({ name: boardPayload?.name, description: boardPayload?.description });
           const decision = decisionsParsed.data.taskBoards[bundleHash] ?? { action: 'copy' as const };
@@ -4085,7 +4181,7 @@ router.post(
             pos: typeof boardPayload?.pos === 'number' ? boardPayload.pos : undefined,
           });
 
-          const columnsRaw = Array.isArray(payload?.columns) ? (payload.columns as any[]) : [];
+          const columnsRaw = Array.isArray(payload?.columns) ? (payload.columns as Record<string, unknown>[]) : [];
           const createdColumnByTitle = new Map<string, string>();
           for (const c of columnsRaw) {
             const title = String(c?.title || '').trim();
@@ -4100,7 +4196,7 @@ router.post(
             createdColumnByTitle.set(title, createdCol.id);
           }
 
-          const cardsRaw = Array.isArray(payload?.cards) ? (payload.cards as any[]) : [];
+          const cardsRaw = Array.isArray(payload?.cards) ? (payload.cards as Record<string, unknown>[]) : [];
           for (const c of cardsRaw) {
             const colTitle = String(c?.columnTitle || '').trim();
             const colId = createdColumnByTitle.get(colTitle);
@@ -4148,8 +4244,8 @@ router.post(
             continue;
           }
 
-          const payload = containerParsed.data.payload as any;
-          const roomPayload = payload?.room ?? {};
+          const payload = containerParsed.data.payload as Record<string, unknown>;
+          const roomPayload = (payload?.room ?? {}) as Record<string, unknown>;
           const bundleHash = computeBundleHash({
             name: roomPayload?.name,
             isPrivate: roomPayload?.isPrivate,
@@ -4168,7 +4264,7 @@ router.post(
             starshipId,
             name: String(roomPayload?.name || 'Room'),
             isPrivate: Boolean(roomPayload?.isPrivate),
-            topic: roomPayload?.topic ?? null,
+            topic: (roomPayload?.topic ?? null) as string | null,
           });
 
           // Creator becomes admin participant.
@@ -4193,7 +4289,7 @@ router.post(
           }
 
           // Tool assignments (map source tool slug -> created tool slug -> tool id)
-          const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as any[]) : [];
+          const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as Record<string, unknown>[]) : [];
           if (toolAssignments.length > 0) {
             for (const ta of toolAssignments) {
               const sourceToolSlug = typeof ta?.toolSlug === 'string' ? ta.toolSlug.trim() : '';
@@ -4212,7 +4308,7 @@ router.post(
           }
 
           // Pins (views/datasets/task boards)
-          const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as any[]) : [];
+          const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
           for (const p of viewPins) {
             const sourceViewSlug = typeof p?.viewSlug === 'string' ? p.viewSlug.trim() : '';
             if (!sourceViewSlug) continue;
@@ -4230,7 +4326,7 @@ router.post(
             });
           }
 
-          const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as any[]) : [];
+          const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as Record<string, unknown>[]) : [];
           for (const p of datasetPins) {
             const sourceDatasetSlug = typeof p?.datasetSlug === 'string' ? p.datasetSlug.trim() : '';
             if (!sourceDatasetSlug) continue;
@@ -4248,7 +4344,7 @@ router.post(
             });
           }
 
-          const taskBoardPins = Array.isArray(payload?.taskBoardPins) ? (payload.taskBoardPins as any[]) : [];
+          const taskBoardPins = Array.isArray(payload?.taskBoardPins) ? (payload.taskBoardPins as Record<string, unknown>[]) : [];
           for (const p of taskBoardPins) {
             const sourceBoardSlug = typeof p?.taskBoardSlug === 'string' ? p.taskBoardSlug.trim() : '';
             if (!sourceBoardSlug) continue;

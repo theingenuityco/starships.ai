@@ -366,7 +366,19 @@ async function handleAutomatePostAuth(args: {
       // Ignore
     }
 
-    router.push(`/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`)
+    const datasetTarget = `/ship/${starship.slug}/datasets/${encodeURIComponent(datasetId)}`
+
+    // Prevent LoginPageClient's "already authenticated" redirect effect from overriding
+    // the dataset redirect on OAuth flows (where the auth_code param is quickly removed),
+    // and provide a fallback target in case navigation is delayed.
+    try {
+      window.sessionStorage.setItem('automate_post_auth_redirect', String(Date.now()))
+      window.sessionStorage.setItem('automate_post_auth_target', datasetTarget)
+    } catch {
+      // Ignore
+    }
+
+    router.push(datasetTarget)
     queryClient.invalidateQueries()
     return true
   } catch {

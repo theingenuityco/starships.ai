@@ -52,6 +52,29 @@ export default function LoginPageClient() {
       return
     }
     if (isAuthenticated) {
+      // If an automate post-auth redirect just fired, don't override it here.
+      try {
+        const rawTs = typeof window !== 'undefined' ? window.sessionStorage.getItem('automate_post_auth_redirect') : null
+        const ts = rawTs ? Number(rawTs) : NaN
+        const fresh = Number.isFinite(ts) && Date.now() - ts < 30_000
+        const target = typeof window !== 'undefined' ? window.sessionStorage.getItem('automate_post_auth_target') : null
+        if (fresh) {
+          // Fallback: if we're still on /login, push to the stored dataset target.
+          if (typeof window !== 'undefined' && window.location.pathname === '/login' && target) {
+            router.push(target)
+            try {
+              window.sessionStorage.removeItem('automate_post_auth_redirect')
+              window.sessionStorage.removeItem('automate_post_auth_target')
+            } catch {
+              // ignore
+            }
+          }
+          return
+        }
+      } catch {
+        // ignore
+      }
+
       // OAuth flow lands on /login?auth_code=... and the LoginForm/useOAuthLogin hook
       // will handle redirecting after exchanging the code. Avoid racing it here.
       const authCode = searchParams?.get('auth_code')

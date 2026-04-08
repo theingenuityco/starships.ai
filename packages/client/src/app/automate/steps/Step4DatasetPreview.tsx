@@ -26,7 +26,7 @@ export function Step4DatasetPreview({
   const overlayRef = useRef<HTMLDivElement>(null)
 
   function handleExport() {
-    // Store the full flow data in localStorage so post-auth can provision the dataset
+    // Store the full flow data in localStorage so post-auth can provision the leadgen room
     // (localStorage survives new-tab navigations, e.g. email verification links)
     try {
       const payload = {
@@ -111,15 +111,12 @@ export function Step4DatasetPreview({
               onClick={handleExport}
               className="flex items-center gap-2 rounded-none bg-primary px-6 py-3.5 text-sm font-semibold text-white transition-all hover:brightness-110"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                <path d="M8 2v8M4 7l4 4 4-4M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Export {icp.estimatedAccountCount.toLocaleString()}+ accounts
+              Set up my workspace →
             </button>
           </div>
 
           <p className="mt-4 text-center text-xs text-white/25">
-            Showing a preview of {accounts.length} accounts. Sign up to export the full dataset.
+            Showing a preview of {accounts.length} accounts. Sign up to launch your Lead Generation workspace.
           </p>
         </div>
       </div>
@@ -138,17 +135,17 @@ export function Step4DatasetPreview({
             <div className="mb-1 flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                Dataset ready
+                Workspace ready
               </span>
             </div>
 
             <h2 className="mt-3 text-2xl font-semibold text-white leading-snug">
-              Export your {icp.name} dataset
+              Launch your Lead Generation workspace
             </h2>
             <p className="mt-2 text-sm text-white/55 leading-relaxed">
-              Create a free account to export{' '}
-              <strong className="text-white/80">{icp.estimatedAccountCount.toLocaleString()}+ accounts</strong>{' '}
-              and start automating your outreach for {companyName}.
+              Create a free account to set up your{' '}
+              <strong className="text-white/80">{icp.name}</strong>{' '}
+              workspace and start finding accounts for {companyName}.
             </p>
 
             <div className="mt-6 space-y-3">

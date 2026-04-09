@@ -516,7 +516,7 @@ const ListDatasetsQuerySchema = z.object({
 });
 
 const ListRowsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(0).max(200).optional(),
+  limit: z.coerce.number().int().min(0).max(5000).optional(),
   offset: z.coerce.number().int().min(0).max(1_000_000_000).optional(),
   search: z.string().trim().max(2000).optional(),
   q: z.string().trim().max(2000).optional(),
@@ -866,7 +866,8 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
-    const q = validateData(ListRowsQuerySchema, req.query, res, 'list dataset rows query') || {};
+    const q = validateData(ListRowsQuerySchema, req.query, res, 'list dataset rows query');
+    if (!q) return;
     const limit = typeof (q as any).limit === 'number' ? (q as any).limit : 50;
     const offset = typeof (q as any).offset === 'number' ? (q as any).offset : 0;
     const expand = typeof (req.query as any)?.expand === 'string' ? String((req.query as any).expand) : '';

@@ -4,6 +4,7 @@ import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
+import { LeadgenDashboard } from '@/components/rooms/LeadgenDashboard'
 import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
@@ -33,7 +34,7 @@ import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
 import { useStarshipTools } from '@/hooks/useTools'
@@ -222,6 +223,9 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return raw.trim().length === 0
   }, [routeParams.roomSlug])
 
+  const pathname = usePathname()
+  const isDashboardRoute = pathname?.endsWith('/dashboard') ?? false
+
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipData?.id ?? '', Boolean(starshipData?.id))
 
@@ -245,6 +249,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       ) ?? null
     )
   }, [roomsData?.rooms, normalizedRoomSlug])
+
+  const isLeadGenRoom =
+    String((activeRoom as any)?.provisionedByBundle || '').trim() === 'lead-generation' ||
+    String(activeRoom?.slug || '').trim().toLowerCase() === 'leadgen'
 
   // Lead-gen flow guardrail:
   // If we somehow land in the Lobby while there is still a pending lead-gen prompt in sessionStorage
@@ -860,6 +868,15 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             }
             hideCloseButton={true}
             className="h-full"
+          />
+        ) : activeConversationId && isDashboardRoute && isLeadGenRoom ? (
+          <LeadgenDashboard
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomName={activeRoom?.name}
+            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTaskBoards={pinsData?.taskBoards ?? []}
           />
         ) : activeConversationId ? (
           <RoomConversationIndexView

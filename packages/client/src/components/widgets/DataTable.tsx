@@ -70,6 +70,7 @@ export interface DataTableProps {
   primaryKey?: string | null
   onCommitRows?: (payload: { rows: Array<Record<string, unknown>>; meta: RowsCommitMeta }) => Promise<void> | void
   onDeleteRow?: (payload: { rowKey: string; row: Record<string, unknown> }) => Promise<void> | void
+  renderExpanded?: (row: Record<string, unknown>, rowIndex: number) => React.ReactNode
 }
 
 type SortState = { key: string; dir: 'asc' | 'desc' } | null
@@ -142,12 +143,14 @@ export function DataTable({
   primaryKey = null,
   onCommitRows,
   onDeleteRow,
+  renderExpanded,
 }: DataTableProps): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState(1)
   const [queryState, setQueryState] = useState('')
   const [sort, setSort] = useState<SortState>(null)
   const [hiddenColumnKeysState, setHiddenColumnKeysState] = useState<Set<string>>(() => new Set())
   const [draftData, setDraftData] = useState<Array<Record<string, unknown>>>(() => (Array.isArray(data) ? data : []))
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   type CellPos = { r: number; c: number }
@@ -265,7 +268,10 @@ export function DataTable({
 
   useEffect(() => {
     setCurrentPage(1)
+    setExpandedRows(new Set())
   }, [query, sort, hiddenColumnKeys])
+
+  const hasExpand = typeof renderExpanded === 'function'
 
   const safePageSize = Number.isFinite(pageSize) ? Math.max(0, Math.floor(pageSize)) : 10
   const totalRows = safeData.length
@@ -855,6 +861,9 @@ export function DataTable({
           <table className="w-full min-w-full text-sm">
             <thead className="sticky top-0 z-[1] bg-muted backdrop-blur supports-[backdrop-filter]:bg-muted/90 text-xs">
               <tr>
+                {hasExpand && (
+                  <th scope="col" className="w-8 border-b px-1 py-1.5" aria-label="Expand" />
+                )}
                 {showPkGutter && (
                   <th
                     scope="col"
@@ -916,32 +925,56 @@ export function DataTable({
               {visibleRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={Math.max(1, visibleColumns.length) + (showPkGutter ? 1 : 0)}
+                    colSpan={Math.max(1, visibleColumns.length) + (showPkGutter ? 1 : 0) + (hasExpand ? 1 : 0)}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
                     {loading ? 'Loading…' : query.trim() ? 'No matching rows' : 'No data available'}
                   </td>
                 </tr>
               ) : (
-                visibleRows.map((row, tableRowIndex) => (
+                visibleRows.map((row, tableRowIndex) => {
+                  const globalRowIndex = safePageSize === 0 ? tableRowIndex : pageStart + tableRowIndex
+                  const isExpanded = expandedRows.has(tableRowIndex)
+                  const toggleExpand = (e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    setExpandedRows((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(tableRowIndex)) next.delete(tableRowIndex)
+                      else next.add(tableRowIndex)
+                      return next
+                    })
+                  }
+                  return (
+                  <React.Fragment key={`${globalRowIndex}-${row[visibleColumns[0]?.key ?? 'row'] ?? tableRowIndex}`}>
                   <tr
-                    key={`${pageStart + tableRowIndex}-${row[visibleColumns[0]?.key ?? 'row'] ?? tableRowIndex}`}
                     className={cn(
-                      'border-b last:border-0',
+                      'border-b',
+                      !isExpanded && 'last:border-0',
                       striped && tableRowIndex % 2 === 0 && 'bg-muted/20',
                       'transition-colors hover:bg-muted/30',
                       rowClickable && 'cursor-pointer focus-within:ring-2 focus-within:ring-ring'
                     )}
                     onClick={
                       rowClickable
-                        ? () =>
-                            onRowClick({
-                              row,
-                              rowIndex: safePageSize === 0 ? tableRowIndex : pageStart + tableRowIndex,
-                            })
+                        ? () => onRowClick({ row, rowIndex: globalRowIndex })
                         : undefined
                     }
                   >
+                    {hasExpand && (
+                      <td className="w-8 px-1 py-2.5 align-top">
+                        <button
+                          type="button"
+                          onClick={toggleExpand}
+                          className="flex items-center justify-center w-5 h-5 rounded-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
+                        >
+                          <Icon
+                            name="chevron-right"
+                            className={cn('h-3.5 w-3.5 transition-transform', isExpanded && 'rotate-90')}
+                          />
+                        </button>
+                      </td>
+                    )}
                     {showPkGutter && (
                       <td className="sticky left-0 z-[1] border-r px-2 py-1.5 text-left tabular-nums text-muted-foreground/80 bg-muted/60 text-xs">
                         <div className="group flex items-center gap-1 min-w-0">
@@ -1059,7 +1092,19 @@ export function DataTable({
                       )
                     })}
                   </tr>
-                ))
+                  {hasExpand && isExpanded && (
+                    <tr className="border-b last:border-0 bg-muted/10">
+                      <td
+                        colSpan={visibleColumns.length + (showPkGutter ? 1 : 0) + 1}
+                        className="px-4 py-3"
+                      >
+                        {renderExpanded!(row, globalRowIndex)}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
+                  )
+                })
               )}
             </tbody>
           </table>

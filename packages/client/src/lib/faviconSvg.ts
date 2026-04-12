@@ -39,11 +39,7 @@ export function buildFaviconInitScriptSource(): string {
   return `(function () {
   try {
     var now = Date.now();
-    var theme = null;
-    try { theme = window.localStorage ? window.localStorage.getItem('theme') : null; } catch (e) { theme = null; }
-    var prefersDark = null;
-    try { prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { prefersDark = null; }
-    var isDark = theme === 'dark' ? true : theme === 'light' ? false : !!prefersDark;
+    var isDark = true;
     // Match app theme background:
     // - light: hsl(38 30% 97.5%) ≈ #fbf9f7
     // - dark:  hsl(0 0% 0%)     = #000000

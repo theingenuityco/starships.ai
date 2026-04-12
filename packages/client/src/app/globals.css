@@ -398,40 +398,40 @@
   }
 
   .dark {
-    /* Enhanced Dark Theme - Deep neutral workspace */
-    --background: 0 0% 6%; /* ~#0f0f0f */
-    --foreground: 0 0% 95%;
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 95%;
-    --primary: 38 92% 54%; /* Amber primary in dark */
+    /* Deep navy — matches automate onboarding #050b24 */
+    --background: 228 76% 8%;   /*  #050b24  — base */
+    --foreground: 0 0% 96%;
+    --card: 228 52% 16%;        /*  +8% lightness jump — clearly distinct from bg */
+    --card-foreground: 0 0% 96%;
+    --primary: 38 92% 54%; /* Amber primary */
     --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 95%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 10%;
-    --accent-foreground: 0 0% 95%;
-    --border: 0 0% 16%;
-    --input: 0 0% 16%;
+    --secondary: 228 45% 20%;   /* hover surface on cards */
+    --secondary-foreground: 0 0% 96%;
+    --muted: 228 45% 20%;
+    --muted-foreground: 228 10% 54%;
+    --accent: 228 40% 23%;      /* active/selected surface */
+    --accent-foreground: 0 0% 96%;
+    --border: 228 40% 22%;
+    --input: 228 40% 22%;
     --ring: 38 92% 54%;
-    --destructive: 0 62% 50%;
+    --destructive: 0 70% 52%;
     --destructive-foreground: 0 0% 98%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 228 65% 11%;     /* between bg and card — for dropdowns */
+    --popover-foreground: 0 0% 96%;
+    --radius: 0.5rem;
 
-    /* Command Deck Dark - Deep space gradients */
-    --command-bg: linear-gradient(135deg, hsl(0 0% 3%), hsl(0 0% 2%));
-    --starship-accent: hsl(280 70% 60%);
+    /* Command Deck Dark - Deep navy gradients */
+    --command-bg: linear-gradient(135deg, hsl(228 80% 5%), hsl(228 70% 3%));
+    --starship-accent: hsl(210 95% 60%);
     --primary-rgb: 245 158 11;
 
-    /* Shadow colors for dark mode - border moved to frosted-glass-card */
-    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
-    --frosted-border: 1px solid rgba(255, 255, 255, 0.08);
-    /* Subtle frosted overlay for dark mode: slightly lighter than bg */
-    --frosted-overlay: hsl(0 0% 100% / 0.06);
+    /* Shadow colors for dark mode */
+    --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.5);
+    --frosted-border: 1px solid rgba(150, 170, 255, 0.1);
+    --frosted-overlay: hsl(228 50% 100% / 0.05);
 
     /* App gradient variables (dark) */
-    --app-tint: hsl(280 20% 10%); /* Purple tint for nebula effect */
+    --app-tint: hsl(228 76% 12%); /* Strong navy tint */
     --app-wash: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 68%);
     --app-vignette: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 60%);
     --app-deep: color-mix(in hsl, hsl(var(--background)), var(--app-tint) 64%);

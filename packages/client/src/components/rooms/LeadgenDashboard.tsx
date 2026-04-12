@@ -1,16 +1,13 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import type { IcpProfile, RoomPinnedDataset, RoomPinnedTaskBoard, StarshipDatasetColumn } from '@starships/protocol'
+import React, { useMemo, useState } from 'react'
+import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
 import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
-import { MetricGrid } from '@/components/widgets/MetricGrid'
-import type { Metric } from '@/components/widgets/MetricGrid'
-import { DataTable } from '@/components/widgets/DataTable'
-import type { DataColumn, DataColumnDataType } from '@/components/widgets/DataTable'
-import { AgentActivityColumn } from '@/components/dashboard/AgentActivityColumn'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { avatarColour } from '@/components/dashboard/utils'
+import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
 import Icon from '@/components/primitives/Icon'
 import Link from 'next/link'
 
@@ -23,161 +20,439 @@ interface LeadgenDashboardProps {
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 
-// Column priority ordering for the lead feed tables
-const PRIORITY_COLUMNS_ACCOUNTS = ['company_name', 'name', 'status', 'industry', 'website', 'location', 'employee_count']
-const PRIORITY_COLUMNS_CONTACTS = ['first_name', 'last_name', 'name', 'email', 'lead_status', 'title', 'company', 'linkedin_url']
+// --- Status badge configs ---
 
-// Sort order for account/contact status fields (best leads first)
-const STATUS_SORT_ORDER: Record<string, number> = { qualified: 0, researched: 1, new: 2, disqualified: 3 }
-const CONTACT_SORT_ORDER: Record<string, number> = {
+const ACCOUNT_STATUS: Record<string, { label: string; cls: string }> = {
+  qualified:    { label: 'Qualified',    cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
+  researched:   { label: 'Researched',   cls: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/20' },
+  new:          { label: 'New',          cls: 'bg-muted text-muted-foreground border-border' },
+  disqualified: { label: 'Disqualified', cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
+}
+
+const CONTACT_STATUS: Record<string, { label: string; cls: string }> = {
+  qualified:      { label: 'Qualified',      cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
+  responded:      { label: 'Responded',      cls: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/20' },
+  connected:      { label: 'Connected',      cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-400 border-sky-500/20' },
+  attempted:      { label: 'Attempted',      cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/20' },
+  new:            { label: 'New',            cls: 'bg-muted text-muted-foreground border-border' },
+  unqualified:    { label: 'Unqualified',    cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
+  do_not_contact: { label: 'Do Not Contact', cls: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/20' },
+}
+
+// --- Sorting ---
+
+const ACCOUNT_SORT: Record<string, number> = { qualified: 0, researched: 1, new: 2, disqualified: 3 }
+const CONTACT_SORT: Record<string, number> = {
   qualified: 0, responded: 1, connected: 2, attempted: 3, new: 4, unqualified: 5, do_not_contact: 6,
 }
 
-function datasetColumnsToTableColumns(cols: StarshipDatasetColumn[], priority: string[]): DataColumn[] {
-  const sorted = [...cols].sort((a, b) => {
-    const ai = priority.indexOf(a.name)
-    const bi = priority.indexOf(b.name)
-    if (ai === -1 && bi === -1) return 0
-    if (ai === -1) return 1
-    if (bi === -1) return -1
-    return ai - bi
-  })
-  return sorted.map((c) => ({
-    key: c.name,
-    label: c.name.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
-    dataType: c.type as DataColumnDataType | undefined,
-    format: c.format,
-    enumOptions: c.enum?.options,
-  }))
+// --- Helpers ---
+
+function getStr(row: Record<string, unknown>, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = row[k]
+    if (v !== null && v !== undefined && String(v).trim()) return String(v).trim()
+  }
+  return ''
 }
 
-// --- GoalBanner ---
-
-interface GoalBannerProps {
-  icp: IcpProfile
-  qualifiedAccountCount: number
+function getInitials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 }
 
-function GoalBanner({ icp, qualifiedAccountCount }: GoalBannerProps) {
-  const headlineParts = [
-    icp.traits.companySize,
-    icp.traits.industry ? `in ${icp.traits.industry}` : null,
-    icp.traits.geography,
-  ].filter(Boolean)
-  const headline = headlineParts.length > 0 ? headlineParts.join(' · ') : icp.name
+function getAccountKey(row: Record<string, unknown>, primaryKey: string | null | undefined): string | null {
+  if (primaryKey && row[primaryKey] != null) return String(row[primaryKey])
+  for (const k of ['account_id', 'id', 'account_name', 'name', 'company_name']) {
+    if (row[k] != null) return String(row[k])
+  }
+  return null
+}
 
-  const pills = [icp.traits.industry, icp.traits.companySize, icp.traits.geography, ...icp.traits.roles].filter(Boolean)
+function isContactLinkedToAccount(contact: Record<string, unknown>, accountKey: string): boolean {
+  const ref = contact['account']
+  if (!ref || typeof ref !== 'object') return false
+  const r = ref as Record<string, unknown>
+  if (r['key'] !== undefined) return String(r['key']) === accountKey
+  return String(ref) === accountKey
+}
 
-  const pct =
-    icp.estimatedAccountCount > 0
-      ? Math.min(100, Math.round((qualifiedAccountCount / icp.estimatedAccountCount) * 100))
-      : 0
+// --- StatusBadge ---
 
+function StatusBadge({ status, map }: { status: string; map: Record<string, { label: string; cls: string }> }) {
+  const cfg = map[status] ?? { label: status, cls: 'bg-muted text-muted-foreground border-border' }
   return (
-    <div className="rounded-xl border border-border/40 bg-card/60 px-5 py-4 space-y-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Your Goal</p>
-          <p className="text-sm font-semibold">Finding {headline}</p>
-        </div>
-        {icp.estimatedAccountCount > 0 && (
-          <p className="text-xs text-muted-foreground whitespace-nowrap">
-            {qualifiedAccountCount} of {icp.estimatedAccountCount} qualified
-          </p>
-        )}
-      </div>
-      {icp.estimatedAccountCount > 0 && <Progress value={pct} className="h-1.5" />}
-      {pills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {pills.map((p) => (
-            <span key={p} className="inline-flex items-center rounded-full bg-primary/10 text-primary text-xs font-medium px-2.5 py-0.5">
-              {p}
-            </span>
-          ))}
-        </div>
-      )}
+    <span className={cn('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', cfg.cls)}>
+      {cfg.label}
+    </span>
+  )
+}
+
+// --- EntityAvatar ---
+
+function EntityAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
+  const initials = getInitials(name) || '?'
+  const color = avatarColour(name)
+  const dim = size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'
+  return (
+    <div className={cn('rounded-full flex items-center justify-center font-semibold text-white shrink-0', dim, color)}>
+      {initials}
     </div>
   )
 }
 
-// --- LeadFeed ---
+// --- ContactsSubTable ---
 
-interface LeadFeedProps {
-  accountRows: Array<Record<string, unknown>>
-  accountColumns: StarshipDatasetColumn[]
-  contactRows: Array<Record<string, unknown>>
-  contactColumns: StarshipDatasetColumn[]
-  accountsLoading: boolean
-  contactsLoading: boolean
-}
+function ContactsSubTable({
+  contacts,
+  loading,
+}: {
+  contacts: Array<Record<string, unknown>>
+  loading: boolean
+}) {
+  if (loading) {
+    return <p className="text-xs text-muted-foreground py-1">Loading contacts…</p>
+  }
 
-function LeadFeed({ accountRows, accountColumns, contactRows, contactColumns, accountsLoading, contactsLoading }: LeadFeedProps) {
-  const mappedAccountCols = useMemo(
-    () => datasetColumnsToTableColumns(accountColumns, PRIORITY_COLUMNS_ACCOUNTS),
-    [accountColumns],
-  )
-  const mappedContactCols = useMemo(
-    () => datasetColumnsToTableColumns(contactColumns, PRIORITY_COLUMNS_CONTACTS),
-    [contactColumns],
-  )
-
-  const sortedAccountRows = useMemo(
-    () =>
-      [...accountRows].sort(
-        (a, b) =>
-          (STATUS_SORT_ORDER[String(a['status'] ?? 'new')] ?? 99) -
-          (STATUS_SORT_ORDER[String(b['status'] ?? 'new')] ?? 99),
-      ),
-    [accountRows],
-  )
-  const sortedContactRows = useMemo(
-    () =>
-      [...contactRows].sort(
-        (a, b) =>
-          (CONTACT_SORT_ORDER[String(a['lead_status'] ?? 'new')] ?? 99) -
-          (CONTACT_SORT_ORDER[String(b['lead_status'] ?? 'new')] ?? 99),
-      ),
-    [contactRows],
-  )
+  if (contacts.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground flex items-center gap-1.5 py-1">
+        <Icon name="user" className="h-3.5 w-3.5" />
+        No contacts found for this account
+      </p>
+    )
+  }
 
   return (
-    <Tabs defaultValue="accounts" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Leads Ready to Act On</h2>
-        <TabsList>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="contacts">Contacts</TabsTrigger>
-        </TabsList>
+    <div className="rounded-md border border-border/60 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted/40 border-b border-border/60">
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Contact</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
+            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">LinkedIn</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contacts.map((contact, i) => {
+            const fullName = getStr(contact, 'first_name') + (getStr(contact, 'last_name') ? ' ' + getStr(contact, 'last_name') : '') || getStr(contact, 'name', 'full_name', 'contact_name')
+            const title = getStr(contact, 'title', 'job_title', 'role')
+            const leadStatus = getStr(contact, 'lead_status', 'status')
+            const email = getStr(contact, 'email', 'email_address')
+            const linkedin = getStr(contact, 'linkedin_url', 'linkedin')
+            return (
+              <tr key={i} className={cn('border-b last:border-0 hover:bg-muted/20 transition-colors')}>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <EntityAvatar name={fullName || '?'} size="sm" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-tight truncate">{fullName || '—'}</p>
+                      {title && <p className="text-xs text-muted-foreground truncate">{title}</p>}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  {leadStatus ? <StatusBadge status={leadStatus} map={CONTACT_STATUS} /> : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-3 py-2.5">
+                  {email ? (
+                    <a
+                      href={`mailto:${email}`}
+                      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Icon name="mail" className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate max-w-[180px]">{email}</span>
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-2.5">
+                  {linkedin ? (
+                    <a
+                      href={linkedin}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Icon name="external-link" className="h-3.5 w-3.5" />
+                      <span>View</span>
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// --- AccountsTable ---
+
+const PAGE_SIZE = 25
+
+interface AccountsTableProps {
+  rows: Array<Record<string, unknown>>
+  allContactRows: Array<Record<string, unknown>>
+  loading: boolean
+  contactsLoading: boolean
+  primaryKey: string | null | undefined
+  datasetName?: string
+}
+
+function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, datasetName }: AccountsTableProps) {
+  const [query, setQuery] = useState('')
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+  const [page, setPage] = useState(1)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((row) => {
+      const name = getStr(row, 'company_name', 'name', 'account_name')
+      const industry = getStr(row, 'industry')
+      const location = getStr(row, 'location', 'city', 'country')
+      return name.toLowerCase().includes(q) || industry.toLowerCase().includes(q) || location.toLowerCase().includes(q)
+    })
+  }, [rows, query])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(totalPages, Math.max(1, page))
+  const pageStart = (safePage - 1) * PAGE_SIZE
+  const visibleRows = filtered.slice(pageStart, pageStart + PAGE_SIZE)
+
+  const toggleExpand = (i: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  const handleQueryChange = (q: string) => {
+    setQuery(q)
+    setPage(1)
+    setExpandedRows(new Set())
+  }
+
+  const handleExport = () => {
+    const cols = [
+      { key: 'company', label: 'Company', format: 'text' as const },
+      { key: 'status', label: 'Status', format: 'text' as const },
+      { key: 'industry', label: 'Industry', format: 'text' as const },
+      { key: 'location', label: 'Location', format: 'text' as const },
+      { key: 'employees', label: 'Employees', format: 'text' as const },
+      { key: 'website', label: 'Website', format: 'text' as const },
+    ]
+    const data = rows.map((r) => ({
+      company: getStr(r, 'company_name', 'name', 'account_name'),
+      status: getStr(r, 'status'),
+      industry: getStr(r, 'industry'),
+      location: getStr(r, 'location', 'city', 'country'),
+      employees: getStr(r, 'employee_count', 'employee_range', 'employees', 'company_size'),
+      website: getStr(r, 'website', 'website_url'),
+    }))
+    downloadTableAsCsv(adaptDataTable(cols, data), `${sanitizeFilename(datasetName ?? 'accounts')}-${Date.now()}.csv`)
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            placeholder="Search accounts…"
+            className="h-9 pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{filtered.length.toLocaleString()} accounts</span>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={rows.length === 0}>
+            <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
+            Export CSV
+          </Button>
+        </div>
       </div>
-      <TabsContent value="accounts">
-        <DataTable
-          columns={mappedAccountCols}
-          data={sortedAccountRows}
-          loading={accountsLoading}
-          showSearch
-          showRowCount
-          showExportCsv
-          editable={false}
-          pageSize={20}
-          outerBorder
-          showTitle={false}
-        />
-      </TabsContent>
-      <TabsContent value="contacts">
-        <DataTable
-          columns={mappedContactCols}
-          data={sortedContactRows}
-          loading={contactsLoading}
-          showSearch
-          showRowCount
-          showExportCsv
-          editable={false}
-          pageSize={20}
-          outerBorder
-          showTitle={false}
-        />
-      </TabsContent>
-    </Tabs>
+
+      {/* Table */}
+      <div className="rounded-lg border border-border overflow-hidden bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50 border-b border-border">
+                <th className="w-8 px-3 py-3" />
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Company</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Industry</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Location</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Employees</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Website</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="h-5 bg-muted/40 rounded animate-pulse w-full" />
+                    </td>
+                  </tr>
+                ))
+              ) : visibleRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    {query.trim() ? 'No accounts match your search' : 'No accounts yet'}
+                  </td>
+                </tr>
+              ) : (
+                visibleRows.map((row, i) => {
+                  const isExpanded = expandedRows.has(pageStart + i)
+                  const companyName = getStr(row, 'company_name', 'name', 'account_name')
+                  const status = getStr(row, 'status')
+                  const industry = getStr(row, 'industry')
+                  const location = getStr(row, 'location', 'city', 'country')
+                  const employees = getStr(row, 'employee_count', 'employee_range', 'employees', 'company_size')
+                  const website = getStr(row, 'website', 'website_url')
+                  const accountKey = getAccountKey(row, primaryKey)
+                  const linkedContacts = accountKey
+                    ? allContactRows
+                        .filter((c) => isContactLinkedToAccount(c, accountKey))
+                        .sort((a, b) => (CONTACT_SORT[getStr(a, 'lead_status')] ?? 99) - (CONTACT_SORT[getStr(b, 'lead_status')] ?? 99))
+                    : []
+
+                  return (
+                    <React.Fragment key={pageStart + i}>
+                      <tr
+                        className={cn(
+                          'border-b transition-colors hover:bg-muted/30 cursor-pointer',
+                          isExpanded && 'bg-muted/20',
+                          !isExpanded && 'last:border-0',
+                        )}
+                        onClick={() => toggleExpand(pageStart + i)}
+                      >
+                        {/* Expand chevron */}
+                        <td className="w-8 px-3 py-3.5">
+                          <Icon
+                            name="chevron-right"
+                            className={cn('h-4 w-4 text-muted-foreground transition-transform', isExpanded && 'rotate-90')}
+                          />
+                        </td>
+
+                        {/* Company */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <EntityAvatar name={companyName || '?'} />
+                            <div className="min-w-0">
+                              <p className="font-medium leading-tight truncate">{companyName || '—'}</p>
+                              {website && (
+                                <a
+                                  href={website.startsWith('http') ? website : `https://${website}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate block max-w-[200px]"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {website.replace(/^https?:\/\//, '')}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 py-3.5">
+                          {status ? <StatusBadge status={status} map={ACCOUNT_STATUS} /> : <span className="text-muted-foreground">—</span>}
+                        </td>
+
+                        {/* Industry */}
+                        <td className="px-4 py-3.5 text-sm text-muted-foreground">{industry || '—'}</td>
+
+                        {/* Location */}
+                        <td className="px-4 py-3.5">
+                          {location ? (
+                            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Icon name="map-pin" className="h-3.5 w-3.5 shrink-0" />
+                              {location}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        {/* Employees */}
+                        <td className="px-4 py-3.5">
+                          {employees ? (
+                            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Icon name="users" className="h-3.5 w-3.5 shrink-0" />
+                              {employees}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        {/* Website (icon only) */}
+                        <td className="px-4 py-3.5">
+                          {website ? (
+                            <a
+                              href={website.startsWith('http') ? website : `https://${website}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Icon name="external-link" className="h-3.5 w-3.5" />
+                              Visit
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* Expanded contacts */}
+                      {isExpanded && (
+                        <tr className="border-b last:border-0 bg-muted/10">
+                          <td colSpan={7} className="px-6 py-4">
+                            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                              Contacts · {linkedContacts.length}
+                            </p>
+                            <ContactsSubTable contacts={linkedContacts} loading={contactsLoading} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border text-sm text-muted-foreground bg-muted/20">
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>
+              <Icon name="chevron-left" className="h-4 w-4" />
+            </Button>
+            <span>Page {safePage} of {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
+              <Icon name="chevron-right" className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -186,72 +461,40 @@ function LeadFeed({ accountRows, accountColumns, contactRows, contactColumns, ac
 export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: LeadgenDashboardProps) {
   const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
 
-  const { accountsDatasetId, contactsDatasetId, icpDatasetId } = useMemo(() => {
+  const { accountsDataset, contactsDatasetId } = useMemo(() => {
     const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
     const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
     return {
-      accountsDatasetId: pinned.find((d) => d.slug.includes('accounts'))?.id ?? null,
+      accountsDataset: pinned.find((d) => d.slug.includes('accounts')) ?? null,
       contactsDatasetId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
-      icpDatasetId: allDatasets.find((d) => d.slug.includes('icp'))?.id ?? null,
     }
   }, [allDatasets, pinnedDatasets])
 
   const { data: accountsPage, isLoading: accountsLoading } = useDatasetRows(
     starshipId,
-    accountsDatasetId ?? '',
+    accountsDataset?.id ?? '',
     200,
     0,
     undefined,
-    Boolean(accountsDatasetId),
+    Boolean(accountsDataset?.id),
   )
 
   const { data: contactsPage, isLoading: contactsLoading } = useDatasetRows(
     starshipId,
     contactsDatasetId ?? '',
-    200,
+    500,
     0,
     undefined,
     Boolean(contactsDatasetId),
   )
 
-  const { data: icpPage } = useDatasetRows(starshipId, icpDatasetId ?? '', 1, 0, undefined, Boolean(icpDatasetId))
-
-  const accountRows = accountsPage?.data ?? []
-  const contactRows = contactsPage?.data ?? []
-
-  const qualifiedAccounts = accountRows.filter((r) => r['status'] === 'qualified').length
-  const qualifiedContacts = contactRows.filter((r) => r['lead_status'] === 'qualified').length
-
-  const activeIcp = useMemo((): IcpProfile | null => {
-    const row = icpPage?.data?.[0]
-    if (!row) return null
-    const traits = row['traits'] as IcpProfile['traits'] | undefined
-    return {
-      id: String(row['id'] ?? ''),
-      name: String(row['name'] ?? ''),
-      description: String(row['description'] ?? ''),
-      traits: {
-        industry: String(traits?.industry ?? ''),
-        roles: Array.isArray(traits?.roles) ? traits.roles.map(String) : [],
-        companySize: String(traits?.companySize ?? ''),
-        geography: String(traits?.geography ?? ''),
-      },
-      estimatedAccountCount: Number(row['estimatedAccountCount'] ?? 0),
-    }
-  }, [icpPage])
-
-  const icpLoading = Boolean(icpDatasetId) && !icpPage
-
-  const summaryMetrics = useMemo((): Metric[] => {
-    const totalAccounts = accountsPage?.pagination.total ?? accountRows.length
-    const totalContacts = contactsPage?.pagination.total ?? contactRows.length
-    return [
-      { label: 'Total Accounts', value: totalAccounts, icon: 'building' },
-      { label: 'Qualified Accounts', value: qualifiedAccounts, icon: 'check-circle', trend: 'up', trendValue: 'qualified' },
-      { label: 'Total Contacts', value: totalContacts, icon: 'users' },
-      { label: 'Qualified Contacts', value: qualifiedContacts, icon: 'user-check', trend: 'up', trendValue: 'qualified' },
-    ]
-  }, [accountRows, contactRows, accountsPage, contactsPage, qualifiedAccounts, qualifiedContacts])
+  const accountRows = useMemo(
+    () =>
+      [...(accountsPage?.data ?? [])].sort(
+        (a, b) => (ACCOUNT_SORT[getStr(a, 'status')] ?? 99) - (ACCOUNT_SORT[getStr(b, 'status')] ?? 99),
+      ),
+    [accountsPage?.data],
+  )
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -270,31 +513,15 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-          {/* Goal banner */}
-          {icpLoading ? (
-            <Skeleton className="h-[112px] w-full rounded-xl" />
-          ) : activeIcp ? (
-            <GoalBanner icp={activeIcp} qualifiedAccountCount={qualifiedAccounts} />
-          ) : null}
-
-          {/* KPI metrics */}
-          <MetricGrid metrics={summaryMetrics} columns={4} />
-
-          {/* Two-column main area */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-            <LeadFeed
-              accountRows={accountRows}
-              accountColumns={accountsPage?.columns ?? []}
-              contactRows={contactRows}
-              contactColumns={contactsPage?.columns ?? []}
-              accountsLoading={accountsLoading}
-              contactsLoading={contactsLoading}
-            />
-            <div className="rounded-xl border border-border/40 overflow-hidden max-h-[600px]">
-              <AgentActivityColumn starshipId={starshipId} />
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <AccountsTable
+            rows={accountRows}
+            allContactRows={contactsPage?.data ?? []}
+            loading={accountsLoading}
+            contactsLoading={contactsLoading}
+            primaryKey={accountsDataset?.primaryKey}
+            datasetName={accountsDataset?.name}
+          />
         </div>
       </div>
     </div>

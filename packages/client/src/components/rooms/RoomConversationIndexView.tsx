@@ -261,6 +261,21 @@ export function RoomConversationIndexView(props: {
                 <Icon name="pin" weight="bold" className="h-4 w-4" />
               </Button>
             ) : null}
+            {isLeadGenRoom && effectiveStarshipSlug && props.roomSlug ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+                aria-label="Dashboard"
+                title="Dashboard"
+                asChild
+              >
+                <Link href={`/ship/${encodeURIComponent(effectiveStarshipSlug)}/rooms/${encodeURIComponent(props.roomSlug)}/dashboard`}>
+                  <Icon name="bar-chart" weight="bold" className="h-4 w-4" />
+                </Link>
+              </Button>
+            ) : null}
             <NotificationMenu type="room" roomId={props.roomConversationId} starshipId={props.starshipId} />
           </>
         }

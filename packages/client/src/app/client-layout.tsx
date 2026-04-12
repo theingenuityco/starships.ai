@@ -14,8 +14,7 @@ import { motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { StarshipRail } from '@/components/navigation/StarshipRail'
-import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { MobileNavProvider } from '@/components/navigation/MobileNavContext'
 import { Suspense } from 'react'
 
@@ -54,7 +53,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { user, isAuthenticated } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
   const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
-  const railStarships = orderStarshipsOwnedFirst(starships ?? [], user?.id)
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
@@ -275,20 +273,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <NotificationSoundBootstrap />
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-card">
-          {/* Rail only (no sidebar panel) */}
-          <div className="flex-shrink-0 relative z-50">
-            <aside className="relative h-full">
-              <StarshipRail
-                starships={railStarships}
-                activeSlug={null}
-                onSelect={s => {
-                  setSelectedStarship(s.id)
-                  router.push(`/ship/${encodeURIComponent(s.slug)}`)
-                }}
-              />
-            </aside>
-          </div>
-
           {/* Main Content Area - takes remaining space */}
           <div className="flex-1 min-h-0 min-w-0 p-0 md:pt-4 md:pr-4 md:pb-4 md:pl-0">
             <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">

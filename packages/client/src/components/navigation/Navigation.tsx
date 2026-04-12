@@ -3,11 +3,10 @@
 import Icon from '@/components/primitives/Icon'
 
 import { NavigationSection } from '@/components/navigation/NavigationSection'
-import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
-import { orderStarshipsOwnedFirst, pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { pickPrimaryStarshipForUser, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useWallet } from '@/hooks/useWallet'
 import { NOTIFICATION_QUERY_KEYS, useNotificationsList } from '@/hooks/useNotifications'
@@ -18,6 +17,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { RoomSidebarList } from '@/components/rooms/RoomSidebarList'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -121,7 +122,6 @@ export function Navigation(props: NavigationProps) {
 
   // Get user starships to find a default starship
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
-  const railStarships = useMemo(() => orderStarshipsOwnedFirst(userStarships ?? [], user?.id), [userStarships, user?.id])
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -383,8 +383,6 @@ export function Navigation(props: NavigationProps) {
       >
         {/* Top: rail + main column */}
         <div className="flex flex-1 min-h-0 flex-row overflow-hidden">
-          {isAuthenticated ? <StarshipRail starships={railStarships} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/account')} /> : null}
-
           <div
             className="flex flex-col transition-all duration-300 ease-in-out"
             style={{
@@ -398,8 +396,8 @@ export function Navigation(props: NavigationProps) {
             <div className="pl-2 pr-2 pt-5 pb-1.5 flex-shrink-0 flex items-center justify-between gap-2 min-w-0">
               <div
                 className="text-muted-foreground hover:text-foreground flex flex-1 min-w-0 items-center justify-start gap-0 rounded-lg px-1.5 py-1 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
-                onClick={handleHeaderClick}
-                title={isMobile ? undefined : isExpanded ? 'Go to default channel' : 'Expand sidebar'}
+                onClick={!isExpanded ? handleHeaderClick : undefined}
+                title={isMobile ? undefined : isExpanded ? undefined : 'Expand sidebar'}
                 style={{ cursor: isMobile ? 'default' : 'pointer' }}
               >
                 {/* Collapsed: show a compact "expand" affordance (and unread dot). Expanded: no leading icon slot. */}
@@ -416,16 +414,35 @@ export function Navigation(props: NavigationProps) {
                   </div>
                 ) : null}
                 {isExpanded ? (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                    className="flex flex-1 min-w-0 items-center gap-1.5"
-                    title={starshipData?.name || 'Starships.ai'}
-                  >
-                    <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate">{starshipData?.name || 'Starships.ai'}</span>
-                  </motion.div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                        className="group/starship-trigger flex flex-1 min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-muted/70 dark:hover:bg-[#2C2C30] transition-colors"
+                        title={starshipData?.name || 'Starships.ai'}
+                      >
+                        <StarshipsLogo width={20} height={20} className="flex-shrink-0 text-current" gradientId="nav-header-logo" idleLoop={false} playOnMountOnce={false} />
+                        <span className="block min-w-0 flex-1 text-sm font-medium tracking-tight leading-snug truncate text-left">{starshipData?.name || 'Starships.ai'}</span>
+                        <Icon name="chevron-down" className="flex-shrink-0 h-3 w-3 opacity-0 group-hover/starship-trigger:opacity-60 transition-opacity" />
+                      </motion.button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-52">
+                      {(userStarships ?? []).map(s => (
+                        <DropdownMenuItem
+                          key={s.id}
+                          onClick={() => handleStarshipSelect(s)}
+                          className={activeStarshipSlug === s.slug ? 'bg-muted/60' : ''}
+                        >
+                          <span className="truncate">{s.name}</span>
+                          {activeStarshipSlug === s.slug ? <Icon name="check" className="ml-auto h-3.5 w-3.5 flex-shrink-0 text-primary" /> : null}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : null}
               </div>
               {/* Right-side actions: notifications (icon only) + close/collapse */}

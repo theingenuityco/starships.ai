@@ -10,15 +10,18 @@ import type {
   UpsertStarshipDatasetRowsResponse,
   UpdateStarshipDatasetRequest,
 } from '@starships/protocol'
+import type { DatasetRowFilter } from '@starships/models'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
+
+export type { DatasetRowFilter }
 
 export const DATASET_QUERY_KEYS = {
   all: ['datasets'] as const,
   byStarship: (starshipId: string) => [...DATASET_QUERY_KEYS.all, 'starship', starshipId] as const,
   byId: (starshipId: string, datasetId: string) => [...DATASET_QUERY_KEYS.byStarship(starshipId), 'detail', datasetId] as const,
-  rows: (starshipId: string, datasetId: string, limit: number, offset: number, expand?: string, search?: string) =>
-    [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows', { limit, offset, expand: expand ?? '', search: search ?? '' }] as const,
+  rows: (starshipId: string, datasetId: string, limit: number, offset: number, expand?: string, search?: string, filters?: DatasetRowFilter[]) =>
+    [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows', { limit, offset, expand: expand ?? '', search: search ?? '', filters: filters ?? [] }] as const,
 } as const
 
 export function useStarshipDatasets(starshipId: string, enabled: boolean = true, opts?: { includeArchived?: boolean }) {
@@ -57,15 +60,22 @@ export function useDatasetRows(
   limit: number,
   offset: number,
   search: string | undefined,
-  enabled: boolean = true
+  enabled: boolean = true,
+  filters?: DatasetRowFilter[]
 ) {
   return useQuery({
-    queryKey: DATASET_QUERY_KEYS.rows(starshipId, datasetId, limit, offset, 'refs', search),
+    queryKey: DATASET_QUERY_KEYS.rows(starshipId, datasetId, limit, offset, 'refs', search, filters),
     queryFn: async (): Promise<StarshipDatasetRowsPageResponse> => {
       const response: FetchResponse<ApiResponse<StarshipDatasetRowsPageResponse>> = await api.get(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}/rows`,
         {
-          params: { limit, offset, expand: 'refs', ...(search && search.trim() ? { search: search.trim() } : null) },
+          params: {
+            limit,
+            offset,
+            expand: 'refs',
+            ...(search && search.trim() ? { search: search.trim() } : null),
+            ...(filters && filters.length > 0 ? { filters: JSON.stringify(filters) } : null),
+          },
         }
       )
       return response.data.data

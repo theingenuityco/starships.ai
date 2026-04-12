@@ -6,7 +6,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { isImageUrl } from '@/lib/isImageUrl'
@@ -150,23 +149,6 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             Billing
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem
-          className={navMenuItemClassName}
-          onSelect={e => {
-            // Keep the menu open while toggling theme.
-            e.preventDefault()
-          }}
-        >
-          <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-            <Icon name="moon" className={navMenuItemIconClassName} />
-          </div>
-          <div className="flex items-center justify-between w-full gap-3">
-            <span>Theme</span>
-            <div className="shrink-0">
-              <ThemeToggle size="xs" />
-            </div>
-          </div>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogoutClick} className={`${navMenuItemClassName} text-destructive hover:text-destructive focus:text-destructive`}>
           <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>

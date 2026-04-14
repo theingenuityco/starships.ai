@@ -104,8 +104,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const { META_PIXEL_ID } = getPublicEnvConfig()
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
+        <Script id="app-theme-init" strategy="beforeInteractive">{`try{localStorage.removeItem('theme')}catch(e){}`}</Script>
         <Script id="app-favicon-init" strategy="beforeInteractive">
           {buildFaviconInitScriptSource()}
         </Script>

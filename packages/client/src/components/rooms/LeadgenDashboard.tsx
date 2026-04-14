@@ -3,8 +3,10 @@
 import React, { useMemo, useState } from 'react'
 import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
 import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import type { DatasetRowFilter } from '@/hooks/useDatasets'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
 import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
@@ -197,6 +199,15 @@ function ContactsSubTable({
 
 const PAGE_SIZE = 25
 
+interface IcpProfile {
+  /** Value used as the Select option key. Equals String(icpId) when available, otherwise the array index. */
+  id: string
+  /** The numeric icp_id from data_json — present only for rows created via the upsert API (autoincrement). Null for directly-seeded rows. */
+  icpId: number | null
+  name: string
+  targetIndustries: string
+}
+
 interface AccountsTableProps {
   rows: Array<Record<string, unknown>>
   allContactRows: Array<Record<string, unknown>>
@@ -204,9 +215,12 @@ interface AccountsTableProps {
   contactsLoading: boolean
   primaryKey: string | null | undefined
   datasetName?: string
+  icpProfiles: IcpProfile[]
+  icpFilter: string
+  onIcpFilterChange: (value: string) => void
 }
 
-function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, datasetName }: AccountsTableProps) {
+function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, datasetName, icpProfiles, icpFilter, onIcpFilterChange }: AccountsTableProps) {
   const [query, setQuery] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
@@ -266,14 +280,29 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
     <div className="flex flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            placeholder="Search accounts…"
-            className="h-9 pl-9"
-          />
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              placeholder="Search accounts…"
+              className="h-9 pl-9"
+            />
+          </div>
+          {icpProfiles.length > 0 && (
+            <Select value={icpFilter} onValueChange={(v) => { onIcpFilterChange(v); setPage(1); setExpandedRows(new Set()) }}>
+              <SelectTrigger className="h-9 w-[180px]">
+                <SelectValue placeholder="Filter by ICP" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All ICPs</SelectItem>
+                {icpProfiles.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{filtered.length.toLocaleString()} accounts</span>
@@ -459,16 +488,68 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
 // --- LeadgenDashboard ---
 
 export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: LeadgenDashboardProps) {
+  const [icpFilter, setIcpFilter] = useState<string>('all')
   const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
 
-  const { accountsDataset, contactsDatasetId } = useMemo(() => {
+  const { accountsDataset, contactsDatasetId, icpProfilesDatasetId } = useMemo(() => {
     const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
     const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
     return {
       accountsDataset: pinned.find((d) => d.slug.includes('accounts')) ?? null,
       contactsDatasetId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
+      icpProfilesDatasetId: pinned.find((d) => d.slug === 'icp-profiles')?.id ?? null,
     }
   }, [allDatasets, pinnedDatasets])
+
+  const { data: icpProfilesPage } = useDatasetRows(
+    starshipId,
+    icpProfilesDatasetId ?? '',
+    100,
+    0,
+    undefined,
+    Boolean(icpProfilesDatasetId),
+  )
+
+  const icpProfiles = useMemo<IcpProfile[]>(() => {
+    return (icpProfilesPage?.data ?? []).map((row, i) => {
+      const rawId = row['icp_id']
+      const icpId = typeof rawId === 'number' && Number.isFinite(rawId) ? rawId : null
+      return {
+        id: icpId !== null ? String(icpId) : String(i),
+        icpId,
+        name: getStr(row, 'icp_name') || `ICP ${i + 1}`,
+        targetIndustries: getStr(row, 'target_industries'),
+      }
+    })
+  }, [icpProfilesPage?.data])
+
+  const accountFilters = useMemo<DatasetRowFilter[]>(() => {
+    if (icpFilter === 'all') return []
+    const icp = icpProfiles.find((p) => p.id === icpFilter)
+    if (!icp) return []
+
+    if (icp.icpId !== null) {
+      // Rows created via the upsert API have icp_id in data_json and a valid row_key.
+      // Accounts reference ICPs via the icp_profile column as a JSON object
+      // { "kind": "dataset_row", "datasetIdOrSlug": "icp-profiles", "key": <icp_id> }.
+      // PostgreSQL jsonb serialises keys alphabetically with a space after the colon, so the
+      // text representation is:
+      //   {"datasetIdOrSlug": "icp-profiles", "key": <id>, "kind": "dataset_row"}
+      // Using contains on `"key": <id>,` uniquely identifies this ICP without false positives.
+      return [{ column: 'icp_profile', op: 'contains', value: `"key": ${icp.icpId},` }]
+    }
+
+    // Seeded rows (direct appendMany, no autoincrement) have neither icp_id nor row_key.
+    // Accounts seeded alongside them don't have icp_profile set either, so fall back to
+    // matching on the industry string — the most reliable criteria field (both values come
+    // from the same onboarding input). Avoid employee_range (enum vs free-text mismatch)
+    // and country (value-format differences).
+    if (icp.targetIndustries) {
+      return [{ column: 'industry', op: 'contains', value: icp.targetIndustries }]
+    }
+
+    return []
+  }, [icpFilter, icpProfiles])
 
   const { data: accountsPage, isLoading: accountsLoading } = useDatasetRows(
     starshipId,
@@ -477,6 +558,7 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     0,
     undefined,
     Boolean(accountsDataset?.id),
+    accountFilters,
   )
 
   const { data: contactsPage, isLoading: contactsLoading } = useDatasetRows(
@@ -521,6 +603,9 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
             contactsLoading={contactsLoading}
             primaryKey={accountsDataset?.primaryKey}
             datasetName={accountsDataset?.name}
+            icpProfiles={icpProfiles}
+            icpFilter={icpFilter}
+            onIcpFilterChange={setIcpFilter}
           />
         </div>
       </div>

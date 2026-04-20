@@ -13,13 +13,14 @@ import { FaviconThemeSync } from '@/components/theme/FaviconThemeSync'
 import { MetaPixelHeadScript, MetaPixelNoScript } from '@/components/analytics/meta-pixel-snippets'
 import { buildFaviconInitScriptSource } from '@/lib/faviconSvg'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Orbitron } from 'next/font/google'
 import Script from 'next/script'
 import { Toaster as SonnerToaster } from 'sonner'
 import { Suspense } from 'react'
 import { getPublicEnvConfig } from '@starships/env/public'
 
 const inter = Inter({ subsets: ['latin'] })
+const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron', weight: ['400', '700', '900'] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
@@ -112,7 +113,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Script>
         <MetaPixelHeadScript pixelId={META_PIXEL_ID} />
       </head>
-      <body className={`${inter.className} app-gradient-bg`} suppressHydrationWarning>
+      <body className={`${inter.className} ${orbitron.variable} app-gradient-bg`} suppressHydrationWarning>
         <MetaPixelNoScript pixelId={META_PIXEL_ID} />
         <SentryWrapper />
         <ThemeProvider attribute="class" forcedTheme="dark" disableTransitionOnChange>

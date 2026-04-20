@@ -63,6 +63,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
     pathname === '/' ||
+    pathname === '/new' ||
     pathname === '/pricing' ||
     pathname === '/use-cases' ||
     pathname.startsWith('/use-cases/') ||

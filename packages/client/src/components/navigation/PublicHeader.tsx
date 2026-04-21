@@ -102,14 +102,6 @@ export function PublicHeader(): React.JSX.Element {
 
         <nav className="hidden sm:flex items-center gap-4 md:gap-7 text-[15px] md:text-base leading-none">
           <Link
-            href="/explore"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
-            className={`${landingHeaderNavItem} ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-            aria-current={pathname.startsWith('/explore') ? 'page' : undefined}
-          >
-            Explore
-          </Link>
-          <Link
             href="/pricing"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
             className={`${landingHeaderNavItem} ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
@@ -167,16 +159,6 @@ export function PublicHeader(): React.JSX.Element {
 
           {mobileMenuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg p-1 z-[60]">
-              <Link
-                href="/explore"
-                onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
-                  setMobileMenuOpen(false)
-                }}
-                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-              >
-                Explore
-              </Link>
               <Link
                 href="/login"
                 onClick={() => {

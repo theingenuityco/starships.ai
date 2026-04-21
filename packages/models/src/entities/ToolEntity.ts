@@ -8,7 +8,7 @@
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError as ClassValidatorValidationError, IsBoolean, IsArray, IsIn } from 'class-validator';
+import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError as ClassValidatorValidationError, IsBoolean, IsArray } from 'class-validator';
 import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 import { ValidationError } from '@starships/errors';
 
@@ -121,68 +121,12 @@ export class ToolEntity implements ToolModel {
   @Length(1, 20)
   version!: string; // Semantic version (e.g., '1.0.2')
 
-  @Expose()
-  @IsOptional()
-  @IsISO8601()
-  templateSnapshotAt?: string; // When tool last synced with template
-
   /** Connector providers used by this tool's blueprint (connector_action nodes) */
   @Expose()
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   requiredConnectorProviders?: string[];
-
-  // Publication workflow fields
-  @Expose()
-  @IsString()
-  @IsIn(['draft', 'pending_approval', 'published', 'rejected'])
-  publicationStatus!: 'draft' | 'pending_approval' | 'published' | 'rejected';
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publicationRequestedBy?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publicationApprovedBy?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsISO8601()
-  publicationApprovedAt?: string;
-
-  // Additional publication metadata (owner-selected)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @IsIn(['patch', 'minor', 'major'])
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 20)
-  publicationRequestedVersion?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  publicationChangelog?: string;
-
-  // Update availability info (computed at runtime, not stored in DB)
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  updateInfo?: {
-    needsUpdate: boolean;
-    latestVersion: string;
-    templateUpdatedAt?: string;
-  };
 
   /**
    * Simple validation function using class-validator
@@ -212,8 +156,6 @@ export class ToolEntity implements ToolModel {
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         starshipId: dataRecord.starshipId || '',
-        sourceTemplateId: dataRecord.sourceTemplateId,
-        publishedTemplateId: dataRecord.publishedTemplateId,
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters,

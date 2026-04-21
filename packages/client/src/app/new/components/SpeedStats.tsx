@@ -82,7 +82,7 @@ export default function SpeedStats() {
         aria-hidden
         style={{
           background: [
-            'linear-gradient(to right, #050b24, #0a1040, #050b24)',
+            'linear-gradient(to right, #0f0f0f, #171717, #0f0f0f)',
             'radial-gradient(ellipse 800px 300px at 50% 50%, rgba(245,158,11,0.06), transparent)',
           ].join(', '),
         }}

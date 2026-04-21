@@ -101,7 +101,7 @@ export default function EmailShowcase() {
   const active = personas.find((p) => p.id === activeId)!
 
   return (
-    <section className="relative py-20 sm:py-24 px-4 sm:px-6 bg-[#070d2a]">
+    <section className="relative py-20 sm:py-24 px-4 sm:px-6 bg-[#171717]">
       <div className="mx-auto max-w-6xl">
         {/* Heading */}
         <div className="text-center mb-12 sm:mb-14">

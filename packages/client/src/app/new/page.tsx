@@ -50,7 +50,7 @@ export const metadata: Metadata = {
 export default function NewLandingPage() {
   return (
     <StarTheme theme="dark">
-      <div className="min-h-[100dvh] bg-[#050b24] relative">
+      <div className="min-h-[100dvh] bg-[#0f0f0f] relative">
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         <StarryBackground className="opacity-70" style={{ '--star-color': 'rgba(255,255,255,0.9)' } as any} />
 

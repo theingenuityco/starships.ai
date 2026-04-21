@@ -47,8 +47,8 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
 
   const gradientSurfaceStyle = {
     background: [
-      'linear-gradient(95deg, rgba(39,24,94,0.95) 0%, rgba(114,47,166,0.92) 42%, rgba(150,70,156,0.9) 68%, rgba(189,126,52,0.92) 100%)',
-      'radial-gradient(circle at 6% 50%, rgba(99,102,241,0.30) 0%, transparent 34%)',
+      'linear-gradient(95deg, rgba(20,15,10,0.98) 0%, rgba(60,35,15,0.95) 42%, rgba(120,70,25,0.92) 68%, rgba(189,126,52,0.92) 100%)',
+      'radial-gradient(circle at 6% 50%, rgba(189,126,52,0.15) 0%, transparent 34%)',
       'radial-gradient(circle at 96% 52%, rgba(251,191,36,0.28) 0%, transparent 34%)',
     ].join(', '),
   }

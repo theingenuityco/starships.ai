@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+import { landingPrimaryCtaSection, shellMutedDark, shellMutedDarkLift } from '@/app/components/landing/landingSurface'
 import Icon from '@/components/primitives/Icon'
 
 const SHOWCASE_IMAGES = ['/landing/usecases/people.png', '/landing/usecases/ai-members.png']
@@ -39,16 +39,16 @@ export default function InvertedShowcaseHighlights() {
 
   return (
     <section className="mb-14 md:mb-16">
-      <div className={`p-4 sm:p-5 md:p-6 ${shellMuted} ${shellMutedLift}`}>
+      <div className={`p-4 sm:p-5 md:p-6 ${shellMutedDark} ${shellMutedDarkLift}`}>
         <div className="inverse-layout">
           <div className="inverse-copy text-left p-5 sm:p-6">
-            <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+            <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-white/90 leading-tight">
               <span className="inline-flex items-center justify-center text-primary">
                 <Icon name="users" size={22} />
               </span>
               Collaborative AI Workspaces
             </h3>
-            <p className="mt-2 text-sm md:text-base text-slate-700 max-w-md">Shared agent sessions let your team plan, execute, and follow through together without losing context.</p>
+            <p className="mt-2 text-sm md:text-base text-white/70 max-w-md">Shared agent sessions let your team plan, execute, and follow through together without losing context.</p>
             <div className="mt-6">
               <Link href="/login" className={landingPrimaryCtaSection}>
                 <span>Get Started Free</span>

@@ -64,10 +64,10 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
                     className="animate-workflow-step relative pb-4 last:pb-0"
                     style={{ animationDelay: `${idx * 0.12}s` }}
                   >
-                    <div className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-none border-2 border-emerald-600 bg-white">
+                    <div className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-md border border-emerald-500 bg-white">
                       <span className="text-xs font-bold tabular-nums text-emerald-700">{idx + 1}</span>
                     </div>
-                    <div className="ml-10 flex gap-3 rounded-none border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3.5 shadow-[0_4px_14px_rgba(15,23,42,0.06)]">
+                    <div className="ml-10 flex gap-3 rounded-lg border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3.5 shadow-sm">
                       <Icon name="check-circle" className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" weight="fill" />
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-slate-900">{s.title}</div>
@@ -79,7 +79,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
               </ol>
 
               {useCase.tip ? (
-                <div className="mt-5 rounded-none border border-slate-200 bg-white p-3">
+                <div className="mt-5 rounded-lg border border-slate-200 bg-white p-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
                     <Icon name="lightbulb" className="h-4 w-4 shrink-0 text-amber-500" />
                     Tip
@@ -95,7 +95,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
               <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
                 <div className="absolute -inset-[2px] bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
               </div>
-              <div className="relative flex flex-col items-start justify-between gap-6 overflow-hidden !rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
+              <div className="relative flex flex-col items-start justify-between gap-6 overflow-hidden rounded-xl border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
                 <div className="min-w-0 flex-1">
                   <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
                   <p className="mt-2 max-w-[90ch] text-base text-white/90 sm:text-lg">{useCase.nextDescription}</p>
@@ -138,7 +138,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
               </div>
             </div>
             <div className="order-1 lg:order-2">
-              <div className="relative aspect-video w-full overflow-hidden rounded-none border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 shadow-[0_6px_20px_rgba(15,23,42,0.12)]">
+              <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 shadow-md">
                 <iframe
                   src={useCase.videoEmbedUrl}
                   title="Lead generation demo"
@@ -181,7 +181,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
                   return (
                     <div
                       key={card.title}
-                      className="flex h-full flex-col items-center justify-center rounded-none border-2 border-amber-400 bg-amber-50 p-6 text-center shadow-[0_6px_20px_rgba(15,23,42,0.08)] sm:p-8"
+                      className="flex h-full flex-col items-center justify-center rounded-xl border border-amber-400 bg-amber-50 p-6 text-center shadow-sm sm:p-8"
                     >
                       <h3 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">Explore more capabilities</h3>
                       <div className="mt-6">
@@ -207,7 +207,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
               <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
                 <div className="absolute -inset-[2px] bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
               </div>
-              <div className="relative flex flex-col items-start justify-between gap-6 overflow-hidden !rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
+              <div className="relative flex flex-col items-start justify-between gap-6 overflow-hidden rounded-xl border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 p-7 text-white shadow-lg sm:flex-row sm:items-center sm:p-8">
                 <div>
                   <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">{useCase.nextTitle}</h2>
                   <p className="mt-2 max-w-[90ch] text-base text-white/90 sm:text-lg">{useCase.nextDescription}</p>

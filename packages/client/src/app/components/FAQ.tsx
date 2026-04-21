@@ -48,28 +48,28 @@ const QA: FAQItem[] = [
 interface FAQProps {
   items?: FAQItem[]
   title?: string
-  /** Outer section wash — landing FAQ uses cream; pricing uses white. */
-  sectionTone?: 'cream' | 'white'
+  /** Outer section wash — landing FAQ uses dark; pricing uses white. */
+  sectionTone?: 'dark' | 'white'
 }
 
-export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'cream' }: FAQProps) {
+export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'dark' }: FAQProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
   const toggle = (index: number) => {
     setOpenIndex(openIndex === index ? null : index)
   }
 
+  const isDark = sectionTone === 'dark'
+
   return (
     <section
       className={cn(
-        'px-4 text-slate-900',
-        sectionTone === 'white' ? 'py-20 sm:py-24 md:py-28' : 'py-14',
-        sectionTone === 'white' && 'bg-white',
+        'px-4',
+        sectionTone === 'white' ? 'py-20 sm:py-24 md:py-28 bg-white text-slate-900' : 'py-14 text-white',
       )}
-      style={sectionTone === 'white' ? undefined : { backgroundColor: 'hsl(38 30% 97.5%)' }}
     >
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center text-slate-900">
+        <h2 className={cn('text-2xl sm:text-3xl md:text-4xl font-bold mb-6 text-center', isDark ? 'text-white' : 'text-slate-900')}>
           {title.endsWith('FAQs') ? (
             <>
               {title.slice(0, -1)}
@@ -83,14 +83,29 @@ export default function FAQ({ items = QA, title = 'FAQs', sectionTone = 'cream' 
           {items.map((item, i) => {
             const isOpen = openIndex === i
             return (
-              <div key={i} className="overflow-hidden rounded-none border border-slate-200 shadow-[0_6px_20px_rgba(15,23,42,0.08)]" style={{ backgroundColor: '#F8F8FA' }}>
-                <button onClick={() => toggle(i)} className="flex w-full items-center justify-between gap-2 p-5 text-left transition-colors duration-100 hover:bg-slate-100">
-                  <span className="flex-1 font-medium text-slate-900">{item.q}</span>
-                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 shrink-0 text-slate-500 transition-transform duration-100" />
+              <div
+                key={i}
+                className={cn(
+                  'overflow-hidden rounded-xl border shadow-sm',
+                  isDark ? 'border-white/[0.08] bg-white/[0.04]' : 'border-slate-200 bg-[#F8F8FA]',
+                )}
+              >
+                <button
+                  onClick={() => toggle(i)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-2 p-5 text-left transition-colors duration-100',
+                    isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-100',
+                  )}
+                >
+                  <span className={cn('flex-1 font-medium', isDark ? 'text-white/90' : 'text-slate-900')}>{item.q}</span>
+                  <Icon
+                    name={isOpen ? 'chevron-down' : 'chevron-right'}
+                    className={cn('h-4 w-4 shrink-0 transition-transform duration-100', isDark ? 'text-white/40' : 'text-slate-500')}
+                  />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                   <div className="px-5 pb-5 pt-0">
-                    <div className="text-sm text-slate-700">{item.a}</div>
+                    <div className={cn('text-sm', isDark ? 'text-white/60' : 'text-slate-700')}>{item.a}</div>
                   </div>
                 </div>
               </div>

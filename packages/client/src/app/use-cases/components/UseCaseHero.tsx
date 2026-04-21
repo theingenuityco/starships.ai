@@ -30,11 +30,11 @@ export function UseCaseHero(props: { useCase: UseCaseModel }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               {useCase.tag ? (
-                <Badge variant="connected" className="rounded-none px-3 py-1 text-[11px] font-semibold">
+                <Badge variant="connected" className="rounded-full px-3 py-1 text-[11px] font-semibold">
                   {useCase.tag}
                 </Badge>
               ) : null}
-              <Badge variant="outline" className="rounded-none border-slate-300 bg-white text-slate-600">
+              <Badge variant="outline" className="rounded-full border-slate-300 bg-white text-slate-600">
                 Playbook
               </Badge>
             </div>

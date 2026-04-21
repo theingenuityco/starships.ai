@@ -105,7 +105,7 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d)
   }
 
-  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
+  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-sm'
   const regularPlanGlowStyle: CSSProperties = {
     background: 'linear-gradient(to bottom, rgba(124, 58, 237, 0.28) 0%, rgba(167, 139, 250, 0.14) 7%, rgba(248, 248, 250, 0) 18%)',
   }
@@ -161,10 +161,10 @@ export function StarshipUpgradeSection({ starshipId, cardClassName, hideDescript
                     <div
                       key={plan.priceId}
                       className={cn(
-                        'relative isolate overflow-visible rounded-none text-left h-full w-full cursor-default transition-all duration-200',
+                        'relative isolate overflow-visible rounded-xl text-left h-full w-full cursor-default transition-all duration-200',
                         planCardSurfaceClass,
                         subscribeMutation.isPending && 'opacity-70',
-                        isCurrent ? 'border-primary/45 ring-2 ring-primary/20' : 'hover:shadow-[4px_4px_0_0_rgb(203_213_225)]'
+                        isCurrent ? 'border-primary/45 ring-2 ring-primary/20' : 'hover:shadow-md'
                       )}
                     >
                       <div className="pointer-events-none absolute inset-0 z-0" style={cardGlowStyle} aria-hidden />

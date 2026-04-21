@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Docs
@@ -90,16 +89,3 @@ export const docsSearchTool: ToolParams = {
   },
 };
 
-export const docsSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: docsSearchTool.name,
-  description: docsSearchTool.description,
-  parameters: docsSearchTool.parameters,
-  blueprint: docsSearchTool.blueprint,
-
-  slug: 'search-docs',
-  version: '1.0.3',
-  category: 'data',
-  exampleUsage: '{ "q": "tools", "limit": 10 } // returns search results; env baseUrl inferred',
-  requiresApiKey: false,
-  configurationFields: [],
-};

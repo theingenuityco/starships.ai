@@ -7,38 +7,26 @@
  */
 
 import { Agent, AgentParams } from '@starships/autopilot';
-import { ForbiddenError, NotFoundError, ValidationError } from '@starships/errors';
+import { NotFoundError, ValidationError } from '@starships/errors';
 import {
   AgentRepository,
-  AgentTemplateRepository,
   StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
   ToolRepository,
-  ToolTemplateRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
-  DEFAULT_AGENT_TEMPERATURE,
-  MAX_AGENT_MAX_TOKENS,
-  MAX_AGENT_TIMEOUT_MS,
-  MIN_AGENT_MAX_TOKENS,
-  MIN_AGENT_TIMEOUT_MS,
   getConnection,
   PostgresConnection,
 } from '@starships/models';
 import type {
-  PendingAgentSummary,
-  UserModel,
-  StarshipModel,
   AgentModel,
   CreateAgentRequest,
   UpdateAgentRequest,
-  ToolModel,
+  UserModel,
 } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
-import { PublicationService } from './PublicationService';
-import { AgentMarketingService } from './AgentMarketingService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -76,19 +64,8 @@ export class AgentService {
     this.connectorSecretService = new ConnectorSecretService();
   }
 
-  /**
-   * Guard: agents deployed from marketplace templates are immutable.
-   * We treat any agent with a sourceTemplateId as "deployed from marketplace".
-   *
-   * NOTE: This intentionally does not block `updateFromTemplate()` which is the
-   * supported way to bring a deployed agent forward to the latest template.
-   */
-  private assertAgentIsEditable(agent: AgentModel, action: string): void {
-    if (typeof agent.sourceTemplateId === 'string' && agent.sourceTemplateId.trim().length > 0) {
-      throw new ValidationError(
-        `Cannot ${action} agent "${agent.name}" because it was deployed from the marketplace. Create a copy to customize it.`
-      );
-    }
+  private assertAgentIsEditable(_agent: AgentModel, _action: string): void {
+    // No-op: template immutability check removed with template system
   }
 
   /** Safely get starshipId from agent */
@@ -169,7 +146,6 @@ export class AgentService {
       state: agentState, // Use provided state or default initialization
       previewPrompts: data.previewPrompts,
       assignedToolSlugs: data.assignedToolSlugs,
-      sourceTemplateId: data.sourceTemplateId,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -293,171 +269,6 @@ export class AgentService {
     }
 
     return allAgents;
-  }
-
-  /**
-   * Get agents with pagination metadata
-   */
-  async getAgentsWithPagination(
-    page: number = 1,
-    limit: number = 50
-  ): Promise<{
-    agents: AgentModel[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      has_next: boolean;
-      has_prev: boolean;
-    };
-  }> {
-    const allAgents = await this.agentRepository.findAll();
-
-    // Only published agents should appear in the public listing
-    const publishedAgents = allAgents.filter((agent) => agent.publicationStatus === 'published');
-    const total = publishedAgents.length;
-    const offset = (page - 1) * limit;
-    const paginatedAgents = publishedAgents.slice(offset, offset + limit);
-
-    return {
-      agents: paginatedAgents,
-      pagination: {
-        page,
-        limit,
-        total,
-        has_next: offset + limit < total,
-        has_prev: page > 1,
-      },
-    };
-  }
-
-  /**
-   * Get agents that are pending publication approval (instance admin view)
-   */
-  async getPendingAgents(
-    page: number = 1,
-    limit: number = 50
-  ): Promise<{
-    agents: PendingAgentSummary[];
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      has_next: boolean;
-      has_prev: boolean;
-    };
-  }> {
-    const allAgents = await this.agentRepository.findAll();
-    const pendingAgents = allAgents.filter((agent) => agent.publicationStatus === 'pending_approval');
-    const total = pendingAgents.length;
-    const offset = (page - 1) * limit;
-    const paginatedAgents = pendingAgents.slice(offset, offset + limit);
-
-    // Bulk-load assigned tool slugs for this page of agents (avoid N+1).
-    const toolRows = await this.agentRepository.getAssignedToolSlugsForAgents(paginatedAgents.map((a) => a.id));
-    const toolSlugsByAgentId = new Map<string, string[]>();
-    for (const row of toolRows) {
-      const list = toolSlugsByAgentId.get(row.agentId) ?? [];
-      list.push(row.toolSlug);
-      toolSlugsByAgentId.set(row.agentId, list);
-    }
-
-    // Enrich with user display name and starship label for admin UX,
-    // while keeping publicationRequestedBy as the underlying user id.
-    const userRepo = new UserRepository();
-    const starshipRepo = new StarshipRepository();
-
-    // Avoid N+1 queries by preloading the small set of users and starships
-    // referenced by this page of agents.
-    const requestedUserIds = new Set<string>();
-    const starshipIds = new Set<string>();
-
-    for (const agent of paginatedAgents) {
-      if (agent.publicationRequestedBy) {
-        requestedUserIds.add(String(agent.publicationRequestedBy));
-      }
-      if (agent.starshipId) {
-        starshipIds.add(agent.starshipId);
-      }
-    }
-
-    let usersById = new Map<string, UserModel>();
-    let starshipsById = new Map<string, StarshipModel>();
-
-    try {
-      const [allUsers, allStarships] = await Promise.all([userRepo.findAll(), starshipRepo.findAll()]);
-
-      usersById = new Map((allUsers || []).filter((u) => requestedUserIds.has(u.id)).map((u) => [u.id, u]));
-
-      starshipsById = new Map((allStarships || []).filter((s) => starshipIds.has(s.id)).map((s) => [s.id, s]));
-    } catch {
-      // If the bulk preload fails for any reason, we simply fall back
-      // to showing minimal metadata below without blocking the response.
-      usersById = new Map();
-      starshipsById = new Map();
-    }
-
-    const enrichedAgents: PendingAgentSummary[] = [];
-
-    for (const agent of paginatedAgents) {
-      let requestedBy: PendingAgentSummary['requestedBy'] | undefined;
-      let requestedByStarship: PendingAgentSummary['requestedByStarship'] | undefined;
-      let assignedToolSlugs: string[] = [];
-
-      if (agent.publicationRequestedBy) {
-        const user = usersById.get(agent.publicationRequestedBy as string) || null;
-
-        if (user) {
-          requestedBy = {
-            id: user.id,
-            name: user.displayName || user.email || user.id,
-            avatar: user.avatar,
-          };
-        } else {
-          requestedBy = {
-            id: agent.publicationRequestedBy,
-          };
-        }
-      }
-
-      const starship = starshipsById.get(agent.starshipId) || null;
-      if (starship) {
-        requestedByStarship = {
-          id: starship.id,
-          name: starship.name || starship.slug,
-          slug: starship.slug,
-        };
-      }
-
-      // Resolve assigned tools for this agent so admin review can see
-      // the actual tool slugs attached to the agent, even though the
-      // underlying relationship is stored via the junction table.
-      assignedToolSlugs = (toolSlugsByAgentId.get(agent.id) || []).filter((slug) => typeof slug === 'string' && slug.trim().length > 0);
-
-      enrichedAgents.push({
-        agent: {
-          ...agent,
-          // Provide a denormalized view of assigned tool slugs strictly
-          // for the admin pending agents view. This mirrors the
-          // assignedToolSlugs used in other parts of the app while
-          // keeping the underlying storage relationship-based.
-          assignedToolSlugs,
-        },
-        requestedBy,
-        requestedByStarship,
-      });
-    }
-
-    return {
-      agents: enrichedAgents,
-      pagination: {
-        page,
-        limit,
-        total,
-        has_next: offset + limit < total,
-        has_prev: page > 1,
-      },
-    };
   }
 
   /**
@@ -627,73 +438,6 @@ export class AgentService {
   }
 
   /**
-   * Get tools that are pending publication for a given agent (admin view).
-   * This is used on the instance admin approvals screen to surface which
-   * tools will be published/updated alongside the agent.
-   */
-  async getPendingToolsForAgent(agentId: string): Promise<import('@starships/protocol').ToolModel[]> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-
-    // For admin review, mirror the heuristics used in the builder's
-    // AgentPublishModal: only show tools that are either:
-    // - New templates (no templateId yet), or
-    // - Have a newer template version available (template.version !== tool.version),
-    // and which are non-draft with complete params + blueprint.
-    const templateRepo = new ToolTemplateRepository();
-    const templateCache = new Map<string, Awaited<ReturnType<(typeof templateRepo)['findById']>>>();
-
-    const publishTools: import('@starships/protocol').ToolModel[] = [];
-
-    for (const tool of tools) {
-      // Skip draft or incomplete tools
-      if (tool.status === 'draft') continue;
-
-      const hasParams =
-        // Tools can be valid/publishable even with **no parameters**.
-        // Treat any object-typed JSON schema as acceptable (properties may be empty or omitted).
-        !!tool.parameters && tool.parameters.type === 'object';
-
-      const hasBlueprint =
-        !!tool.blueprint &&
-        typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
-        Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes);
-
-      if (!hasParams || !hasBlueprint) continue;
-
-      const publishedTemplateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
-      const isNewTemplate = !publishedTemplateId;
-      let hasTemplateUpdate = false;
-
-      if (publishedTemplateId) {
-        let template = templateCache.get(publishedTemplateId);
-        if (template === undefined) {
-          try {
-            template = await templateRepo.findById(publishedTemplateId);
-          } catch {
-            template = null;
-          }
-          templateCache.set(publishedTemplateId, template);
-        }
-
-        if (template && template.version && tool.version && template.version !== tool.version) {
-          hasTemplateUpdate = true;
-        }
-      }
-
-      if (isNewTemplate || hasTemplateUpdate) {
-        publishTools.push(tool);
-      }
-    }
-
-    return publishTools;
-  }
-
-  /**
    * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
   async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
@@ -837,167 +581,4 @@ export class AgentService {
     return agentInstance;
   }
 
-  /**
-   * Update agent to latest template version
-   */
-  async updateFromTemplate(agentId: string, userId: string): Promise<AgentModel> {
-    // Verify ownership
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    const starship = await this.starshipRepository.findById(agent.starshipId);
-    if (!starship || starship.ownerId !== userId) {
-      throw new ForbiddenError('You do not have permission to update this agent');
-    }
-
-    // 1) Sync the agent itself (including tool relationships + tool instance create/delete)
-    const updatedAgent = await this.agentRepository.updateFromTemplate(agentId);
-
-    // 2) Mirror startup behavior: update attached tool *instances* from their templates.
-    // This is NOT best-effort for manual updates: if tool updates fail, surface the error
-    // so the caller knows the agent is not fully reconciled.
-    const toolRepo = new ToolRepository();
-    const attachedTools = await this.agentRepository.getAgentToolsByRelationships(agentId);
-
-    for (const tool of attachedTools) {
-      if (!tool?.sourceTemplateId) continue;
-      // Idempotent: ToolRepository.updateFromTemplate only syncs template-owned fields.
-      await toolRepo.updateFromTemplate(tool.id);
-    }
-
-    return updatedAgent;
-  }
-
-  // ============================================================================
-  // PUBLICATION WORKFLOW (delegated to PublicationService)
-  // ============================================================================
-
-  /**
-   * Request publication for an agent (owner or instance admin)
-   * Delegates to PublicationService for cleaner separation of concerns.
-   */
-  async requestPublication(
-    agentId: string,
-    userId: string,
-    options: {
-      versionBump: 'patch' | 'minor' | 'major';
-      changelog: string;
-      toolOverrides?: { toolId: string; versionBump: 'patch' | 'minor' | 'major'; changelog: string }[];
-    }
-  ): Promise<AgentModel> {
-    const publicationService = new PublicationService();
-    return await publicationService.requestPublication(agentId, userId, options);
-  }
-
-  /**
-   * Approve publication for an agent (instance admin only)
-   * Delegates to PublicationService.
-   */
-  async approvePublication(agentId: string, adminUserId: string): Promise<AgentModel> {
-    const publicationService = new PublicationService();
-    return await publicationService.approvePublication(agentId, adminUserId);
-  }
-
-  /**
-   * Reject publication for an agent (instance admin only)
-   * Delegates to PublicationService.
-   */
-  async rejectPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
-    const publicationService = new PublicationService();
-    return await publicationService.rejectPublication(agentId, adminUserId);
-  }
-
-  /**
-   * Prepare publication: Generate missing marketing content and return preview
-   * Delegates to PublicationService.
-   */
-  async preparePublication(agentId: string, adminUserId: string): Promise<{
-    agent: AgentModel;
-    templateId: string;
-    marketingContent: {
-      avatarUrl?: string;
-      problemStatementsText?: string[];
-      problemStatementsImageUrl?: string;
-      capabilitiesImageUrl?: string;
-      tryThesePromptsImageUrl?: string;
-    };
-  }> {
-    const publicationService = new PublicationService();
-    return await publicationService.preparePublication(agentId, adminUserId);
-  }
-
-  /**
-   * Regenerate specific marketing content item
-   * Delegates to PublicationService.
-   */
-  async regenerateMarketingContent(
-    agentId: string,
-    templateId: string,
-    type: 'avatar' | 'problem_statements_text' | 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image',
-    adminUserId: string
-  ): Promise<{
-    agent: AgentModel;
-    marketingContent: {
-      avatarUrl?: string;
-      problemStatementsText?: string[];
-      problemStatementsImageUrl?: string;
-      capabilitiesImageUrl?: string;
-      tryThesePromptsImageUrl?: string;
-    };
-  }> {
-    const publicationService = new PublicationService();
-    return await publicationService.regenerateMarketingContent(agentId, templateId, type, adminUserId);
-  }
-
-  /**
-   * Update problem statements for a template (before publication)
-   * Delegates to PublicationService.
-   */
-  async updateProblemStatements(templateId: string, statements: string[], adminUserId: string): Promise<{
-    problemStatementsText: string[];
-  }> {
-    const publicationService = new PublicationService();
-    return await publicationService.updateProblemStatements(templateId, statements, adminUserId);
-  }
-
-  /**
-   * Confirm publication: Mark agent as published (template already exists with content)
-   * Delegates to PublicationService.
-   */
-  async confirmPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
-    const publicationService = new PublicationService();
-    return await publicationService.confirmPublication(agentId, adminUserId);
-  }
-
-  /**
-   * Unpublish: remove the marketplace template and revert to draft.
-   * Delegates to PublicationService.
-   */
-  async unpublishAgent(agentId: string): Promise<AgentModel> {
-    const publicationService = new PublicationService();
-    return await publicationService.unpublishAgent(agentId);
-  }
-
-  // ============================================================================
-  // AGENT MARKETING (instance admin tooling)
-  // ============================================================================
-
-  async generateAgentMarketingContent(
-    agentId: string,
-    adminUserId: string
-  ): Promise<{
-    agent: AgentModel;
-    marketingContent: {
-      avatarUrl?: string;
-      problemStatementsText?: string[];
-      problemStatementsImageUrl?: string;
-      capabilitiesImageUrl?: string;
-      tryThesePromptsImageUrl?: string;
-    };
-  }> {
-    const svc = new AgentMarketingService();
-    return await svc.generateAgentMarketingContent(agentId, adminUserId);
-  }
 }

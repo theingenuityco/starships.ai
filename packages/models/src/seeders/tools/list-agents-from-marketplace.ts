@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: list-agents-from-marketplace
@@ -119,18 +118,4 @@ export const agentTemplateListTool: ToolParams = {
     ],
     metadata: {},
   },
-};
-
-export const agentTemplateListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentTemplateListTool.name,
-  description: agentTemplateListTool.description,
-  parameters: agentTemplateListTool.parameters,
-  blueprint: agentTemplateListTool.blueprint,
-
-  slug: 'list-agents-from-marketplace',
-  version: '1.0.0',
-  category: 'automation',
-  exampleUsage: '{ "query": "customer support", "page": 1, "limit": 50 } // searches and returns matching agent templates from the marketplace',
-  requiresApiKey: false,
-  configurationFields: [],
 };

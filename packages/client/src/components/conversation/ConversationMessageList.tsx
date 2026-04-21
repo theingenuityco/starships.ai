@@ -797,7 +797,6 @@ export function ConversationMessageList({
       const role = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : undefined
       const version = typeof (agent as any)?.version === 'string' ? String((agent as any).version).trim() : undefined
       const category = typeof (agent as any)?.category === 'string' ? String((agent as any).category).trim() : undefined
-      const publicationStatus = typeof (agent as any)?.publicationStatus === 'string' ? String((agent as any).publicationStatus).trim() : undefined
       const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs) ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean) : undefined
       const createdAt = typeof (agent as any)?.createdAt === 'string' ? String((agent as any).createdAt).trim() : undefined
       const updatedAt = typeof (agent as any)?.updatedAt === 'string' ? String((agent as any).updatedAt).trim() : undefined
@@ -811,7 +810,6 @@ export function ConversationMessageList({
         role,
         version,
         category,
-        publicationStatus,
         assignedToolSlugs,
         createdAt,
         updatedAt,
@@ -2277,7 +2275,6 @@ export function ConversationMessageList({
                         role: undefined,
                         version: undefined,
                         category: undefined,
-                        publicationStatus: undefined,
                         assignedToolSlugs: undefined,
                         createdAt: undefined,
                         updatedAt: undefined,

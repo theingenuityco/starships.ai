@@ -1,5 +1,4 @@
 export { AgentService } from './AgentService';
-export { AgentTemplateService } from './AgentTemplateService';
 export { AttachmentService } from './AttachmentService';
 export { AvatarGenerationService } from './AvatarGenerationService';
 export { BalanceValidationService } from './BalanceValidationService';

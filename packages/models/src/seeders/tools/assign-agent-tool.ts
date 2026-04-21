@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Assign Tool to Agent
@@ -152,19 +151,3 @@ export const agentAssignToolTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: assign-agent-tool
- */
-export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentAssignToolTool.name,
-  description: agentAssignToolTool.description,
-  parameters: agentAssignToolTool.parameters,
-  blueprint: agentAssignToolTool.blueprint,
-
-  slug: 'assign-agent-tool',
-  version: '1.0.4',
-  category: 'automation',
-  exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
-  requiresApiKey: false,
-  configurationFields: [],
-};

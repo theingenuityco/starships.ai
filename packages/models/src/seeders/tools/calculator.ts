@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Calculator Tool Definition
@@ -177,21 +176,3 @@ export const calculatorTool: ToolParams = {
   },
 };
 
-/**
- * Calculator Tool Template Configuration
- */
-export const calculatorToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  // Core ToolParams
-  name: calculatorTool.name,
-  description: calculatorTool.description,
-  parameters: calculatorTool.parameters,
-  blueprint: calculatorTool.blueprint,
-
-  // Template metadata
-  slug: 'calculator',
-  version: '1.0.1',
-  category: 'utility',
-  exampleUsage: 'Use in LLM function-calling: { "name": "calculator", "arguments": { "expression": "2 + 3 * 4" } }',
-  requiresApiKey: false,
-  configurationFields: [],
-};

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Connector
@@ -90,16 +89,3 @@ export const connectorSearchTool: ToolParams = {
   },
 };
 
-export const connectorSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: connectorSearchTool.name,
-  description: connectorSearchTool.description,
-  parameters: connectorSearchTool.parameters,
-  blueprint: connectorSearchTool.blueprint,
-
-  slug: 'search-connector',
-  version: '1.0.0',
-  category: 'automation',
-  exampleUsage: '{ "q": "slack", "limit": 10 } // returns search results; env baseUrl inferred',
-  requiresApiKey: false,
-  configurationFields: [],
-};

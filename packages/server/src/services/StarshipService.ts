@@ -5,12 +5,9 @@ import {
   AgentRepository,
   StarshipMemberRepository,
   StarshipRepository,
-  ToolRepository,
-  ToolTemplateRepository,
   UserRepository,
 } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
-import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
 import { SubscriptionPlanCatalogService } from './SubscriptionPlanCatalogService';
 import { logger } from '@/utils/logger';
@@ -41,51 +38,16 @@ export class StarshipService {
   private agentRepository: AgentRepository;
   private userRepository: UserRepository;
   private starshipMemberRepository: StarshipMemberRepository;
-  private toolRepository: ToolRepository;
-  private toolTemplateRepository: ToolTemplateRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.userRepository = new UserRepository();
     this.starshipMemberRepository = new StarshipMemberRepository();
-    this.toolRepository = new ToolRepository();
-    this.toolTemplateRepository = new ToolTemplateRepository();
   }
 
-  private async ensureBaselineStarshipToolsAllowed(starshipId: string): Promise<void> {
-    const requiredBaseTemplateSlugs = ['read-url', 'read-older-messages'] as const;
-
-    // Snapshot existing tools + starship-level permission rows so we can:
-    // - avoid re-deploy when a tool is already deployed
-    // - avoid creating duplicate starship_tools rows when an allow mapping already exists
-    const [tools, starshipToolPerms] = await Promise.all([
-      this.toolRepository.findByStarship(starshipId),
-      this.agentRepository.getStarshipToolPermissions(starshipId),
-    ]);
-    const slugToSourceTemplateId = new Map<string, string | null | undefined>(tools.map((t) => [t.slug, t.sourceTemplateId]));
-
-    for (const baseSlug of requiredBaseTemplateSlugs) {
-      const templateId = await this.toolTemplateRepository.resolveTemplateIdForAssignedSlug(baseSlug);
-      if (!templateId) continue;
-
-      // If a starship_tools mapping already exists for any tool instance created from this template,
-      // prefer updating THAT mapping to allow, to avoid creating duplicate mapped instances.
-      const mapped = starshipToolPerms.find((p) => slugToSourceTemplateId.get(p.toolSlug) === templateId);
-      if (mapped) {
-        if (mapped.permission !== 'allow') {
-          await this.agentRepository.setStarshipToolPermissionBySlug({ starshipId, toolSlug: mapped.toolSlug, permission: 'allow' });
-        }
-        continue;
-      }
-
-      // No mapping exists yet. Deploy tool instance if missing (by template linkage) and map it.
-      let deployed = await this.toolRepository.findByTemplateIdAndStarship(templateId, starshipId);
-      if (!deployed) {
-        deployed = await this.toolRepository.createFromTemplateId(templateId, starshipId, {});
-      }
-      await this.agentRepository.setStarshipToolPermissionBySlug({ starshipId, toolSlug: deployed.slug, permission: 'allow' });
-    }
+  private async ensureBaselineStarshipToolsAllowed(_starshipId: string): Promise<void> {
+    // Tool template system has been removed; baseline tool seeding is a no-op.
   }
 
   /**
@@ -446,68 +408,6 @@ export class StarshipService {
       initialCredits: 200, // 200 welcome credits for new users
     });
 
-    // Deploy Aria + her tools/permissions. Best-effort: the starship should still exist even if
-    // the template/tooling layer is temporarily unavailable.
-    try {
-      await StarshipService.createInitialAgents(userId, starship.id);
-    } catch (err) {
-      logger.error('[StarshipService] Failed to create initial agents for default starship', {
-        starshipId: starship.id,
-        userId,
-        operation: 'create_initial_agents_default_starship',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
     return starship;
-  }
-
-  /**
-   * Create initial agent for a new starship: Aria only (Executive Officer).
-   * Aria's tools are deployed by AgentTemplateService when creating from template.
-   * Returns a map of created agents by name when created.
-   */
-  static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, AgentModel>> {
-    const created: Record<string, AgentModel> = {};
-    try {
-      const templateService = new AgentTemplateService();
-      const agentRepo = new AgentRepository();
-
-      const ariaTemplates = await templateService.searchTemplates('Aria');
-      const ariaTemplate = ariaTemplates.find((t) => t.name === 'Aria');
-
-      if (ariaTemplate) {
-        try {
-          const aria = await templateService.createAgentFromTemplate(ariaTemplate.id, starshipId);
-          if (aria?.id) {
-            await agentRepo.setAllAssignedToolPermissionsForAgent(aria.id, 'allow');
-          }
-          if (aria) created['Aria'] = aria;
-        } catch (err) {
-          logger.error('[StarshipService] Failed to create Aria agent', {
-            starshipId,
-            userId,
-            operation: 'create_aria_agent',
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      } else {
-        logger.warn('[StarshipService] Aria template not found - skipping Aria creation', {
-          starshipId,
-          userId,
-          operation: 'create_initial_agents',
-        });
-      }
-
-      return created;
-    } catch (error) {
-      logger.error('[StarshipService] Failed to create initial agents', {
-        starshipId,
-        userId,
-        operation: 'create_initial_agents',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return created;
-    }
   }
 }

@@ -19,9 +19,11 @@ export type TemplateCategory =
   | 'data'
   | 'communication'
   | 'automation';
+
+export type AgentTemplateCategory = TemplateCategory;
+export type ToolTemplateCategory = TemplateCategory;
 /* Export domain types (database domains) */
 export * from './domains/agent';
-export * from './domains/agent-template';
 export * from './domains/attachment';
 export * from './domains/auth';
 export * from './domains/channel';

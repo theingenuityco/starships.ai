@@ -4,7 +4,6 @@ export type { PostgresConfig } from './helpers/database';
 
 /* Entity exports */
 export { AgentEntity } from './entities/AgentEntity';
-export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { ConnectorSecretEntity } from './entities/ConnectorSecretEntity';
 export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
@@ -30,7 +29,6 @@ export { ConversationParticipantEntity } from './entities/ConversationParticipan
 export { ConversationNotificationPrefEntity } from './entities/ConversationNotificationPrefEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
 export { ToolEntity } from './entities/ToolEntity';
-export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
 export { UserEntity } from './entities/UserEntity';
 export { UsageEntity } from './entities/UsageEntity';
 export { WalletEntity } from './entities/WalletEntity';
@@ -53,7 +51,6 @@ export { AutopilotAwaitFiringEntity } from './entities/AutopilotAwaitFiringEntit
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
-export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
 export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { ConnectorSecretRepository } from './repositories/ConnectorSecretRepository';
@@ -86,7 +83,6 @@ export { ConversationParticipantRepository } from './repositories/ConversationPa
 export { ConversationNotificationPrefRepository } from './repositories/ConversationNotificationPrefRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { ToolRepository } from './repositories/ToolRepository';
-export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
 export { UsageRepository } from './repositories/UsageRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WalletRepository } from './repositories/WalletRepository';
@@ -119,10 +115,6 @@ export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './h
 
 /* Management scripts */
 export { migrationRunner } from './scripts/migration-runner';
-export { seedToolTemplates } from './scripts/seed-tool-templates';
-export { seedAgentTemplates } from './scripts/seed-agent-templates';
-export { seedUpdateDeployedInstances } from './scripts/seed-update-deployed-instances';
-export { migrateDocTools } from './scripts/migrate-doc-tools';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';

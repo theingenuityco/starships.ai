@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get View
@@ -80,17 +79,3 @@ export const getViewTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const getViewToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: getViewTool.name,
-  description: getViewTool.description,
-  parameters: getViewTool.parameters,
-  blueprint: getViewTool.blueprint,
-  slug: getViewTool.slug,
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "viewId": "view_123" }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Modify Tool Blueprint Node
@@ -431,17 +430,3 @@ export const blueprintModifyNodeTool: ToolParams = {
   },
 };
 
-export const toolModifyBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: blueprintModifyNodeTool.name,
-  description: blueprintModifyNodeTool.description,
-  parameters: blueprintModifyNodeTool.parameters,
-  blueprint: blueprintModifyNodeTool.blueprint,
-
-  slug: 'modify-tool-blueprint-node',
-  version: '1.0.2',
-  category: 'automation',
-  exampleUsage:
-    '{ "toolSlug": "my-tool", "op": "add", "node": { "ref": "process", "type": "code", "name": "Process Data", "parameters": { "code": "return input;" } } }',
-  requiresApiKey: false,
-  configurationFields: [],
-};

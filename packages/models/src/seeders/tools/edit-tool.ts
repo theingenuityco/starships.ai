@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Edit Tool
@@ -214,19 +213,3 @@ export const toolEditTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: edit-tool
- */
-export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: toolEditTool.name,
-  description: toolEditTool.description,
-  parameters: toolEditTool.parameters,
-  blueprint: toolEditTool.blueprint,
-
-  slug: 'edit-tool',
-  version: '1.0.4',
-  category: 'automation',
-  exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
-  requiresApiKey: false,
-  configurationFields: [],
-};

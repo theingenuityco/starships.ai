@@ -3,14 +3,14 @@
  * End-to-end tests for the echo tool using autopilot Tool node
  */
 
-import { echoTool, echoToolTemplate } from '../echo';
+import { echoTool } from '../echo';
 import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
 
 describe('Echo Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(echoTool, echoToolTemplate, 'echo');
+    testHelper = new ToolTestHelper(echoTool, undefined, 'echo');
     testHelper.clearEventLogs();
   });
 
@@ -85,27 +85,6 @@ describe('Echo Tool', () => {
       if (endNode?.parameters) {
         const params = endNode.parameters as Record<string, unknown>;
         expect(params.output).toBeDefined();
-      }
-    });
-  });
-
-  describe('Template Configuration', () => {
-    it('should have consistent template configuration', () => {
-      const result = testHelper.testTemplateConsistency();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have correct template metadata', () => {
-      expect(echoToolTemplate.slug).toBe('echo');
-      expect(echoToolTemplate.category).toBe('utility');
-      expect(echoToolTemplate.requiresApiKey).toBe(false);
-    });
-
-    it('should have example usage', () => {
-      expect(echoToolTemplate.exampleUsage).toBeDefined();
-      if (echoToolTemplate.exampleUsage) {
-        expect(echoToolTemplate.exampleUsage.length).toBeGreaterThan(0);
       }
     });
   });
@@ -279,7 +258,7 @@ describe('Echo Tool', () => {
       expect(validation.structureValid).toBe(true);
       expect(validation.parametersValid).toBe(true);
       expect(validation.blueprintValid).toBe(true);
-      expect(validation.templateValid).toBe(true);
+
       expect(validation.errors).toHaveLength(0);
     });
   });

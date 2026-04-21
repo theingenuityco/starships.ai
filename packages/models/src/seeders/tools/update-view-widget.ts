@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Update View Widget
@@ -95,17 +94,3 @@ export const updateViewWidgetTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const updateViewWidgetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: updateViewWidgetTool.name,
-  description: updateViewWidgetTool.description,
-  parameters: updateViewWidgetTool.parameters,
-  blueprint: updateViewWidgetTool.blueprint,
-  slug: updateViewWidgetTool.slug,
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "viewId": "view_123", "nodeId": "chart", "props": { "title": "Updated" } }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

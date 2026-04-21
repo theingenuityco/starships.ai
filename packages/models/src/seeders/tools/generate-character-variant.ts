@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: generate-character-variant
@@ -657,22 +656,4 @@ export const generateCharacterVariantTool: ToolParams = {
       },
     ],
   },
-};
-
-export const generateCharacterVariantToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: generateCharacterVariantTool.name,
-  description: generateCharacterVariantTool.description,
-  parameters: generateCharacterVariantTool.parameters,
-  blueprint: generateCharacterVariantTool.blueprint,
-  transforms: undefined,
-  mutations: undefined,
-  condition: undefined,
-
-  slug: 'generate-character-variant',
-  version: '1.0.0',
-  category: 'creative',
-  exampleUsage:
-    '{ "agentSlug": "clara", "prompt": "same character, but looking thoughtful with hand on chin, background is a modern office" }',
-  requiresApiKey: false,
-  configurationFields: [],
 };

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: list-agents
@@ -96,16 +95,3 @@ export const agentListTool: ToolParams = {
   },
 };
 
-export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentListTool.name,
-  description: agentListTool.description,
-  parameters: agentListTool.parameters,
-  blueprint: agentListTool.blueprint,
-
-  slug: 'list-agents',
-  version: '1.0.4',
-  category: 'automation',
-  exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
-  requiresApiKey: false,
-  configurationFields: [],
-};

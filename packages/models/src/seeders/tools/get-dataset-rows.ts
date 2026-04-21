@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Dataset Rows
@@ -115,18 +114,3 @@ export const getDatasetRowsTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const getDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: getDatasetRowsTool.name,
-  description: getDatasetRowsTool.description,
-  parameters: getDatasetRowsTool.parameters,
-  blueprint: getDatasetRowsTool.blueprint,
-  slug: getDatasetRowsTool.slug,
-  version: '1.0.0',
-  category: 'data',
-  exampleUsage:
-    '{ "datasetSlug": "leads", "limit": 50, "offset": 0, "expandRefs": true, "search": "acme", "filters": "[{\\"column\\":\\"status\\",\\"op\\":\\"eq\\",\\"value\\":\\"new\\"}]" }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

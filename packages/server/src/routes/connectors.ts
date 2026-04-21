@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { getEnvConfig } from '@starships/env';
 import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
-import { ConnectorTemplateRepository, ToolTemplateRepository } from '@starships/models';
+import { ConnectorTemplateRepository } from '@starships/models';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
@@ -27,18 +27,7 @@ const env = getEnvConfig();
 
 const router: Router = Router();
 
-type ConnectionLike = {
-  query: <T>(sql: string, params?: unknown[]) => Promise<T[]>;
-};
 
-type ConnectorPopularityScore = { conv: number; tokens: number };
-
-// Cache connector popularity scores to avoid running the heavy analytics query on every catalog request.
-// This endpoint is public and can be called frequently (e.g. marketplace browsing).
-const CONNECTOR_CATALOG_POPULARITY_TTL_MS = 5 * 60 * 1000;
-let cachedConnectorCatalogPopularity:
-  | { key: string; expiresAt: number; score: Map<string, ConnectorPopularityScore> }
-  | null = null;
 
 interface OAuthStateContext {
   starshipId?: string;
@@ -122,115 +111,6 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
         return providerMatch || nameMatch || descMatch || categoryMatch;
       });
       results = filtered;
-    }
-
-    // Sort catalog by observed usage in conversations (do NOT use connector_templates.usage_count).
-    // We approximate connector popularity by attributing tool calls to the connector providers
-    // required by the tool template (tool_templates.required_connector_providers).
-    try {
-      const providers = results
-        .map((c) => (c && typeof c.provider === 'string' ? c.provider.trim() : ''))
-        .filter((p) => p.length > 0);
-
-      if (providers.length > 0) {
-        const providerKey = [...providers].sort().join('|');
-        const now = Date.now();
-        const cached =
-          cachedConnectorCatalogPopularity &&
-          cachedConnectorCatalogPopularity.key === providerKey &&
-          cachedConnectorCatalogPopularity.expiresAt > now
-            ? cachedConnectorCatalogPopularity.score
-            : null;
-
-        if (cached) {
-          results = [...results].sort((a, b) => {
-            const ap = String(a.provider || '').trim();
-            const bp = String(b.provider || '').trim();
-            const as = cached.get(ap) ?? { conv: 0, tokens: 0 };
-            const bs = cached.get(bp) ?? { conv: 0, tokens: 0 };
-            if (bs.conv !== as.conv) return bs.conv - as.conv;
-            if (bs.tokens !== as.tokens) return bs.tokens - as.tokens;
-            return ap.localeCompare(bp);
-          });
-        } else {
-        const toolTemplateRepo = new ToolTemplateRepository();
-        const connection = (((toolTemplateRepo as any).getConnection?.() ?? null) as unknown as ConnectionLike | null) ?? null;
-
-        if (connection?.query) {
-          const windowDays = 30;
-          const rows = await connection.query<{ provider: string; conversation_count: number; token_count: string | number | null }>(
-            `
-              WITH tool_calls AS (
-                SELECT
-                  (tc -> 'function' ->> 'name') AS tool_slug,
-                  m.conversation_id AS conversation_id
-                FROM messages m
-                JOIN LATERAL jsonb_array_elements(m.tool_calls) tc ON TRUE
-                WHERE m.role = 'assistant'
-                  AND m.tool_calls IS NOT NULL
-                  AND jsonb_typeof(m.tool_calls) = 'array'
-                  AND m.created_at >= NOW() - ($1::int * INTERVAL '1 day')
-              ),
-              used AS (
-                SELECT DISTINCT
-                  prov AS provider,
-                  tc.conversation_id AS conversation_id
-                FROM tool_calls tc
-                JOIN tool_templates tt ON tt.slug = tc.tool_slug
-                JOIN LATERAL unnest(COALESCE(tt.required_connector_providers, '{}'::text[])) prov ON TRUE
-                WHERE tc.tool_slug IS NOT NULL
-                  AND tc.tool_slug <> ''
-                  AND prov = ANY($2::text[])
-              ),
-              counts AS (
-                SELECT provider, COUNT(DISTINCT conversation_id)::int AS conversation_count
-                FROM used
-                GROUP BY provider
-              ),
-              tokens AS (
-                SELECT u.provider AS provider, COALESCE(SUM(us.total_tokens), 0)::bigint AS token_count
-                FROM used u
-                JOIN usage us ON us.conversation_id = u.conversation_id
-                WHERE us.created_at >= NOW() - ($1::int * INTERVAL '1 day')
-                GROUP BY u.provider
-              )
-              SELECT c.provider, c.conversation_count, t.token_count
-              FROM counts c
-              LEFT JOIN tokens t ON t.provider = c.provider
-            `,
-            [windowDays, providers]
-          );
-
-          const score = new Map<string, ConnectorPopularityScore>();
-          for (const r of rows || []) {
-            const provider = typeof r?.provider === 'string' ? String(r.provider).trim() : '';
-            if (!provider) continue;
-            const conv = typeof r?.conversation_count === 'number' ? r.conversation_count : 0;
-            const tokensRaw = r?.token_count;
-            const tokens = typeof tokensRaw === 'number' ? tokensRaw : typeof tokensRaw === 'string' ? Number(tokensRaw) : 0;
-            score.set(provider, { conv: Number.isFinite(conv) ? conv : 0, tokens: Number.isFinite(tokens) ? tokens : 0 });
-          }
-
-          cachedConnectorCatalogPopularity = {
-            key: providerKey,
-            expiresAt: now + CONNECTOR_CATALOG_POPULARITY_TTL_MS,
-            score,
-          };
-
-          results = [...results].sort((a, b) => {
-            const ap = String(a.provider || '').trim();
-            const bp = String(b.provider || '').trim();
-            const as = score.get(ap) ?? { conv: 0, tokens: 0 };
-            const bs = score.get(bp) ?? { conv: 0, tokens: 0 };
-            if (bs.conv !== as.conv) return bs.conv - as.conv;
-            if (bs.tokens !== as.tokens) return bs.tokens - as.tokens;
-            return ap.localeCompare(bp);
-          });
-        }
-        }
-      }
-    } catch {
-      // Best-effort only: fall back to ConnectorService ordering
     }
 
     const total = results.length;

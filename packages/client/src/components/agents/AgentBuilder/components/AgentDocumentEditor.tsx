@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'motion/react'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -18,15 +17,12 @@ import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
-import type { ToolModel, ApiResponse, AgentModel, AgentTemplateModel, UpdateAgentRequest } from '@starships/protocol'
+import type { ToolModel, ApiResponse, AgentModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { useLlmModels } from '@/hooks/useLlmModels'
-import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
 import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
@@ -112,7 +108,6 @@ export function AgentDocumentEditor({
 
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
-  const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
 
   const formatAgentDisplayName = (name: string | undefined | null, role: string | undefined | null): string => {
     const n = typeof name === 'string' ? name.trim() : ''
@@ -130,9 +125,6 @@ export function AgentDocumentEditor({
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
   const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
-
-  // Dialog state for update confirmation
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false)
 
   // Local loading state for publication request
   const [isRequestingPublish, setIsRequestingPublish] = useState(false)
@@ -160,17 +152,8 @@ export function AgentDocumentEditor({
   // Local input state for adding preview prompts
   const [newPreviewPrompt, setNewPreviewPrompt] = useState('')
 
-  // Marketplace-deployed agents are template-based (they have sourceTemplateId).
-  // For these, we hide certain "builder-only" sections like System Prompt and Advanced options.
-  const isTemplateAgent = useMemo(() => {
-    return !!(providedAgent?.sourceTemplateId || fullAgent?.sourceTemplateId)
-  }, [providedAgent?.sourceTemplateId, fullAgent?.sourceTemplateId])
-
-  const promptsEditable = !(isTemplateAgent || readOnly)
+  const promptsEditable = !readOnly
   const agentIdForPermissions = (providedAgent?.id || providedAgentId || fullAgent?.id || null) as string | null
-
-  // Update mutation for template agents
-  const updateMutation = useUpdateAgentFromTemplate()
 
   const { data: starshipTools = [] } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
@@ -309,46 +292,8 @@ export function AgentDocumentEditor({
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
 
-  // Tools currently assigned to this agent (resolved to full ToolModel objects from starshipTools)
-  const assignedToolsForOverrides: ToolModel[] = useMemo(() => {
-    if (!Array.isArray(starshipTools) || !Array.isArray(selectedToolSlugs)) return []
-    const bySlug = new Map<string, ToolModel>()
-    for (const tool of starshipTools) {
-      if (tool.slug) {
-        bySlug.set(tool.slug, tool)
-      }
-    }
-    const allAssigned = (selectedToolSlugs as string[]).map(slug => bySlug.get(slug)).filter((t): t is ToolModel => !!t)
-
-    // Only show per-tool publish controls for tools that are actually publishable at template level:
-    // - Not draft
-    // - Have complete parameters + blueprint
-    // - Either have no template yet (new tool) or have updateInfo.needsUpdate === true (template has newer version)
-    return allAssigned.filter(tool => {
-      if (tool.status === 'draft') return false
-      // A tool can be valid/publishable even if it has **no parameters**.
-      // In that case, `properties` may be an empty object (or sometimes omitted).
-      const hasParams = !!tool.parameters && tool.parameters.type === 'object'
-      const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
-      if (!hasParams || !hasBlueprint) return false
-
-      const isNewTemplate = !tool.publishedTemplateId
-      const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
-      return isNewTemplate || hasTemplateUpdate
-    })
-  }, [starshipTools, selectedToolSlugs])
-
-  // Publish/template semantics: only non-draft tools with a complete definition (params + blueprint)
-  // are synchronized onto the published AgentTemplate. The "diff vs published template" UI must
-  // compare on the same basis, otherwise tools can appear "changed" forever even after publishing.
-  const isToolPublishableForTemplate = (tool: ToolModel | undefined | null): boolean => {
-    if (!tool) return false
-    if (tool.status === 'draft') return false
-    // Allow no-argument tools (empty or missing `properties`).
-    const hasParams = !!tool.parameters && tool.parameters.type === 'object'
-    const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
-    return hasParams && hasBlueprint
-  }
+  // Publication workflow has been removed; no tool overrides are needed.
+  const assignedToolsForOverrides: ToolModel[] = []
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
@@ -449,7 +394,6 @@ export function AgentDocumentEditor({
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
-            setPublishedTemplate(null)
           }
           return
         }
@@ -477,7 +421,6 @@ export function AgentDocumentEditor({
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
-            setPublishedTemplate(null)
           }
           return
         }
@@ -511,7 +454,6 @@ export function AgentDocumentEditor({
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
-            setPublishedTemplate(null)
           }
         }
       } finally {
@@ -526,42 +468,9 @@ export function AgentDocumentEditor({
     }
   }, [starshipId, value?.slug, providedAgentId, providedAgent, queryClient])
 
-  // Load the published template (if any) for comparison to gate republish in UI.
-  // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.
-  useEffect(() => {
-    let cancelled = false
-    const loadTemplate = async () => {
-      const templateId = fullAgent?.publishedTemplateId
-      if (!templateId) {
-        setPublishedTemplate(null)
-        return
-      }
-      try {
-        const res: FetchResponse<ApiResponse<AgentTemplateModel>> = await api.get(`/api/v1/agent-templates/${templateId}`)
-        const tpl = res.data.data
-        if (!cancelled) {
-          setPublishedTemplate(tpl)
-        }
-      } catch {
-        if (!cancelled) {
-          setPublishedTemplate(null)
-        }
-      }
-    }
-    void loadTemplate()
-    return () => {
-      cancelled = true
-    }
-  }, [fullAgent?.publishedTemplateId])
-
   // Toggle tool assignment with optimistic UI and server persistence when possible
   const handleToggleTool = async (slug: string, isSelected: boolean) => {
     if (readOnly) return
-    // Prevent tool changes for template agents
-    if (isTemplateAgent) {
-      toast.error('Cannot modify tools', { description: 'Template agents are read-only. Use the update button to sync with the latest template version.' })
-      return
-    }
     const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
     onFieldChange?.('assignedToolSlugs', next)
     if (!agentId) return
@@ -572,20 +481,6 @@ export function AgentDocumentEditor({
       onFieldChange?.('assignedToolSlugs', selectedToolSlugs)
       const message = err?.response?.data?.error || err?.message || 'Failed to update tools'
       toast.error('Tool update failed', { description: message })
-    }
-  }
-
-  const handleUpdateFromTemplate = async () => {
-    if (readOnly) return
-    if (!agentId) return
-
-    try {
-      await updateMutation.mutateAsync(agentId)
-      setShowUpdateDialog(false)
-      // Reload the page to refresh all data
-      window.location.reload()
-    } catch (error: any) {
-      // Error toast is handled by the mutation hook
     }
   }
 
@@ -621,14 +516,6 @@ export function AgentDocumentEditor({
     if (readOnly) return
     if (!agentId) return
     if (!fullAgent) return
-
-    // Prevent duplicate requests when already pending; allow republish for already-published templates
-    if (fullAgent.publicationStatus === 'pending_approval') {
-      return
-    }
-    if (fullAgent.publicationStatus === 'published' && !fullAgent.publishedTemplateId) {
-      return
-    }
 
     if (!changelog.trim()) {
       toast.error('Changelog required', { description: 'Please provide a short changelog describing your changes.' })
@@ -760,163 +647,13 @@ export function AgentDocumentEditor({
     void syncAgent()
   }, [agentId, value, onChange, providedAgentId, providedAgent, onFieldChange])
 
-  const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const hasExistingAgent = !!agentId
+  const canRequestPublication = hasExistingAgent && !!fullAgent && !readOnly
 
-  // Determine if this agent differs from its published template (if any)
-  const { differsFromPublishedTemplate, publishedChangeDetails } = useMemo(() => {
-    if (!fullAgent?.publishedTemplateId || !publishedTemplate) {
-      return { differsFromPublishedTemplate: false, publishedChangeDetails: [] as string[] }
-    }
-
-    const normalizePrompts = (prompts?: string[] | null): string[] => (prompts || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean)
-    const normalizeSlugs = (slugs?: string[] | null): string[] =>
-      (slugs || [])
-        .map(s => (typeof s === 'string' ? s.trim() : ''))
-        .filter(Boolean)
-        .sort()
-
-    const normalizeCore = (src: {
-      name?: string | null
-      role?: string | null
-      description?: string | null
-      model?: string | null
-      category?: string | null
-      temperature?: number | null
-      maxTokens?: number | null
-      timeout?: number | null
-      reasoning?: unknown
-      systemPrompt?: string | null
-      blueprint?: unknown
-      previewPrompts?: string[] | null
-    }) => {
-      const blueprint = src.blueprint && typeof src.blueprint === 'object' ? src.blueprint : { nodes: [], edges: [] }
-      // Align with backend defaults: treat missing temperature as DEFAULT_AGENT_TEMPERATURE (0.7)
-      const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
-      return {
-        name: src.name ?? '',
-        role: src.role ?? '',
-        description: src.description ?? '',
-        model: src.model ?? '',
-        category: src.category ?? 'general',
-        temperature: normalizedTemperature,
-        maxTokens: src.maxTokens ?? null,
-        timeout: src.timeout ?? null,
-        reasoning: src.reasoning ?? null,
-        systemPrompt: src.systemPrompt ?? '',
-        blueprint,
-        previewPrompts: normalizePrompts(src.previewPrompts),
-      }
-    }
-
-    const agentCore = normalizeCore(fullAgent)
-    const templateCore = normalizeCore(publishedTemplate)
-
-    const sameName = agentCore.name === templateCore.name
-    const sameRole = agentCore.role === templateCore.role
-    const sameDescription = agentCore.description === templateCore.description
-    const sameModel = agentCore.model === templateCore.model
-    const sameCategory = agentCore.category === templateCore.category
-    const sameTemperature = agentCore.temperature === templateCore.temperature
-    const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
-    const sameTimeout = agentCore.timeout === templateCore.timeout
-    const sameReasoning = JSON.stringify(agentCore.reasoning) === JSON.stringify(templateCore.reasoning)
-    const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
-    const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
-
-    // Avatar comparison:
-    // - Agent avatar is starship-scoped (Attachment) and has createdAt.
-    // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
-    // We treat the avatar as "same" if the agent has no avatar and the template has none,
-    // or if the agent avatar was created at/before the template's avatarUpdatedAt.
-    const templateAvatarUpdatedAt = publishedTemplate.avatarUpdatedAt
-    const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
-    const templateHasAvatar = typeof publishedTemplate.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
-    const toMs = (s?: string) => {
-      if (!s) return NaN
-      const t = new Date(s).getTime()
-      return Number.isFinite(t) ? t : NaN
-    }
-    const agentAvatarMs = toMs(avatarCreatedAt)
-    const templateAvatarMs = toMs(templateAvatarUpdatedAt)
-    const sameAvatar =
-      (!agentHasAvatar && !templateHasAvatar) || (agentHasAvatar && templateHasAvatar && Number.isFinite(agentAvatarMs) && Number.isFinite(templateAvatarMs) && agentAvatarMs <= templateAvatarMs)
-
-    // Tool comparison:
-    // - Template baseline contains tool *template slugs* and only includes tools that are publishable at template level.
-    // - Current form contains tool *instance slugs* and may include draft/incomplete tools.
-    // To avoid perpetual "Tools changed" after publish, compare only the publishable subset of current assignments.
-    const allCurrentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
-    const toolsBySlug = new Map<string, ToolModel>()
-    for (const t of Array.isArray(starshipTools) ? starshipTools : []) {
-      if (t?.slug) toolsBySlug.set(t.slug, t)
-    }
-    const currentTools = normalizeSlugs(
-      allCurrentTools
-        .map(slug => {
-          const tool = toolsBySlug.get(slug)
-          // If we can't resolve, keep raw slug so we don't incorrectly hide a diff.
-          if (!tool) return slug
-          if (!isToolPublishableForTemplate(tool)) return null
-
-          // The published AgentTemplate stores tool *template* slugs.
-          // Prefer the tool's published template slug when available; fallback to the tool slug.
-          // (Fallback handles older API responses and/or tools that haven't been promoted.)
-          return tool.publishedTemplateSlug || tool.slug || slug
-        })
-        .filter((s): s is string => typeof s === 'string' && s.length > 0)
-    )
-    const baselineTools = normalizeSlugs(publishedTemplate.assignedToolSlugs || [])
-    const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
-
-    const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
-    const templateBlueprintStr = JSON.stringify(templateCore.blueprint)
-    const sameBlueprint = agentBlueprintStr === templateBlueprintStr
-
-    const changes: string[] = []
-    if (!sameName) changes.push('Name')
-    if (!sameRole) changes.push('Role')
-    if (!sameDescription) changes.push('Description')
-    if (!sameModel) changes.push('Model')
-    if (!sameCategory) changes.push('Category')
-    if (!sameTemperature) changes.push('Temperature')
-    if (!sameMaxTokens) changes.push('Max tokens')
-    if (!sameTimeout) changes.push('Timeout')
-    if (!sameReasoning) changes.push('Reasoning')
-    if (!sameSystemPrompt) changes.push('System prompt')
-    if (!samePreviewPrompts) changes.push('Preview prompts')
-    if (!sameAvatar) changes.push('Avatar')
-    if (!sameTools) changes.push('Tools')
-    if (!sameBlueprint) changes.push('Blueprint')
-
-    const differs = !(
-      sameName &&
-      sameRole &&
-      sameDescription &&
-      sameModel &&
-      sameCategory &&
-      sameTemperature &&
-      sameMaxTokens &&
-      sameTimeout &&
-      sameReasoning &&
-      sameSystemPrompt &&
-      samePreviewPrompts &&
-      sameAvatar &&
-      sameTools &&
-      sameBlueprint
-    )
-
-    return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, starshipTools, avatarAttachmentId, avatarCreatedAt])
-
-  const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
-  const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
-
-  // Autosave agent changes for existing (non-template) agents
+  // Autosave agent changes for existing agents
   useEffect(() => {
     if (!agentId) return
     if (readOnly) return
-    if (isTemplateAgent) return
     if (!fullAgent) return
 
     // Build update payload from current form value
@@ -1123,124 +860,10 @@ export function AgentDocumentEditor({
       cancelled = true
       clearTimeout(timeout)
     }
-  }, [agentId, value, readOnly, isTemplateAgent, queryClient, fullAgent])
+  }, [agentId, value, readOnly, queryClient, fullAgent])
 
   return (
     <div className={embedded ? 'pt-2 pb-6' : 'pt-4 pb-20'}>
-      {/* Template Agent Update Banner */}
-      {!embedded && isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
-          className="relative overflow-hidden rounded-xl p-4"
-          style={{
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(124, 58, 237, 0.05))',
-            borderColor: 'rgba(139, 92, 246, 0.2)',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-          }}
-        >
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent)',
-            }}
-            animate={{
-              x: ['-100%', '200%'],
-            }}
-            transition={{
-              duration: 2.5,
-              repeat: Infinity,
-              ease: 'linear',
-            }}
-          />
-          <div className="relative flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div
-                className="relative z-10 flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
-                style={{
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  border: '1px solid rgba(139, 92, 246, 0.2)',
-                }}
-              >
-                <Icon name="download" className="h-4 w-4" style={{ color: 'rgb(139, 92, 246)' }} />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">New update available</span>
-                <Badge
-                  variant="outline"
-                  className="text-xs font-mono flex items-center gap-1"
-                  style={{
-                    borderColor: 'rgba(139, 92, 246, 0.3)',
-                    background: 'rgba(139, 92, 246, 0.05)',
-                    color: 'rgb(139, 92, 246)',
-                  }}
-                >
-                  <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />v{fullAgent?.updateInfo?.latestVersion}
-                </Badge>
-              </div>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setShowUpdateDialog(true)}
-              style={{
-                background: 'rgba(139, 92, 246, 0.1)',
-                borderColor: 'rgba(139, 92, 246, 0.3)',
-                color: 'rgb(139, 92, 246)',
-              }}
-              className="hover:opacity-80 transition-opacity"
-            >
-              Update Now
-            </Button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Update Confirmation Dialog */}
-      <Dialog open={!embedded && showUpdateDialog && !readOnly} onOpenChange={setShowUpdateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Agent</DialogTitle>
-            <DialogDescription>A new version of this agent template is available.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-1">Current Version:</p>
-                <p className="font-mono font-semibold text-base">v{fullAgent?.version}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground mb-1">Latest Version:</p>
-                <p className="font-mono font-semibold text-base text-purple-600">v{fullAgent?.updateInfo?.latestVersion}</p>
-              </div>
-            </div>
-
-            <div className="text-sm bg-muted/50 p-4 rounded-lg border">
-              <p className="text-muted-foreground">This will update your agent with the latest template configuration, including instructions, model settings, and tool assignments.</p>
-            </div>
-
-            {fullAgent?.updateInfo?.templateUpdatedAt && (
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <Icon name="clock" className="w-3.5 h-3.5" />
-                Template last updated: {new Date(fullAgent.updateInfo.templateUpdatedAt).toLocaleString()}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpdateDialog(false)} disabled={updateMutation.isPending}>
-              Later
-            </Button>
-            <Button onClick={handleUpdateFromTemplate} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Updating...' : 'Update Now'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
       {!embedded ? (
         <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
@@ -1273,26 +896,8 @@ export function AgentDocumentEditor({
                   <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
                 </div>
 
-                {/* Status, Version & Last updated */}
+                {/* Version & Last updated */}
                 <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                  <span
-                    className={cn(
-                      'inline-flex items-center gap-1 font-medium',
-                      publicationStatus === 'published'
-                        ? 'text-emerald-500'
-                        : publicationStatus === 'pending_approval'
-                          ? 'text-amber-500'
-                          : publicationStatus === 'rejected'
-                            ? 'text-red-500'
-                            : 'text-muted-foreground'
-                    )}
-                  >
-                    <Icon
-                      name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
-                      className="w-3 h-3"
-                    />
-                    <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
-                  </span>
                   {fullAgent?.version && (
                     <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
                       <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
@@ -1305,12 +910,6 @@ export function AgentDocumentEditor({
                     </div>
                   )}
                 </div>
-
-                {publicationStatus === 'rejected' && (
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>Last request was rejected. Update your agent and request publication again.</span>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1330,49 +929,7 @@ export function AgentDocumentEditor({
 
                       // Provide a sensible default changelog if none is set yet
                       if (!changelog.trim()) {
-                        if (!fullAgent?.publishedTemplateId) {
-                          // First-time publish
-                          setChangelog('Initial publication of this agent to Explore.')
-                        } else if (publishedChangeDetails.length > 0) {
-                          // Re-publish with detected changes – summarize the changed fields
-                          const summary = publishedChangeDetails.join(', ').toLowerCase()
-                          setChangelog(`Updated ${summary}.`)
-                        } else {
-                          // Fallback when we can't detect specific fields
-                          setChangelog('Minor updates and fixes.')
-                        }
-                      }
-
-                      // Provide sensible default changelogs for tools as well, if not already set
-                      if (assignedToolsForOverrides.length > 0) {
-                        setToolOverrides(prev => {
-                          const next = { ...prev }
-                          for (const tool of assignedToolsForOverrides) {
-                            const existing = next[tool.id] || {
-                              versionBump: 'patch' as const,
-                              changelog: '',
-                            }
-                            if (existing.changelog && existing.changelog.trim()) continue
-
-                            const isNewTemplate = !tool.publishedTemplateId
-                            const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
-
-                            let defaultLog: string
-                            if (isNewTemplate) {
-                              defaultLog = 'Initial publication of this tool for this agent.'
-                            } else if (hasTemplateUpdate) {
-                              defaultLog = 'Synced latest tool definition changes for this agent.'
-                            } else {
-                              defaultLog = 'Minor updates and fixes for this tool.'
-                            }
-
-                            next[tool.id] = {
-                              versionBump: existing.versionBump || 'patch',
-                              changelog: defaultLog,
-                            }
-                          }
-                          return next
-                        })
+                        setChangelog('Initial publication of this agent to Explore.')
                       }
 
                       // Always start the stepped flow at the agent card
@@ -1381,30 +938,11 @@ export function AgentDocumentEditor({
                     }}
                   >
                     <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                    {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
+                    {isRequestingPublish ? 'Publishing…' : 'Publish'}
                   </Button>
                 )}
               </div>
 
-              {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
-                      {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
-                    </button>
-                  </TooltipTrigger>
-                  {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
-                    <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
-                      <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
-                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                        {publishedChangeDetails.map(change => (
-                          <li key={change}>{change}</li>
-                        ))}
-                      </ul>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              )}
             </div>
           )}
         </div>
@@ -1418,8 +956,6 @@ export function AgentDocumentEditor({
           onOpenChange={setShowPublishDialog}
           fullAgent={fullAgent}
           value={value}
-          differsFromPublishedTemplate={differsFromPublishedTemplate}
-          publishedChangeDetails={publishedChangeDetails}
           assignedToolsForOverrides={assignedToolsForOverrides}
           versionBump={versionBump}
           setVersionBump={setVersionBump}
@@ -1461,7 +997,7 @@ export function AgentDocumentEditor({
                   value={value.name}
                   onChange={e => onFieldChange?.('name', e.target.value)}
                   placeholder="Agent name"
-                  disabled={isTemplateAgent || readOnly}
+                  disabled={readOnly}
                   className={cn('text-sm h-9', selectLikeFieldClass)}
                 />
               </div>
@@ -1480,7 +1016,7 @@ export function AgentDocumentEditor({
                   value={value.role}
                   onChange={e => onFieldChange?.('role', e.target.value)}
                   placeholder='e.g. "Customer Support Agent"'
-                  disabled={isTemplateAgent || readOnly}
+                  disabled={readOnly}
                   className={cn('text-sm h-9', selectLikeFieldClass)}
                 />
               </div>
@@ -1498,7 +1034,7 @@ export function AgentDocumentEditor({
                 <StandardSelect
                   mode="single"
                   aria-label="Change category"
-                  disabled={isTemplateAgent || readOnly}
+                  disabled={readOnly}
                   value={value.category}
                   options={AGENT_CATEGORIES.map(cat => ({
                     value: cat,
@@ -1511,7 +1047,7 @@ export function AgentDocumentEditor({
                     keywords: cat,
                   }))}
                   placeholder="Select a category"
-                  triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
+                  triggerClassName={cn('w-full', readOnly && 'cursor-not-allowed')}
                   onChange={cat => {
                     onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
                   }}
@@ -1531,7 +1067,7 @@ export function AgentDocumentEditor({
                 <StandardSelect
                   mode="single"
                   aria-label="Select model"
-                  disabled={isLoadingModels || isTemplateAgent || readOnly}
+                  disabled={isLoadingModels || readOnly}
                   value={value.model}
                   options={availableModels.map(m => ({
                     value: m,
@@ -1563,7 +1099,7 @@ export function AgentDocumentEditor({
                 <StandardSelect
                   mode="multiple"
                   aria-label="Select tools"
-                  disabled={isTemplateAgent || readOnly}
+                  disabled={readOnly}
                   value={selectedToolSlugs}
                   options={allToolOptions.map(slug => ({
                     value: slug,
@@ -1578,10 +1114,10 @@ export function AgentDocumentEditor({
                   placeholder="Select tools"
                   searchPlaceholder="Search tools..."
                   emptyLabel="No tools found."
-                  triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                  triggerClassName={cn('w-full', readOnly && 'opacity-60 cursor-not-allowed')}
                   renderTriggerLabel={({ selectedOptions }) => {
                     if (!selectedOptions.length) {
-                      return <span className="text-xs text-muted-foreground">{isTemplateAgent || readOnly ? 'No tools assigned' : 'Select tools'}</span>
+                      return <span className="text-xs text-muted-foreground">{readOnly ? 'No tools assigned' : 'Select tools'}</span>
                     }
                     const values = selectedOptions.map(opt => String(opt.value))
                     let label: string
@@ -1593,7 +1129,7 @@ export function AgentDocumentEditor({
                     return <span className="text-xs font-mono truncate max-w-full">{label}</span>
                   }}
                   onOptionToggle={(slug, wasSelected) => {
-                    if (isTemplateAgent || readOnly) return
+                    if (readOnly) return
                     void handleToggleTool(slug, wasSelected)
                   }}
                 />
@@ -1608,13 +1144,13 @@ export function AgentDocumentEditor({
                 <Icon name="file-text" className="w-4 h-4" />
                 <span className="text-xs font-semibold">Description</span>
               </div>
-              <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <div className={cn('flex-1', readOnly && 'opacity-60 pointer-events-none cursor-not-allowed')}>
                 <Textarea
                   value={value.description}
                   onChange={e => onFieldChange?.('description', e.target.value)}
                   placeholder="Write a clear description."
                   className={cn('text-sm min-h-[80px] resize-none', selectLikeFieldClass)}
-                  disabled={isTemplateAgent || readOnly}
+                  disabled={readOnly}
                 />
               </div>
             </div>
@@ -1807,21 +1343,18 @@ export function AgentDocumentEditor({
                 </Button>
               </div>
             ) : null}
-            {!isTemplateAgent && (
-              <div className="text-[11px] text-muted-foreground flex items-center justify-end">
-                <span>
-                  {(value.previewPrompts || []).length}
-                  /10
-                </span>
-              </div>
-            )}
+            <div className="text-[11px] text-muted-foreground flex items-center justify-end">
+              <span>
+                {(value.previewPrompts || []).length}
+                /10
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Advanced options (includes Blueprint) — private/custom agents only */}
-      {!isTemplateAgent ? (
-        <Card className="rounded-2xl border-border/50 shadow-sm mt-6 overflow-hidden">
+      {/* Advanced options (includes Blueprint) */}
+      <Card className="rounded-2xl border-border/50 shadow-sm mt-6 overflow-hidden">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full">
               <div className="flex items-center gap-2 px-6 py-4 text-muted-foreground hover:text-foreground transition-colors">
@@ -1998,7 +1531,6 @@ export function AgentDocumentEditor({
             </CollapsibleContent>
           </Collapsible>
         </Card>
-      ) : null}
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
     </div>

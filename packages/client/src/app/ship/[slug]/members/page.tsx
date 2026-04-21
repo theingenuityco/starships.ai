@@ -19,7 +19,7 @@ import type { StarshipInviteListItem, StarshipMemberListItem, StarshipMembersAnd
 import { STARSHIP_MEMBERS_QUERY_KEYS, useInfiniteStarshipMembers, useRemoveStarshipMember, useRevokeStarshipInvite } from '@/hooks/useStarshipMembers'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
 import { AGENT_QUERY_KEYS, useInfiniteStarshipAgents } from '@/hooks/useAgents'
-import { useDeleteAgent, useDeleteAgentWithUnusedTools, useUnpublishAgent } from '@/hooks/useAgents'
+import { useDeleteAgent, useDeleteAgentWithUnusedTools } from '@/hooks/useAgents'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuth } from '@/hooks/useAuth'
@@ -91,16 +91,6 @@ function getAgentLabel(a: AgentWithAvatar): { primary: string; secondary?: strin
   return { primary }
 }
 
-function getAgentMarketplaceStatus(a: AgentWithAvatar): { label: string; className: string } {
-  const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
-  if (fromMarketplace) return { label: 'Deployed from Explore', className: 'text-muted-foreground' }
-
-  const status = a.publicationStatus
-  if (status === 'published') return { label: 'Published to Explore', className: 'text-muted-foreground' }
-  if (status === 'pending_approval') return { label: 'Publish pending', className: 'text-muted-foreground' }
-  if (status === 'rejected') return { label: 'Publish rejected', className: 'text-destructive' }
-  return { label: 'Private', className: 'text-muted-foreground' }
-}
 
 function getCategoryMeta(category?: string): { label: string; className: string } | null {
   const raw = typeof category === 'string' ? category.trim().toLowerCase() : ''
@@ -366,14 +356,11 @@ export default function MembersPage() {
   const createInvite = useCreateStarshipInvite(starshipIdStr ?? '')
   const deleteAgent = useDeleteAgent()
   const deleteAgentWithUnusedTools = useDeleteAgentWithUnusedTools()
-  const unpublishAgent = useUnpublishAgent()
 
   const [confirmAction, setConfirmAction] = useState<
     | { kind: 'kickHuman'; userId: string; label: string }
-    | { kind: 'kickAgent'; agentId: string; label: string }
     | { kind: 'revokeInvite'; email: string; label: string }
     | { kind: 'deleteAgent'; agentId: string; label: string }
-    | { kind: 'unpublishAgent'; agentId: string; label: string }
     | null
   >(null)
 
@@ -566,7 +553,6 @@ export default function MembersPage() {
 
   const renderAgentRow = (a: AgentWithAvatar) => {
     const label = getAgentLabel(a)
-    const status = getAgentMarketplaceStatus(a)
     const categoryMeta = getCategoryMeta(a.category)
     const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
     const key = a.id || agentSlug || label.primary
@@ -592,11 +578,7 @@ export default function MembersPage() {
     const detailsHref = slug && agentSlug ? `/ship/${encodeURIComponent(slug)}/agent/${encodeURIComponent(agentSlug)}` : null
     const agentId = typeof a.id === 'string' ? a.id.trim() : ''
     const chatHref = slug && agentId ? `/ship/${encodeURIComponent(slug)}/rooms/lobby?agentId=${encodeURIComponent(agentId)}` : slug ? `/ship/${encodeURIComponent(slug)}/rooms/lobby` : null
-    const fromMarketplace = typeof a.sourceTemplateId === 'string' && a.sourceTemplateId.trim().length > 0
-    const isPublished = a.publicationStatus === 'published'
-    const canKickAgent = Boolean(fromMarketplace && a.id)
-    const canUnpublish = Boolean(!fromMarketplace && isPublished && a.id)
-    const canDelete = Boolean(!fromMarketplace && !isPublished && a.id)
+    const canDelete = Boolean(a.id)
     const canExportBundle = Boolean(isInstanceAdmin === true && a.id)
     const isExporting = Boolean(exportingAgentId && a.id && exportingAgentId === a.id)
     return (
@@ -627,16 +609,12 @@ export default function MembersPage() {
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="truncate text-emerald-600 dark:text-emerald-400">Online</span>
-                <span aria-hidden="true">·</span>
+                {categoryMeta ? <span aria-hidden="true">·</span> : null}
                 {categoryMeta ? (
                   <span className={cn('inline-flex items-center gap-1', categoryMeta.className)} aria-label={`Category: ${categoryMeta.label}`} title={`Category: ${categoryMeta.label}`}>
                     <span>{categoryMeta.label}</span>
                   </span>
                 ) : null}
-                {categoryMeta ? <span aria-hidden="true">·</span> : null}
-                <span className={cn('inline-flex items-center gap-1', status.className)} aria-label={status.label} title={status.label}>
-                  <span>{status.label}</span>
-                </span>
               </div>
             </div>
           </div>
@@ -705,23 +683,7 @@ export default function MembersPage() {
                 </DropdownMenuItem>
               ) : null}
 
-              {canKickAgent ? (
-                <DropdownMenuItem
-                  onClick={() => setConfirmAction({ kind: 'kickAgent', agentId: a.id, label: label.primary })}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
-                >
-                  <Icon name="x-circle" className="h-4 w-4" />
-                  Kick
-                </DropdownMenuItem>
-              ) : canUnpublish ? (
-                <DropdownMenuItem
-                  onClick={() => setConfirmAction({ kind: 'unpublishAgent', agentId: a.id, label: label.primary })}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
-                >
-                  <Icon name="globe" className="h-4 w-4" />
-                  Unpublish
-                </DropdownMenuItem>
-              ) : canDelete ? (
+              {canDelete ? (
                 <DropdownMenuItem
                   onClick={() => setConfirmAction({ kind: 'deleteAgent', agentId: a.id, label: label.primary })}
                   className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
@@ -1142,28 +1104,20 @@ export default function MembersPage() {
             <DialogTitle className="text-destructive">
               {confirmAction?.kind === 'kickHuman'
                 ? 'Kick member'
-                : confirmAction?.kind === 'kickAgent'
-                  ? 'Kick agent'
-                  : confirmAction?.kind === 'revokeInvite'
-                    ? 'Revoke invitation'
-                    : confirmAction?.kind === 'deleteAgent'
-                      ? 'Delete agent'
-                      : confirmAction?.kind === 'unpublishAgent'
-                        ? 'Unpublish agent'
-                        : 'Confirm'}
+                : confirmAction?.kind === 'revokeInvite'
+                  ? 'Revoke invitation'
+                  : confirmAction?.kind === 'deleteAgent'
+                    ? 'Delete agent'
+                    : 'Confirm'}
             </DialogTitle>
             <DialogDescription>
               {confirmAction?.kind === 'kickHuman'
-                ? 'This will remove this member’s access to the starship immediately.'
-                : confirmAction?.kind === 'kickAgent'
-                  ? 'This will remove the agent from this starship.'
-                  : confirmAction?.kind === 'revokeInvite'
-                    ? 'This will revoke the invite so it can no longer be used.'
-                    : confirmAction?.kind === 'deleteAgent'
-                      ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
-                      : confirmAction?.kind === 'unpublishAgent'
-                        ? 'This will remove the agent from Explore (it will stay deployed in your starship).'
-                        : ''}
+                ? "This will remove this member's access to the starship immediately."
+                : confirmAction?.kind === 'revokeInvite'
+                  ? 'This will revoke the invite so it can no longer be used.'
+                  : confirmAction?.kind === 'deleteAgent'
+                    ? 'This will permanently delete the agent. You can optionally also delete any tools that become unassigned.'
+                    : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -1172,17 +1126,13 @@ export default function MembersPage() {
               <div className="flex items-start gap-2">
                 <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
                 <div className="min-w-0">
-                  <p className="font-medium text-destructive">You’re about to:</p>
+                  <p className="font-medium text-destructive">You&apos;re about to:</p>
                   <p className="text-destructive/80 break-words">
                     {confirmAction.kind === 'kickHuman'
                       ? `Kick ${confirmAction.label}`
-                      : confirmAction.kind === 'kickAgent'
-                        ? `Kick ${confirmAction.label}`
-                        : confirmAction.kind === 'revokeInvite'
-                          ? `Revoke invitation for ${confirmAction.label}`
-                          : confirmAction.kind === 'deleteAgent'
-                            ? `Delete ${confirmAction.label}`
-                            : `Unpublish ${confirmAction.label}`}
+                      : confirmAction.kind === 'revokeInvite'
+                        ? `Revoke invitation for ${confirmAction.label}`
+                        : `Delete ${confirmAction.label}`}
                   </p>
                 </div>
               </div>
@@ -1195,7 +1145,7 @@ export default function MembersPage() {
                 type="button"
                 variant="ghost"
                 onClick={() => setConfirmAction(null)}
-                disabled={removeMember.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+                disabled={removeMember.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending}
               >
                 Cancel
               </Button>
@@ -1240,26 +1190,22 @@ export default function MembersPage() {
                 type="button"
                 variant="ghost"
                 onClick={() => setConfirmAction(null)}
-                disabled={removeMember.isPending || revokeInvite.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+                disabled={removeMember.isPending || revokeInvite.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending}
               >
                 Cancel
               </Button>
               <Button
                 type="button"
                 variant="destructive"
-                disabled={removeMember.isPending || revokeInvite.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending || unpublishAgent.isPending}
+                disabled={removeMember.isPending || revokeInvite.isPending || deleteAgent.isPending || deleteAgentWithUnusedTools.isPending}
                 onClick={async () => {
                   const action = confirmAction
                   if (!action) return
                   try {
                     if (action.kind === 'kickHuman') {
                       await removeMember.mutateAsync(action.userId)
-                    } else if (action.kind === 'kickAgent') {
-                      await deleteAgent.mutateAsync(action.agentId)
                     } else if (action.kind === 'revokeInvite') {
                       await revokeInvite.mutateAsync(action.email)
-                    } else if (action.kind === 'unpublishAgent') {
-                      await unpublishAgent.mutateAsync(action.agentId)
                     }
                   } finally {
                     setConfirmAction(null)
@@ -1270,17 +1216,11 @@ export default function MembersPage() {
                   ? removeMember.isPending
                     ? 'Kicking…'
                     : 'Kick'
-                  : confirmAction?.kind === 'kickAgent'
-                    ? deleteAgent.isPending
-                      ? 'Kicking…'
-                      : 'Kick'
-                    : confirmAction?.kind === 'revokeInvite'
-                      ? revokeInvite.isPending
-                        ? 'Revoking…'
-                        : 'Revoke'
-                      : unpublishAgent.isPending
-                        ? 'Unpublishing…'
-                        : 'Unpublish'}
+                  : confirmAction?.kind === 'revokeInvite'
+                    ? revokeInvite.isPending
+                      ? 'Revoking…'
+                      : 'Revoke'
+                    : 'Confirm'}
               </Button>
             </DialogFooter>
           )}

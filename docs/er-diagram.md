@@ -164,35 +164,8 @@ erDiagram
     }
 
     %% ------------------------------------------------------------------------
-    %% Agents / Tools (templates + instances)
+    %% Agents / Tools
     %% ------------------------------------------------------------------------
-    agent_templates {
-        string id PK
-        string slug UK
-        string name
-        text description
-        string category
-        boolean is_public
-        int usage_count
-        string[] tags
-        text system_prompt
-        string model
-        float temperature
-        int max_tokens
-        int timeout
-        jsonb state
-        jsonb blueprint
-        string icon
-        string[] preview_prompts
-        string version
-        string avatar_s3_key
-        string avatar_mime_type
-        timestamp avatar_updated_at
-        jsonb reasoning
-        timestamp created_at
-        timestamp updated_at
-    }
-
     agents {
         string id PK
         string slug
@@ -209,42 +182,10 @@ erDiagram
         jsonb blueprint
         jsonb reasoning
         string starship_id FK
-        string source_template_id FK
-        string published_template_id FK
         string version
-        timestamp template_snapshot_at
-        string publication_status "draft|pending_approval|published|rejected"
-        string publication_requested_by FK
-        string publication_approved_by FK
-        timestamp publication_approved_at
-        string publication_version_bump "patch|minor|major"
-        string publication_requested_version
-        text publication_changelog
         string avatar_attachment_id FK
         text avatar_prompt
         timestamp deployed_at
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    tool_templates {
-        string id PK
-        string slug UK
-        string name
-        text description
-        jsonb parameters
-        jsonb blueprint
-        jsonb transforms
-        jsonb mutations
-        text condition
-        string category
-        boolean is_public
-        int usage_count
-        string[] tags
-        text example_usage
-        boolean requires_api_key
-        jsonb configuration_fields
-        string version
         timestamp created_at
         timestamp updated_at
     }
@@ -263,17 +204,7 @@ erDiagram
         boolean is_enabled
         string status "draft|active"
         string starship_id FK
-        string source_template_id FK
-        string published_template_id FK
         string version
-        timestamp template_snapshot_at
-        string publication_status "draft|pending_approval|published|rejected"
-        string publication_requested_by FK
-        string publication_approved_by FK
-        timestamp publication_approved_at
-        string publication_version_bump "patch|minor|major"
-        string publication_requested_version
-        text publication_changelog
         timestamp deployed_at
         timestamp created_at
         timestamp updated_at
@@ -283,12 +214,6 @@ erDiagram
         string agent_id PK FK
         string tool_id PK FK
         string permission "allow|ask|deny"
-        timestamp created_at
-    }
-
-    agent_template_tool_templates {
-        string agent_template_id PK FK
-        string tool_template_id PK FK
         timestamp created_at
     }
 
@@ -519,10 +444,6 @@ erDiagram
 
     conversations ||--o{ conversations : "parent_of"
 
-    agent_templates ||--o{ agents : "source_for"
-    agent_templates ||--o{ agents : "published_template"
-    tool_templates ||--o{ tools : "source_for"
-    tool_templates ||--o{ tools : "published_template"
     agents ||--o{ agent_tools : "uses"
     tools ||--o{ agent_tools : "used_by"
     conversations ||--o{ messages : "contains"
@@ -646,7 +567,7 @@ graph TD
 - **Tool Configuration**: Tools support flexible configuration via JSONB blueprint field
 - **Usage Tracking**: Comprehensive token usage tracking for analytics
 - **Full-text Search**: GIN indexes on concatenated text fields for efficient search across all major entities
-- **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_participants`
+- **Junction Tables**: Proper many-to-many relationships via `agent_tools` and `conversation_participants`
 
 ### Migration Changes (v2.1.0)
 

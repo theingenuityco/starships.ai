@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Views
@@ -91,17 +90,3 @@ export const searchViewsTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const searchViewsToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: searchViewsTool.name,
-  description: searchViewsTool.description,
-  parameters: searchViewsTool.parameters,
-  blueprint: searchViewsTool.blueprint,
-  slug: searchViewsTool.slug,
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "name": "Dashboard", "limit": 10 }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

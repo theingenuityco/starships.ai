@@ -200,15 +200,6 @@ export function buildPublicS3ObjectUrl(s3Key: string): string | undefined {
   return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
 }
 
-/**
- * Generate a destination key for a public agent template avatar.
- * Keys include a timestamp so updates naturally bust caches.
- */
-export function buildAgentTemplatePublicAvatarS3Key(options: { templateId: string; filename: string }): string {
-  const timestamp = Date.now();
-  const sanitizedFilename = sanitizeFilename(options.filename || 'avatar.png');
-  return `public/agent-templates/${options.templateId}/avatar_${timestamp}_${sanitizedFilename}`;
-}
 
 /**
  * Copy an object within the configured S3 bucket.
@@ -235,65 +226,6 @@ export async function copyObjectInS3(options: { sourceKey: string; destKey: stri
   await getS3Client().send(command);
 }
 
-/**
- * Upload a public avatar image for an agent template.
- * These are served via API routes and stored in S3 under a stable prefix.
- */
-export async function uploadAgentTemplateAvatarToS3(options: {
-  templateId: string;
-  filename: string;
-  mimeType: string;
-  buffer: Buffer;
-}): Promise<string> {
-  const bucket = env.AWS_S3_BUCKET;
-  if (!bucket) {
-    throw new Error('AWS_S3_BUCKET not configured');
-  }
-
-  const s3Key = buildAgentTemplatePublicAvatarS3Key({ templateId: options.templateId, filename: options.filename });
-
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: s3Key,
-    Body: options.buffer,
-    ContentType: options.mimeType,
-  });
-
-  await getS3Client().send(command);
-  return s3Key;
-}
-
-/**
- * Upload a public profile image for an agent template.
- * These are served via API routes and stored in S3 under a stable prefix.
- */
-export async function uploadAgentTemplateProfileImageToS3(options: {
-  templateId: string;
-  type: 'problem_statements' | 'capabilities' | 'try_these_prompts';
-  filename: string;
-  mimeType: string;
-  buffer: Buffer;
-}): Promise<string> {
-  const bucket = env.AWS_S3_BUCKET;
-  if (!bucket) {
-    throw new Error('AWS_S3_BUCKET not configured');
-  }
-
-  const timestamp = Date.now();
-  const sanitizedFilename = options.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const typeSlug = String(options.type).replace(/[^a-z0-9_-]/gi, '_');
-  const s3Key = `public/agent-templates/${options.templateId}/profile_${typeSlug}_${timestamp}_${sanitizedFilename}`;
-
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: s3Key,
-    Body: options.buffer,
-    ContentType: options.mimeType,
-  });
-
-  await getS3Client().send(command);
-  return s3Key;
-}
 
 /**
  * Delete file from S3

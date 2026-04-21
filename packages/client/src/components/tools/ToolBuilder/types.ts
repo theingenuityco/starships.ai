@@ -15,7 +15,6 @@ export interface ToolBuilderViewProps {
   onCancel?: () => void
   starshipId?: string
   toolId?: string
-  templateId?: string | null
 }
 
 export interface ToolBuilderViewRef {

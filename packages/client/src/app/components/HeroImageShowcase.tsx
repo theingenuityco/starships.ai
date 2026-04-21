@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { landingFrameInset, landingHeroShowcaseOverlapLift, panelLightLift } from '@/app/components/landing/landingSurface'
+import { landingFrameInsetDark, landingHeroShowcaseOverlapLift, panelLightLift } from '@/app/components/landing/landingSurface'
 
 const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead-generation.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
@@ -54,7 +54,7 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
   }
 
   return (
-    <section className="relative z-[11] flow-root pb-16 sm:pb-20 px-4 bg-white text-slate-900">
+    <section className="relative z-[11] flow-root pb-16 sm:pb-20 px-4">
       {/* White band stays flush under hero; only the framed mockup lifts (wrapper transform, not section margin). */}
       <div className="relative z-[12] mx-auto max-w-6xl">
         <div className="relative" style={overlapHero ? overlapHeroFrameStyle : undefined}>
@@ -62,7 +62,7 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
             <div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div
-                  className={`relative overflow-hidden ${landingFrameInset}`}
+                  className={`relative overflow-hidden ${landingFrameInsetDark}`}
                   style={{
                     width: '95%',
                     height: '95%',

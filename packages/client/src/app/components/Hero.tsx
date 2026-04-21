@@ -70,17 +70,6 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
         minHeight: 'calc(100dvh - 150px - clamp(5rem, 10vh, 6.75rem))',
       }}
     >
-      {/* Planet horizon — same treatment as lead-generation use case hero */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[42vh] sm:h-[50vh]"
-        aria-hidden
-        style={{
-          backgroundImage: "url('/landing/planet-base.svg')",
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center bottom',
-          backgroundSize: 'cover',
-        }}
-      />
       <div className="w-full max-w-6xl mx-auto flex flex-col gap-6 sm:gap-8 items-center text-center relative z-10">
         <div className="w-full min-w-0 flex flex-col items-center">
           {/* Fluid type scale; nowrap keeps the H1 on one line. */}

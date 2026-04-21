@@ -28,12 +28,6 @@ export default function Security() {
         </h2>
         <p className="text-sm md:text-base text-white/60 text-center max-w-2xl mx-auto mb-5 md:mb-6">Built so you can safely give AI real work, without losing control of your data or process.</p>
 
-        <div className="mb-0">
-          <div className="mx-auto" style={{ width: '220px', maxWidth: '100%' }}>
-            <video src="/landing/security/security.mov" autoPlay loop muted playsInline style={{ width: '220px', height: 'auto', display: 'block' }} />
-          </div>
-        </div>
-
         <div>
           <ul className="grid gap-5 sm:gap-6 md:gap-8 md:grid-cols-3">
             {items.map((i, idx) => (

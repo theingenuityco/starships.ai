@@ -64,7 +64,7 @@ export function UseCaseSections(props: { useCase: UseCaseModel }) {
                     className="animate-workflow-step relative pb-4 last:pb-0"
                     style={{ animationDelay: `${idx * 0.12}s` }}
                   >
-                    <div className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-md border-2 border-emerald-600 bg-white">
+                    <div className="absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-md border border-emerald-500 bg-white">
                       <span className="text-xs font-bold tabular-nums text-emerald-700">{idx + 1}</span>
                     </div>
                     <div className="ml-10 flex gap-3 rounded-lg border border-slate-200 border-l-4 border-l-emerald-500 bg-white px-4 py-3.5 shadow-sm">

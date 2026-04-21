@@ -201,7 +201,7 @@ export function PublicFooter(props: {
               href="https://theingenuity.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-none px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
+              className="rounded-md px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
               onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://theingenuity.co' })}
             >
               The Ingenuity Co

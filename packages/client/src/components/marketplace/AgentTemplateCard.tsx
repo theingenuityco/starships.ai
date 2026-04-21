@@ -51,7 +51,7 @@ interface AgentTemplateCardProps {
    * Defaults to true.
    */
   showDeployCta?: boolean
-  /** Merged onto the outer card shell (e.g. `rounded-none` on public landing). */
+  /** Merged onto the outer card shell. */
   cardClassName?: string
 }
 

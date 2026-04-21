@@ -33,17 +33,7 @@ export function LeadGenerationHero(props: { useCase: UseCaseModel }) {
   return (
     <section className="relative min-h-[100vh] flex flex-col justify-center overflow-hidden text-white" style={{ backgroundColor: '#050b24' }}>
       <StarryBackground position="absolute" className="opacity-70" style={{ '--star-color': 'rgba(255,255,255,0.9)' } as any} />
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[42vh] sm:h-[50vh]"
-        aria-hidden
-        style={{
-          backgroundImage: "url('/landing/planet-base.svg')",
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center bottom',
-          backgroundSize: 'cover',
-        }}
-      />
-      <div className="relative z-10 max-w-5xl mx-auto w-full text-center px-4">
+<div className="relative z-10 max-w-5xl mx-auto w-full text-center px-4">
         <h1 className="inline-block font-semibold tracking-tight leading-tight text-3xl sm:text-5xl md:text-7xl text-balance whitespace-normal sm:whitespace-nowrap">
           Lead generation made <span className="text-primary">simple</span>.
         </h1>

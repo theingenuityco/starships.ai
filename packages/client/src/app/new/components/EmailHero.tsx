@@ -18,19 +18,8 @@ export default function EmailHero() {
       className="relative flex items-center justify-center px-4 sm:px-6 pt-24 sm:pt-28 md:pt-32 pb-16 sm:pb-20 overflow-hidden"
       style={{ minHeight: 'calc(100dvh - 80px)' }}
     >
-      {/* Planet horizon */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[42vh] sm:h-[50vh]"
-        aria-hidden
-        style={{
-          backgroundImage: "url('/landing/planet-base.svg')",
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center bottom',
-          backgroundSize: 'cover',
-        }}
-      />
 
-      {/* Asset placeholder: Warp speed star-trail effect radiating from center with email envelope icons
+{/* Asset placeholder: Warp speed star-trail effect radiating from center with email envelope icons
           streaking outward — represents emails being sent at light speed */}
       <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
         {/* Warp trail lines radiating from center */}

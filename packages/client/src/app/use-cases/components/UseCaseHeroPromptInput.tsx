@@ -115,7 +115,7 @@ export function UseCaseHeroPromptInput(props: {
         }}
       >
         <div className="relative">
-          <div className="relative rounded-none border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_20px_rgba(15,23,42,0.08)] transition-colors focus-within:border-amber-400/80">
+          <div className="relative rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors focus-within:border-amber-400/80">
             <div className="relative text-left">
               {showTypewriter && (
                 <div className="pointer-events-none absolute inset-0 p-0 pr-14 text-left text-base sm:text-lg leading-relaxed text-muted-foreground whitespace-pre-wrap break-words" aria-hidden>

@@ -129,7 +129,7 @@ export default function ConnectorHighlights() {
               {displayConnectors.map((iconSrc, idx) => (
                 <div
                   key={iconSrc}
-                  className={`connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)] ${
+                  className={`connector-highlights-tile relative rounded-lg bg-white border border-slate-200 shadow-sm ${
                     pulsingIndex === idx ? 'connector-highlights-tile-pulsing' : ''
                   }`}
                 >
@@ -141,7 +141,7 @@ export default function ConnectorHighlights() {
                 </div>
               ))}
 
-              <div className="connector-highlights-tile relative rounded-none bg-white border-2 border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]">
+              <div className="connector-highlights-tile relative rounded-lg bg-white border border-slate-200 shadow-sm">
                 <div className="connector-highlights-tile-inner">
                   <span className="text-sm sm:text-base font-semibold text-slate-500">99+</span>
                 </div>
@@ -152,7 +152,7 @@ export default function ConnectorHighlights() {
       </div>
       <style jsx>{`
         .connector-icons-wrap {
-          border-radius: 0;
+          border-radius: inherit;
           padding: 18px;
         }
 

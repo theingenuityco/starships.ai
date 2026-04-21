@@ -51,7 +51,7 @@ export function LandingUseCasesSection() {
               <article key={useCase.title} className={`w-full p-3 sm:p-4 md:p-5 ${shellMuted} ${shellMutedLift}`}>
                 <div className="flex flex-col items-center gap-4 sm:gap-5 md:gap-6 lg:flex-row">
                   <div
-                    className="w-full lg:flex-1 rounded-none p-2.5 sm:p-3 md:p-4"
+                    className="w-full lg:flex-1 rounded-lg p-2.5 sm:p-3 md:p-4"
                     style={{
                       background: [
                         useCase.title === 'Lead enrichment'
@@ -66,7 +66,7 @@ export function LandingUseCasesSection() {
                       ].join(', '),
                     }}
                   >
-                    <div className="rounded-none overflow-hidden border border-slate-200 bg-white">
+                    <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
                       <img
                         src={useCase.imageSrc}
                         alt={useCase.imageAlt}
@@ -82,7 +82,7 @@ export function LandingUseCasesSection() {
                       />
                     </div>
                   </div>
-                  <div className="w-full lg:w-[320px] text-left rounded-none p-2 sm:p-3 md:p-4">
+                  <div className="w-full lg:w-[320px] text-left p-2 sm:p-3 md:p-4">
                     <h4 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
                       <span className="inline-flex items-center justify-center text-primary">
                         <Icon name={useCase.icon} size={22} />
@@ -192,7 +192,7 @@ export default function UseCases() {
             <div className={`w-full p-3 sm:p-4 md:p-5 ${shellMuted} ${shellMutedLift}`}>
               <div className="flex flex-col lg:flex-row items-center gap-4 sm:gap-5 md:gap-6">
                 <div
-                  className="w-full lg:flex-1 rounded-none p-2.5 sm:p-3 md:p-4"
+                  className="w-full lg:flex-1 rounded-lg p-2.5 sm:p-3 md:p-4"
                   style={{
                     background: [
                       'linear-gradient(95deg, rgba(189,126,52,0.92) 0%, rgba(150,70,156,0.90) 32%, rgba(114,47,166,0.92) 58%, rgba(39,24,94,0.95) 100%)',
@@ -201,14 +201,14 @@ export default function UseCases() {
                     ].join(', '),
                   }}
                 >
-                  <div className="rounded-none overflow-hidden">
+                  <div className="rounded-lg overflow-hidden">
                     <ErrorBoundary name="ScheduleRepetitiveTasksDemo">
                       <ScheduleRepetitiveTasksDemo />
                     </ErrorBoundary>
                   </div>
                 </div>
 
-                <div className="w-full lg:w-[320px] text-left rounded-none p-4 sm:p-5">
+                <div className="w-full lg:w-[320px] text-left p-4 sm:p-5">
                   <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
                     <span className="inline-flex items-center justify-center text-primary">
                       <Icon name="calendar" size={22} />

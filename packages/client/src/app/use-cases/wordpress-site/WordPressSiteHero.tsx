@@ -29,9 +29,9 @@ export function WordPressSiteHero(props: { useCase: UseCaseModel }) {
           <div className="min-w-0 max-w-xl">
             <div className="flex flex-wrap items-center gap-2">
               {useCase.tag ? (
-                <span className="rounded-none border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/95">{useCase.tag}</span>
+                <span className="rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/95">{useCase.tag}</span>
               ) : null}
-              <span className="rounded-none border border-white/25 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">Playbook</span>
+              <span className="rounded-full border border-white/25 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/80">Playbook</span>
             </div>
 
             <h1 className="mt-5 text-balance text-3xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl md:text-6xl">{useCase.title}</h1>

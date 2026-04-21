@@ -39,10 +39,10 @@ export default function Security() {
             {items.map((i, idx) => (
               <li
                 key={idx}
-                className="text-center rounded-none border border-slate-200 p-5 md:p-6 shadow-[3px_3px_0_0_rgb(226_232_240)]"
+                className="text-center rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm"
                 style={{ backgroundColor: '#F8F8FA' }}
               >
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-none border-2 border-slate-200 bg-white text-slate-800 shadow-[3px_3px_0_0_rgb(226_232_240)]">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm">
                   <Icon name={i.icon} className="w-6 h-6" />
                 </div>
                 <div className="mt-4 font-bold text-slate-900 text-xl md:text-2xl leading-tight tracking-tight">{i.title}</div>

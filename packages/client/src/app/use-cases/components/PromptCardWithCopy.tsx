@@ -23,7 +23,7 @@ export function PromptCardWithCopy({ prompt, className = '' }: { prompt: string;
   }, [prompt])
 
   return (
-    <div className={cn('overflow-hidden rounded-none border border-slate-200 bg-slate-50', className)}>
+    <div className={cn('overflow-hidden rounded-lg border border-slate-200 bg-slate-50', className)}>
       <div className="flex items-start justify-between gap-3 p-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">

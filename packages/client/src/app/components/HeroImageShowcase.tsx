@@ -59,7 +59,7 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
       <div className="relative z-[12] mx-auto max-w-6xl">
         <div className="relative" style={overlapHero ? overlapHeroFrameStyle : undefined}>
           <div className={`w-full p-3 sm:p-4 md:p-5 ${panelLightLift}`} style={gradientSurfaceStyle}>
-            <div className="relative w-full aspect-[16/9] overflow-hidden rounded-none">
+            <div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div
                   className={`relative overflow-hidden ${landingFrameInset}`}

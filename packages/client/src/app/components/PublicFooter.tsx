@@ -40,8 +40,7 @@ export function PublicFooter(props: {
       title: 'Platform',
       links: [
         { label: 'Pricing', href: '/pricing' },
-        { label: 'Explore', href: '/explore' },
-        { label: 'Login', href: '/login' },
+{ label: 'Login', href: '/login' },
       ],
     },
     {

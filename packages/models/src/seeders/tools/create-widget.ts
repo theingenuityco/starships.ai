@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Create Widget (Simplified)
@@ -105,19 +104,4 @@ export const createWidgetTool: ToolParams = {
     ],
     metadata: {},
   },
-};
-
-export const createWidgetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: createWidgetTool.name,
-  description: createWidgetTool.description,
-  parameters: createWidgetTool.parameters,
-  blueprint: createWidgetTool.blueprint,
-
-  slug: 'create-widget',
-  version: '1.1.0',
-  category: 'utility',
-  exampleUsage:
-    '{ "name": "Sales Chart", "description": "Pie chart showing sales", "widgetType": "PieChart", "props": { "title": "Q4 Sales", "segments": [{ "label": "Electronics", "value": 40 }] } }',
-  requiresApiKey: false,
-  configurationFields: [],
 };

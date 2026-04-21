@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: get-agent
@@ -153,18 +152,4 @@ export const agentGetTool: ToolParams = {
     ],
     metadata: {},
   },
-};
-
-export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentGetTool.name,
-  description: agentGetTool.description,
-  parameters: agentGetTool.parameters,
-  blueprint: agentGetTool.blueprint,
-
-  slug: 'get-agent',
-  version: '1.0.4',
-  category: 'automation',
-  exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
-  requiresApiKey: false,
-  configurationFields: [],
 };

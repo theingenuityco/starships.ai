@@ -2,7 +2,6 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import Icon from '@/components/primitives/Icon'
 import { useNotificationsList } from '@/hooks/useNotifications'
 import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
@@ -91,8 +90,6 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
     router.push('/')
   }, [ownedTargetSlug, router])
 
-  const isMarketplaceActive = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
-
   return (
     <div className="flex h-full w-16 flex-col items-center gap-1.5 bg-card pt-3 pb-2.5" aria-label="Starship switcher">
       {/* Top logo – same sizing as rail items for clean alignment */}
@@ -126,39 +123,12 @@ export function StarshipRail({ starships, activeSlug, onSelect }: { starships: S
         </TooltipContent>
       </Tooltip>
 
-      {/* Scrollable starships + marketplace – spacing matches Discord-style rail */}
+      {/* Scrollable starships – spacing matches Discord-style rail */}
       <div className="flex w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overflow-x-visible px-2 pt-1 pb-2 custom-scrollbar">
         {items.map(s => {
           const isActive = Boolean(activeSlug && s.slug === activeSlug)
           return <StarshipRailItem key={s.id} starship={s} isActive={isActive} onSelect={onSelect} />
         })}
-
-        {/* Marketplace shortcut (Explore agents) – directly after last starship */}
-        <Tooltip delayDuration={250}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => router.push('/explore/agents')}
-              className={[
-                'group relative mt-1 flex h-9 w-9 items-center justify-center rounded-xl border transition-all',
-                isMarketplaceActive ? 'border-primary/50 bg-primary/10 text-primary shadow-sm' : 'border-border/60 bg-muted/10 text-muted-foreground hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-sm',
-              ].join(' ')}
-              aria-label="Explore agents"
-              aria-current={isMarketplaceActive ? 'page' : undefined}
-            >
-              <span
-                className={[
-                  'absolute -left-2 top-1/2 w-1 -translate-y-1/2 rounded-full bg-primary transition-all',
-                  isMarketplaceActive ? 'h-5 opacity-100' : 'h-3 opacity-0 group-hover:opacity-100',
-                ].join(' ')}
-              />
-              <Icon name="store" className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-card text-foreground border border-border/40 shadow-lg">
-            Explore agents
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   )

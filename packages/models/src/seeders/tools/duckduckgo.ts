@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * DuckDuckGo Instant Answer Tool Definition
@@ -290,30 +289,3 @@ export const duckduckgoTool: ToolParams = {
   },
 };
 
-/**
- * DuckDuckGo Tool Template Configuration
- */
-export const duckduckgoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  // Core ToolParams
-  name: duckduckgoTool.name,
-  description: duckduckgoTool.description,
-  parameters: duckduckgoTool.parameters,
-  blueprint: duckduckgoTool.blueprint,
-
-  // Template metadata
-  slug: 'duckduckgo-instant',
-  version: '1.0.1',
-  category: 'data',
-  exampleUsage: JSON.stringify(
-    {
-      calculation: { name: 'duckduckgo-instant', arguments: { query: '15% of 250' } },
-      definition: { name: 'duckduckgo-instant', arguments: { query: 'define quantum computing' } },
-      fact: { name: 'duckduckgo-instant', arguments: { query: 'population of Tokyo' } },
-      conversion: { name: 'duckduckgo-instant', arguments: { query: '100 USD to EUR' } },
-    },
-    null,
-    2
-  ),
-  requiresApiKey: false,
-  configurationFields: [],
-};

@@ -3,7 +3,7 @@
  * Executes test-tool using real Autopilot execution with mocked HTTP only
  */
 
-import { toolTestTool, toolTestToolTemplate } from '../test-tool';
+import { toolTestTool } from '../test-tool';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions, HostRuntime } from '@starships/autopilot';
 
@@ -63,13 +63,6 @@ describe('Tool Test Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      expect(toolTestToolTemplate.name).toBe(toolTestTool.name);
-      expect(toolTestToolTemplate.description).toBe(toolTestTool.description);
-      expect(toolTestToolTemplate.parameters).toEqual(toolTestTool.parameters);
-      expect(toolTestToolTemplate.blueprint).toEqual(toolTestTool.blueprint);
-      expect(toolTestToolTemplate.slug).toBe('test-tool');
-      expect(toolTestToolTemplate.category).toBe('automation');
-      expect(toolTestToolTemplate.requiresApiKey).toBe(false);
     });
   });
 

@@ -3,7 +3,7 @@
  * Direct end-to-end tests using real autopilot Tool execution
  */
 
-import { calculatorTool, calculatorToolTemplate } from '../calculator';
+import { calculatorTool } from '../calculator';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -74,15 +74,7 @@ describe('Calculator Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      expect(calculatorToolTemplate.name).toBe(calculatorTool.name);
-      expect(calculatorToolTemplate.description).toBe(calculatorTool.description);
-      expect(calculatorToolTemplate.parameters).toEqual(calculatorTool.parameters);
-      expect(calculatorToolTemplate.blueprint).toEqual(calculatorTool.blueprint);
 
-      expect(calculatorToolTemplate.slug).toBe('calculator');
-      expect(calculatorToolTemplate.category).toBe('utility');
-      expect(calculatorToolTemplate.requiresApiKey).toBe(false);
-      expect(calculatorToolTemplate.exampleUsage).toBeDefined();
     });
   });
 

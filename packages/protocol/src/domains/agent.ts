@@ -7,7 +7,6 @@
 
 // Import autopilot types at the top level
 import type { AgentParams } from '@starships/autopilot';
-import type { TemplateCategory } from '../index';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -32,54 +31,13 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   createdAt: string;
   updatedAt: string;
   // Optional categorization (for organizing agents in UI/marketplace)
-  // Kept in sync with the shared TemplateCategory union used by AgentTemplateModel.
-  category?: TemplateCategory;
+  category?: string;
   // Starship ownership (FK)
   starshipId: string;
-  // Optional source template reference (FK)
-  sourceTemplateId?: string;
-  // Optional example prompts surfaced on agents (may be inherited from template)
+  // Optional example prompts surfaced on agents
   previewPrompts?: string[];
   // Versioning fields
   version: string; // Semantic version (e.g., '1.0.2')
-  templateSnapshotAt?: string; // When agent last synced with template
-  // Update availability info (populated in listing endpoints)
-  updateInfo?: {
-    needsUpdate: boolean;
-    latestVersion: string; // Template's latest version
-    templateUpdatedAt?: string; // When template was last updated
-  };
-
-  /**
-   * Publication workflow fields
-   *
-   * - draft: default state, only visible to owner
-   * - pending_approval: owner requested publish; waiting for instance admin review
-   * - published: approved by instance admin and visible as a published agent
-   * - rejected: rejected by instance admin (owner can revise and request again)
-   */
-  publicationStatus: 'draft' | 'pending_approval' | 'published' | 'rejected';
-  publicationRequestedBy?: string;
-  publicationApprovedBy?: string;
-  publicationApprovedAt?: string;
-
-  /**
-   * Optional publication metadata chosen by the owner when requesting publish.
-   *
-   * - publicationVersionBump: how the owner wants to bump from the current version
-   * - publicationRequestedVersion: the exact target version string (e.g. '1.2.3')
-   * - publicationChangelog: human-readable notes about what changed
-   */
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-  publicationRequestedVersion?: string;
-  publicationChangelog?: string;
-
-  /**
-   * Optional pointer to the template row this agent is published into.
-   * - sourceTemplateId: where the agent was originally created from (source template).
-   * - publishedTemplateId: where this agent is promoted to on publish.
-   */
-  publishedTemplateId?: string;
 
   /**
    * Optional denormalized view of tool assignments for this agent.
@@ -153,14 +111,12 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
    */
   role: string;
   // Optional categorization (for organizing agents in UI/marketplace)
-  category?: TemplateCategory;
+  category?: string;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
-  // Optional template reference and prompts
-  sourceTemplateId?: string;
+  // Optional prompts
   previewPrompts?: string[];
   // Versioning fields
   version?: string;
-  templateSnapshotAt?: string;
 };
 
 /**
@@ -176,8 +132,7 @@ export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetad
    */
   role?: string;
   // Optional categorization (for organizing agents in UI/marketplace)
-  category?: TemplateCategory;
-  sourceTemplateId?: string;
+  category?: string;
   previewPrompts?: string[];
   /**
    * Optional structured reasoning config.
@@ -185,15 +140,6 @@ export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetad
    */
   reasoning?: AgentParamsWithoutMetadata['reasoning'] | null;
   version?: string;
-  templateSnapshotAt?: string;
-  publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';
-  publicationRequestedBy?: string;
-  publicationApprovedBy?: string;
-  publicationApprovedAt?: string;
-  publishedTemplateId?: string;
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-  publicationRequestedVersion?: string;
-  publicationChangelog?: string;
 
   /**
    * Optional avatar image for the agent, stored as an Attachment (S3-backed).
@@ -215,42 +161,3 @@ export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetad
   tryThesePromptsAttachmentId?: string;
 }
 
-/**
- * DTO for admin pending agents listing.
- * Wraps the agent plus denormalized metadata needed only for that view.
- */
-export interface PendingAgentSummary {
-  agent: AgentModel;
-  requestedBy?: {
-    id: string;
-    name?: string;
-    avatar?: string;
-  };
-  requestedByStarship?: {
-    id: string;
-    name?: string;
-    slug?: string;
-  };
-}
-
-/**
- * Response type for update check
- */
-export interface AgentUpdateCheckResponse {
-  needsUpdate: boolean;
-  currentVersion: string; // Agent's current version
-  latestVersion: string; // Template's latest version
-  templateUpdatedAt?: string;
-}
-
-/**
- * Response type for update from template (minimal response)
- */
-export interface AgentUpdateResponse {
-  id: string;
-  name: string;
-  version: string;
-  templateSnapshotAt?: string;
-  updatedAt: string;
-  message: string;
-}

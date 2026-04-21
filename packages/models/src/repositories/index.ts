@@ -1,5 +1,4 @@
 export { AgentRepository } from './AgentRepository';
-export { AgentTemplateRepository } from './AgentTemplateRepository';
 export { AttachmentRepository } from './AttachmentRepository';
 export { ConversationRepository } from './ConversationRepository';
 export { ConnectorSecretRepository } from './ConnectorSecretRepository';
@@ -12,7 +11,6 @@ export { ConnectorRepository } from './ConnectorRepository';
 export { ConnectorEventRepository } from './ConnectorEventRepository';
 export { ConnectorWebhookBindingRepository } from './ConnectorWebhookBindingRepository';
 export { ToolRepository } from './ToolRepository';
-export { ToolTemplateRepository } from './ToolTemplateRepository';
 export { UsageRepository } from './UsageRepository';
 export { UserRepository } from './UserRepository';
 export { WidgetRepository } from './WidgetRepository';

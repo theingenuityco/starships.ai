@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Echo Tool Definition
@@ -47,19 +46,3 @@ export const echoTool: ToolParams = {
   },
 };
 
-/**
- * Echo Tool Template Configuration
- */
-export const echoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: echoTool.name,
-  description: echoTool.description,
-  parameters: echoTool.parameters,
-  blueprint: echoTool.blueprint,
-
-  slug: 'echo',
-  version: '1.0.1',
-  category: 'utility',
-  exampleUsage: 'Use in LLM function-calling: { "name": "echo", "arguments": { "message": "Hello Tools!" } }',
-  requiresApiKey: false,
-  configurationFields: [],
-};

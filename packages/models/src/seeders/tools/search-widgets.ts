@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Search Widgets
@@ -97,18 +96,3 @@ export const searchWidgetsTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const searchWidgetsToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: searchWidgetsTool.name,
-  description: searchWidgetsTool.description,
-  parameters: searchWidgetsTool.parameters,
-  blueprint: searchWidgetsTool.blueprint,
-
-  slug: 'search-widgets',
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "name": "Revenue", "widgetType": "BarChart", "limit": 10 }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

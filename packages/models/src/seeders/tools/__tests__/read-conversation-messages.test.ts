@@ -2,16 +2,13 @@
  * Read Conversation Messages Tool Tests
  */
 
-import { readConversationMessagesTool, readConversationMessagesToolTemplate } from '../read-conversation-messages';
+import { readConversationMessagesTool } from '../read-conversation-messages';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, HostRuntime, NodeHandlerOptions } from '@starships/autopilot';
 
 describe('Read Conversation Messages', () => {
   it('has a valid tool + template definition', () => {
     expect(readConversationMessagesTool.slug).toBe('read-older-messages');
-    expect(readConversationMessagesToolTemplate.slug).toBe('read-older-messages');
-    expect(readConversationMessagesToolTemplate.name).toBe(readConversationMessagesTool.name);
-    expect(readConversationMessagesToolTemplate.description).toBe(readConversationMessagesTool.description);
   });
 
   it('requires limit + offset', () => {

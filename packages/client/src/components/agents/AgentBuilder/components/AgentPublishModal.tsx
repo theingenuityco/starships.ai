@@ -20,8 +20,6 @@ interface AgentPublishModalProps {
   onOpenChange: (open: boolean) => void
   fullAgent: AgentModel | null
   value: AgentFormData
-  differsFromPublishedTemplate: boolean
-  publishedChangeDetails: string[]
   assignedToolsForOverrides: ToolModel[]
   versionBump: VersionBump
   setVersionBump: React.Dispatch<React.SetStateAction<VersionBump>>
@@ -62,8 +60,6 @@ export function AgentPublishModal({
   onOpenChange,
   fullAgent,
   value,
-  differsFromPublishedTemplate,
-  publishedChangeDetails,
   assignedToolsForOverrides,
   versionBump,
   setVersionBump,
@@ -134,27 +130,10 @@ export function AgentPublishModal({
 
             {activePublishStep === 'agent' && (
               <>
-                {fullAgent?.publishedTemplateId ? (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
-                    {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? (
-                      <ul className="list-disc list-inside space-y-0.5 text-[11px] text-muted-foreground">
-                        {publishedChangeDetails.map(item => (
-                          <li key={item} className="font-medium">
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[11px] text-muted-foreground">No detected differences from the last published template.</p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
-                    <p className="text-[11px] text-muted-foreground">First time publishing this agent to Explore.</p>
-                  </div>
-                )}
+                <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-muted-foreground">Agent changes in this publish</p>
+                  <p className="text-[11px] text-muted-foreground">Publishing this agent to Explore.</p>
+                </div>
 
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-muted-foreground">Agent version bump</p>
@@ -224,13 +203,7 @@ export function AgentPublishModal({
               <div className="space-y-3 pr-1">
                 {assignedToolsForOverrides.map(tool => {
                   const override = toolOverrides[tool.id] || { versionBump: 'patch' as const, changelog: '' }
-                  const isNewTemplate = !tool.publishedTemplateId
-                  const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
-                  const changeLabel = isNewTemplate
-                    ? 'New tool will be published for this agent.'
-                    : hasTemplateUpdate
-                      ? 'Tool definition changes will be synced to its template.'
-                      : 'No detected changes vs current template.'
+                  const changeLabel = 'Tool will be published for this agent.'
                   const currentToolVersion = tool.version || '1.0.0'
                   const nextToolVersion = computeNextVersion(currentToolVersion, override.versionBump)
                   const isActiveToolStep = activePublishStep === tool.id
@@ -262,9 +235,6 @@ export function AgentPublishModal({
                             <p className="uppercase text-[10px] text-muted-foreground mb-0.5">New</p>
                             <p className="font-mono font-semibold text-sm text-emerald-600">v{nextToolVersion}</p>
                           </div>
-                          {tool.updateInfo?.latestVersion && tool.updateInfo.latestVersion !== tool.version && (
-                            <div className="col-span-2 text-[10px] text-emerald-600 text-right">Template latest: v{tool.updateInfo.latestVersion}</div>
-                          )}
                         </div>
                       </div>
 

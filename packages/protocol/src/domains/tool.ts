@@ -3,57 +3,10 @@
  *
  * Database-specific tool interfaces and API contract types.
  * Builds upon ToolParams from @starships/autopilot for tool definitions.
- *
- * Follows the Agent/AgentTemplate pattern:
- * - ToolTemplate: Reusable marketplace templates
- * - Tool: User's configured instances deployed to starships
  */
 
 // Import autopilot types
 import type { ToolParams } from '@starships/autopilot';
-
-// ============================================================================
-// TOOL TEMPLATE TYPES (Marketplace)
-// ============================================================================
-
-import type { TemplateCategory } from '../index';
-
-/**
- * Tool template category options (using shared TemplateCategory)
- */
-export type ToolTemplateCategory = TemplateCategory;
-
-/**
- * Core tool template entity - marketplace/gallery items
- */
-export interface ToolTemplateModel extends ToolParams {
-  // Core template fields
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-
-  // Template metadata
-  category: ToolTemplateCategory;
-  usageCount: number;
-
-  // Versioning
-  version: string; // Semantic version (e.g., '1.0.2')
-
-  /** Connector providers used by this tool's blueprint (connector_action nodes) */
-  requiredConnectorProviders?: string[];
-
-  // Template preview
-  exampleUsage?: string; // Example of how to use the tool
-
-  // Configuration hints
-  requiresApiKey?: boolean;
-  configurationFields?: Array<{
-    name: string;
-    type: 'string' | 'number' | 'boolean';
-    description: string;
-    required: boolean;
-  }>;
-}
 
 // ============================================================================
 // TOOL TYPES (Deployed Instances)
@@ -77,18 +30,6 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   // Foreign key relationships
   starshipId: string; // Tool belongs to a starship
 
-  /** Template relationships (optional) */
-  sourceTemplateId?: string;
-  publishedTemplateId?: string;
-
-  /**
-   * Convenience fields populated by some listing endpoints.
-   * These allow clients to reason about template-backed behavior without
-   * additional round trips.
-   */
-  sourceTemplateSlug?: string;
-  publishedTemplateSlug?: string;
-
   // ToolParams fields (made optional for draft support)
   parameters?: ToolParams['parameters'];
   blueprint?: ToolParams['blueprint'];
@@ -100,73 +41,10 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
 
   // Versioning fields
   version: string; // Semantic version (e.g., '1.0.2')
-  templateSnapshotAt?: string; // When tool last synced with template
 
   /** Connector providers used by this tool's blueprint (connector_action nodes) */
   requiredConnectorProviders?: string[];
-  // Update availability info (populated in listing endpoints)
-  updateInfo?: {
-    needsUpdate: boolean;
-    latestVersion: string; // Template's latest version
-    templateUpdatedAt?: string; // When template was last updated
-  };
-
-  /**
-   * Publication workflow fields (mirror AgentModel)
-   *
-   * - draft: default state, only visible to owner
-   * - pending_approval: owner requested publish; waiting for instance admin review
-   * - published: approved by instance admin and visible as a published template-backed tool
-   * - rejected: rejected by instance admin (owner can revise and request again)
-   */
-  publicationStatus: 'draft' | 'pending_approval' | 'published' | 'rejected';
-  publicationRequestedBy?: string;
-  publicationApprovedBy?: string;
-  publicationApprovedAt?: string;
-
-  /**
-   * Optional publication metadata chosen by the owner when requesting publish.
-   *
-   * - publicationVersionBump: how the owner wants to bump from the current version
-   * - publicationRequestedVersion: the exact target version string (e.g. '1.2.3')
-   * - publicationChangelog: human-readable notes about what changed
-   */
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-  publicationRequestedVersion?: string;
-  publicationChangelog?: string;
 }
-
-// ============================================================================
-// TOOL TEMPLATE REQUEST/RESPONSE TYPES
-// ============================================================================
-
-/**
- * Request to create a new tool template
- */
-export interface CreateToolTemplateRequest extends Omit<ToolParams, 'slug'> {
-  category: ToolTemplateCategory;
-  version?: string; // Semantic version (defaults to '1.0.0' if not provided)
-  requiredConnectorProviders?: string[]; // Server computes from blueprint when not provided
-  exampleUsage?: string;
-  requiresApiKey?: boolean;
-  configurationFields?: Array<{
-    name: string;
-    type: 'string' | 'number' | 'boolean';
-    description: string;
-    required: boolean;
-  }>;
-}
-
-/**
- * Request to update a tool template
- */
-export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest> & {
-  /**
-   * Slugs are server-generated and not directly editable.
-   */
-  slug?: never;
-  version?: string;
-};
 
 // ============================================================================
 // TOOL REQUEST/RESPONSE TYPES
@@ -182,12 +60,8 @@ export interface CreateToolRequest extends Omit<ToolParams, 'slug' | 'parameters
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
   status?: ToolStatus; // Tool status: 'draft' or 'active'
-  // Template linkage (optional)
-  sourceTemplateId?: string;
-  publishedTemplateId?: string;
   version?: string; // Semantic version (defaults to '1.0.0' if not provided)
-  templateSnapshotAt?: string; // When tool was created/synced from template
-  /** Connector providers (typically copied from template) */
+  /** Connector providers */
   requiredConnectorProviders?: string[];
 }
 
@@ -200,72 +74,12 @@ export type UpdateToolRequest = Partial<Omit<CreateToolRequest, 'slug'>> & {
    * Disallow providing `slug` in updates at the type level.
    */
   slug?: never;
-  sourceTemplateId?: string;
-  publishedTemplateId?: string;
   version?: string;
-  templateSnapshotAt?: string;
-  // Publication workflow fields (for admin approval / publish flows)
-  publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';
-  publicationRequestedBy?: string;
-  publicationApprovedBy?: string;
-  publicationApprovedAt?: string;
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-  publicationRequestedVersion?: string;
-  publicationChangelog?: string;
 };
-
-/**
- * Response type for update check
- */
-export interface ToolUpdateCheckResponse {
-  needsUpdate: boolean;
-  currentVersion: string; // Tool's current version
-  latestVersion: string; // Template's latest version
-  templateUpdatedAt?: string;
-}
-
-/**
- * Response type for update from template (minimal response)
- */
-export interface ToolUpdateResponse {
-  id: string;
-  name: string;
-  version: string;
-  templateSnapshotAt?: string;
-  updatedAt: string;
-  message: string;
-}
-
-/**
- * DTO for admin pending tools listing.
- * Wraps the tool plus denormalized metadata needed only for that view.
- */
-export interface PendingToolSummary {
-  tool: ToolModel;
-  requestedBy?: {
-    id: string;
-    name?: string;
-    avatar?: string;
-  };
-  requestedByStarship?: {
-    id: string;
-    name?: string;
-    slug?: string;
-  };
-}
 
 // ============================================================================
 // SEARCH/FILTER TYPES
 // ============================================================================
-
-/**
- * Tool template search/filter parameters
- */
-export interface ToolTemplateSearchParams {
-  category?: ToolTemplateCategory;
-  query?: string; // For text search across name/description
-  requiresApiKey?: boolean;
-}
 
 /**
  * Tool search/filter parameters

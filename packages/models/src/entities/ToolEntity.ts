@@ -225,9 +225,6 @@ export class ToolEntity implements ToolModel {
         isEnabled: dataRecord.isEnabled ?? true,
         status: status,
         version: dataRecord.version || '1.0.0',
-        templateSnapshotAt: dataRecord.templateSnapshotAt,
-        // Publication workflow default for creates
-        publicationStatus: (dataRecord.publicationStatus as ToolModel['publicationStatus']) || 'draft',
         ...dataRecord,
       });
     } else {

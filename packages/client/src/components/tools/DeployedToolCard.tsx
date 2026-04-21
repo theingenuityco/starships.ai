@@ -20,11 +20,6 @@ interface DeployedToolCardProps {
 }
 
 export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, showActions = false }: DeployedToolCardProps) {
-  // Check if this is a template-based tool (deployed from a template)
-  const isTemplateTool = !!tool.sourceTemplateId
-
-  // Get update info from tool object (populated by API)
-  const needsUpdate = isTemplateTool && tool.updateInfo?.needsUpdate
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
       <Card
@@ -105,55 +100,6 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
                     v{tool.version}
                   </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                {tool.sourceTemplateId && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0.5 flex items-center"
-                    style={{
-                      borderColor: 'rgba(245,158,11,0.4)',
-                      backgroundColor: 'rgba(245,158,11,0.15)',
-                      color: 'rgba(245,158,11,1)',
-                    }}
-                  >
-                    <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
-                    System
-                  </Badge>
-                )}
-                {/* Premium update available indicator with subtle animation */}
-                {needsUpdate && (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
-                    <Badge
-                      className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
-                        borderColor: 'rgba(139, 92, 246, 0.3)',
-                        color: 'rgb(139, 92, 246)',
-                        boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
-                      }}
-                    >
-                      <motion.div
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
-                        }}
-                        animate={{
-                          x: ['-100%', '100%'],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: 'linear',
-                        }}
-                      />
-                      <span className="relative z-10 flex items-center gap-1">
-                        <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                        NEW UPDATE AVAILABLE
-                      </span>
-                    </Badge>
-                  </motion.div>
                 )}
               </div>
               <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">

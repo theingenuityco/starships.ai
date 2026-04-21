@@ -10,10 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import type { AgentTemplateModel } from '@starships/protocol'
-
-export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const initialAgentTemplates = props.initialAgentTemplates ?? []
+export default function Hero() {
   const router = useRouter()
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)

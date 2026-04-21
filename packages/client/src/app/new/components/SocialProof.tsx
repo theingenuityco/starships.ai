@@ -24,7 +24,7 @@ const testimonials = [
 
 export default function SocialProof() {
   return (
-    <section className="relative py-20 sm:py-24 px-4 sm:px-6 bg-[#050b24]">
+    <section className="relative py-20 sm:py-24 px-4 sm:px-6 bg-[#0f0f0f]">
       <div className="mx-auto max-w-6xl">
         {/* Heading */}
         <div className="text-center mb-12 sm:mb-14">
@@ -65,7 +65,7 @@ export default function SocialProof() {
             {[...Array(5)].map((_, i) => (
               <div
                 key={i}
-                className="h-8 w-8 rounded-full border-2 border-[#050b24] bg-gradient-to-br from-slate-600 to-slate-800"
+                className="h-8 w-8 rounded-full border-2 border-[#0f0f0f] bg-gradient-to-br from-slate-600 to-slate-800"
                 style={{ filter: 'blur(2px)' }}
                 aria-hidden
               />

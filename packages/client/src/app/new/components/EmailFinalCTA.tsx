@@ -33,7 +33,7 @@ export default function EmailFinalCTA() {
         aria-hidden
         style={{
           background: [
-            'linear-gradient(to bottom, #0d1235, #050b24, #050b24)',
+            'linear-gradient(to bottom, #171717, #0f0f0f, #0f0f0f)',
             'radial-gradient(ellipse 1000px 400px at 50% 0%, rgba(245,158,11,0.10), transparent 60%)',
           ].join(', '),
         }}

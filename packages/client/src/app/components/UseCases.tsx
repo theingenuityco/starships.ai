@@ -3,7 +3,7 @@
 import CollaborationHighlights from '@/app/components/CollaborationHighlights'
 import ConnectorHighlights from '@/app/components/ConnectorHighlights'
 import InvertedShowcaseHighlights from '@/app/components/InvertedShowcaseHighlights'
-import { landingPrimaryCtaSection, shellMuted, shellMutedLift } from '@/app/components/landing/landingSurface'
+import { landingPrimaryCtaSection, shellMutedDark, shellMutedDarkLift } from '@/app/components/landing/landingSurface'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
 import Icon from '@/components/primitives/Icon'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
@@ -35,20 +35,20 @@ const LANDING_USE_CASE_CARDS = [
 
 export function LandingUseCasesSection() {
   return (
-    <div className="bg-white py-10 sm:py-12 md:py-14">
+    <div className="py-10 sm:py-12 md:py-14">
       <div className="relative max-w-7xl mx-auto px-4">
         <div className="pt-10 sm:pt-12 md:pt-16">
           <div className="mb-8 sm:mb-10 md:mb-12">
-            <h3 className="text-2xl sm:text-3xl font-bold text-center text-slate-900">
+            <h3 className="text-2xl sm:text-3xl font-bold text-center text-white">
               Use <span className="text-primary">Cases</span>
             </h3>
-            <p className="mt-2 text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">
+            <p className="mt-2 text-sm md:text-base text-white/60 text-center max-w-2xl mx-auto">
               Find leads, enrich data, and send outreach faster.
             </p>
           </div>
           <div className="space-y-5 sm:space-y-6">
             {LANDING_USE_CASE_CARDS.map(useCase => (
-              <article key={useCase.title} className={`w-full p-3 sm:p-4 md:p-5 ${shellMuted} ${shellMutedLift}`}>
+              <article key={useCase.title} className={`w-full p-3 sm:p-4 md:p-5 ${shellMutedDark} ${shellMutedDarkLift}`}>
                 <div className="flex flex-col items-center gap-4 sm:gap-5 md:gap-6 lg:flex-row">
                   <div
                     className="w-full lg:flex-1 rounded-lg p-2.5 sm:p-3 md:p-4"
@@ -66,7 +66,7 @@ export function LandingUseCasesSection() {
                       ].join(', '),
                     }}
                   >
-                    <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+                    <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20">
                       <img
                         src={useCase.imageSrc}
                         alt={useCase.imageAlt}
@@ -83,13 +83,13 @@ export function LandingUseCasesSection() {
                     </div>
                   </div>
                   <div className="w-full lg:w-[320px] text-left p-2 sm:p-3 md:p-4">
-                    <h4 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+                    <h4 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-white/90 leading-tight">
                       <span className="inline-flex items-center justify-center text-primary">
                         <Icon name={useCase.icon} size={22} />
                       </span>
                       {useCase.title}
                     </h4>
-                    <p className="mt-2 text-sm md:text-base text-slate-700 max-w-md">{useCase.description}</p>
+                    <p className="mt-2 text-sm md:text-base text-white/70 max-w-md">{useCase.description}</p>
                     <div className="mt-6">
                       <Link href="/login" className={landingPrimaryCtaSection}>
                         <span>Get Started Free</span>
@@ -142,29 +142,29 @@ export function LandingUseCasesSection() {
 
 export default function UseCases() {
   return (
-    <section className="relative pb-0 text-slate-900">
-      <div className="pt-8 sm:pt-10 md:pt-12 pb-10 sm:pb-12 md:pb-14" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
+    <section className="relative pb-0 text-white">
+      <div className="pt-8 sm:pt-10 md:pt-12 pb-10 sm:pb-12 md:pb-14">
         <div className="relative max-w-7xl mx-auto px-4">
-        <div className="mb-8 sm:mb-10 md:mb-12">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-slate-900">
-            How it <span className="text-primary">works?</span>
-          </h2>
-          <p className="mt-2 text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">Deploy agents, add tools, and collaborate in one workspace.</p>
-        </div>
+          <div className="mb-8 sm:mb-10 md:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-center text-white">
+              How it <span className="text-primary">works?</span>
+            </h2>
+            <p className="mt-2 text-sm md:text-base text-white/60 text-center max-w-2xl mx-auto">Deploy agents, add tools, and collaborate in one workspace.</p>
+          </div>
 
-        <CollaborationHighlights />
+          <CollaborationHighlights />
         </div>
       </div>
 
       <LandingUseCasesSection />
 
-      <div className="py-10 sm:py-12 md:py-14" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
+      <div className="py-10 sm:py-12 md:py-14">
         <div className="max-w-7xl mx-auto px-4">
           <div className="mb-8 sm:mb-10 md:mb-12">
-            <h3 className="text-2xl sm:text-3xl font-bold text-center text-slate-900">
+            <h3 className="text-2xl sm:text-3xl font-bold text-center text-white">
               Connector <span className="text-primary">Library</span>
             </h3>
-            <p className="mt-2 text-sm md:text-base text-slate-600 text-center max-w-2xl mx-auto">
+            <p className="mt-2 text-sm md:text-base text-white/60 text-center max-w-2xl mx-auto">
               Connect your stack so agents can take action across every tool your team already uses.
             </p>
           </div>
@@ -172,13 +172,13 @@ export default function UseCases() {
         </div>
       </div>
 
-      <div className="bg-white py-10 sm:py-12 md:py-14">
+      <div className="py-10 sm:py-12 md:py-14">
         <div className="max-w-7xl mx-auto px-4">
           <div className="mb-8 sm:mb-10 md:mb-12">
-            <h3 className="text-2xl sm:text-3xl font-bold text-center text-slate-900">
+            <h3 className="text-2xl sm:text-3xl font-bold text-center text-white">
               Team Workflow <span className="text-primary">Automation</span>
             </h3>
-            <p className="mt-2 text-sm md:text-base text-slate-600 text-center">
+            <p className="mt-2 text-sm md:text-base text-white/60 text-center">
               Coordinate teammates and recurring tasks in one shared workspace.
             </p>
           </div>
@@ -189,7 +189,7 @@ export default function UseCases() {
 
           {/* Schedule repetitive tasks */}
           <div className="mt-10 sm:mt-12 md:mt-16">
-            <div className={`w-full p-3 sm:p-4 md:p-5 ${shellMuted} ${shellMutedLift}`}>
+            <div className={`w-full p-3 sm:p-4 md:p-5 ${shellMutedDark} ${shellMutedDarkLift}`}>
               <div className="flex flex-col lg:flex-row items-center gap-4 sm:gap-5 md:gap-6">
                 <div
                   className="w-full lg:flex-1 rounded-lg p-2.5 sm:p-3 md:p-4"
@@ -209,13 +209,13 @@ export default function UseCases() {
                 </div>
 
                 <div className="w-full lg:w-[320px] text-left p-4 sm:p-5">
-                  <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+                  <h3 className="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-white/90 leading-tight">
                     <span className="inline-flex items-center justify-center text-primary">
                       <Icon name="calendar" size={22} />
                     </span>
                     Schedule repetitive tasks
                   </h3>
-                  <p className="mt-2 text-sm md:text-base text-slate-700 max-w-md">Set recurring schedules once, then review and approve outcomes as your agents execute.</p>
+                  <p className="mt-2 text-sm md:text-base text-white/70 max-w-md">Set recurring schedules once, then review and approve outcomes as your agents execute.</p>
                   <div className="mt-6">
                     <Link href="/login" className={landingPrimaryCtaSection}>
                       <span>Get Started Free</span>

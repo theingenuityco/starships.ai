@@ -21,6 +21,10 @@ export const panelLightLift = `${softLift} hover:shadow-[0_8px_24px_rgba(15,23,4
 export const shellMuted = 'rounded-xl border border-slate-200 bg-[#F8F8FA] shadow-sm'
 export const shellMutedLift = `${softLift} hover:shadow-md`
 
+/** Outer shells — dark landing sections */
+export const shellMutedDark = 'rounded-xl border border-white/[0.08] bg-white/[0.04] shadow-sm'
+export const shellMutedDarkLift = `${softLift} hover:bg-white/[0.06] hover:shadow-md`
+
 export const socialDark =
   'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white ' +
   `${landingMotion} hover:border-white/25 hover:bg-white/[0.1] hover:text-white active:opacity-90`
@@ -85,11 +89,20 @@ export const landingSecondaryCta =
   'shadow-sm transition-all duration-100 hover:bg-slate-900 hover:text-white hover:border-slate-900 hover:shadow-md ' +
   'active:-translate-y-px'
 
+/** Secondary — dark sections */
+export const landingSecondaryCtaDark =
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/[0.06] px-6 py-3 text-base font-semibold text-white ' +
+  'shadow-sm transition-all duration-100 hover:bg-white/[0.12] hover:border-white/30 hover:shadow-md ' +
+  'active:-translate-y-px'
+
 /** Header nav hit area: works on light pages and star-theme-dark landing. */
 export const landingHeaderNavItem = 'transition-colors duration-100 rounded-md px-2 py-1 hover:bg-slate-900/[0.06] dark:hover:bg-white/10'
 
 /** Inline image / screenshot frame */
 export const landingFrameInset = 'rounded-xl border border-slate-200/80 bg-white shadow-sm'
+
+/** Inline image / screenshot frame — dark landing sections */
+export const landingFrameInsetDark = 'rounded-xl border border-white/10 bg-[#111111] shadow-sm'
 
 /**
  * Vertical lift of `HeroImageShowcase` into the hero (16:9 frame math).

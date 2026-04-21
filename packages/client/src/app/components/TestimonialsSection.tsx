@@ -39,32 +39,32 @@ const TESTIMONIALS = [
 
 export default function TestimonialsSection() {
   return (
-    <section className="py-16 sm:py-20 md:py-24 px-4 text-slate-900" style={{ backgroundColor: 'hsl(38 30% 97.5%)' }}>
+    <section className="py-16 sm:py-20 md:py-24 px-4 text-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white">
             Built for <span className="text-primary">individuals and teams</span> of all sizes
           </h2>
-          <p className="mt-3 text-sm md:text-base text-slate-600">From solo builders to cross-functional teams, Starships adapts to your workflow.</p>
+          <p className="mt-3 text-sm md:text-base text-white/60">From solo builders to cross-functional teams, Starships adapts to your workflow.</p>
         </div>
 
         <div className="mt-10 md:mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           {TESTIMONIALS.map((item, idx) => (
-            <article key={idx} className={`text-left flex flex-col min-h-[230px] ${idx > 0 ? 'lg:border-l lg:border-slate-200/80 lg:pl-8' : ''}`}>
-              <p className="text-[15px] leading-relaxed text-slate-800 italic">{item.quote}</p>
-              <div className="mt-6 pt-4 border-t border-slate-300/70 flex items-center justify-between gap-3">
+            <article key={idx} className={`text-left flex flex-col min-h-[230px] ${idx > 0 ? 'lg:border-l lg:border-white/10 lg:pl-8' : ''}`}>
+              <p className="text-[15px] leading-relaxed text-white/80 italic">{item.quote}</p>
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
                 <div>
                   <a
                     href={item.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-semibold text-slate-900 hover:text-primary hover:underline underline-offset-2 transition-colors"
+                    className="text-sm font-semibold text-white/90 hover:text-primary hover:underline underline-offset-2 transition-colors"
                   >
                     {item.author}
                   </a>
-                  <p className="text-xs text-slate-600">{item.role}</p>
+                  <p className="text-xs text-white/50">{item.role}</p>
                 </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white" aria-hidden>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/[0.06]" aria-hidden>
                   <Image src={item.sourceLogo} alt="" width={15} height={15} className="object-contain" />
                 </span>
               </div>

@@ -21,7 +21,7 @@ export default function PricingTeaser() {
     router.push('/login')
   }
   return (
-    <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4 bg-white">
+    <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4">
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="relative group">
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>

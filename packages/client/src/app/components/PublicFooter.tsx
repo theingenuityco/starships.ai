@@ -41,7 +41,6 @@ export function PublicFooter(props: {
       links: [
         { label: 'Pricing', href: '/pricing' },
         { label: 'Explore', href: '/explore' },
-        { label: 'Use cases', href: '/use-cases' },
         { label: 'Login', href: '/login' },
       ],
     },
@@ -49,8 +48,6 @@ export function PublicFooter(props: {
       title: 'Resources',
       links: [
         { label: 'Documentation', href: '/docs', external: true },
-        { label: 'Lead generation', href: '/use-cases/lead-generation' },
-        { label: 'WordPress site', href: '/use-cases/wordpress-site' },
         { label: 'Marketplace', href: '/marketplace' },
       ],
     },

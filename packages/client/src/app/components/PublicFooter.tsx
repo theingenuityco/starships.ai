@@ -71,7 +71,7 @@ export function PublicFooter(props: {
   ]
 
   return (
-    <footer className="relative isolate overflow-hidden border-t border-white/10 bg-[#050b24] pt-10 pb-8 text-white sm:pt-14">
+    <footer className="relative isolate overflow-hidden border-t border-white/10 bg-[#0f0f0f] pt-10 pb-8 text-white sm:pt-14">
       {showTopDivider ? <div suppressHydrationWarning className={topDividerClassName} /> : null}
 
       <div
@@ -97,7 +97,7 @@ export function PublicFooter(props: {
           <div className="md:col-span-4">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#050b24] focus-visible:ring-2 focus-visible:ring-white/40"
+              className="inline-flex items-center gap-2 text-white outline-none ring-offset-2 ring-offset-[#0f0f0f] focus-visible:ring-2 focus-visible:ring-white/40"
               onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: '/' })}
             >
               <span
@@ -201,7 +201,7 @@ export function PublicFooter(props: {
               href="https://theingenuity.co"
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-none px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
+              className="rounded-md px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
               onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://theingenuity.co' })}
             >
               The Ingenuity Co

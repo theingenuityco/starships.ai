@@ -21,13 +21,13 @@ export default function PricingTeaser() {
     router.push('/login')
   }
   return (
-    <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4 bg-white">
+    <section className="relative pt-8 sm:pt-10 pb-12 sm:pb-14 px-4">
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="relative group">
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
             <div className="absolute -inset-[2px] bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
           </div>
-          <div className="relative flex flex-col items-center justify-between gap-5 overflow-hidden !rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center text-white shadow-lg sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left">
+          <div className="relative flex flex-col items-center justify-between gap-5 overflow-hidden rounded-xl border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-center text-white shadow-lg sm:gap-6 sm:px-8 sm:py-9 md:flex-row md:text-left">
             <div>
               <h2 className="mb-2 text-2xl font-semibold text-white md:text-3xl">Meet your AI team in minutes</h2>
               <p className="text-sm text-white/85">Start free, then scale up when you’re ready.</p>

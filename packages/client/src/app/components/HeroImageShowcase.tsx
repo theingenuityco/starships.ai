@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { landingFrameInset, landingHeroShowcaseOverlapLift, panelLightLift } from '@/app/components/landing/landingSurface'
+import { landingFrameInsetDark, landingHeroShowcaseOverlapLift, panelLightLift } from '@/app/components/landing/landingSurface'
 
 const SHOWCASE_IMAGES = ['/landing/showcase/github-gmail.png', '/landing/showcase/lead-generation.png', '/landing/showcase/lin.png', '/landing/showcase/gmail.png']
 
@@ -47,22 +47,22 @@ export default function HeroImageShowcase(props: { overlapHero?: boolean }) {
 
   const gradientSurfaceStyle = {
     background: [
-      'linear-gradient(95deg, rgba(39,24,94,0.95) 0%, rgba(114,47,166,0.92) 42%, rgba(150,70,156,0.9) 68%, rgba(189,126,52,0.92) 100%)',
-      'radial-gradient(circle at 6% 50%, rgba(99,102,241,0.30) 0%, transparent 34%)',
+      'linear-gradient(95deg, rgba(20,15,10,0.98) 0%, rgba(60,35,15,0.95) 42%, rgba(120,70,25,0.92) 68%, rgba(189,126,52,0.92) 100%)',
+      'radial-gradient(circle at 6% 50%, rgba(189,126,52,0.15) 0%, transparent 34%)',
       'radial-gradient(circle at 96% 52%, rgba(251,191,36,0.28) 0%, transparent 34%)',
     ].join(', '),
   }
 
   return (
-    <section className="relative z-[11] flow-root pb-16 sm:pb-20 px-4 bg-white text-slate-900">
+    <section className="relative z-[11] flow-root pb-16 sm:pb-20 px-4">
       {/* White band stays flush under hero; only the framed mockup lifts (wrapper transform, not section margin). */}
       <div className="relative z-[12] mx-auto max-w-6xl">
         <div className="relative" style={overlapHero ? overlapHeroFrameStyle : undefined}>
-          <div className={`w-full p-3 sm:p-4 md:p-5 ${panelLightLift}`} style={gradientSurfaceStyle}>
-            <div className="relative w-full aspect-[16/9] overflow-hidden rounded-none">
+          <div className={`w-full rounded-xl overflow-hidden p-3 sm:p-4 md:p-5 ${panelLightLift}`} style={gradientSurfaceStyle}>
+            <div className="relative w-full aspect-[16/9] overflow-hidden rounded-lg">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div
-                  className={`relative overflow-hidden ${landingFrameInset}`}
+                  className={`relative overflow-hidden ${landingFrameInsetDark}`}
                   style={{
                     width: '95%',
                     height: '95%',

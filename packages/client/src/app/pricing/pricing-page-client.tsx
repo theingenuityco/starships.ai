@@ -39,8 +39,7 @@ export default function PricingPageClient(): React.JSX.Element {
   const { data: plans = [], isLoading, isError } = useSubscriptionPlans(true, { publicAccess: !isAuthenticated })
 
   const shipClassOrder: Record<string, number> = { scout: 0, frigate: 1, cruiser: 2 }
-  /** Same flat fill and hard-offset depth as landing `shellMuted` / Security cards. */
-  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
+  const planCardSurfaceClass = 'border border-slate-200 bg-[#F8F8FA] shadow-sm'
   /**
    * Top → bottom wash (inline gradient so opacity reads on `#F8F8FA`; Tailwind-only stops were too faint).
    * Subtle under plan title/price; fades out by ~18% height from the top.
@@ -240,18 +239,18 @@ export default function PricingPageClient(): React.JSX.Element {
               {isLoading ? (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {[0, 1, 2].map(idx => (
-                  <Card key={idx} className="h-72 animate-pulse rounded-none" />
+                  <Card key={idx} className="h-72 animate-pulse rounded-xl" />
                 ))}
               </div>
             ) : isError ? (
-              <Card className="mx-auto max-w-2xl rounded-none border-destructive/30">
+              <Card className="mx-auto max-w-2xl rounded-xl border-destructive/30">
                 <CardHeader>
                   <CardTitle>Couldn&apos;t load plans right now</CardTitle>
                   <CardDescription>Our pricing catalog is temporarily unavailable. Please refresh in a moment.</CardDescription>
                 </CardHeader>
               </Card>
             ) : selfServePlans.length === 0 ? (
-              <Card className="mx-auto max-w-2xl rounded-none">
+              <Card className="mx-auto max-w-2xl rounded-xl">
                 <CardHeader>
                   <CardTitle>No plans available</CardTitle>
                   <CardDescription>There are no active plan entries in the catalog at the moment.</CardDescription>
@@ -263,7 +262,7 @@ export default function PricingPageClient(): React.JSX.Element {
 
           {!isLoading && !isError && selfServePlans.length > 0 ? (
             <section className="w-full shrink-0">
-              <div className="overflow-hidden rounded-none bg-[#F8F8FA]">
+              <div className="overflow-hidden rounded-xl bg-[#F8F8FA]">
                 <div className="overflow-x-auto overflow-y-hidden">
                   <table className="w-full min-w-[920px] table-fixed border-collapse text-left">
                     <colgroup>
@@ -297,7 +296,7 @@ export default function PricingPageClient(): React.JSX.Element {
                             >
                               <div
                                 className={cn(
-                                  'mx-auto flex min-h-[32px] w-full items-center justify-center rounded-none py-2 text-[11px] font-semibold leading-none tracking-[0.08em]',
+                                  'mx-auto flex min-h-[32px] w-full items-center justify-center rounded-xl py-2 text-[11px] font-semibold leading-none tracking-[0.08em]',
                                   isRecommended ? 'bg-amber-400 text-slate-900' : 'bg-transparent text-transparent'
                                 )}
                               >
@@ -306,13 +305,13 @@ export default function PricingPageClient(): React.JSX.Element {
                               <div className="relative isolate mx-auto w-full">
                                 <div
                                   className={cn(
-                                    'relative z-10 flex h-[174px] w-full min-w-0 flex-col overflow-x-hidden overflow-y-visible rounded-none border bg-[#F8F8FA]',
+                                    'relative z-10 flex h-[174px] w-full min-w-0 flex-col overflow-x-hidden overflow-y-visible rounded-xl border bg-[#F8F8FA] shadow-sm',
                                     shipClass === 'frigate'
-                                      ? 'border-amber-300 shadow-[3px_3px_0_0_rgb(226_232_240)]'
-                                      : 'border-slate-200 shadow-[3px_3px_0_0_rgb(226_232_240)]'
+                                      ? 'border-amber-300'
+                                      : 'border-slate-200'
                                   )}
                                 >
-                                  <div className="pointer-events-none absolute inset-0 z-0 rounded-none" style={cardGlowStyle} aria-hidden />
+                                  <div className="pointer-events-none absolute inset-0 z-0 rounded-xl" style={cardGlowStyle} aria-hidden />
                                   <div className="relative z-10 box-border flex min-h-0 min-w-0 flex-1 flex-col px-4 pb-4 pt-4 sm:px-5">
                                     <div className="min-w-0 shrink-0 space-y-1.5 text-center sm:space-y-2">
                                       <div className="text-balance text-base font-semibold leading-tight tracking-tight text-foreground break-words sm:text-lg">
@@ -427,7 +426,7 @@ export default function PricingPageClient(): React.JSX.Element {
             <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
               <div className="absolute -inset-[2px] bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 opacity-50 blur-md transition-opacity duration-500 group-hover:opacity-80" />
             </div>
-            <div className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden !rounded-none border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-white shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
+            <div className="relative flex w-full flex-col items-stretch gap-6 overflow-hidden rounded-xl border-0 bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-amber-500 px-6 py-8 text-white shadow-lg sm:px-8 sm:py-9 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0 flex-1 text-left">
                 <h3 className="text-2xl font-semibold text-white md:text-3xl">Request a custom quote</h3>
                 <p className="mt-2 max-w-2xl text-sm text-white/90">Looking for enterprise solutions? Email us what you need.</p>

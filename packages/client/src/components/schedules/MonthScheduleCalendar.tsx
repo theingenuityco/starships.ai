@@ -23,8 +23,6 @@ export type MonthScheduleCalendarProps = {
   runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>
   onDayClick?: (date: Date) => void
   className?: string
-  /** Landing / neo-brutalist: square corners on grid, cells, and task chips */
-  squareEdges?: boolean
 }
 
 function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>, key: string): MonthCalendarRun[] {
@@ -72,14 +70,13 @@ export function MonthScheduleCalendar({
   runsByDay,
   onDayClick,
   className,
-  squareEdges = false,
 }: MonthScheduleCalendarProps) {
   const CellTag: any = onDayClick ? 'button' : 'div'
-  const frameRadius = squareEdges ? 'rounded-none' : 'rounded-xl'
-  const headerCellRadius = squareEdges ? 'rounded-none' : 'rounded-md'
-  const dayCellRadius = squareEdges ? 'rounded-none' : 'rounded-lg'
-  const chipRadius = squareEdges ? 'rounded-none' : 'rounded-md'
-  const dotRadius = squareEdges ? 'rounded-none' : 'rounded-full'
+  const frameRadius = 'rounded-xl'
+  const headerCellRadius = 'rounded-md'
+  const dayCellRadius = 'rounded-lg'
+  const chipRadius = 'rounded-md'
+  const dotRadius = 'rounded-full'
 
   return (
     <div className={cn('space-y-3', className)}>

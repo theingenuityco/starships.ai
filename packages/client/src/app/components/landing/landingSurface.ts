@@ -1,11 +1,11 @@
 /**
- * Starships landing surfaces — sharp corners, neutral slate depth (no indigo offset “borders”).
+ * Starships landing surfaces — soft radius, neutral slate depth.
  * Amber stays on primary propulsion CTAs.
  */
 
 /**
  * Public marketing page floor — warmer than `bg-background` (97.5% L) so it visibly reads as cream.
- * Pair with `StarTheme theme="light"` (Pricing, Explore, etc.).
+ * Pair with `StarTheme theme=”light”` (Pricing, Explore, etc.).
  */
 export const marketingPublicPageWash = 'bg-[hsl(39_42%_96%)]'
 
@@ -14,18 +14,18 @@ export const landingMotion = 'transition-all duration-100 ease-out'
 const softLift = `${landingMotion} hover:-translate-y-px`
 
 /** Light — white */
-export const panelLight = 'rounded-none border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
+export const panelLight = 'rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.08)]'
 export const panelLightLift = `${softLift} hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]`
 
-/** Outer shells (dense blocks on cream sections) — hard offset shadow matches landing icon tiles */
-export const shellMuted = 'rounded-none border border-slate-200 bg-[#F8F8FA] shadow-[3px_3px_0_0_rgb(226_232_240)]'
-export const shellMutedLift = `${softLift} hover:shadow-[4px_4px_0_0_rgb(203_213_225)]`
+/** Outer shells (dense blocks on cream sections) */
+export const shellMuted = 'rounded-xl border border-slate-200 bg-[#F8F8FA] shadow-sm'
+export const shellMutedLift = `${softLift} hover:shadow-md`
 
 export const socialDark =
-  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-none border border-white/15 bg-white/[0.06] text-white ' +
+  'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white ' +
   `${landingMotion} hover:border-white/25 hover:bg-white/[0.1] hover:text-white active:opacity-90`
 
-export const footerNavLinkDark = 'inline-flex w-full max-w-full items-center gap-1.5 rounded-none py-1.5 text-sm font-semibold text-white/90 transition-colors duration-100 hover:text-white'
+export const footerNavLinkDark = 'inline-flex w-full max-w-full items-center gap-1.5 rounded-md py-1.5 text-sm font-semibold text-white/90 transition-colors duration-100 hover:text-white'
 
 export const footerEyebrowDark = 'pb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-violet-200'
 
@@ -81,15 +81,15 @@ export const landingWhiteCtaOnGradientMd = `${landingWhiteOnGradientCore} h-11 p
 
 /** Secondary — light sections */
 export const landingSecondaryCta =
-  'inline-flex items-center justify-center gap-2 rounded-none border-2 border-slate-800 bg-white px-6 py-3 text-base font-semibold text-slate-800 ' +
-  'shadow-[3px_3px_0_0_rgb(203_213_225)] transition-all duration-100 hover:bg-slate-900 hover:text-white hover:shadow-[4px_4px_0_0_rgb(148_163_184)] ' +
-  'active:translate-x-0.5 active:translate-y-0.5 active:shadow-[2px_2px_0_0_rgb(203_213_225)]'
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-800 ' +
+  'shadow-sm transition-all duration-100 hover:bg-slate-900 hover:text-white hover:border-slate-900 hover:shadow-md ' +
+  'active:-translate-y-px'
 
 /** Header nav hit area: works on light pages and star-theme-dark landing. */
-export const landingHeaderNavItem = 'transition-colors duration-100 rounded-none px-2 py-1 hover:bg-slate-900/[0.06] dark:hover:bg-white/10'
+export const landingHeaderNavItem = 'transition-colors duration-100 rounded-md px-2 py-1 hover:bg-slate-900/[0.06] dark:hover:bg-white/10'
 
 /** Inline image / screenshot frame */
-export const landingFrameInset = 'rounded-none border-2 border-slate-200/80 bg-white shadow-[3px_3px_0_0_rgb(226_232_240)]'
+export const landingFrameInset = 'rounded-xl border border-slate-200/80 bg-white shadow-sm'
 
 /**
  * Vertical lift of `HeroImageShowcase` into the hero (16:9 frame math).

@@ -30,12 +30,12 @@ export default function CollaborationHighlights() {
         {HIGHLIGHTS.map(item => (
           <article
             key={item.title}
-            className="rounded-none border border-slate-200 p-4 md:p-5 shadow-[3px_3px_0_0_rgb(226_232_240)]"
+            className="rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm"
             style={{ backgroundColor: '#F8F8FA' }}
           >
             <h4 className="text-base font-semibold text-slate-900 md:text-lg">{item.title}</h4>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.description}</p>
-            <div className="mt-4 overflow-hidden rounded-none border border-slate-200 bg-slate-100">
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
               <div className="relative w-full aspect-[16/9]">
                 <Image src={item.imageSrc} alt={item.imageAlt} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover object-left-top" />
               </div>

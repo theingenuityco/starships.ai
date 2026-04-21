@@ -107,7 +107,7 @@ export function PublicHeader(): React.JSX.Element {
               <button
                 type="button"
                 className={[
-                  'inline-flex items-center gap-1.5 rounded-none transition-colors duration-100',
+                  'inline-flex items-center gap-1.5 transition-colors duration-100',
                   pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
                   landingHeaderNavItem,
                 ].join(' ')}
@@ -120,19 +120,19 @@ export function PublicHeader(): React.JSX.Element {
             <DropdownMenuContent
               align="start"
               sideOffset={8}
-              className="w-80 overflow-hidden rounded-none border border-border bg-card p-0 text-card-foreground shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+              className="w-80 overflow-hidden rounded-xl border border-border bg-card p-0 text-card-foreground shadow-lg"
             >
               <div className="border-b border-border px-3 py-2.5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Use cases</p>
               </div>
               <DropdownMenuItem
-                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
+                className="cursor-pointer items-start gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
                   router.push('/use-cases/lead-generation')
                 }}
               >
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-primary">
                   <Icon name="sparkles" className="h-4 w-4 text-primary" weight="regular" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -141,13 +141,13 @@ export function PublicHeader(): React.JSX.Element {
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="cursor-pointer items-start gap-3 rounded-none px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
+                className="cursor-pointer items-start gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
                 onSelect={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
                   router.push('/use-cases/wordpress-site')
                 }}
               >
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-primary">
                   <Icon name="globe" className="h-4 w-4 text-primary" weight="regular" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -230,7 +230,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Lead generation
               </Link>
@@ -240,7 +240,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 WordPress site
               </Link>
@@ -250,7 +250,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Explore
               </Link>
@@ -260,7 +260,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/login', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Login
               </Link>
@@ -270,7 +270,7 @@ export function PublicHeader(): React.JSX.Element {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'mobile' })
                   setMobileMenuOpen(false)
                 }}
-                className={`block rounded-none px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
+                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/pricing') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
               >
                 Pricing
               </Link>

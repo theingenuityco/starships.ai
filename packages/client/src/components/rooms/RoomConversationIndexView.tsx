@@ -8,13 +8,20 @@ import type { ConversationMessageInputRef } from '@/components/conversation/Conv
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { LEAD_GEN_PROMPT_CARDS } from '@/app/use-cases/lead-gen-prompts'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+const LEAD_GEN_PROMPT_CARDS = [
+  { title: 'Find ideal leads', description: 'Find me 50 leads of professional photographers in London, with their website, LinkedIn, and work email.' },
+  { title: 'Get decision makers', description: 'For each company in this sheet, list 1–2 likely decision makers with their role and LinkedIn profile.' },
+  { title: 'Enrich my list', description: 'Enrich this CSV of companies with 1–2 decision makers per company, including role, LinkedIn, and verified work email.' },
+  { title: 'Write first-touch emails', description: 'Write a short, friendly cold email for each contact that references one specific detail from their site or LinkedIn.' },
+  { title: 'Score the leads', description: 'Score each lead as A/B/C based on fit and timing, and add one sentence on why you gave that score.' },
+] as const
 
 export function RoomConversationIndexView(props: {
   starshipId: string
@@ -399,20 +406,6 @@ export function RoomConversationIndexView(props: {
         </div>
       </div>
 
-      {isLobbyRoom ? (
-        <div className="flex-none room-conversation-bg px-4 py-5 sm:py-6 flex flex-col items-center gap-4" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))' }}>
-          <Button
-            asChild
-            size="lg"
-            className="relative inline-flex items-center justify-center h-11 px-6 rounded-full text-sm sm:text-base font-semibold whitespace-nowrap text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] transition border-0 gap-2"
-          >
-            <Link href="/use-cases/lead-generation" className="inline-flex items-center gap-2">
-              Generate Leads
-              <Icon name="chevron-right" className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      ) : null}
     </div>
   )
 }

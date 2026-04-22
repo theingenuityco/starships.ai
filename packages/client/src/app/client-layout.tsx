@@ -52,7 +52,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const router = useRouter()
   const { user, isAuthenticated } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
-  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(user?.id ?? '', !!user?.id)
+  const { data: starships = [] } = useUserStarships(user?.id ?? '', !!user?.id)
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
   const isDashboard = pathname === '/'
@@ -60,14 +60,13 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isMarketplaceRoute = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isMarketplace = isExploreRoute || isMarketplaceRoute
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
-  const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
     pathname === '/' ||
     pathname === '/new' ||
     pathname === '/pricing' ||
     pathname === '/use-cases' ||
     pathname.startsWith('/use-cases/') ||
-    pathname === '/automate' ||
+    pathname === '/onboarding' ||
     pathname === '/login' ||
     pathname === '/accept-invite' ||
     pathname === '/forgot-password' ||
@@ -95,7 +94,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path === '/terms') return 'Terms of Service | Starships.ai'
       if (path === '/privacy') return 'Privacy Policy | Starships.ai'
       if (path === '/account') return 'My Profile | Starships.ai'
-      if (path === '/onboarding') return 'Set up your starship | Starships.ai'
+      if (path === '/onboarding') return 'Get started — Starships.ai'
       if (path.startsWith('/connectors/') && path.endsWith('/install')) return 'Connectors | Starships.ai'
 
       // Admin
@@ -176,29 +175,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => clearTimeout(t)
   }, [])
 
-  // Redirect already-logged-in users who haven't completed the wizard.
-  // IMPORTANT: We only force the wizard when the user is navigating to their OWN starship.
-  // Invite joiners should be able to use the invited starship without being forced through onboarding.
-  // Must run unconditionally (before any early return) to satisfy Rules of Hooks.
-  useEffect(() => {
-    if (!isAuthenticated || !user || pathname === '/onboarding' || isPublicSimplePage) return
-    if (user.wizardOnboardingCompleted) return
-    if (starshipsLoading) return
-    if (!isShipPage) return
-
-    const parts = pathname.split('/').filter(Boolean) // ['ship', '{slug}', ...]
-    const slug = parts.length >= 2 && parts[0] === 'ship' ? parts[1] : null
-    if (!slug) return
-
-    const current = starships.find(s => s.slug === slug) ?? null
-    if (!current) return
-
-    const isOwner = Boolean(user?.id && current.ownerId === user.id)
-    if (!isOwner) return
-
-    router.replace('/onboarding')
-  }, [isAuthenticated, user?.id, user?.wizardOnboardingCompleted, pathname, isPublicSimplePage, starshipsLoading, isShipPage, starships, router])
-
   if (isPublicSimplePage) {
     // Public pages - no authentication required
     const isPricing = pathname === '/pricing'
@@ -216,23 +192,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           children
         )}
       </div>
-    )
-  }
-
-  // Wizard onboarding - full page, no sidebar (authenticated only via JwtAuthGate)
-  if (pathname === '/onboarding') {
-    return (
-      <JwtAuthGate>
-        <StarTheme>
-          <NotificationSoundBootstrap />
-          <Suspense fallback={null}>
-            <EmailChangeToastHandler />
-          </Suspense>
-          <div className="relative min-h-[100dvh] w-full overflow-auto bg-background">
-            <main className="relative min-h-full w-full">{children}</main>
-          </div>
-        </StarTheme>
-      </JwtAuthGate>
     )
   }
 

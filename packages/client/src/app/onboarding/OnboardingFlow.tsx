@@ -7,7 +7,7 @@ import { Step2CompanyInfo } from './steps/Step2CompanyInfo'
 import { Step3IcpProfiles } from './steps/Step3IcpProfiles'
 import { Step4DatasetPreview } from './steps/Step4DatasetPreview'
 
-export type AutomateFlowData = {
+export type OnboardingFlowData = {
   companyName: string
   websiteUrl: string
   bio: string
@@ -15,7 +15,7 @@ export type AutomateFlowData = {
   previewAccounts: IcpAccountPreview[]
 }
 
-const INITIAL_DATA: AutomateFlowData = {
+const INITIAL_DATA: OnboardingFlowData = {
   companyName: '',
   websiteUrl: '',
   bio: '',
@@ -23,11 +23,11 @@ const INITIAL_DATA: AutomateFlowData = {
   previewAccounts: [],
 }
 
-export function AutomateFlow() {
+export function OnboardingFlow() {
   const [step, setStep] = useState(1)
-  const [data, setData] = useState<AutomateFlowData>(INITIAL_DATA)
+  const [data, setData] = useState<OnboardingFlowData>(INITIAL_DATA)
 
-  function update(patch: Partial<AutomateFlowData>) {
+  function update(patch: Partial<OnboardingFlowData>) {
     setData(prev => ({ ...prev, ...patch }))
   }
 

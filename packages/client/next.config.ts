@@ -26,6 +26,11 @@ const nextConfig: NextConfig = {
     // Enable optimizations for CI builds to reduce memory usage
     ...(process.env.CI ? { optimizePackageImports: ['@radix-ui/react-icons', '@iconify/react'] } : {}),
   },
+  async redirects() {
+    return [
+      { source: '/automate', destination: '/onboarding', permanent: true },
+    ]
+  },
   async headers() {
     // NOTE: These are HTTP cache headers for CDN/edge + browser caching.
     // App Router static/ISR controls *generation*; these headers control *delivery*.
@@ -64,6 +69,7 @@ const nextConfig: NextConfig = {
       },
       // Public pages (cache at edge; browsers revalidate)
       { source: '/', headers: [{ key: 'Cache-Control', value: HOME_DOCUMENT_CACHE_CONTROL }] },
+      { source: '/onboarding', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/use-cases', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/use-cases/:path*', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
       { source: '/explore', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },

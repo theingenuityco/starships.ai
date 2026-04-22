@@ -1,9 +1,9 @@
-import type { ToolTemplateCategory } from '@starships/protocol'
+import type { ToolCategory } from '@starships/protocol'
 
 export interface ToolFormData {
   name: string
   description: string
-  category: ToolTemplateCategory
+  category: ToolCategory
   exampleUsage: string
   requiresApiKey: boolean
   parameters: string // JSON string for the parameters schema

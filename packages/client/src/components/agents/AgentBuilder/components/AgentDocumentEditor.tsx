@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 import { useLlmModels } from '@/hooks/useLlmModels'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
-import { AgentPublishModal } from './AgentPublishModal'
+
 import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
@@ -125,25 +125,6 @@ export function AgentDocumentEditor({
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
   const [showIdentityInBanner, setShowIdentityInBanner] = useState(false)
-
-  // Local loading state for publication request
-  const [isRequestingPublish, setIsRequestingPublish] = useState(false)
-
-  // Publication dialog state (agent-level)
-  const [showPublishDialog, setShowPublishDialog] = useState(false)
-  const [versionBump, setVersionBump] = useState<'patch' | 'minor' | 'major'>('patch')
-  const [changelog, setChangelog] = useState('')
-
-  // Optional per-tool publication overrides (keyed by toolId)
-  const [toolOverrides, setToolOverrides] = useState<
-    Record<
-      string,
-      {
-        versionBump: 'patch' | 'minor' | 'major'
-        changelog: string
-      }
-    >
-  >({})
 
   // Autosave state (existing agents only)
   const [isAutosaving, setIsAutosaving] = useState(false)
@@ -291,9 +272,6 @@ export function AgentDocumentEditor({
     const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
     return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
   }, [starshipTools, selectedToolSlugs])
-
-  // Publication workflow has been removed; no tool overrides are needed.
-  const assignedToolsForOverrides: ToolModel[] = []
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
@@ -484,78 +462,7 @@ export function AgentDocumentEditor({
     }
   }
 
-  const computeNextVersion = (currentVersion: string | undefined, bump: 'patch' | 'minor' | 'major'): string => {
-    const base = currentVersion || '1.0.0'
-    const match = base.match(/^(\d+)\.(\d+)\.(\d+)/)
-    if (!match) return '1.0.0'
 
-    const major = Number(match[1])
-    const minor = Number(match[2])
-    const patch = Number(match[3])
-
-    switch (bump) {
-      case 'patch':
-        return `${major}.${minor}.${patch + 1}`
-      case 'minor':
-        return `${major}.${minor + 1}.0`
-      case 'major':
-        return `${major + 1}.0.0`
-    }
-  }
-
-  const nextVersion = useMemo(() => computeNextVersion(fullAgent?.version, versionBump), [fullAgent?.version, versionBump])
-
-  // Publish dialog step state: agent first, then each assigned tool override
-  const publishSteps = useMemo(() => {
-    const toolIds = Array.isArray(assignedToolsForOverrides) ? assignedToolsForOverrides.map(t => t.id) : []
-    return ['agent', ...toolIds]
-  }, [assignedToolsForOverrides])
-  const [activePublishStep, setActivePublishStep] = useState<string>('agent')
-
-  const handleRequestPublication = async () => {
-    if (readOnly) return
-    if (!agentId) return
-    if (!fullAgent) return
-
-    if (!changelog.trim()) {
-      toast.error('Changelog required', { description: 'Please provide a short changelog describing your changes.' })
-      return
-    }
-
-    try {
-      setIsRequestingPublish(true)
-      const res: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/publish-request`, {
-        versionBump,
-        changelog: changelog.trim(),
-        toolOverrides: Object.entries(toolOverrides)
-          .filter(([, o]) => !!o.changelog.trim())
-          .map(([toolId, o]) => ({
-            toolId,
-            versionBump: o.versionBump,
-            changelog: o.changelog.trim(),
-          })),
-      })
-      const updated = res.data.data.agent
-
-      // Update local fullAgent state so UI reflects new status immediately
-      setFullAgent(updated)
-
-      // Update cached agent detail as well
-      queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
-
-      toast.success('Publication requested', {
-        description: res.data.data.message || 'Your agent is now pending review for publication.',
-      })
-      setShowPublishDialog(false)
-      setChangelog('')
-      setToolOverrides({})
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to request publication'
-      toast.error('Failed to request publication', { description: message })
-    } finally {
-      setIsRequestingPublish(false)
-    }
-  }
 
   // If slug is empty but we can infer it from window.location, set it once as a last resort
   useEffect(() => {
@@ -648,7 +555,6 @@ export function AgentDocumentEditor({
   }, [agentId, value, onChange, providedAgentId, providedAgent, onFieldChange])
 
   const hasExistingAgent = !!agentId
-  const canRequestPublication = hasExistingAgent && !!fullAgent && !readOnly
 
   // Autosave agent changes for existing agents
   useEffect(() => {
@@ -913,65 +819,7 @@ export function AgentDocumentEditor({
               </div>
             </div>
           )}
-
-          {!readOnly && (
-            <div className="flex flex-col gap-1 items-start sm:items-end">
-              <div className="flex flex-wrap items-center gap-2">
-                {hasExistingAgent && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primaryOutline"
-                    className="gap-1.5"
-                    disabled={isRequestingPublish || !canRequestPublication}
-                    onClick={() => {
-                      if (!canRequestPublication) return
-
-                      // Provide a sensible default changelog if none is set yet
-                      if (!changelog.trim()) {
-                        setChangelog('Initial publication of this agent to Explore.')
-                      }
-
-                      // Always start the stepped flow at the agent card
-                      setActivePublishStep('agent')
-                      setShowPublishDialog(true)
-                    }}
-                  >
-                    <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                    {isRequestingPublish ? 'Publishing…' : 'Publish'}
-                  </Button>
-                )}
-              </div>
-
-            </div>
-          )}
         </div>
-      ) : null}
-
-      {/* Publication Request Dialog */}
-      {!embedded ? (
-        <AgentPublishModal
-          open={showPublishDialog}
-          readOnly={readOnly}
-          onOpenChange={setShowPublishDialog}
-          fullAgent={fullAgent}
-          value={value}
-          assignedToolsForOverrides={assignedToolsForOverrides}
-          versionBump={versionBump}
-          setVersionBump={setVersionBump}
-          changelog={changelog}
-          setChangelog={setChangelog}
-          toolOverrides={toolOverrides}
-          setToolOverrides={setToolOverrides}
-          publishSteps={publishSteps}
-          activePublishStep={activePublishStep}
-          setActivePublishStep={setActivePublishStep}
-          nextVersion={nextVersion}
-          isRequestingPublish={isRequestingPublish}
-          onSubmit={() => {
-            void handleRequestPublication()
-          }}
-        />
       ) : null}
 
       {/* Core configuration */}

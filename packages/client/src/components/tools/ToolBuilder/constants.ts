@@ -1,5 +1,5 @@
 import type { ToolFormData } from './types'
-import type { ToolTemplateCategory } from '@starships/protocol'
+import type { ToolCategory } from '@starships/protocol'
 
 export const INITIAL_FORM_DATA: ToolFormData = {
   name: '',
@@ -26,4 +26,4 @@ export const INITIAL_FORM_DATA: ToolFormData = {
   ),
 }
 
-export const CATEGORIES: ToolTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
+export const CATEGORIES: ToolCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']

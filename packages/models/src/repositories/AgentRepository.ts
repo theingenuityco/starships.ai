@@ -1,14 +1,9 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { ToolEntity } from '@/entities/ToolEntity';
-import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
-import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
-import { AttachmentRepository } from '@/repositories/AttachmentRepository';
-import { ToolRepository } from '@/repositories/ToolRepository';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 import { generateSlug } from '@/helpers/slugUtils';
-import { compareVersions } from '@/utils/version';
 import {
   DEFAULT_AGENT_MAX_TOKENS,
   DEFAULT_AGENT_TIMEOUT_MS,
@@ -18,88 +13,13 @@ import {
   MIN_AGENT_TIMEOUT_MS,
 } from '@/constants/agentDefaults';
 import { ValidationError } from '@starships/errors';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
-import type { AgentParamsWithoutMetadata } from '@starships/protocol';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel } from '@starships/protocol';
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { PostgresConnection } from '@/helpers/database';
 
 export class AgentRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
     super('AgentRepository', connection);
-  }
-
-  /**
-   * Unpublish an agent: revert publication status to draft and clear publication metadata.
-   *
-   * Note: This is intended to be paired with deletion of the associated agent_template
-   * (published_template_id) at the service layer.
-   */
-  async unpublishAgent(id: string): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const agentId = String(id || '').trim();
-        if (!agentId) {
-          this.handleNotFound('Agent', id);
-        }
-
-        const connection = this.getConnection();
-        const res = await connection.query<Record<string, unknown>>(
-          `
-          UPDATE agents
-          SET
-            publication_status = 'draft',
-            publication_requested_by = NULL,
-            publication_approved_by = NULL,
-            publication_approved_at = NULL,
-            publication_version_bump = NULL,
-            publication_requested_version = NULL,
-            publication_changelog = NULL,
-            published_template_id = NULL,
-            updated_at = NOW()
-          WHERE id = $1
-          RETURNING *
-          `,
-          [agentId]
-        );
-
-        const row = res?.[0];
-        if (!row) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        return fromDatabase(AgentEntity, row as Record<string, unknown>);
-      },
-      'unpublishAgent',
-      'Agent',
-      id
-    );
-  }
-
-  /**
-   * Find the earliest agent that was promoted into a given template.
-   * Useful for tracing template lineage and for template-scoped operations that
-   * still require a starship context (remote runner, attachments, etc.).
-   */
-  async findParentAgentByPublishedTemplateId(templateId: string): Promise<AgentModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const id = String(templateId || '').trim();
-        if (!id) return null;
-        const connection = this.getConnection();
-        const row = await connection.queryOne<Record<string, unknown>>(
-          `SELECT *
-           FROM agents
-           WHERE published_template_id = $1
-           ORDER BY created_at ASC
-           LIMIT 1`,
-          [id]
-        );
-        return row ? fromDatabase(AgentEntity, row) : null;
-      },
-      'findParentAgentByPublishedTemplateId',
-      'Agent',
-      templateId
-    );
   }
 
   async findAll(): Promise<AgentModel[]> {
@@ -121,24 +41,6 @@ export class AgentRepository extends BaseRepository {
 
         const agent = fromDatabase(AgentEntity, result);
 
-        // If agent has a source template, fetch it and populate updateInfo
-        if (agent.sourceTemplateId) {
-          const connection = this.getConnection();
-          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE id = $1', [
-            agent.sourceTemplateId,
-          ]);
-
-          if (templateResult) {
-            const template = fromDatabase(AgentTemplateEntity, templateResult);
-            const comparison = compareVersions(agent.version, template.version);
-            agent.updateInfo = {
-              needsUpdate: comparison < 0,
-              latestVersion: template.version,
-              templateUpdatedAt: template.updatedAt,
-            };
-          }
-        }
-
         return agent;
       },
       'findById',
@@ -156,40 +58,6 @@ export class AgentRepository extends BaseRepository {
           [starshipId]
         );
         const agents = fromDatabaseArray(AgentEntity, result);
-
-        // Collect unique source template IDs
-        const templateIds = [...new Set(agents.filter((a) => a.sourceTemplateId).map((a) => a.sourceTemplateId))];
-
-        // If there are templates, fetch them in a single query
-        if (templateIds.length > 0) {
-          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
-          const templates = await connection.query<Record<string, unknown>>(
-            `SELECT * FROM agent_templates WHERE id IN (${placeholders})`,
-            templateIds
-          );
-
-          // Build a map of template ID to template for quick lookup
-          const templateMap = new Map<string, AgentTemplateModel>();
-          for (const template of templates) {
-            const templateModel = fromDatabase(AgentTemplateEntity, template);
-            templateMap.set(templateModel.id, templateModel);
-          }
-
-          // Populate updateInfo for each agent with a source template
-          for (const agent of agents) {
-            if (agent.sourceTemplateId) {
-              const template = templateMap.get(agent.sourceTemplateId);
-              if (template) {
-                const comparison = compareVersions(agent.version, template.version);
-                agent.updateInfo = {
-                  needsUpdate: comparison < 0,
-                  latestVersion: template.version,
-                  templateUpdatedAt: template.updatedAt,
-                };
-              }
-            }
-          }
-        }
 
         return agents;
       },
@@ -359,13 +227,6 @@ export class AgentRepository extends BaseRepository {
 
           // Versioning fields
           version: data.version || '1.0.0',
-          templateSnapshotAt: data.templateSnapshotAt,
-
-          // Publication workflow defaults
-          publicationStatus: 'draft',
-          publicationRequestedBy: undefined,
-          publicationApprovedBy: undefined,
-          publicationApprovedAt: undefined,
 
           // PostgreSQL specific fields
           starshipId: starshipId, // Direct foreign key
@@ -783,11 +644,7 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
-   * Upsert a starship-level tool permission by slug.
-   *
-   * Accepts either:
-   * - tool instance slug (tools.slug), OR
-   * - tool template slug (tool_templates.slug) (will resolve the deployed tool on this starship)
+   * Upsert a starship-level tool permission by tool instance slug.
    */
   async setStarshipToolPermissionBySlug(args: {
     starshipId: string;
@@ -802,21 +659,11 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        // 1) Tool instance slug on starship (tools.slug)
-        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        // Look up by tool instance slug on starship (tools.slug)
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
-        // 2) Fallback: tool template slug → resolve deployed tool for this starship
-        if (!toolResult?.id) {
-          toolResult = await connection.queryOne<{ id: string }>(
-            `SELECT t.id FROM tools t
-             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
-             WHERE tt.slug = $1 AND t.starship_id = $2
-             LIMIT 1`,
-            [toolSlug, starshipId]
-          );
-        }
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
@@ -837,8 +684,7 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
-   * Remove a starship-level tool permission mapping by tool slug.
-   * Accepts tool instance slug or template slug (same resolution as setStarshipToolPermissionBySlug).
+   * Remove a starship-level tool permission mapping by tool instance slug.
    */
   async removeStarshipToolPermissionBySlug(args: { starshipId: string; toolSlug: string }): Promise<void> {
     return this.executeWithErrorHandling(
@@ -850,20 +696,10 @@ export class AgentRepository extends BaseRepository {
 
         const connection = this.getConnection();
         // Resolve tool ID by instance slug
-        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
-        // Fallback: resolve by template slug
-        if (!toolResult?.id) {
-          toolResult = await connection.queryOne<{ id: string }>(
-            `SELECT t.id FROM tools t
-             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
-             WHERE tt.slug = $1 AND t.starship_id = $2
-             LIMIT 1`,
-            [toolSlug, starshipId]
-          );
-        }
         if (!toolResult?.id) {
           // Idempotent: nothing to delete
           return;
@@ -932,22 +768,11 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        // 1) Look up by tool instance slug on starship (tools.slug)
-        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        // Look up by tool instance slug on starship (tools.slug)
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
-        // 2) If not found, client may have sent a template slug (e.g. from DeploymentConfirmationModal assignedToolSlugs).
-        //    Resolve tool on this starship that was created from a template with that slug.
-        if (!toolResult?.id) {
-          toolResult = await connection.queryOne<{ id: string }>(
-            `SELECT t.id FROM tools t
-             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
-             WHERE tt.slug = $1 AND t.starship_id = $2
-             LIMIT 1`,
-            [toolSlug, starshipId]
-          );
-        }
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
@@ -995,20 +820,11 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        // Resolve tool id (instance slug first, then template slug)
-        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        // Resolve tool id by instance slug
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
-        if (!toolResult?.id) {
-          toolResult = await connection.queryOne<{ id: string }>(
-            `SELECT t.id FROM tools t
-             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
-             WHERE tt.slug = $1 AND t.starship_id = $2
-             LIMIT 1`,
-            [toolSlug, starshipId]
-          );
-        }
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
@@ -1044,147 +860,6 @@ export class AgentRepository extends BaseRepository {
       'setEffectiveToolPermissionBySlug',
       'Agent',
       args.agentId
-    );
-  }
-
-  // ============================================================================
-  // AGENT TEMPLATE RELATIONSHIPS
-  // ============================================================================
-
-  /**
-   * Create Agent from AgentTemplate with proper relationship
-   */
-  async createFromTemplate(templateId: string, starshipId: string, customizations?: Partial<CreateAgentRequest>): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        // Use AgentTemplateRepository to get template
-        const templateRepository = new AgentTemplateRepository();
-        // Important: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
-        // Public findById() intentionally strips these fields for marketplace/client consumption.
-        const template = await templateRepository.findInternalById(templateId);
-
-        if (!template) {
-          this.handleNotFound('AgentTemplate', templateId);
-        }
-
-        // Slugs are always generated by the server.
-        // Instance slugs use incremental suffixes and are unique PER starship.
-        const baseFromName = generateSlug(String(customizations?.name || template.name || 'agent')) || 'agent';
-        const slug = await generateUniqueSlugIncremental(
-          baseFromName,
-          async (candidate) => await this.agentSlugExistsOnStarship(starshipId, candidate),
-          { fallbackBase: 'agent', maxLength: 100 }
-        );
-
-        // Create agent from template with optional customizations
-        const now = new Date().toISOString();
-        const agentData: CreateAgentRequest = {
-          name: customizations?.name || template.name,
-          role: customizations?.role || template.role || 'Assistant',
-          description: customizations?.description || template.description,
-          model: customizations?.model || template.model,
-          temperature: customizations?.temperature ?? template.temperature,
-          maxTokens: customizations?.maxTokens ?? template.maxTokens,
-          reasoning:
-            (customizations as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
-            (template as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
-            undefined,
-          timeout: customizations?.timeout ?? template.timeout,
-          systemPrompt: customizations?.systemPrompt || template.systemPrompt,
-          state: customizations?.state || template.state || { tools: [], messages: [] },
-          blueprint: customizations?.blueprint || template.blueprint,
-          previewPrompts: customizations?.previewPrompts || template.previewPrompts,
-          assignedToolSlugs: customizations?.assignedToolSlugs,
-          sourceTemplateId: template.id,
-          version: template.version, // Copy template version
-          templateSnapshotAt: now, // Capture snapshot time
-        };
-
-        // Create agent with source_template_id foreign key
-        const agentProps = {
-          ...agentData,
-          slug,
-          starshipId: starshipId,
-          sourceTemplateId: template.id, // Set source_template_id foreign key
-          deployedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        };
-
-        const agentEntity = toEntityInstance(AgentEntity, agentProps);
-        const result = await this.createEntity<Record<string, unknown>>('agents', toDatabase(agentEntity));
-        const agent = fromDatabase(AgentEntity, result);
-
-        // Avatar propagation on create:
-        // If the template has a public avatar stored (avatar_s3_key), create an attachment reference
-        // owned by this starship and link it on the newly created agent.
-        //
-        // This covers initial deployments (e.g. starship creation) where updateFromTemplate() is not called.
-        try {
-          const storage = await templateRepository.getAvatarStorageById(templateId);
-          if (storage?.avatarS3Key) {
-            const mimeType = storage.avatarMimeType || 'image/png';
-            const extForMime = (mt: string): string => {
-              if (mt.includes('png')) return 'png';
-              if (mt.includes('jpeg') || mt.includes('jpg')) return 'jpg';
-              if (mt.includes('webp')) return 'webp';
-              if (mt.includes('gif')) return 'gif';
-              return 'img';
-            };
-            const filename = `template-avatar__${templateId}__${agent.id}.${extForMime(mimeType)}`;
-
-            const attachmentRepo = new AttachmentRepository();
-            const existing = await attachmentRepo.findByStarshipAndS3Key(starshipId, storage.avatarS3Key);
-            const created =
-              existing ??
-              (await attachmentRepo.create({
-                starshipId,
-                messageId: undefined,
-                filename,
-                mimeType,
-                sizeBytes: 0,
-                s3Key: storage.avatarS3Key,
-              }));
-
-            const updatedWithAvatar = await this.update(agent.id, { avatarAttachmentId: created.id });
-            if (updatedWithAvatar) {
-              // Return the hydrated/updated agent with avatarAttachmentId set
-              return updatedWithAvatar;
-            }
-          }
-        } catch {
-          // Best-effort: do not fail agent creation if avatar propagation fails.
-        }
-
-        // Increment template usage count
-        const connection = this.getConnection();
-        await connection.query('UPDATE agent_templates SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1', [templateId]);
-
-        return agent;
-      },
-      'createFromTemplate',
-      'Agent'
-    );
-  }
-
-  /**
-   * Get the AgentTemplate that this Agent was created from
-   */
-  async getSourceTemplate(agentId: string): Promise<AgentTemplateModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>(
-          `SELECT at.* FROM agent_templates at
-           INNER JOIN agents a ON a.source_template_id = at.id
-           WHERE a.id = $1`,
-          [agentId]
-        );
-        return result ? fromDatabase(AgentTemplateEntity, result) : null;
-      },
-      'getSourceTemplate',
-      'Agent',
-      agentId
     );
   }
 
@@ -1348,459 +1023,5 @@ export class AgentRepository extends BaseRepository {
     );
   }
 
-  // ============================================================================
-  // TEMPLATE VERSIONING & UPDATE MANAGEMENT
-  // ============================================================================
-
-  /**
-   * Batch count how many agents are using each tool in a starship.
-   * Returns a Map of toolId -> agent count.
-   * This avoids N+1 queries when checking usage for multiple tools.
-   */
-  private async batchCountAgentsUsingTools(toolIds: string[], starshipId: string): Promise<Map<string, number>> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (toolIds.length === 0) {
-          return new Map();
-        }
-
-        const connection = this.getConnection();
-        const placeholders = toolIds.map((_, idx) => `$${idx + 2}`).join(', ');
-
-        const results = await connection.query<{ tool_id: string; agent_count: string }>(
-          `SELECT at.tool_id, COUNT(DISTINCT at.agent_id) as agent_count
-           FROM agent_tools at
-           INNER JOIN agents a ON a.id = at.agent_id
-           WHERE at.tool_id IN (${placeholders})
-             AND a.starship_id = $1
-           GROUP BY at.tool_id`,
-          [starshipId, ...toolIds]
-        );
-
-        const countMap = new Map<string, number>();
-        for (const row of results) {
-          countMap.set(row.tool_id, parseInt(row.agent_count, 10) || 0);
-        }
-
-        // Set count to 0 for tools not in results
-        for (const toolId of toolIds) {
-          if (!countMap.has(toolId)) {
-            countMap.set(toolId, 0);
-          }
-        }
-
-        return countMap;
-      },
-      'batchCountAgentsUsingTools',
-      'Agent'
-    );
-  }
-
-  /**
-   * Update agent with latest template data
-   */
-  async updateFromTemplate(agentId: string): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const agent = await this.findById(agentId);
-
-        if (!agent) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        if (!agent.sourceTemplateId) {
-          throw new Error('Agent is not linked to a template');
-        }
-
-        const templateRepo = new AgentTemplateRepository();
-        // IMPORTANT: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
-        // Public findById() intentionally strips these fields for marketplace/client consumption.
-        const template = await templateRepo.findInternalById(agent.sourceTemplateId);
-
-        if (!template) {
-          this.handleNotFound('AgentTemplate', agent.sourceTemplateId);
-        }
-
-        // Copy current template data to agent.
-        // Important: avoid copying runtime-owned state; only sync template-owned fields.
-        const updates: UpdateAgentRequest = {
-          systemPrompt: template.systemPrompt,
-          blueprint: template.blueprint,
-          model: template.model,
-          version: template.version, // Copy template version to agent
-          templateSnapshotAt: new Date().toISOString(),
-          // Keep agent category + preview prompts aligned with template for UI/marketplace display.
-          category: template.category,
-          previewPrompts: template.previewPrompts,
-        };
-
-        // Reasoning config: allow templates to define it, but don't force-clear if missing.
-        if (template.reasoning !== undefined) {
-          updates.reasoning = template.reasoning ?? null;
-        }
-
-        // Only copy optional numeric fields if they're defined in the template
-        if (template.temperature !== null && template.temperature !== undefined) {
-          updates.temperature = template.temperature;
-        }
-        if (template.maxTokens !== null && template.maxTokens !== undefined) {
-          updates.maxTokens = template.maxTokens;
-        }
-        if (template.timeout !== null && template.timeout !== undefined) {
-          updates.timeout = template.timeout;
-        }
-
-        // Avatar sync:
-        // - Templates store avatar as S3 pointer fields (avatar_s3_key/mime/updated_at).
-        // - Agents store avatar as Attachment FK (avatarAttachmentId).
-        // We propagate template avatar to the agent ONLY if:
-        // - agent has no avatar, OR
-        // - agent avatar was previously synced from a template (filename prefix), OR
-        // - previously-synced avatar points to a different S3 key than the template now uses.
-        const storage = await templateRepo.getAvatarStorageById(agent.sourceTemplateId);
-        if (storage?.avatarS3Key) {
-          const attachmentRepo = new AttachmentRepository();
-
-          const isSyncedFilename = (filename: unknown): boolean => typeof filename === 'string' && filename.startsWith('template-avatar__');
-
-          const extForMime = (mimeType: string | undefined): string => {
-            if (!mimeType) return 'img';
-            if (mimeType.includes('png')) return 'png';
-            if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return 'jpg';
-            if (mimeType.includes('webp')) return 'webp';
-            if (mimeType.includes('gif')) return 'gif';
-            return 'img';
-          };
-
-          let shouldSetAvatar = false;
-          const existingId = agent.avatarAttachmentId;
-          let existingSyncedIdToDelete: string | undefined;
-
-          if (!existingId) {
-            shouldSetAvatar = true;
-          } else {
-            const existing = await attachmentRepo.findById(existingId);
-            if (!existing) {
-              shouldSetAvatar = true;
-              existingSyncedIdToDelete = existingId;
-            } else if (existing.starshipId !== agent.starshipId) {
-              // Defensive: data inconsistency; replace.
-              shouldSetAvatar = true;
-            } else if (!isSyncedFilename(existing.filename)) {
-              // Custom/user avatar: do not overwrite.
-              shouldSetAvatar = false;
-            } else if (existing.s3Key !== storage.avatarS3Key) {
-              // Previously synced, but template avatar changed: refresh.
-              shouldSetAvatar = true;
-              existingSyncedIdToDelete = existingId;
-            } else {
-              // Already synced and points to the same template S3 key: no-op.
-              shouldSetAvatar = false;
-            }
-          }
-
-          if (shouldSetAvatar) {
-            const mimeType = storage.avatarMimeType || 'image/png';
-            const filename = `template-avatar__${agent.sourceTemplateId}__${agent.id}.${extForMime(mimeType)}`;
-
-            const existing = await attachmentRepo.findByStarshipAndS3Key(agent.starshipId, storage.avatarS3Key);
-            const created =
-              existing ??
-              (await attachmentRepo.create({
-                starshipId: agent.starshipId,
-                messageId: undefined,
-                filename,
-                mimeType,
-                sizeBytes: 0,
-                s3Key: storage.avatarS3Key,
-                imageWidth: undefined,
-                imageHeight: undefined,
-              }));
-
-            updates.avatarAttachmentId = created.id;
-
-            // Best-effort cleanup: remove the old synced attachment row (never deletes S3 here).
-            if (existingSyncedIdToDelete && existingSyncedIdToDelete !== created.id) {
-              try {
-                await attachmentRepo.delete(existingSyncedIdToDelete);
-              } catch {
-                // ignore
-              }
-            }
-          }
-        }
-
-        // ============================================================================
-        // TOOL SYNC: Deploy and link tools from template to agent
-        // ============================================================================
-        // When a template is updated with new tools or tools are removed, we need to sync
-        // these changes to all deployed agents that were created from that template.
-        //
-        // Strategy:
-        // 1. Get the template's assigned tool slugs
-        // 2. Get the agent's current tools that were sourced from templates
-        // 3. Add new tools that are in the template but not linked to the agent
-        // 4. Remove tools that are no longer in the template (only template-sourced tools)
-        //
-        // Optimization: Uses batch queries to avoid N+1 problems:
-        // - Batch fetch tool template information in one query
-        // - Batch count agent usage for all tools at once
-        //
-        // Note: We only remove tools that were sourced from templates (have sourceTemplateId).
-        // User-added tools (without sourceTemplateId) are preserved.
-        if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
-          const toolRepo = new ToolRepository();
-
-          // Get current tools linked to this agent
-          const currentTools = await this.getAgentTools(agentId, agent.starshipId);
-
-          // Build a set of template slugs that should be linked to this agent
-          const requiredToolSlugs = new Set(template.assignedToolSlugs);
-
-          // Batch fetch tool template information for all template-sourced tools
-          // This avoids N+1 queries when looking up template slugs
-          const templateSourcedTools = currentTools.filter((t) => t.sourceTemplateId);
-          const uniqueTemplateIds = [...new Set(templateSourcedTools.map((t) => t.sourceTemplateId).filter(Boolean))];
-
-          const connection = this.getConnection();
-          const toolTemplateMap = new Map<string, string>(); // templateId -> templateSlug
-
-          if (uniqueTemplateIds.length > 0) {
-            const placeholders = uniqueTemplateIds.map((_, idx) => `$${idx + 1}`).join(', ');
-            const templateRows = await connection.query<{ id: string; slug: string }>(
-              `SELECT id, slug FROM tool_templates WHERE id IN (${placeholders})`,
-              uniqueTemplateIds as string[]
-            );
-
-            for (const row of templateRows) {
-              if (row.id && row.slug) {
-                toolTemplateMap.set(row.id, row.slug);
-              }
-            }
-          }
-
-          // Build a map of currently linked tools by their source template slug
-          const currentToolsByTemplateSlug = new Map<string, string>(); // templateSlug -> toolId
-
-          for (const tool of templateSourcedTools) {
-            if (tool.sourceTemplateId) {
-              const templateSlug = toolTemplateMap.get(tool.sourceTemplateId);
-              if (templateSlug) {
-                currentToolsByTemplateSlug.set(templateSlug, tool.id);
-              }
-            }
-          }
-
-          // Remove tools that are no longer in the template (only template-sourced tools)
-          const toolsToRemove: Array<{ slug: string; id: string }> = [];
-          for (const [templateSlug, toolId] of currentToolsByTemplateSlug.entries()) {
-            if (!requiredToolSlugs.has(templateSlug)) {
-              toolsToRemove.push({ slug: templateSlug, id: toolId });
-            }
-          }
-
-          if (toolsToRemove.length > 0) {
-            // Batch count agent usage for all tools to be removed (avoids N+1 queries)
-            const toolIdsToRemove = toolsToRemove.map((t) => t.id);
-            const usageCountMap = await this.batchCountAgentsUsingTools(toolIdsToRemove, agent.starshipId);
-
-            for (const { slug: templateSlug, id: toolId } of toolsToRemove) {
-              try {
-                const agentCount = usageCountMap.get(toolId) || 0;
-
-                if (agentCount > 1) {
-                  // Other agents are using this tool - just remove the relationship
-                  await this.removeToolRelationship(agentId, toolId);
-                  console.log(
-                    `[AgentRepository] Removed tool '${templateSlug}' from agent ${agentId} (no longer in template). ` +
-                      `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
-                  );
-                } else if (agentCount === 1) {
-                  // This is the only agent using this tool. Since it is no longer in the template,
-                  // remove it entirely from the starship (deletes the agent_tools join row via cascade).
-                  const deleted = await toolRepo.delete(toolId);
-                  if (deleted) {
-                    console.log(
-                      `[AgentRepository] Deleted tool '${templateSlug}' (${toolId}) from starship ${agent.starshipId} ` +
-                        `because it was no longer in template and had no other agent users`
-                    );
-                  } else {
-                    // Defensive: if delete reports false, fall back to just unlinking.
-                    await this.removeToolRelationship(agentId, toolId);
-                    console.warn(
-                      `[AgentRepository] Failed to delete tool '${templateSlug}' (${toolId}); unlinked from agent ${agentId} instead`
-                    );
-                  }
-                } else {
-                  // agentCount is 0 or unexpected - tool might not be linked
-                  console.warn(`[AgentRepository] Tool '${templateSlug}' (${toolId}) has unexpected agent count: ${agentCount}`);
-                }
-              } catch (error) {
-                console.error(`[AgentRepository] Failed to remove tool '${templateSlug}' from agent ${agentId}:`, error);
-                // Continue with other tools instead of failing completely
-              }
-            }
-          }
-
-          // Add missing tools (after cleanup so we don't temporarily over-assign tools)
-          for (const toolSlug of requiredToolSlugs) {
-            if (!currentToolsByTemplateSlug.has(toolSlug)) {
-              try {
-                // Check if tool is already deployed to this starship
-                let deployedTool = await toolRepo.findByTemplateSlugAndStarship(toolSlug, agent.starshipId);
-
-                if (!deployedTool) {
-                  // Deploy tool from template to starship
-                  deployedTool = await toolRepo.createFromTemplate(toolSlug, agent.starshipId);
-                  console.log(`[AgentRepository] Deployed tool '${toolSlug}' to starship ${agent.starshipId} during agent update`);
-                }
-
-                // Link tool to agent
-                await this.addToolRelationship(agentId, deployedTool.id);
-                console.log(`[AgentRepository] Linked tool '${toolSlug}' to agent ${agentId} during template sync`);
-              } catch (error) {
-                console.error(`[AgentRepository] Failed to deploy/link tool '${toolSlug}' during agent update:`, error);
-                // Continue with other tools instead of failing completely
-              }
-            }
-          }
-        } else {
-          // Template has no assigned tools - remove all template-sourced tools from agent
-          const toolRepo = new ToolRepository();
-          const currentTools = await this.getAgentTools(agentId, agent.starshipId);
-          const templateSourcedTools = currentTools.filter((t) => t.sourceTemplateId);
-
-          if (templateSourcedTools.length > 0) {
-            // Batch count agent usage for all tools to be removed (avoids N+1 queries)
-            const toolIds = templateSourcedTools.map((t) => t.id);
-            const usageCountMap = await this.batchCountAgentsUsingTools(toolIds, agent.starshipId);
-
-            for (const tool of templateSourcedTools) {
-              try {
-                const agentCount = usageCountMap.get(tool.id) || 0;
-
-                if (agentCount > 1) {
-                  await this.removeToolRelationship(agentId, tool.id);
-                  console.log(
-                    `[AgentRepository] Removed template-sourced tool '${tool.name}' from agent ${agentId} (template has no tools). ` +
-                      `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
-                  );
-                } else if (agentCount === 1) {
-                  // This is the only agent using this template-sourced tool. Since the template has no tools,
-                  // remove it entirely from the starship (deletes the agent_tools join row via cascade).
-                  const deleted = await toolRepo.delete(tool.id);
-                  if (deleted) {
-                    console.log(
-                      `[AgentRepository] Deleted template-sourced tool '${tool.name}' (${tool.id}) from starship ${agent.starshipId} ` +
-                        `because template has no tools and it had no other agent users`
-                    );
-                  } else {
-                    // Defensive: if delete reports false, fall back to just unlinking.
-                    await this.removeToolRelationship(agentId, tool.id);
-                    console.warn(
-                      `[AgentRepository] Failed to delete template-sourced tool '${tool.name}' (${tool.id}); unlinked from agent ${agentId} instead`
-                    );
-                  }
-                } else {
-                  console.warn(`[AgentRepository] Tool '${tool.name}' (${tool.id}) has unexpected agent count: ${agentCount}`);
-                }
-              } catch (error) {
-                console.error(`[AgentRepository] Failed to remove tool '${tool.name}' from agent ${agentId}:`, error);
-              }
-            }
-          }
-        }
-
-        const updated = await this.update(agentId, updates);
-        if (!updated) {
-          throw new Error('Failed to update agent from template');
-        }
-
-        return updated;
-      },
-      'updateFromTemplate',
-      'Agent',
-      agentId
-    );
-  }
-
-  /**
-   * Atomically mark an agent as pending publication and persist request metadata.
-   *
-   * Uses SELECT ... FOR UPDATE inside a transaction to prevent concurrent
-   * publication requests from both succeeding when the agent is already pending.
-   */
-  async requestPublicationAtomic(
-    id: string,
-    updates: {
-      publicationStatus: AgentModel['publicationStatus'];
-      publicationRequestedBy: string;
-      publicationVersionBump: 'patch' | 'minor' | 'major';
-      publicationRequestedVersion: string;
-      publicationChangelog: string;
-    }
-  ): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-
-        const agent = await connection.transaction<AgentModel | null>(async (client) => {
-          // Lock the agent row to serialize concurrent publication requests
-          const selectRes = await client.query<Record<string, unknown>>('SELECT * FROM agents WHERE id = $1 FOR UPDATE', [id]);
-          const row = selectRes.rows?.[0];
-
-          if (!row) {
-            this.handleNotFound('Agent', id);
-          }
-
-          const currentAgent = fromDatabase(AgentEntity, row as Record<string, unknown>);
-
-          // If another request already moved this agent to pending_approval,
-          // surface the same validation error as the service-level guard.
-          if (currentAgent.publicationStatus === 'pending_approval') {
-            throw new ValidationError('Agent is already pending approval');
-          }
-
-          const updateRes = await client.query<Record<string, unknown>>(
-            `
-            UPDATE agents
-            SET
-              publication_status = $2,
-              publication_requested_by = $3,
-              publication_version_bump = $4,
-              publication_requested_version = $5,
-              publication_changelog = $6,
-              updated_at = NOW()
-            WHERE id = $1
-            RETURNING *
-            `,
-            [
-              id,
-              updates.publicationStatus,
-              updates.publicationRequestedBy,
-              updates.publicationVersionBump,
-              updates.publicationRequestedVersion,
-              updates.publicationChangelog,
-            ]
-          );
-
-          const updatedRow = updateRes.rows?.[0];
-          if (!updatedRow) {
-            this.handleNotFound('Agent', id);
-          }
-
-          return fromDatabase(AgentEntity, updatedRow as Record<string, unknown>);
-        });
-
-        if (!agent) {
-          this.handleNotFound('Agent', id);
-        }
-
-        return agent;
-      },
-      'requestPublicationAtomic',
-      'Agent',
-      id
-    );
-  }
 }
+

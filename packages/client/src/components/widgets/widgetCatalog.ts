@@ -7,7 +7,6 @@ import { DataTable } from './DataTable'
 import { MetricGrid } from './MetricGrid'
 import { AreaChart, BarChart, DonutChart, LineChart, PieChart, RadarChart, RadialChart } from './charts'
 import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
-import { AgentSuggestionCard } from './AgentSuggestionCard'
 import { StarshipDetails } from './StarshipDetails'
 
 import { Box } from './primitives/Box'
@@ -380,15 +379,6 @@ export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = Object.freeze([
     defaultProps: {},
     fields: [],
     Component: ConnectorSuggestionCard,
-  },
-  {
-    type: 'AgentSuggestionCard',
-    label: 'Agent suggestion card',
-    category: 'Other',
-    acceptsChildren: false,
-    defaultProps: {},
-    fields: [],
-    Component: AgentSuggestionCard,
   },
 ])
 

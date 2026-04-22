@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Open Tool (Create or Open)
@@ -201,20 +200,3 @@ export const toolOpenTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: open-tool
- */
-export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: toolOpenTool.name,
-  description: toolOpenTool.description,
-  parameters: toolOpenTool.parameters,
-  blueprint: toolOpenTool.blueprint,
-
-  slug: 'open-tool',
-  version: '1.0.8',
-  category: 'automation',
-  exampleUsage:
-    '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',
-  requiresApiKey: false,
-  configurationFields: [],
-};

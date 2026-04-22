@@ -35,7 +35,7 @@ import tippy from 'tippy.js'
 // Using TipTap-native Suggestion renderer with tippy.js for positioning
 // Using native textarea again; react-mentions kept internal mention state we no longer use
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import api, { agentAPI, templateAPI } from '@/lib/api'
+import api, { agentAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
@@ -1895,30 +1895,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               setTemplatePrompts(freshPrompts.filter(Boolean))
               return
             }
-          }
-        } catch {}
-        try {
-          // Fallback to template prompts when a sourceTemplateId exists
-          const sourceTemplateId = a?.sourceTemplateId
-          if (sourceTemplateId) {
-            const tpl = await templateAPI.getById(sourceTemplateId)
-            const previews = (tpl as any)?.previewPrompts || []
-            if (!aborted && Array.isArray(previews) && previews.length > 0) {
-              setTemplatePrompts(previews.filter(Boolean))
-              return
-            }
-          }
-        } catch {}
-        try {
-          // Last resort: fetch all templates and match by slug/name
-          const all = await templateAPI.getAll()
-          const lowerName = String(a?.name || '').toLowerCase()
-          const lowerSlug = String(a?.slug || '').toLowerCase()
-          const match = (all || []).find((t: any) => String(t?.slug || '').toLowerCase() === lowerSlug || String(t?.name || '').toLowerCase() === lowerName)
-          const previews = (match as any)?.previewPrompts || []
-          if (!aborted && Array.isArray(previews) && previews.length > 0) {
-            setTemplatePrompts(previews.filter(Boolean))
-            return
           }
         } catch {}
       })()

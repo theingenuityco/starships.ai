@@ -8,7 +8,6 @@ import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { track } from '@/lib/analytics'
 import { Orbitron } from 'next/font/google'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -102,69 +101,6 @@ export function PublicHeader(): React.JSX.Element {
         </button>
 
         <nav className="hidden sm:flex items-center gap-4 md:gap-7 text-[15px] md:text-base leading-none">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={[
-                  'inline-flex items-center gap-1.5 transition-colors duration-100',
-                  pathname.startsWith('/use-cases') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground',
-                  landingHeaderNavItem,
-                ].join(' ')}
-                aria-current={pathname.startsWith('/use-cases') ? 'page' : undefined}
-              >
-                <span>Use cases</span>
-                <Icon name="chevron-down" className="h-4 w-4 opacity-80" aria-hidden />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={8}
-              className="w-80 overflow-hidden rounded-xl border border-border bg-card p-0 text-card-foreground shadow-lg"
-            >
-              <div className="border-b border-border px-3 py-2.5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Use cases</p>
-              </div>
-              <DropdownMenuItem
-                className="cursor-pointer items-start gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
-                onSelect={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'desktop' })
-                  router.push('/use-cases/lead-generation')
-                }}
-              >
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-primary">
-                  <Icon name="sparkles" className="h-4 w-4 text-primary" weight="regular" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">Lead generation</div>
-                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Research → personalize → follow up → improve</div>
-                </div>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer items-start gap-3 rounded-md px-3 py-3 text-left outline-none transition-colors data-[highlighted]:bg-muted data-[highlighted]:text-foreground"
-                onSelect={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'desktop' })
-                  router.push('/use-cases/wordpress-site')
-                }}
-              >
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-primary">
-                  <Icon name="globe" className="h-4 w-4 text-primary" weight="regular" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">WordPress site</div>
-                  <div className="mt-0.5 text-xs leading-snug text-muted-foreground">Plan → write → SEO → launch checklist</div>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Link
-            href="/explore"
-            onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'desktop' })}
-            className={`${landingHeaderNavItem} ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-            aria-current={pathname.startsWith('/explore') ? 'page' : undefined}
-          >
-            Explore
-          </Link>
           <Link
             href="/pricing"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/pricing', variant: 'desktop' })}
@@ -223,37 +159,6 @@ export function PublicHeader(): React.JSX.Element {
 
           {mobileMenuOpen && (
             <div className="absolute right-0 mt-2 w-44 rounded-lg border border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-lg p-1 z-[60]">
-              <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground">Use cases</div>
-              <Link
-                href="/use-cases/lead-generation"
-                onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/lead-generation', variant: 'mobile' })
-                  setMobileMenuOpen(false)
-                }}
-                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/lead-generation' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-              >
-                Lead generation
-              </Link>
-              <Link
-                href="/use-cases/wordpress-site"
-                onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/use-cases/wordpress-site', variant: 'mobile' })
-                  setMobileMenuOpen(false)
-                }}
-                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname === '/use-cases/wordpress-site' ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-              >
-                WordPress site
-              </Link>
-              <Link
-                href="/explore"
-                onClick={() => {
-                  track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/explore', variant: 'mobile' })
-                  setMobileMenuOpen(false)
-                }}
-                className={`block rounded-md px-3 py-2 text-sm transition-colors duration-100 ${pathname.startsWith('/explore') ? 'text-foreground font-medium' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-              >
-                Explore
-              </Link>
               <Link
                 href="/login"
                 onClick={() => {

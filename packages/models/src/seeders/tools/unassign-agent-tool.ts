@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Unassign Tool from Agent
@@ -145,19 +144,3 @@ export const agentUnassignToolTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: unassign-agent-tool
- */
-export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentUnassignToolTool.name,
-  description: agentUnassignToolTool.description,
-  parameters: agentUnassignToolTool.parameters,
-  blueprint: agentUnassignToolTool.blueprint,
-
-  slug: 'unassign-agent-tool',
-  version: '1.0.4',
-  category: 'automation',
-  exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
-  requiresApiKey: false,
-  configurationFields: [],
-};

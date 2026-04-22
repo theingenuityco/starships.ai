@@ -11,7 +11,6 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
-import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
@@ -72,13 +71,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      {/* Update Notification - Floating top right */}
-      {existingTool && (
-        <div className="absolute top-6 right-6 z-50">
-          <ToolUpdateNotification tool={existingTool} />
-        </div>
-      )}
-      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.sourceTemplateId} />
+      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} />
       {conversationId && (
         <div className="absolute left-0 right-0 bottom-0 px-0 sm:px-4 md:px-6 pb-[env(safe-area-inset-bottom)] z-30 pointer-events-none">
           <div className="w-full sm:max-w-2xl lg:max-w-3xl sm:mx-auto pointer-events-auto">

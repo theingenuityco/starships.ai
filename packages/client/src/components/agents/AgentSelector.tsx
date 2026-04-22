@@ -6,7 +6,6 @@ import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
 import { AgentCard } from '@/components/agents/AgentCard'
 import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 import { AgentForm } from '@/components/agents/AgentForm'
-import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -130,40 +129,6 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     }
   }, [agentsError])
 
-  // Shared function to handle agent creation from template
-  const handleCreateFromTemplate = async (templateId: string) => {
-    // Validate that we have a valid starshipId
-    if (!starshipId || typeof starshipId !== 'string' || starshipId.trim() === '') {
-      console.error('Cannot create agent: Invalid or missing starshipId:', starshipId)
-      setError('Cannot create agent: No valid starship selected. Please ensure you have access to a starship first.')
-      return
-    }
-
-    try {
-      // Use the real API to create agent from template
-      const { templateAPI } = await import('@/lib/api')
-      const newAgent = await templateAPI.createAgentFromTemplate(templateId, starshipId)
-
-      // Select the newly created agent
-      onAgentSelect(newAgent)
-    } catch (error) {
-      console.error('Failed to create agent from template:', error)
-      // Enhanced error handling with specific error messages
-      let errorMessage = 'Failed to create agent from template'
-
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as any
-        if (axiosError.response?.data?.error) {
-          errorMessage = axiosError.response.data.error
-        } else if (axiosError.response?.data?.message) {
-          errorMessage = axiosError.response.data.message
-        }
-      }
-
-      setError(errorMessage)
-    }
-  }
-
   const handleCreateAgent = () => {
     setEditingAgent(null)
     setShowForm(true)
@@ -281,24 +246,6 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     <div className="space-y-6">
       {showCreateButton && (
         <div className="flex items-center gap-2 justify-end">
-          <AgentTemplateSelector
-            onSelectTemplate={template => {
-              // Handle template selection if needed
-            }}
-            onCreateFromTemplate={handleCreateFromTemplate}
-            trigger={
-              <Button
-                variant="default"
-                size="sm"
-                disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
-                className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!starshipId ? 'No starship available for agent deployment' : undefined}
-              >
-                <Icon name="sparkles" className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span>From Template</span>
-              </Button>
-            }
-          />
           <Button
             onClick={handleCreateAgent}
             size="sm"

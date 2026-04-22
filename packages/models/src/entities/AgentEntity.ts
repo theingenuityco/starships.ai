@@ -94,12 +94,6 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   tryThesePromptsAttachmentId?: string;
 
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  sourceTemplateId?: string;
-
   // Core AgentParams fields
   @Expose()
   @IsString()
@@ -181,69 +175,6 @@ export class AgentEntity implements AgentModel {
   @Length(1, 20)
   version!: string; // Semantic version (e.g., '1.0.2')
 
-  @Expose()
-  @IsOptional()
-  @IsISO8601()
-  templateSnapshotAt?: string; // When agent last synced with template
-
-  // Publication workflow fields
-  @Expose()
-  @IsString()
-  @IsIn(['draft', 'pending_approval', 'published', 'rejected'])
-  publicationStatus!: 'draft' | 'pending_approval' | 'published' | 'rejected';
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publicationRequestedBy?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publicationApprovedBy?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsISO8601()
-  publicationApprovedAt?: string;
-
-  // Published template linkage (Agent → Template)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publishedTemplateId?: string;
-
-  // Additional publication metadata (owner-selected)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @IsIn(['patch', 'minor', 'major'])
-  publicationVersionBump?: 'patch' | 'minor' | 'major';
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 20)
-  publicationRequestedVersion?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  publicationChangelog?: string;
-
-  // Update availability info (computed at runtime, not stored in DB)
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  updateInfo?: {
-    needsUpdate: boolean;
-    latestVersion: string;
-    templateUpdatedAt?: string;
-  };
-
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -263,7 +194,6 @@ export class AgentEntity implements AgentModel {
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         // Require starshipId for creation
         starshipId: (dataRecord.starshipId as string) || '',
-        sourceTemplateId: dataRecord.sourceTemplateId,
         name: dataRecord.name || '',
         role: (dataRecord.role as string) || 'Assistant',
         description: dataRecord.description,
@@ -276,9 +206,6 @@ export class AgentEntity implements AgentModel {
         state: dataRecord.state || { messages: [], tools: [] },
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         version: dataRecord.version || '1.0.0',
-        templateSnapshotAt: dataRecord.templateSnapshotAt,
-        // Publication workflow default for creates
-        publicationStatus: dataRecord.publicationStatus || 'draft',
         ...dataRecord,
       });
     } else {

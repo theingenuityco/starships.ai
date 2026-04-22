@@ -105,13 +105,6 @@ export function Navigation(props: NavigationProps) {
     }
   }, [isMobile])
 
-  // When Explore is selected, collapse the sidebar to give more space for browsing (icons-only rail).
-  const isMarketplaceRoute = pathname === '/explore' || pathname.startsWith('/explore/') || pathname === '/marketplace' || pathname.startsWith('/marketplace/')
-  useEffect(() => {
-    if (!isMobile && isMarketplaceRoute) {
-      collapseSidebar()
-    }
-  }, [collapseSidebar, isMobile, isMarketplaceRoute])
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
   // State for navigation starship slug
@@ -344,7 +337,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, isMarketplaceRoute, starshipSlug, pathname, isSchedulesRoute, isInstalledRoute, isMembersRoute, isInstanceAdmin, canManageConnectors]
+    [isAuthenticated, starshipSlug, pathname, isSchedulesRoute, isInstalledRoute, isMembersRoute, isInstanceAdmin, canManageConnectors]
   )
 
   const handleSidebarBackgroundClick = useCallback(

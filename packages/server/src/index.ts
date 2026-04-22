@@ -12,7 +12,6 @@ import { getEnvConfig } from '@starships/env';
 import {
   createConnection,
   migrationRunner,
-  seedUpdateDeployedInstances,
 } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -20,13 +19,11 @@ import express from 'express';
 import { createServer } from 'http';
 
 // Route imports
-import agentTemplateRoutes from '@/routes/agent-templates';
 import agentRoutes from '@/routes/agents';
 import attachmentRoutes from '@/routes/attachments';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import connectorRoutes from '@/routes/connectors';
-import exploreRoutes from '@/routes/explore';
 import messageRoutes from '@/routes/messages';
 import roomRoutes from '@/routes/rooms';
 import starshipRoutes from '@/routes/starships';
@@ -110,12 +107,10 @@ app.use(cookieParser());
 app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
-app.use('/api/v1', agentTemplateRoutes);
 app.use('/api/v1', attachmentRoutes);
 app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', roomRoutes);
 app.use('/api/v1', connectorRoutes);
-app.use('/api/v1', exploreRoutes);
 app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
@@ -190,10 +185,6 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
-
-    // Version flow: sync deployed instances to latest DB templates.
-    // (Intentionally idempotent and should not block startup on failure.)
-    await seedUpdateDeployedInstances();
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

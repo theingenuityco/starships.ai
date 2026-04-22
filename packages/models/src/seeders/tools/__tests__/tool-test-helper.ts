@@ -4,7 +4,6 @@
  */
 
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Test result interfaces
@@ -36,16 +35,14 @@ export interface ValidationTestResult {
  */
 export class ToolTestHelper {
   private toolParams: ToolParams;
-  private toolTemplate?: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>;
   private toolName: string;
 
   constructor(
     toolParams: ToolParams,
-    toolTemplate?: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>,
+    _toolTemplate?: unknown,
     toolName?: string
   ) {
     this.toolParams = toolParams;
-    this.toolTemplate = toolTemplate;
     this.toolName = toolName || toolParams.name;
   }
 
@@ -233,44 +230,10 @@ export class ToolTestHelper {
   }
 
   /**
-   * Test template consistency (if template is provided)
+   * Test template consistency (no-op — template system removed)
    */
   testTemplateConsistency(): ToolTestResult {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    if (!this.toolTemplate) {
-      warnings.push('No template provided for consistency check');
-      return { valid: true, errors, warnings };
-    }
-
-    // Check consistency between toolParams and template
-    if (this.toolParams.name !== this.toolTemplate.name) {
-      errors.push('Tool name inconsistency between params and template');
-    }
-
-    if (this.toolParams.description !== this.toolTemplate.description) {
-      errors.push('Tool description inconsistency between params and template');
-    }
-
-    // Check template specific fields
-    if (!this.toolTemplate.slug) {
-      errors.push('Template missing slug');
-    }
-
-    if (!this.toolTemplate.category) {
-      errors.push('Template missing category');
-    }
-
-    if (typeof this.toolTemplate.requiresApiKey !== 'boolean') {
-      warnings.push('Template should specify requiresApiKey boolean');
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-      warnings,
-    };
+    return { valid: true, errors: [], warnings: ['Template system removed'] };
   }
 
   /**

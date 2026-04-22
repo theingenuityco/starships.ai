@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Call Agent
@@ -284,20 +283,3 @@ export const agentCallTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: call-agent
- */
-export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentCallTool.name,
-  description: agentCallTool.description,
-  parameters: agentCallTool.parameters,
-  blueprint: agentCallTool.blueprint,
-
-  slug: 'call-agent',
-  version: '1.0.16',
-  category: 'automation',
-  exampleUsage:
-    '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',
-  requiresApiKey: false,
-  configurationFields: [],
-};

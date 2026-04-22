@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Read Conversation Messages (tail-offset)
@@ -189,18 +188,3 @@ export const readConversationMessagesTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const readConversationMessagesToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: readConversationMessagesTool.name,
-  description: readConversationMessagesTool.description,
-  parameters: readConversationMessagesTool.parameters,
-  blueprint: readConversationMessagesTool.blueprint,
-
-  slug: 'read-older-messages',
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "limit": 20, "offset": 30 } // returns 20 messages older than the newest 30',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

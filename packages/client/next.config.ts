@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: '/automate', destination: '/onboarding', permanent: true },
+      { source: '/automate/', destination: '/onboarding', permanent: true },
     ]
   },
   async headers() {

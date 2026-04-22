@@ -45,19 +45,6 @@ export class ToolEntity implements ToolModel {
   @Length(1, 255)
   starshipId!: string;
 
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  sourceTemplateId?: string;
-
-  // Published template linkage (Tool → ToolTemplate)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  publishedTemplateId?: string;
-
   // Core ToolParams fields
   @Expose()
   @IsString()

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Open Agent (Create or Open)
@@ -259,20 +258,3 @@ export const agentOpenTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: open-agent
- */
-export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentOpenTool.name,
-  description: agentOpenTool.description,
-  parameters: agentOpenTool.parameters,
-  blueprint: agentOpenTool.blueprint,
-
-  slug: 'open-agent',
-  version: '1.0.5',
-  category: 'automation',
-  exampleUsage:
-    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',
-  requiresApiKey: false,
-  configurationFields: [],
-};

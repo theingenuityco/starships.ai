@@ -12,7 +12,6 @@ import { PublicFooter } from '@/app/components/PublicFooter'
 
 import { StarTheme } from '@/components/theme-context'
 import PublicHeader from '@/components/navigation/PublicHeader'
-import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 import dynamic from 'next/dynamic'
 
 // `useAuth` / `useUserStarships` need TanStack Query. Some SSR paths (e.g. Next 16 + Turbopack)
@@ -28,10 +27,7 @@ const PricingTeaser = dynamic(() => import('@/app/components/PricingTeaser'), {
   ),
 })
 
-export default function HomePageClient(props: { initialAgentTemplates?: AgentTemplateModel[]; initialToolTemplates?: ToolTemplateModel[] }) {
-  const initialAgentTemplates = props.initialAgentTemplates ?? []
-  const initialToolTemplates = props.initialToolTemplates ?? []
-
+export default function HomePageClient() {
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-[#0f0f0f] relative">
@@ -63,7 +59,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
 
           {/* Hero alone: keep horizontal clip without forcing overflow-y (which would clip the showcase overlap). */}
           <div className="overflow-x-hidden">
-            <Hero initialAgentTemplates={initialAgentTemplates} />
+            <Hero />
           </div>
           <HeroImageShowcase />
           <div className="overflow-x-hidden">

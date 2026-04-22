@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Modify Tool Blueprint Edge
@@ -414,24 +413,3 @@ export const blueprintModifyEdgeTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const toolModifyBlueprintEdgeToolTemplate: Omit<
-  ToolTemplateModel,
-  'id' | 'createdAt' | 'updatedAt' | 'usageCount'
-> = {
-  name: blueprintModifyEdgeTool.name,
-  description: blueprintModifyEdgeTool.description,
-  parameters: blueprintModifyEdgeTool.parameters,
-  blueprint: blueprintModifyEdgeTool.blueprint,
-
-  slug: 'modify-tool-blueprint-edge',
-  version: '1.0.2',
-  category: 'automation',
-  exampleUsage:
-    '{ "toolSlug": "my-tool", "op": "add", "edge": { "ref": "edge_process", "from": "start", "to": "process" } }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-
-
-

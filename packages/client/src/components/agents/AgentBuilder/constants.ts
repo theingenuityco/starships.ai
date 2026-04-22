@@ -1,5 +1,5 @@
 import type { AgentFormData } from './types'
-import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentCategory } from '@starships/protocol'
 
 export const INITIAL_FORM_DATA: AgentFormData = {
   name: '',
@@ -33,7 +33,7 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   },
 }
 
-export const AGENT_CATEGORIES: AgentTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
+export const AGENT_CATEGORIES: AgentCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']
 
 export const DEFAULT_MODELS = ['anthropic/claude-sonnet-4.5', 'anthropic/claude-opus-4', 'anthropic/claude-sonnet-3.5', 'openai/gpt-4o', 'openai/gpt-4-turbo', 'openai/o1-preview']
 

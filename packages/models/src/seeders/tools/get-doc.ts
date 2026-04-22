@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Doc
@@ -92,16 +91,3 @@ export const docsGetDocTool: ToolParams = {
   },
 };
 
-export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: docsGetDocTool.name,
-  description: docsGetDocTool.description,
-  parameters: docsGetDocTool.parameters,
-  blueprint: docsGetDocTool.blueprint,
-
-  slug: 'get-doc',
-  version: '1.0.3',
-  category: 'data',
-  exampleUsage: '{ "slug": "core-concepts/tools" } // returns markdown content; env baseUrl inferred',
-  requiresApiKey: false,
-  configurationFields: [],
-};

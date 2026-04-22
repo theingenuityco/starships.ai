@@ -1,4 +1,4 @@
-import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentCategory } from '@starships/protocol'
 import type { AgentModel } from '@starships/protocol'
 
 export interface AgentFormData {
@@ -14,7 +14,7 @@ export interface AgentFormData {
    * Category is optional in the backend and should not be defaulted in the UI.
    * We keep it as a controlled field by allowing the empty-string sentinel.
    */
-  category: AgentTemplateCategory | ''
+  category: AgentCategory | ''
   model: string
   temperature: number
   maxTokens: number

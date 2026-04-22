@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Patch View Root
@@ -84,17 +83,3 @@ export const patchViewRootTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const patchViewRootToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: patchViewRootTool.name,
-  description: patchViewRootTool.description,
-  parameters: patchViewRootTool.parameters,
-  blueprint: patchViewRootTool.blueprint,
-  slug: patchViewRootTool.slug,
-  version: '1.0.0',
-  category: 'utility',
-  exampleUsage: '{ "viewId": "view_123", "patch": [{ "op": "add", "path": "/children/0", "value": { "id": "chart" } }] }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

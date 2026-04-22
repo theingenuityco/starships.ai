@@ -1,7 +1,7 @@
 import Icon from '@/components/primitives/Icon'
-import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentCategory } from '@starships/protocol'
 
-export const getCategoryIcon = (category: AgentTemplateCategory) => {
+export const getCategoryIcon = (category: AgentCategory) => {
   switch (category) {
     case 'automation':
       return <Icon name="bot" className="w-5 h-5" />
@@ -16,7 +16,7 @@ export const getCategoryIcon = (category: AgentTemplateCategory) => {
   }
 }
 
-export const getCategoryColor = (category: AgentTemplateCategory) => {
+export const getCategoryColor = (category: AgentCategory) => {
   const colors = {
     general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
     automation: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
@@ -31,7 +31,7 @@ export const getCategoryColor = (category: AgentTemplateCategory) => {
   return colors[category] || colors.general
 }
 
-export const getCategoryDotColor = (category: AgentTemplateCategory) => {
+export const getCategoryDotColor = (category: AgentCategory) => {
   const colors: Record<string, string> = {
     general: 'bg-gray-400',
     automation: 'bg-emerald-400',

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Upsert Dataset Rows
@@ -100,17 +99,3 @@ export const upsertDatasetRowsTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const upsertDatasetRowsToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: upsertDatasetRowsTool.name,
-  description: upsertDatasetRowsTool.description,
-  parameters: upsertDatasetRowsTool.parameters,
-  blueprint: upsertDatasetRowsTool.blueprint,
-  slug: upsertDatasetRowsTool.slug,
-  version: '1.0.0',
-  category: 'data',
-  exampleUsage: '{ "datasetSlug": "leads", "mode": "upsert", "rows": [{ "email": "a@b.com", "status": "new" }] }',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

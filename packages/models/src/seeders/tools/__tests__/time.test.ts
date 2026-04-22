@@ -3,14 +3,14 @@
  * End-to-end tests for the get_current_time tool using autopilot Tool node
  */
 
-import { timeTool, timeToolTemplate } from '../time';
+import { timeTool } from '../time';
 import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
 
 describe('Time Tool', () => {
   let testHelper: ToolTestHelper;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(timeTool, timeToolTemplate, 'get_current_time');
+    testHelper = new ToolTestHelper(timeTool, undefined, 'get_current_time');
     testHelper.clearEventLogs();
   });
 
@@ -97,27 +97,6 @@ describe('Time Tool', () => {
       for (const edge of blueprint.edges) {
         expect(nodeRefs.has(edge.from)).toBe(true);
         expect(nodeRefs.has(edge.to)).toBe(true);
-      }
-    });
-  });
-
-  describe('Template Configuration', () => {
-    it('should have consistent template configuration', () => {
-      const result = testHelper.testTemplateConsistency();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have correct template metadata', () => {
-      expect(timeToolTemplate.slug).toBe('get-current-time');
-      expect(timeToolTemplate.category).toBe('utility');
-      expect(timeToolTemplate.requiresApiKey).toBe(false);
-    });
-
-    it('should have example usage', () => {
-      expect(timeToolTemplate.exampleUsage).toBeDefined();
-      if (timeToolTemplate.exampleUsage) {
-        expect(timeToolTemplate.exampleUsage.length).toBeGreaterThan(0);
       }
     });
   });
@@ -330,7 +309,7 @@ describe('Time Tool', () => {
       expect(validation.structureValid).toBe(true);
       expect(validation.parametersValid).toBe(true);
       expect(validation.blueprintValid).toBe(true);
-      expect(validation.templateValid).toBe(true);
+
       expect(validation.errors).toHaveLength(0);
     });
   });

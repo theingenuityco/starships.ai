@@ -3,7 +3,7 @@
  * End-to-end tests using real autopilot Tool execution with minimal HTTP mocking
  */
 
-import { toolListTool, toolListToolTemplate } from '../list-tools';
+import { toolListTool } from '../list-tools';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions, Edge, HostRuntime } from '@starships/autopilot';
 import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
@@ -89,15 +89,7 @@ describe('Tool List Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      expect(toolListToolTemplate.name).toBe(toolListTool.name);
-      expect(toolListToolTemplate.description).toBe(toolListTool.description);
-      expect(toolListToolTemplate.parameters).toEqual(toolListTool.parameters);
-      expect(toolListToolTemplate.blueprint).toEqual(toolListTool.blueprint);
 
-      expect(toolListToolTemplate.slug).toBe('list-tools');
-      expect(toolListToolTemplate.category).toBe('automation');
-      expect(toolListToolTemplate.requiresApiKey).toBe(false);
-      expect(toolListToolTemplate.exampleUsage).toBeDefined();
     });
   });
 

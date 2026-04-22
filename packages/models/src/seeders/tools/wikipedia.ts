@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Wikipedia Tool Definition using HTTP REST API
@@ -378,30 +377,3 @@ export const wikipediaTool: ToolParams = {
   },
 };
 
-/**
- * Wikipedia Tool Template Configuration
- */
-export const wikipediaToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  // Core ToolParams
-  name: wikipediaTool.name,
-  description: wikipediaTool.description,
-  parameters: wikipediaTool.parameters,
-  blueprint: wikipediaTool.blueprint,
-
-  // Template metadata
-  slug: 'wikipedia-search',
-  version: '1.0.1',
-  category: 'data',
-  exampleUsage: JSON.stringify(
-    {
-      search: { name: 'wikipedia-search', arguments: { query: 'artificial intelligence', action: 'search' } },
-      summary: { name: 'wikipedia-search', arguments: { query: 'Machine learning', action: 'summary' } },
-      content: { name: 'wikipedia-search', arguments: { query: 'Deep learning', action: 'content' } },
-      sections: { name: 'wikipedia-search', arguments: { query: 'Neural network', action: 'sections' } },
-    },
-    null,
-    2
-  ),
-  requiresApiKey: false,
-  configurationFields: [],
-};

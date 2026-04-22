@@ -1,7 +1,7 @@
 import Icon from '@/components/primitives/Icon'
-import type { ToolTemplateCategory } from '@starships/protocol'
+import type { ToolCategory } from '@starships/protocol'
 
-export const getCategoryIcon = (category: ToolTemplateCategory) => {
+export const getCategoryIcon = (category: ToolCategory) => {
   switch (category) {
     case 'automation':
       return <Icon name="bot" className="w-5 h-5" />
@@ -16,7 +16,7 @@ export const getCategoryIcon = (category: ToolTemplateCategory) => {
   }
 }
 
-export const getCategoryColor = (category: ToolTemplateCategory) => {
+export const getCategoryColor = (category: ToolCategory) => {
   const colors = {
     general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
     automation: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',

@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Get Tool
@@ -135,16 +134,3 @@ export const toolGetTool: ToolParams = {
   },
 };
 
-export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: toolGetTool.name,
-  description: toolGetTool.description,
-  parameters: toolGetTool.parameters,
-  blueprint: toolGetTool.blueprint,
-
-  slug: 'get-tool',
-  version: '1.0.5',
-  category: 'automation',
-  exampleUsage: '{ "slug": "calc" } // returns full tool details including blueprint; connector infers starship context',
-  requiresApiKey: false,
-  configurationFields: [],
-};

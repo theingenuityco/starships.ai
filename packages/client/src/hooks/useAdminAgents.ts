@@ -1,43 +1,15 @@
 'use client'
 
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse, PendingAgentSummary as ProtocolPendingAgentSummary, ToolModel } from '@starships/protocol'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AgentModel, ApiResponse } from '@starships/protocol'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { AGENT_QUERY_KEYS } from './useAgents'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
-export interface PaginationMeta {
-  page: number
-  limit: number
-  total: number
-  has_next: boolean
-  has_prev: boolean
-}
-
-export type PendingAgentSummary = ProtocolPendingAgentSummary & {
-  requestedBy?: {
-    id: string
-    name?: string
-    avatar?: string
-  }
-  requestedByStarship?: {
-    id: string
-    name?: string
-    slug?: string
-  }
-}
-
-export interface PendingAgentsResponse {
-  agents: PendingAgentSummary[]
-  pagination: PaginationMeta
-}
-
 export const ADMIN_AGENT_QUERY_KEYS = {
   all: ['admin', 'agents'] as const,
-  pending: (page: number, limit: number) => [...ADMIN_AGENT_QUERY_KEYS.all, 'pending', { page, limit }] as const,
-  pendingTools: (agentId: string) => [...ADMIN_AGENT_QUERY_KEYS.all, 'pending-tools', agentId] as const,
 } as const
 
 /**
@@ -85,49 +57,6 @@ export function useGenerateAgentMarketingContent() {
   })
 }
 
-/**
- * Fetch agents that are pending publication approval (instance admin only).
- */
-export function usePendingAgents(page: number = 1, limit: number = 20) {
-  return useQuery({
-    queryKey: ADMIN_AGENT_QUERY_KEYS.pending(page, limit),
-    queryFn: async (): Promise<PendingAgentsResponse> => {
-      const response: FetchResponse<ApiResponse<PendingAgentSummary[]>> = await api.get('/api/v1/admin/agents/pending', {
-        params: { page, limit },
-      })
-
-      const agents = response.data.data
-      const pagination = (response.data.meta?.pagination || {
-        page,
-        limit,
-        total: agents.length,
-        has_next: false,
-        has_prev: page > 1,
-      }) as PaginationMeta
-
-      return { agents, pagination }
-    },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-  })
-}
-
-/**
- * Fetch tools that are pending publication for the given agent (instance admin only).
- * Only tools with publicationStatus === 'pending_approval' are returned.
- */
-export function usePendingAgentTools(agentId?: string) {
-  return useQuery({
-    queryKey: agentId ? ADMIN_AGENT_QUERY_KEYS.pendingTools(agentId) : [...ADMIN_AGENT_QUERY_KEYS.all, 'pending-tools', 'none'],
-    enabled: !!agentId,
-    queryFn: async (): Promise<ToolModel[]> => {
-      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/admin/agents/${agentId}/tools`)
-      return response.data.data || []
-    },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-  })
-}
 
 /**
  * Prepare publication: Generate missing marketing content (instance admin only).

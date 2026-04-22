@@ -21,11 +21,8 @@ const BlueprintVisualization = dynamic(
   }
 )
 
-export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, toolId, templateId }, ref) => {
+export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave }, ref) => {
   const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })
-
-  // Determine if this is a template-based tool (readonly)
-  const isReadonly = !!templateId
 
   // Parse blueprint for visualization
   const parsedBlueprint = useMemo<Blueprint | null>(() => {
@@ -59,13 +56,13 @@ export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewPro
           {/* Floating Panels - Top Left */}
           <div className="absolute top-6 left-28 z-10 w-[420px] space-y-2">
             {/* Tool Info Panel */}
-            <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
+            <ToolInfoPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={false} />
 
             {/* Parameters Panel */}
-            <ParametersPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
+            <ParametersPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={false} />
 
             {/* Settings Panel */}
-            <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={isReadonly} />
+            <ToolSettingsPanel formData={formData} errors={errors} onFieldChange={handleFieldChange} readonly={false} />
           </div>
 
           {/* Blueprint or Empty State */}

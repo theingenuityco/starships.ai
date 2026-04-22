@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: Edit Agent
@@ -259,20 +258,3 @@ export const agentEditTool: ToolParams = {
   },
 };
 
-/**
- * Tool Template: edit-agent
- */
-export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: agentEditTool.name,
-  description: agentEditTool.description,
-  parameters: agentEditTool.parameters,
-  blueprint: agentEditTool.blueprint,
-
-  slug: 'edit-agent',
-  version: '1.0.5',
-  category: 'automation',
-  exampleUsage:
-    '{ "slug": "support-agent", "role": "Customer Support Specialist", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',
-  requiresApiKey: false,
-  configurationFields: [],
-};

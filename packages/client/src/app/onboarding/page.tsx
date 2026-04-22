@@ -7,24 +7,18 @@ import { Orbitron } from 'next/font/google'
 import { useAuth, AUTH_QUERY_KEYS } from '@/hooks/useAuth'
 import { useUserStarships, useUpdateStarship } from '@/hooks/useStarships'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
-import { useStarshipAgents } from '@/hooks/useAgents'
-import { useAgentTemplates, useRequiredConnectorsForTemplates } from '@/hooks/useTemplates'
 import { useCompleteWizardOnboarding } from '@/hooks/useWizardOnboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { OnboardingAgentCard } from '@/components/onboarding/OnboardingAgentCard'
 import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
-import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { StarTheme } from '@/components/theme-context'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
-import type { AgentTemplateModel } from '@starships/protocol'
-
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 3
 
 /** Shared content width for all steps. */
 const CONTENT_MAX_W = 'max-w-3xl'
@@ -39,7 +33,6 @@ type OnboardingPersistedState = {
   step: number
   starshipName: string
   inviteEmailRows: string[]
-  deployedTemplateIds: string[]
   /** Emails we already sent an invite to this wizard run (avoids re-sending on Back then Next). */
   invitedEmails: string[]
 }
@@ -57,7 +50,6 @@ function readPersistedOnboardingState(starshipId?: string | null): OnboardingPer
       step: typeof parsed.step === 'number' ? parsed.step : 1,
       starshipName: typeof parsed.starshipName === 'string' ? parsed.starshipName : '',
       inviteEmailRows: Array.isArray(parsed.inviteEmailRows) && parsed.inviteEmailRows.length > 0 ? parsed.inviteEmailRows : [''],
-      deployedTemplateIds: Array.isArray(parsed.deployedTemplateIds) ? parsed.deployedTemplateIds : [],
       invitedEmails: Array.isArray(parsed.invitedEmails) ? parsed.invitedEmails : [],
     }
   } catch {
@@ -96,19 +88,10 @@ export default function OnboardingPage() {
   const [inviteEmailRows, setInviteEmailRows] = useState<string[]>([''])
   /** Emails we already sent an invite to this wizard run; avoids re-sending when user goes Back then Next. */
   const [emailsInvitedThisSession, setEmailsInvitedThisSession] = useState<string[]>([])
-  /** Template IDs of agents the user added on step 3 (used to show required connectors on step 4). */
-  const [deployedTemplateIds, setDeployedTemplateIds] = useState<string[]>([])
 
   const updateStarship = useUpdateStarship()
   const createInvite = useCreateStarshipInvite(primaryStarship?.id ?? '')
   const completeWizard = useCompleteWizardOnboarding()
-
-  const { data: allTemplates = [], isLoading: templatesLoading } = useAgentTemplates(undefined, !!primaryStarship?.id && step === 3)
-  const { data: starshipAgents = [] } = useStarshipAgents(primaryStarship?.id ?? '', step === 4 && !!primaryStarship?.id)
-  const templateIdsForConnectors =
-    deployedTemplateIds.length > 0 ? deployedTemplateIds : ([...new Set((starshipAgents as Array<{ sourceTemplateId?: string }>).map(a => a.sourceTemplateId).filter(Boolean))] as string[])
-  const { data: requiredConnectorsForSelected = [], isLoading: connectorsLoading } = useRequiredConnectorsForTemplates(templateIdsForConnectors, step === 4 && templateIdsForConnectors.length > 0)
-  const connectorProviders = requiredConnectorsForSelected.map(c => c.provider)
 
   const userFirstName = (() => {
     const raw = (user?.name || user?.email?.split('@')[0] || '').trim()
@@ -154,9 +137,6 @@ export default function OnboardingPage() {
     if (persisted.inviteEmailRows && persisted.inviteEmailRows.length > 0) {
       setInviteEmailRows(persisted.inviteEmailRows)
     }
-    if (persisted.deployedTemplateIds) {
-      setDeployedTemplateIds(persisted.deployedTemplateIds)
-    }
     if (persisted.invitedEmails && persisted.invitedEmails.length > 0) {
       setEmailsInvitedThisSession(persisted.invitedEmails)
     }
@@ -169,10 +149,9 @@ export default function OnboardingPage() {
       step,
       starshipName,
       inviteEmailRows,
-      deployedTemplateIds,
       invitedEmails: emailsInvitedThisSession,
     })
-  }, [primaryStarship?.id, step, starshipName, inviteEmailRows, deployedTemplateIds, emailsInvitedThisSession])
+  }, [primaryStarship?.id, step, starshipName, inviteEmailRows, emailsInvitedThisSession])
 
   const handleStep1Next = useCallback(async () => {
     const name = starshipName.trim()
@@ -223,22 +202,6 @@ export default function OnboardingPage() {
     setStep(3)
   }, [inviteEmailsParsed, primaryStarship?.id, createInvite, emailsInvitedThisSession])
 
-  const handleStep3Next = useCallback(() => {
-    setStep(4)
-  }, [])
-
-  const handleAgentDeployed = useCallback((template: AgentTemplateModel) => {
-    setDeployedTemplateIds(prev => (prev.includes(template.id) ? prev : [...prev, template.id]))
-  }, [])
-
-  const handleAgentRemoved = useCallback((template: AgentTemplateModel) => {
-    setDeployedTemplateIds(prev => prev.filter(id => id !== template.id))
-  }, [])
-
-  const handleStep4Next = useCallback(() => {
-    setStep(5)
-  }, [])
-
   const handleFinish = useCallback(async () => {
     await completeWizard.mutateAsync()
     clearPersistedOnboardingState(primaryStarship?.id)
@@ -254,7 +217,7 @@ export default function OnboardingPage() {
     if (step === 1) {
       return updateStarship.isPending ? 'Saving…' : 'Next ->'
     }
-    if (step === 5) {
+    if (step === 3) {
       return completeWizard.isPending ? 'Finishing…' : 'Complete'
     }
     return 'Next ->'
@@ -267,7 +230,7 @@ export default function OnboardingPage() {
     if (step === 2) {
       return createInvite.isPending
     }
-    if (step === 5) {
+    if (step === 3) {
       return completeWizard.isPending
     }
     return false
@@ -276,10 +239,8 @@ export default function OnboardingPage() {
   const handlePrimaryCtaClick = useCallback(() => {
     if (step === 1) return handleStep1Next()
     if (step === 2) return handleStep2Next()
-    if (step === 3) return handleStep3Next()
-    if (step === 4) return handleStep4Next()
-    if (step === 5) return handleFinish()
-  }, [step, handleStep1Next, handleStep2Next, handleStep3Next, handleStep4Next, handleFinish])
+    if (step === 3) return handleFinish()
+  }, [step, handleStep1Next, handleStep2Next, handleFinish])
 
   if (authLoading || !isAuthenticated || (hasStarship && starshipsLoading)) {
     return (
@@ -404,80 +365,6 @@ export default function OnboardingPage() {
               )}
 
               {step === 3 && (
-                <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 20rem), 560px)' }}>
-                  <div className="shrink-0">
-                    <h1 className="text-3xl font-bold tracking-tight">Add AI teammates (recommended)</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">You can add more from Explore later.</p>
-                  </div>
-                  {templatesLoading ? (
-                    <p className="mt-4 text-sm text-muted-foreground">Loading agents...</p>
-                  ) : allTemplates.length === 0 ? (
-                    <p className="mt-4 text-sm text-muted-foreground">No recommended agents available yet. You can always deploy agents from Explore later.</p>
-                  ) : (
-                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-4xl mx-auto">
-                        {allTemplates.map(template => (
-                          <OnboardingAgentCard key={template.id} template={template} targetStarshipId={primaryStarship?.id ?? ''} onDeployed={handleAgentDeployed} onRemoved={handleAgentRemoved} />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 4 && (
-                <div className="mt-6 flex flex-col w-full" style={{ maxHeight: 'min(calc(100dvh - 12rem), 720px)' }}>
-                  <div className="shrink-0">
-                    <h1 className="text-3xl font-bold tracking-tight">Connect your apps</h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {connectorProviders.length > 0
-                        ? 'Based on your AI teammates selection, connect these apps for max efficiency.'
-                        : 'No connectors required by your agents. Here are a few popular connectors to get you started.'}
-                    </p>
-                  </div>
-                  {primaryStarship?.id && (
-                    <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-                      {connectorsLoading ? (
-                        <p className="text-sm text-muted-foreground">Loading connectors...</p>
-                      ) : connectorProviders.length > 0 ? (
-                        <StarshipConnectorsPanel
-                          starshipId={primaryStarship.id}
-                          onlyProviders={connectorProviders}
-                          hideSearch
-                          hideDisconnect={false}
-                          hideReconnect
-                          maxColumns={2}
-                          hideCardDescription
-                          connectButtonLabel="Connect"
-                          matchAgentCardStyle
-                          cardVariant="explore"
-                          density="compact"
-                          animateCards={false}
-                          showDemoVideos
-                        />
-                      ) : (
-                        <StarshipConnectorsPanel
-                          starshipId={primaryStarship.id}
-                          hideSearch
-                          hideDisconnect={false}
-                          hideReconnect
-                          maxColumns={2}
-                          hideCardDescription
-                          connectButtonLabel="Connect"
-                          matchAgentCardStyle
-                          maxItems={3}
-                          cardVariant="explore"
-                          density="compact"
-                          animateCards={false}
-                          showDemoVideos
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {step === 5 && (
                 <div className="mt-6 flex flex-col">
                   <div className="space-y-6">
                     <div>
@@ -508,8 +395,6 @@ export default function OnboardingPage() {
                     onClick={() => {
                       if (step === 2) setStep(1)
                       else if (step === 3) setStep(2)
-                      else if (step === 4) setStep(3)
-                      else if (step === 5) setStep(4)
                     }}
                   >
                     {'<- Back'}

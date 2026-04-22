@@ -1,5 +1,4 @@
 import type { ToolParams } from '@starships/autopilot';
-import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: List Datasets
@@ -86,17 +85,3 @@ export const listDatasetsTool: ToolParams = {
     metadata: {},
   },
 };
-
-export const listDatasetsToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: listDatasetsTool.name,
-  description: listDatasetsTool.description,
-  parameters: listDatasetsTool.parameters,
-  blueprint: listDatasetsTool.blueprint,
-  slug: listDatasetsTool.slug,
-  version: '1.0.0',
-  category: 'data',
-  exampleUsage: '{}',
-  requiresApiKey: false,
-  configurationFields: [],
-};
-

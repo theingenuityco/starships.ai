@@ -10,10 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import type { AgentTemplateModel } from '@starships/protocol'
-
-export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const initialAgentTemplates = props.initialAgentTemplates ?? []
+export default function Hero() {
   const router = useRouter()
   const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
   const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
@@ -91,7 +88,6 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             Chat with your team, delegate work to agents, and ship faster.
           </p>
           <div className="mt-1 sm:mt-2 flex flex-col items-center gap-5 justify-center w-full min-w-0">
-            {/* <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} /> */}
             <Button size="lg" className={landingPrimaryCtaHero} onClick={handlePrimaryClick} disabled={isPrimaryAnimating} aria-busy={isPrimaryAnimating}>
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center mr-1.5 text-slate-900">
                 <StarshipsLogo

@@ -1,4 +1,4 @@
-import type { ApiResponse, TemplateCategory, ToolModel as Tool, AgentUpdateCheckResponse, HeartbeatConfigModel, HeartbeatRunModel, UpdateHeartbeatConfigRequest } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory, ToolModel as Tool, HeartbeatConfigModel, HeartbeatRunModel, UpdateHeartbeatConfigRequest } from '@starships/protocol'
 import type { ApiError as ApiErrorLike } from '@/lib/error-utils'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
@@ -367,7 +367,6 @@ api.interceptors.response.use(
 // Import Agent and Starship related types from protocol package
 import {
   AgentModel,
-  AgentTemplateModel,
   CreateAgentRequest,
   CreateStarshipRequest,
   StarshipAgentsResponse,
@@ -408,7 +407,6 @@ export type {
 
 // For compatibility, alias the types
 export type Agent = AgentModel
-export type AgentTemplate = AgentTemplateModel
 
 export interface Message {
   id: string
@@ -558,17 +556,6 @@ export const agentAPI = {
     return data
   },
 
-  // Template versioning methods
-  checkForUpdate: async (agentId: string): Promise<AgentUpdateCheckResponse> => {
-    const data = await api.get(`/api/v1/agents/${agentId}/check-update`).then(res => extractResponseData<AgentUpdateCheckResponse>(res))
-    return data
-  },
-
-  updateFromTemplate: async (agentId: string): Promise<Agent> => {
-    const data = await api.post(`/api/v1/agents/${agentId}/update-from-template`).then(res => extractResponseData<Agent>(res))
-    invalidateAgentCaches(agentId)
-    return data
-  },
 
   getAgentsWithUpdates: async (starshipId: string): Promise<Agent[]> => {
     const data = await api.get(`/api/v1/starships/${starshipId}/agents/with-updates`).then(res => extractResponseData<Agent[]>(res))
@@ -689,76 +676,6 @@ export const toolAPI = {
   getBySlug: async (starshipId: string, slug: string): Promise<Tool> => {
     const data = await api.get(`/api/v1/starships/${starshipId}/tools/${slug}`).then(res => extractResponseData<Tool>(res))
     return data
-  },
-}
-
-// NEW: Template API
-export const templateAPI = {
-  getAll: async (): Promise<AgentTemplate[]> => {
-    const cacheKey = CACHE_KEYS.TEMPLATES_ALL
-    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get('/api/v1/agent-templates').then(res => extractResponseData<AgentTemplate[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getById: async (id: string): Promise<AgentTemplate> => {
-    const cacheKey = CACHE_KEYS.TEMPLATE_BY_ID(id)
-    const cached = apiCache.get<AgentTemplate>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agent-templates/${id}`).then(res => extractResponseData<AgentTemplate>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getByCategory: async (category: AgentTemplate['category']): Promise<AgentTemplate[]> => {
-    const cacheKey = CACHE_KEYS.TEMPLATES_BY_CATEGORY(category)
-    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agent-templates?category=${category}`).then(res => extractResponseData<AgentTemplate[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getByAuthor: async (authorId: string): Promise<AgentTemplate[]> => {
-    const cacheKey = CACHE_KEYS.TEMPLATES_BY_AUTHOR(authorId)
-    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agent-templates?authorId=${authorId}`).then(res => extractResponseData<AgentTemplate[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  createAgentFromTemplate: async (templateId: string, starshipId: string): Promise<Agent> => {
-    try {
-      const requestBody = { starshipId }
-
-      const data = await api.post(`/api/v1/agent-templates/${templateId}/agents`, requestBody).then(res => extractResponseData<Agent>(res))
-
-      // Invalidate agent caches since we've created a new agent
-      invalidateAgentCaches()
-
-      // Also invalidate the specific template cache to update usage count
-      apiCache.invalidate(CACHE_KEYS.TEMPLATE_BY_ID(templateId))
-
-      return data
-    } catch (error) {
-      console.error('Failed to create agent from template:', error)
-      throw error // Re-throw to allow proper error handling in UI
-    }
   },
 }
 

@@ -24,6 +24,7 @@ export function Step3IcpProfiles({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectingId, setSelectingId] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -49,7 +50,7 @@ export function Step3IcpProfiles({
 
     fetchProfiles()
     return () => { cancelled = true }
-  }, [companyName, websiteUrl, bio])
+  }, [companyName, websiteUrl, bio, retryCount])
 
   async function handleSelect(profile: IcpProfile) {
     setSelectingId(profile.id)
@@ -95,9 +96,8 @@ export function Step3IcpProfiles({
               <button
                 type="button"
                 onClick={() => {
-                  setError(null)
-                  setIsLoading(true)
                   setProfiles([])
+                  setRetryCount(c => c + 1)
                 }}
                 className="mt-6 rounded-none border border-white/15 px-5 py-2.5 text-sm text-white/60 hover:border-white/30 hover:text-white/80 transition-colors"
               >

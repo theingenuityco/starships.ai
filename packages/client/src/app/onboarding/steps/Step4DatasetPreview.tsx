@@ -36,7 +36,7 @@ export function Step4DatasetPreview({
         createdAt: Date.now(),
       }
       window.localStorage.setItem(AUTOMATE_SESSION_KEY, JSON.stringify(payload))
-    } catch (e: any) {
+    } catch {
       // Ignore storage errors; redirect still proceeds
     }
     setShowGate(true)

@@ -66,10 +66,10 @@ export function OnboardingFlow() {
           }}
         />
       )}
-      {step === 4 && data.selectedIcp && (
+      {step === 4 && (
         <Step4DatasetPreview
           companyName={data.companyName}
-          icp={data.selectedIcp}
+          icp={data.selectedIcp!}
           accounts={data.previewAccounts}
           onBack={() => setStep(3)}
         />

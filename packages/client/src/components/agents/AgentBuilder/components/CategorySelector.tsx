@@ -5,13 +5,13 @@ import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentCategory } from '@starships/protocol'
 import { getCategoryIcon, getCategoryColor } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 
 interface CategorySelectorProps {
-  selectedCategory: AgentTemplateCategory | ''
-  onCategoryChange: (category: AgentTemplateCategory) => void
+  selectedCategory: AgentCategory | ''
+  onCategoryChange: (category: AgentCategory) => void
 }
 
 export const CategorySelector: React.FC<CategorySelectorProps> = ({ selectedCategory, onCategoryChange }) => {

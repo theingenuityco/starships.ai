@@ -5,13 +5,13 @@ import React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import type { ToolTemplateCategory } from '@starships/protocol'
+import type { ToolCategory } from '@starships/protocol'
 import { getCategoryIcon, getCategoryColor } from '../utils/categoryHelpers'
 import { CATEGORIES } from '../constants'
 
 interface CategorySelectorProps {
-  selectedCategory: ToolTemplateCategory
-  onCategoryChange: (category: ToolTemplateCategory) => void
+  selectedCategory: ToolCategory
+  onCategoryChange: (category: ToolCategory) => void
   disabled?: boolean
 }
 

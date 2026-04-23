@@ -69,6 +69,8 @@ export function OnboardingFlow() {
       {step === 4 && (
         <Step4DatasetPreview
           companyName={data.companyName}
+          websiteUrl={data.websiteUrl}
+          bio={data.bio}
           icp={data.selectedIcp!}
           accounts={data.previewAccounts}
           onBack={() => setStep(3)}

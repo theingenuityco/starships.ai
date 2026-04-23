@@ -17,6 +17,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { RoomSidebarList } from '@/components/rooms/RoomSidebarList'
+import { RoomTemplatesModal } from '@/components/rooms/RoomTemplatesModal'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
@@ -67,6 +68,7 @@ export function Navigation(props: NavigationProps) {
   // On mobile, always expanded (no collapse functionality)
   const [isExpanded, setIsExpanded] = useState(true)
   const [isCollapsing, setIsCollapsing] = useState(false)
+  const [addRoomOpen, setAddRoomOpen] = useState(false)
 
   // Keep logo stable during collapse animation.
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -500,8 +502,19 @@ export function Navigation(props: NavigationProps) {
               <div className={isExpanded ? 'flex-1 min-h-0 flex flex-col pl-2 pr-1.5' : 'hidden'}>
                 {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
                 <div className="flex-1 min-h-0 overflow-hidden pb-2">
-                  <RoomSidebarList starshipId={String(starshipData.id)} starshipSlug={activeStarshipSlug || ''} onNavigate={isMobile && onClose ? onClose : undefined} />
+                  <RoomSidebarList
+                    starshipId={String(starshipData.id)}
+                    starshipSlug={activeStarshipSlug || ''}
+                    onNavigate={isMobile && onClose ? onClose : undefined}
+                    onAddRoom={() => setAddRoomOpen(true)}
+                  />
                 </div>
+                <RoomTemplatesModal
+                  open={addRoomOpen}
+                  onOpenChange={setAddRoomOpen}
+                  starshipId={String(starshipData.id)}
+                  starshipSlug={activeStarshipSlug || ''}
+                />
               </div>
             )}
 

@@ -9,7 +9,7 @@ import type { RoomModel } from '@starships/protocol'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
-export function RoomSidebarList(props: { starshipId: string; starshipSlug: string; onNavigate?: () => void }) {
+export function RoomSidebarList(props: { starshipId: string; starshipSlug: string; onNavigate?: () => void; onAddRoom?: () => void }) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -124,6 +124,22 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
           </div>
         </ScrollArea>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          if (props.onAddRoom) {
+            props.onAddRoom()
+          } else {
+            router.push(`/ship/${encodeURIComponent(props.starshipSlug)}/rooms`)
+            props.onNavigate?.()
+          }
+        }}
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-2 py-1.5 text-xs text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground transition-colors"
+      >
+        <Icon name="plus" className="h-3.5 w-3.5 flex-shrink-0" />
+        Add room
+      </button>
     </div>
   )
 }

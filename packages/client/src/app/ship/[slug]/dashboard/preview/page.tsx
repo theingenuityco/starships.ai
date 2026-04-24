@@ -7,6 +7,7 @@
  */
 
 import React, { useState } from 'react'
+import { notFound } from 'next/navigation'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Icon from '@/components/primitives/Icon'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
@@ -292,7 +293,9 @@ const MOCK_BOARDS = [
   { id: BOARD_2_ID, name: 'Content Pipeline', starshipId: DEMO_ID, createdAt: daysAgo(10), updatedAt: hoursAgo(3) },
 ]
 
-const MOCK_BOARD_DATA: Record<string, { columns: Record<string, string>; cards: any[]; isLoading: boolean }> = {
+type MockCard = { id: string; title: string; columnId: string; archived: boolean; createdAt: string }
+
+const MOCK_BOARD_DATA: Record<string, { columns: Record<string, string>; cards: MockCard[]; isLoading: boolean }> = {
   [BOARD_1_ID]: {
     isLoading: false,
     columns: {
@@ -375,6 +378,8 @@ function buildPreviewQueryClient(): QueryClient {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPreviewPage(): React.JSX.Element {
+  if (process.env.NODE_ENV === 'production') notFound()
+
   const [queryClient] = useState(() => buildPreviewQueryClient())
 
   return (

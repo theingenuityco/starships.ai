@@ -298,7 +298,7 @@ export class ConversationRepository extends BaseRepository {
             created_at: string;
           }>(
             `SELECT DISTINCT ON (conversation_id)
-               conversation_id, content, agent_name, created_at
+               conversation_id, LEFT(content, 300) AS content, agent_name, created_at
              FROM messages
              WHERE conversation_id = ANY($1::text[])
                AND role = 'assistant'

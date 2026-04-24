@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
 import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
 import type { ApiResponse } from '@starships/protocol'
-import type { TaskBoardModel, TaskBoardDetailsResponse, TaskCardModel, TaskColumnModel } from '@starships/protocol'
+import type { TaskBoardModel, TaskCardModel, TaskColumnModel } from '@starships/protocol'
 
 interface GoalsColumnProps {
   starshipId: string | undefined
@@ -22,8 +22,8 @@ const taskBoardsClient = {
     const res = await api.get<ApiResponse<{ boards: TaskBoardModel[] }>>(`/api/v1/starships/${starshipId}/task-boards`)
     return res.data.data?.boards ?? []
   },
-  getBoard: async (starshipId: string, boardId: string): Promise<TaskBoardDetailsResponse> => {
-    const res = await api.get<ApiResponse<TaskBoardDetailsResponse>>(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}`)
+  getBoard: async (starshipId: string, boardId: string): Promise<{ columns?: TaskColumnModel[] }> => {
+    const res = await api.get<ApiResponse<{ columns?: TaskColumnModel[] }>>(`/api/v1/starships/${starshipId}/task-boards/${encodeURIComponent(boardId)}`)
     return res.data.data
   },
   listCards: async (starshipId: string, boardId: string): Promise<TaskCardModel[]> => {
@@ -51,45 +51,33 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
     refetchOnWindowFocus: false,
   })
 
-  const boardDetailQueries = useQueries({
-    queries: boards.map(board => ({
-      queryKey: ['task-board', starshipId, board.id],
-      queryFn: () => taskBoardsClient.getBoard(starshipId!, board.id),
-      enabled: !!starshipId && !!board.id,
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-    })),
-  })
+  type BoardData = { columns: Record<string, string>; cards: TaskCardModel[]; isLoading: boolean }
 
-  const cardQueries = useQueries({
+  const boardDataQueries = useQueries({
     queries: boards.map(board => ({
-      queryKey: ['task-cards', starshipId, board.id],
-      queryFn: () => taskBoardsClient.listCards(starshipId!, board.id),
+      queryKey: ['task-board-full', starshipId, board.id],
+      queryFn: async (): Promise<BoardData> => {
+        const [details, cards] = await Promise.all([
+          taskBoardsClient.getBoard(starshipId!, board.id),
+          taskBoardsClient.listCards(starshipId!, board.id),
+        ])
+        const columns: Record<string, string> = {}
+        for (const col of (details?.columns ?? []) as TaskColumnModel[]) {
+          columns[col.id] = col.title
+        }
+        return { columns, cards, isLoading: false }
+      },
       enabled: !!starshipId && !!board.id,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     })),
-  })
-
-  const columnNamesByBoard = useMemo(() => {
-    const map: Record<string, Record<string, string>> = {}
-    boards.forEach((board, idx) => {
-      const details = boardDetailQueries[idx]?.data
-      map[board.id] = {}
-      if (Array.isArray(details?.columns)) {
-        for (const col of details!.columns as TaskColumnModel[]) {
-          map[board.id][col.id] = col.title
-        }
-      }
-    })
-    return map
-  }, [boards, boardDetailQueries])
+  }) as UseQueryResult<BoardData>[]
 
   const totalActiveCards = useMemo(() => {
-    return cardQueries.reduce((sum, q) => {
-      return sum + (q.data ?? []).filter(c => !c.archived).length
+    return boardDataQueries.reduce((sum, q) => {
+      return sum + (q.data?.cards ?? []).filter(c => !c.archived).length
     }, 0)
-  }, [cardQueries])
+  }, [boardDataQueries])
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -145,14 +133,15 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
             </div>
           ) : (
             boards.map((board, boardIdx) => {
-              const cards = cardQueries[boardIdx]?.data ?? []
+              const q = boardDataQueries[boardIdx]
+              const cards = q?.data?.cards ?? []
+              const colNames = q?.data?.columns ?? {}
               const activeCards = cards.filter(c => !c.archived)
-              const colNames = columnNamesByBoard[board.id] ?? {}
               const doneCards = activeCards.filter(c => isDoneColumn(colNames[c.columnId] ?? ''))
               const total = activeCards.length
               const done = doneCards.length
               const progressPct = total > 0 ? Math.round((done / total) * 100) : 0
-              const cardsLoading = cardQueries[boardIdx]?.isLoading
+              const cardsLoading = q?.isLoading
 
               return (
                 <div key={board.id} className="rounded-lg border border-border/60 overflow-hidden">

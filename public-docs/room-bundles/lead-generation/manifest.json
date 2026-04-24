@@ -75,174 +75,6 @@
     "tools": [
       {
         "kind": "tool",
-        "fromSlug": "call-agent",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/call-agent.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "unassign-agent-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/unassign-agent-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "create-agent",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/create-agent.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "list-models",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/list-models.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-agents",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-agents.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-agent",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-agent.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "edit-agent",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/edit-agent.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "assign-agent-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/assign-agent-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-tools",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-tools.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "list-connector-templates",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/list-connector-templates.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-connector-actions",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-connector-actions.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-connector-template",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-connector-template.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-connector-action",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-connector-action.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-context7-docs",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-context7-docs.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-context7-doc",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-context7-doc.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "modify-tool-blueprint-edge",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/modify-tool-blueprint-edge.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "modify-tool-blueprint-node",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/modify-tool-blueprint-node.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-doc",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-doc.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-docs",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-docs.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "test-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/test-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "edit-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/edit-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "create-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/create-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "get-tool",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/get-tool.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-room-resources",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-room-resources.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "web-fetch",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/web-fetch.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "read-conversation-messages",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/read-conversation-messages.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-conversations-threads",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-conversations-threads.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "web-search",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/web-search.json"
-      },
-      {
-        "kind": "tool",
         "fromSlug": "create-account",
         "fromStarshipSlug": "starborn-dvlif0",
         "file": "tools/create-account.json"
@@ -255,27 +87,9 @@
       },
       {
         "kind": "tool",
-        "fromSlug": "update-contact",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/update-contact.json"
-      },
-      {
-        "kind": "tool",
         "fromSlug": "disqualify-account",
         "fromStarshipSlug": "starborn-dvlif0",
         "file": "tools/disqualify-account.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "mark-contact-do-not-contact",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/mark-contact-do-not-contact.json"
-      },
-      {
-        "kind": "tool",
-        "fromSlug": "search-contacts",
-        "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/search-contacts.json"
       },
       {
         "kind": "tool",
@@ -285,21 +99,21 @@
       },
       {
         "kind": "tool",
-        "fromSlug": "add-task",
+        "fromSlug": "update-contact",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/add-task.json"
+        "file": "tools/update-contact.json"
       },
       {
         "kind": "tool",
-        "fromSlug": "move-task-card",
+        "fromSlug": "search-contacts",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/move-task-card.json"
+        "file": "tools/search-contacts.json"
       },
       {
         "kind": "tool",
-        "fromSlug": "show-dataset-card",
+        "fromSlug": "mark-contact-do-not-contact",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "tools/show-dataset-card.json"
+        "file": "tools/mark-contact-do-not-contact.json"
       }
     ]
   }

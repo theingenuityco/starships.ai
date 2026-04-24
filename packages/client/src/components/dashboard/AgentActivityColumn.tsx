@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { useStarshipRooms } from '@/hooks/useRooms'
-import type { AgentModel, ConversationModel, ConversationStatus } from '@starships/protocol'
+import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { relativeTime, avatarColour, agentChipColour, durationText } from './utils'
 
 interface AgentActivityColumnProps {
@@ -28,23 +28,15 @@ const BUCKET_LABELS: Record<TimeBucket, string> = {
 
 function timeBucket(dateStr: string | undefined): TimeBucket {
   if (!dateStr) return 'older'
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 60) return 'hour'
-  if (mins < 24 * 60) return 'today'
-  if (mins < 48 * 60) return 'yesterday'
+  const date = new Date(dateStr)
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterdayStart = new Date(todayStart.getTime() - 86_400_000)
+  const hourAgo = now.getTime() - 3_600_000
+  if (date.getTime() >= hourAgo) return 'hour'
+  if (date >= todayStart) return 'today'
+  if (date >= yesterdayStart) return 'yesterday'
   return 'older'
-}
-
-const STATUS_BADGE: Partial<Record<ConversationStatus, { label: string; className: string }>> = {
-  completed: {
-    label: 'Done',
-    className: 'text-muted-foreground bg-muted/50 border-border/40',
-  },
-  paused: {
-    label: 'Paused',
-    className: 'text-amber-500 bg-amber-500/10 border-amber-500/20 dark:text-amber-400',
-  },
 }
 
 function AgentAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
@@ -333,7 +325,6 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                   // ── Agent run ─────────────────────────────────────
                   const agent = conv.agents?.[0]
                   const agentName = agent?.name ?? 'Agent'
-                  const badge = STATUS_BADGE[conv.status] ?? null
                   const roomConvId = resolveRoomConvId(conv.parentConversationId ?? conv.id)
                   const roomName = roomConvId ? roomConvIdToName[roomConvId] : undefined
                   const duration = conv.status === 'completed' ? durationText(conv.createdAt, conv.updatedAt) : ''

@@ -15,6 +15,15 @@ interface ApprovalsPanelProps {
   starshipId: string | undefined
 }
 
+interface PendingApproval {
+  id: string
+  agentId?: string
+  agentName?: string
+  toolSlug?: string
+  toolName?: string
+  argsJson?: Record<string, unknown>
+}
+
 export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
   const queryClient = useQueryClient()
 
@@ -73,7 +82,7 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
   const { byConversationId } = usePendingToolApprovalsMulti(childConvIds, childConvIds.length > 0)
 
   const allApprovals = useMemo(() => {
-    const list: Array<{ approval: any; conversationId: string; parentConvId: string | null }> = []
+    const list: Array<{ approval: PendingApproval; conversationId: string; parentConvId: string | null }> = []
     for (const q of pendingApprovalSummaryQueries) {
       const data = q.data as { roomConvId: string; children: Array<{ id: string; pendingCount: number }> } | undefined
       if (!data) continue
@@ -89,7 +98,7 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
     return list
   }, [pendingApprovalSummaryQueries, byConversationId, dismissedIds])
 
-  const handleApproveOnce = async (approval: any, conversationId: string, parentConvId: string | null) => {
+  const handleApproveOnce = async (approval: PendingApproval, conversationId: string, parentConvId: string | null) => {
     if (submittingId === approval.id) return
     setSubmittingId(approval.id)
     setDismissedIds(prev => new Set(prev).add(approval.id))
@@ -106,7 +115,7 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
     }
   }
 
-  const handleAlwaysAllow = async (approval: any, conversationId: string, parentConvId: string | null) => {
+  const handleAlwaysAllow = async (approval: PendingApproval, conversationId: string, parentConvId: string | null) => {
     if (submittingId === approval.id) return
     const agentId = String(approval?.agentId || '')
     const toolSlug = String(approval?.toolSlug || '')
@@ -130,7 +139,7 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
     }
   }
 
-  const handleDeny = async (approval: any, conversationId: string, parentConvId: string | null) => {
+  const handleDeny = async (approval: PendingApproval, conversationId: string, parentConvId: string | null) => {
     if (submittingId === approval.id) return
     setSubmittingId(approval.id)
     setDismissedIds(prev => new Set(prev).add(approval.id))
@@ -162,7 +171,7 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
 
       {/* Content — scrollable */}
       <div className="overflow-y-auto flex-1">
-        {roomsLoading ? (
+        {roomsLoading || pendingApprovalSummaryQueries.some(q => q.isLoading) ? (
           <div className="p-4 space-y-2.5">
             <Skeleton className="h-16 w-full rounded-lg" />
             <Skeleton className="h-16 w-full rounded-lg" />

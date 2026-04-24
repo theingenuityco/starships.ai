@@ -98,10 +98,10 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
     return undefined
   }, [roomConvIdToName, convParentMap])
 
-  const { runningConvs, recentConvs } = useMemo(() => {
+  const { runningConvs, recentConvs, totalUnfiltered } = useMemo(() => {
     const convs = (conversationsData?.conversations ?? []) as TypedConv[]
-    const sorted = convs
-      .filter(c => c.status !== 'archived')
+    const active = convs.filter(c => c.status !== 'archived')
+    const sorted = active
       .sort(
         (a, b) =>
           new Date(b.updatedAt ?? b.createdAt).getTime() -
@@ -109,6 +109,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
       )
       .slice(0, 30)
     return {
+      totalUnfiltered: active.length,
       runningConvs: sorted.filter(c => c.hasActiveTurn),
       recentConvs: sorted.filter(c => !c.hasActiveTurn).slice(0, 20),
     }
@@ -268,6 +269,14 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                   </div>
                 </div>
               ))}
+
+              {totalUnfiltered > totalConvs && (
+                <div className="px-7 py-3">
+                  <p className="text-[10px] text-muted-foreground/40">
+                    Showing {totalConvs} of {totalUnfiltered} conversations
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

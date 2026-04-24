@@ -270,6 +270,8 @@ const AUTOMATE_SESSION_KEY = 'automate_pending_data'
 
 interface AutomatePendingData {
   companyName: string
+  websiteUrl?: string
+  bio?: string
   icp: {
     id: string
     name: string
@@ -323,7 +325,13 @@ async function handleAutomatePostAuth(args: {
     const provisionRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/automate/provision-leadgen`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ icp: pending.icp, accounts: pending.accounts }),
+      body: JSON.stringify({
+        companyName: pending.companyName,
+        websiteUrl: pending.websiteUrl,
+        bio: pending.bio,
+        icp: pending.icp,
+        accounts: pending.accounts,
+      }),
     })
 
     if (!provisionRes.ok) return false

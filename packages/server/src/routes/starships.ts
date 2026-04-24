@@ -3494,6 +3494,9 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
  * Starship owner / instance-admin only.
  */
 const ProvisionLeadgenBodySchema = z.object({
+  companyName: z.string().min(1).max(200).optional(),
+  websiteUrl: z.string().url().max(500).optional(),
+  bio: z.string().max(2000).optional(),
   icp: z.object({
     id: z.string().min(1).max(200),
     name: z.string().min(1).max(200),
@@ -3533,15 +3536,25 @@ router.post('/starships/:id/automate/provision-leadgen', jwtAuthMiddleware, asyn
     if (!bodyValidation) return;
 
     const starshipId = paramValidation.id;
-    const { icp, accounts } = bodyValidation;
+    const { companyName, websiteUrl, bio, icp, accounts } = bodyValidation;
 
-    // 1. Ensure the leadgen room exists (idempotent).
+    // 1. Persist company-level data to the starship so future room setup wizards can skip re-asking.
+    if (companyName || websiteUrl || bio) {
+      const starshipService = new StarshipService();
+      const updates: { name?: string; websiteUrl?: string; description?: string } = {};
+      if (companyName) updates.name = companyName;
+      if (websiteUrl) updates.websiteUrl = websiteUrl;
+      if (bio) updates.description = bio;
+      await starshipService.updateStarship(starshipId, updates);
+    }
+
+    // 2. Ensure the leadgen room exists (idempotent).
     //    importSummary is only present when the room was freshly created; it is absent when an
     //    existing room was reused. We only seed datasets on a fresh creation so that returning
     //    users who already have a leadgen room are not affected.
     const { room } = await ensureLeadGenRoomInternal({ starshipId, userId: user.id });
 
-    // 2. Resolve the Accounts dataset pinned to the room (needed for the redirect URL regardless).
+    // 3. Resolve the Accounts dataset pinned to the room (needed for the redirect URL regardless).
     const roomDatasetsRepo = new RoomDatasetsRepository();
     const datasetRepo = new StarshipDatasetRepository();
 
@@ -3557,7 +3570,7 @@ router.post('/starships/:id/automate/provision-leadgen', jwtAuthMiddleware, asyn
       if (dataset.slug === 'accounts') accountsDatasetId = dataset.id;
     }
 
-    // 3. Seed datasets with the onboarding data.
+    // 4. Seed datasets with the onboarding data.
     //    This always runs — ensureLeadGenRoomInternal already guarantees the room structure is
     //    not redeployed when one exists, so seeding here is safe for both first-time and repeat
     //    /automate runs.

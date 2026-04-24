@@ -12,11 +12,15 @@ const AUTOMATE_SESSION_KEY = 'automate_pending_data'
 
 export function Step4DatasetPreview({
   companyName,
+  websiteUrl,
+  bio,
   icp,
   accounts,
   onBack,
 }: {
   companyName: string
+  websiteUrl: string
+  bio: string
   icp: IcpProfile
   accounts: IcpAccountPreview[]
   onBack: () => void
@@ -31,12 +35,14 @@ export function Step4DatasetPreview({
     try {
       const payload = {
         companyName,
+        websiteUrl,
+        bio,
         icp,
         accounts,
         createdAt: Date.now(),
       }
       window.localStorage.setItem(AUTOMATE_SESSION_KEY, JSON.stringify(payload))
-    } catch (e: any) {
+    } catch {
       // Ignore storage errors; redirect still proceeds
     }
     setShowGate(true)

@@ -21,8 +21,36 @@ const AVATAR_COLOURS = [
   'bg-pink-500',
 ]
 
-export function avatarColour(name: string): string {
+const CHIP_COLOURS = [
+  'bg-violet-500/10 text-violet-400 border-violet-500/15',
+  'bg-blue-500/10 text-blue-400 border-blue-500/15',
+  'bg-cyan-500/10 text-cyan-400 border-cyan-500/15',
+  'bg-teal-500/10 text-teal-400 border-teal-500/15',
+  'bg-emerald-500/10 text-emerald-400 border-emerald-500/15',
+  'bg-amber-500/10 text-amber-400 border-amber-500/15',
+  'bg-rose-500/10 text-rose-400 border-rose-500/15',
+  'bg-pink-500/10 text-pink-400 border-pink-500/15',
+]
+
+function nameHash(name: string): number {
   let h = 0
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
-  return AVATAR_COLOURS[h % AVATAR_COLOURS.length]!
+  return h
+}
+
+export function avatarColour(name: string): string {
+  return AVATAR_COLOURS[nameHash(name) % AVATAR_COLOURS.length]!
+}
+
+export function agentChipColour(name: string): string {
+  return CHIP_COLOURS[nameHash(name) % CHIP_COLOURS.length]!
+}
+
+export function durationText(startStr: string | undefined, endStr: string | undefined): string {
+  if (!startStr || !endStr) return ''
+  const secs = Math.round((new Date(endStr).getTime() - new Date(startStr).getTime()) / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }

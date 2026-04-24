@@ -22,12 +22,20 @@ export interface Conversation {
 /**
  * Core conversation model - database entity
  */
+export interface ConversationLastMessage {
+  content: string;
+  agentName?: string;
+  createdAt: string;
+}
+
 export interface ConversationModel extends Conversation {
   id: string;
   starshipId: string;
   parentConversationId?: string;
   /** True when there is at least one turn with status 'active' or 'waiting_for_tools'. Populated by list endpoints that join turns; undefined otherwise. */
   hasActiveTurn?: boolean;
+  /** Most recent agent_response message. Populated by list endpoints that join messages; undefined otherwise. */
+  lastMessage?: ConversationLastMessage;
   createdAt: string;
   updatedAt?: string;
 }

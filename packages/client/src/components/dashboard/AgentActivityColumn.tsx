@@ -44,7 +44,7 @@ const STATUS_BADGE: Partial<Record<ConversationStatus, { label: string; classNam
   },
   paused: {
     label: 'Paused',
-    className: 'text-amber-600 bg-amber-500/10 border-amber-400/30 dark:text-amber-400',
+    className: 'text-amber-500 bg-amber-500/10 border-amber-500/20 dark:text-amber-400',
   },
 }
 
@@ -139,20 +139,17 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/50">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 flex-shrink-0">
-          <Icon name="activity" className="h-3.5 w-3.5 text-violet-500" />
-        </div>
-        <span className="text-sm font-semibold">Agent Activity</span>
+      <div className="flex items-center gap-2 px-5 py-3.5">
+        <Icon name="activity" className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+        <span className="text-sm font-semibold tracking-tight">Agent Activity</span>
         {runningConvs.length > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-bold px-1.5 h-[18px]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/15 text-green-500 text-[10px] font-bold px-2 h-[18px]">
             <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
             {runningConvs.length} live
           </span>
         )}
         {totalConvs > 0 && runningConvs.length === 0 && (
-          <span className="inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px]">
+          <span className="inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
             {totalConvs}
           </span>
         )}
@@ -161,34 +158,33 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
       <ScrollArea className="flex-1 min-h-0">
         <div className="py-3">
           {convsLoading ? (
-            <div className="space-y-3 px-4">
+            <div className="space-y-3 px-6 pt-2">
               {[1, 2, 3, 4].map(i => (
                 <div key={i} className="flex items-start gap-3">
                   <Skeleton className="h-7 w-7 rounded-full flex-shrink-0" />
                   <div className="flex-1 space-y-1.5 pt-0.5">
-                    <Skeleton className="h-2.5 w-28" />
-                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-2.5 w-24" />
+                    <Skeleton className="h-3 w-4/5" />
                   </div>
                 </div>
               ))}
             </div>
           ) : totalConvs === 0 ? (
-            <div className="py-12 text-center px-4">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50">
-                <Icon name="activity" className="h-6 w-6 text-muted-foreground/40" />
+            <div className="py-20 text-center px-6">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/40">
+                <Icon name="activity" className="h-6 w-6 text-muted-foreground/30" />
               </div>
-              <p className="text-sm font-medium text-foreground/70 mb-1">No activity yet</p>
+              <p className="text-sm font-medium text-foreground mb-1">No activity yet</p>
               <p className="text-xs text-muted-foreground">Agent conversations will appear here</p>
             </div>
           ) : (
             <>
-              {/* Running now */}
               {runningConvs.length > 0 && (
-                <div className="px-3 mb-3">
+                <div className="px-5 pt-2 pb-2">
                   <div className="rounded-lg border border-green-500/20 bg-green-500/5 overflow-hidden">
-                    <div className="flex items-center gap-1.5 px-3 py-2 border-b border-green-500/10">
-                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-green-500/15">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                      <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">
                         Running now
                       </span>
                     </div>
@@ -203,14 +199,14 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                             key={conv.id}
                             type="button"
                             onClick={() => router.push(convHref(conv))}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-green-500/5 transition-colors group"
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-green-500/5 transition-colors group"
                           >
                             <AgentAvatar name={agentName} size="sm" />
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium text-foreground/90 truncate group-hover:text-foreground transition-colors">
                                 {conv.title || 'Untitled'}
                               </p>
-                              <p className="text-[10px] text-muted-foreground truncate">
+                              <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
                                 {agentName}{roomName && <> · {roomName}</>}
                               </p>
                             </div>
@@ -223,18 +219,17 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                 </div>
               )}
 
-              {/* Timeline */}
               {grouped.map(({ bucket, items }) => (
                 <div key={bucket}>
-                  <div className="flex items-center gap-2 px-4 py-1.5">
+                  <div className="flex items-center gap-3 px-6 py-2">
                     <div className="h-px flex-1 bg-border/40" />
-                    <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wide">
+                    <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider">
                       {BUCKET_LABELS[bucket]}
                     </span>
                     <div className="h-px flex-1 bg-border/40" />
                   </div>
 
-                  <div className="px-3 space-y-0.5">
+                  <div className="px-5 space-y-px">
                     {items.map(conv => {
                       const agent = conv.agents?.[0]
                       const agentName = agent?.name ?? 'Agent'
@@ -251,12 +246,12 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                         >
                           <AgentAvatar name={agentName} size="sm" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-foreground/80 truncate group-hover:text-foreground transition-colors">
+                            <p className="text-xs text-foreground/80 truncate group-hover:text-foreground transition-colors leading-snug">
                               {conv.title || 'Untitled'}
                             </p>
-                            <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
+                            <p className="text-[10px] text-muted-foreground/60 truncate mt-0.5">
                               {agentName}{roomName && <> · {roomName}</>}
-                              <span className="mx-1 opacity-50">·</span>
+                              {' · '}
                               {relativeTime(conv.updatedAt ?? conv.createdAt)}
                             </p>
                           </div>

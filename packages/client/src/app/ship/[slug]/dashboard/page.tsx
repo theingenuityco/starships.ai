@@ -7,7 +7,7 @@ import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleBu
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { GoalsColumn } from '@/components/dashboard/GoalsColumn'
 import { AgentActivityColumn } from '@/components/dashboard/AgentActivityColumn'
-import { OutputsApprovalsColumn } from '@/components/dashboard/OutputsApprovalsColumn'
+import { ApprovalsPanel } from '@/components/dashboard/ApprovalsPanel'
 
 export default function DashboardPage(): React.JSX.Element {
   const { slug: slugParam } = useParams<{ slug: string }>()
@@ -17,37 +17,51 @@ export default function DashboardPage(): React.JSX.Element {
   const starshipId = starship?.id
 
   return (
-    <div className="relative flex flex-col min-h-full min-w-0 bg-background">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card/80 backdrop-blur-sm">
-        <div className="px-4 pt-3.5 pb-2 md:py-2.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex-shrink-0 self-center md:hidden">
-              <MobileNavToggleButton className="mx-2" />
+    <div className="relative flex flex-col h-full min-w-0 bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur-sm">
+        <div className="px-4 py-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex-shrink-0 md:hidden">
+              <MobileNavToggleButton className="mx-1" />
             </span>
-            <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-              <Icon name="dashboard" weight="bold" className="h-4 w-4" />
-            </span>
-            <h3 className="text-sm font-semibold text-foreground truncate leading-tight">Dashboard</h3>
-            <p className="hidden md:block text-xs text-muted-foreground truncate ml-1">
-              Goals · Agent activity · Outputs &amp; approvals
-            </p>
+            <Icon name="dashboard" weight="bold" className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <h3 className="text-sm font-semibold text-foreground">Dashboard</h3>
           </div>
         </div>
       </div>
 
-      {/* Three-column grid */}
-      <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-          <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden min-h-[480px] md:min-h-0 md:h-[calc(100vh-8rem)]">
+      {/* Desktop: main + two-panel aside */}
+      <div className="hidden md:flex flex-1 min-h-0 overflow-hidden">
+        {/* Main — agent activity, dominant width */}
+        <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <AgentActivityColumn starshipId={starshipId} />
+        </main>
+
+        {/* Aside — approvals (top) stacked above goals (bottom) */}
+        <aside className="w-[360px] shrink-0 flex flex-col overflow-hidden">
+          {/* Top panel: approvals — shrinks when empty, scrolls when many items */}
+          <div className="flex-shrink-0 max-h-[45%] flex flex-col overflow-hidden">
+            <ApprovalsPanel starshipId={starshipId} />
+          </div>
+
+          {/* Bottom panel: goals — fills remaining height */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col pt-4">
             <GoalsColumn starshipId={starshipId} />
           </div>
-          <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden min-h-[480px] md:min-h-0 md:h-[calc(100vh-8rem)]">
-            <AgentActivityColumn starshipId={starshipId} />
-          </div>
-          <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm overflow-hidden min-h-[480px] md:min-h-0 md:h-[calc(100vh-8rem)]">
-            <OutputsApprovalsColumn starshipId={starshipId} />
-          </div>
+        </aside>
+      </div>
+
+      {/* Mobile: stacked sections */}
+      <div className="md:hidden flex-1">
+        <div className="min-h-[420px]">
+          <AgentActivityColumn starshipId={starshipId} />
+        </div>
+        <div className="min-h-[280px]">
+          <ApprovalsPanel starshipId={starshipId} />
+        </div>
+        <div className="min-h-[420px]">
+          <GoalsColumn starshipId={starshipId} />
         </div>
       </div>
     </div>

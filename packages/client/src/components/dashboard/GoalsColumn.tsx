@@ -7,7 +7,6 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import api from '@/lib/api'
@@ -115,7 +114,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-4 py-4 space-y-3">
           {boardsLoading ? (
             <div className="space-y-3">
@@ -232,7 +231,7 @@ export function GoalsColumn({ starshipId }: GoalsColumnProps) {
             })
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

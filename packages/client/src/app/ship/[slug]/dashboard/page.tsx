@@ -17,7 +17,7 @@ export default function DashboardPage(): React.JSX.Element {
   const starshipId = starship?.id
 
   return (
-    <div className="relative flex flex-col min-h-full min-w-0 bg-background">
+    <div className="relative flex flex-col h-full min-w-0 bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur-sm">
         <div className="px-4 py-2.5">
@@ -32,10 +32,7 @@ export default function DashboardPage(): React.JSX.Element {
       </div>
 
       {/* Desktop: main + two-panel aside */}
-      <div
-        className="hidden md:flex overflow-hidden"
-        style={{ height: 'calc(100vh - 3.25rem)' }}
-      >
+      <div className="hidden md:flex flex-1 min-h-0 overflow-hidden">
         {/* Main — agent activity, dominant width */}
         <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
           <AgentActivityColumn starshipId={starshipId} />

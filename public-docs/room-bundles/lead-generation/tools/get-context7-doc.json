@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.266Z",
+  "metadata": {
+    "fromSlug": "get-context7-doc",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Context7 Doc",
+      "description": "Get documentation, code snippets, and examples for a specific library. Provide a library ID (from search results) and a specific question or topic to get relevant, ranked documentation.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "libraryId",
+          "query"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "json",
+              "txt"
+            ],
+            "type": "string",
+            "default": "json",
+            "description": "Response format - 'json' for structured data with code and info snippets, 'txt' for plain text"
+          },
+          "query": {
+            "type": "string",
+            "description": "Specific question or topic (e.g., 'how to make POST request', 'authentication methods', 'error handling')"
+          },
+          "libraryId": {
+            "type": "string",
+            "description": "Library identifier obtained from search-code-libraries results"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_docs",
+            "ref": "start_to_get_docs",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "get_docs_to_end",
+            "from": "get_docs"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_docs",
+            "name": "Get Documentation from Context7",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "get-documentation",
+              "timeout": 30000,
+              "connector": "context7"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

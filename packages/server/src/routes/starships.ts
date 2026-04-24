@@ -53,6 +53,7 @@ import Stripe from 'stripe';
 import OpenAI from 'openai';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
+import { BundleEntry, BundleReader, DirectoryBundleReader } from '@/utils/bundle-reader';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -346,7 +347,7 @@ function makeTransactionConnection(client: {
 async function applyRoomBundleToStarship(opts: {
   starshipId: string;
   userId: string;
-  zip: AdmZip;
+  reader: BundleReader;
   manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>;
   decisions: RoomBundleDecisions;
   /**
@@ -359,7 +360,7 @@ async function applyRoomBundleToStarship(opts: {
   imported: Record<string, number>;
   warnings?: string[];
 }> {
-  const { starshipId, userId, zip, manifest, decisions, provisionedByBundleTag } = opts;
+  const { starshipId, userId, reader, manifest, decisions, provisionedByBundleTag } = opts;
   const ContainerSchema = ImportExportContainerSchemaV1RoomBundle;
   const conn = getConnection();
 
@@ -408,7 +409,7 @@ async function applyRoomBundleToStarship(opts: {
 
     // Tools first (same semantics as agent bundle import)
     for (const t of manifest.entities.tools) {
-      const entry = getBundleEntry(zip, t.file);
+      const entry = getBundleEntry(reader, t.file);
       if (!entry) {
         warnings.push(`Bundle is missing tool file: ${t.file}`);
         continue;
@@ -502,7 +503,7 @@ async function applyRoomBundleToStarship(opts: {
 
     // Agents (rewrite assigned tool slugs using toolSlugMap, and create agentIdMap).
     for (const a of manifest.entities.agents) {
-      const entry = getBundleEntry(zip, a.file);
+      const entry = getBundleEntry(reader, a.file);
       if (!entry) {
         warnings.push(`Bundle is missing agent file: ${a.file}`);
         continue;
@@ -662,7 +663,7 @@ async function applyRoomBundleToStarship(opts: {
     }
 
     for (const v of manifest.entities.views) {
-      const entry = getBundleEntry(zip, v.file);
+      const entry = getBundleEntry(reader, v.file);
       if (!entry) {
         warnings.push(`Bundle is missing view file: ${v.file}`);
         continue;
@@ -746,7 +747,7 @@ async function applyRoomBundleToStarship(opts: {
     }
 
     for (const d of manifest.entities.datasets) {
-      const entry = getBundleEntry(zip, d.file);
+      const entry = getBundleEntry(reader, d.file);
       if (!entry) {
         warnings.push(`Bundle is missing dataset file: ${d.file}`);
         continue;
@@ -853,7 +854,7 @@ async function applyRoomBundleToStarship(opts: {
     }
 
     for (const b of manifest.entities.taskBoards) {
-      const entry = getBundleEntry(zip, b.file);
+      const entry = getBundleEntry(reader, b.file);
       if (!entry) {
         warnings.push(`Bundle is missing task board file: ${b.file}`);
         continue;
@@ -936,7 +937,7 @@ async function applyRoomBundleToStarship(opts: {
 
     // Rooms (copy/skip; overwrite treated as copy)
     for (const r of manifest.entities.rooms) {
-      const entry = getBundleEntry(zip, r.file);
+      const entry = getBundleEntry(reader, r.file);
       if (!entry) {
         warnings.push(`Bundle is missing room file: ${r.file}`);
         continue;
@@ -1126,20 +1127,8 @@ function resolvePublicDocsRoot(): string {
   return path.resolve(process.cwd(), 'public-docs');
 }
 
-function getBundleEntry(zip: AdmZip, file: string): AdmZip.IZipEntry | null {
-  const direct = zip.getEntry(file);
-  if (direct) return direct;
-
-  const normalized = file.replace(/^[./]+/, '');
-  const entries = zip.getEntries();
-  for (const entry of entries) {
-    const name = entry.entryName.replace(/^[./]+/, '');
-    if (name === normalized || name.endsWith('/' + normalized)) {
-      return entry;
-    }
-  }
-
-  return null;
+function getBundleEntry(reader: BundleReader, file: string): BundleEntry | null {
+  return reader.getEntry(file);
 }
 
 function requireAuthUser(req: Request, res: Response): AuthUser | null {
@@ -3365,29 +3354,17 @@ async function ensureLeadGenRoomInternal(opts: {
 
   // No existing room; apply the lead-generation bundle from disk.
   const docsRoot = resolvePublicDocsRoot();
-  const zipPath = path.join(docsRoot, 'room-bundles', 'lead-generation.zip');
-  if (!fs.existsSync(zipPath)) {
-    console.error('[leadgen] Bundle zip not found', { docsRoot, zipPath });
+  const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
+  if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
+    console.error('[leadgen] Bundle directory not found', { docsRoot, bundleDir });
     throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
   }
 
-  let zip: AdmZip;
-  try {
-    const buffer = fs.readFileSync(zipPath);
-    zip = new AdmZip(buffer);
-  } catch (err) {
-    console.error('[leadgen] Failed to read lead-generation bundle', { zipPath, error: (err as Error)?.message });
-    throw Object.assign(new Error('Failed to read lead generation room bundle'), { code: 'BUNDLE_READ_ERROR' });
-  }
+  const reader = new DirectoryBundleReader(bundleDir);
 
-  let manifestEntry = zip.getEntry('manifest.json');
+  const manifestEntry = reader.getEntry('manifest.json');
   if (!manifestEntry) {
-    const entries = zip.getEntries();
-    const alt = entries.find((e) => e.entryName.toLowerCase().endsWith('/manifest.json'));
-    if (alt) manifestEntry = alt;
-  }
-  if (!manifestEntry) {
-    console.error('[leadgen] manifest.json missing from bundle', { zipPath, entries: zip.getEntries().map((e) => e.entryName) });
+    console.error('[leadgen] manifest.json missing from bundle directory', { bundleDir });
     throw Object.assign(new Error('Lead generation room bundle is missing manifest.json'), { code: 'MANIFEST_MISSING' });
   }
 
@@ -3395,20 +3372,20 @@ async function ensureLeadGenRoomInternal(opts: {
   try {
     manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
   } catch {
-    console.error('[leadgen] manifest.json is not valid JSON', { zipPath });
+    console.error('[leadgen] manifest.json is not valid JSON', { bundleDir });
     throw Object.assign(new Error('Lead generation room bundle manifest.json is not valid JSON'), { code: 'MANIFEST_INVALID_JSON' });
   }
 
   const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
   if (!manifestParsed.success) {
-    console.error('[leadgen] manifest.json shape is invalid', { zipPath, issues: manifestParsed.error.issues });
+    console.error('[leadgen] manifest.json shape is invalid', { bundleDir, issues: manifestParsed.error.issues });
     throw Object.assign(new Error('Lead generation room bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
   }
 
   try {
     assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
   } catch (err) {
-    console.error('[leadgen] manifest.json contains invalid file paths', { zipPath, error: err instanceof Error ? err.message : String(err) });
+    console.error('[leadgen] manifest.json contains invalid file paths', { bundleDir, error: err instanceof Error ? err.message : String(err) });
     throw err;
   }
 
@@ -3417,7 +3394,7 @@ async function ensureLeadGenRoomInternal(opts: {
   const importSummary = await applyRoomBundleToStarship({
     starshipId,
     userId,
-    zip,
+    reader,
     manifest: manifestParsed.data,
     decisions: emptyDecisions,
     provisionedByBundleTag: 'lead-generation',

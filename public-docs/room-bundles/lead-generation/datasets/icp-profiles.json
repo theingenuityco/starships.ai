@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1",
+  "kind": "dataset",
+  "exportedAt": "2026-03-10T19:02:15.317Z",
+  "metadata": {
+    "fromSlug": "icp-profiles",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "dataset": {
+      "name": "ICP Profiles",
+      "description": "Ideal Customer Profile definitions (segments) used to tag/qualify accounts and contacts.",
+      "columns": [
+        {
+          "name": "icp_id",
+          "type": "number",
+          "constraints": {
+            "unique": true,
+            "autoincrement": true
+          },
+          "description": "Internal ICP id"
+        },
+        {
+          "name": "icp_name",
+          "type": "string",
+          "constraints": {
+            "required": true
+          },
+          "description": "Short name for the ICP segment"
+        },
+        {
+          "name": "target_industries",
+          "type": "string",
+          "description": "Industries to target (free-text or comma-separated)"
+        },
+        {
+          "name": "target_geos",
+          "type": "string",
+          "description": "Geographies to target (free-text or comma-separated)"
+        },
+        {
+          "name": "target_employee_ranges",
+          "type": "string",
+          "description": "Employee range targets (free-text or comma-separated)"
+        },
+        {
+          "name": "buyer_personas",
+          "type": "string",
+          "description": "Primary buyer personas/titles"
+        },
+        {
+          "name": "must_have_signals",
+          "type": "string",
+          "description": "Required signals/keywords/tech/etc."
+        },
+        {
+          "name": "exclusions",
+          "type": "string",
+          "description": "Exclusion criteria / disqualifiers"
+        },
+        {
+          "enum": {
+            "options": [
+              "draft",
+              "active",
+              "archived"
+            ]
+          },
+          "name": "status",
+          "type": "enum",
+          "description": "Lifecycle status"
+        },
+        {
+          "name": "created_at",
+          "type": "datetime",
+          "description": "When the ICP was created"
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "description": "Additional notes"
+        }
+      ],
+      "primaryKey": "icp_id"
+    },
+    "rows": []
+  }
+}

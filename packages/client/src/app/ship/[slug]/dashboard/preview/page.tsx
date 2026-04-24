@@ -34,7 +34,7 @@ const COL_DONE = 'col-done'
 
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 
-const now = new Date('2026-04-24T15:30:00Z').getTime()
+const now = Date.now()
 const minsAgo = (m: number) => new Date(now - m * 60_000).toISOString()
 const hoursAgo = (h: number) => minsAgo(h * 60)
 const daysAgo = (d: number) => hoursAgo(d * 24)

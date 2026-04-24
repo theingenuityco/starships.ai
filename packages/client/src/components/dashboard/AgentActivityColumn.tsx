@@ -3,7 +3,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Icon from '@/components/primitives/Icon'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -207,7 +206,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-foreground/60">No active runs</p>
-                    <p className="text-[11px] text-muted-foreground/40">Agents will appear here when they're working</p>
+                    <p className="text-[11px] text-muted-foreground/40">Agents will appear here when they&apos;re working</p>
                   </div>
                   <Button
                     size="sm"

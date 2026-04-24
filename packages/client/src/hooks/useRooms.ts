@@ -289,6 +289,25 @@ export function useDenyRoomInviteApproval(roomConversationId: string) {
   })
 }
 
+export function useEnsureRoom(starshipId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (ensureEndpoint: string): Promise<{ room: { slug: string } } | undefined> => {
+      const response: FetchResponse<ApiResponse<{ room: { slug: string } }>> = await api.post(
+        `/api/v1/starships/${starshipId}/${ensureEndpoint}`,
+        {}
+      )
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.byStarship(starshipId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to set up room', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
 export function useCreateRoom(starshipId: string) {
   const qc = useQueryClient()
   return useMutation({

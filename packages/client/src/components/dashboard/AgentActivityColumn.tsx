@@ -185,10 +185,10 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
         ) : (
           <div className="py-3">
             {/* ── Running now card ──────────────────────────────────── */}
-            <div className="mx-5 mb-1 rounded-lg border border-muted-foreground/30 overflow-hidden">
+            <div className="mx-5 mb-1 rounded-lg border border-border/40 overflow-hidden">
               {/* Card header */}
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 bg-muted/20">
-                <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', runningConvs.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30')} />
+                <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', runningConvs.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-border/40')} />
                 <span className={cn('text-[10px] font-semibold uppercase tracking-wider', runningConvs.length > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/40')}>
                   Running now
                 </span>
@@ -271,7 +271,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
             {grouped.length > 0 && (
               <div className={cn('flex gap-3', TIMELINE_ITEM_LEFT)}>
                 <div className="w-6 flex justify-center flex-shrink-0">
-                  <div className="w-px bg-muted-foreground/30" style={{ height: 20 }} />
+                  <div className="w-px bg-border/40" style={{ height: 20 }} />
                 </div>
               </div>
             )}
@@ -279,16 +279,19 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
             {/* ── Time-bucketed past conversations ──────────────────── */}
             {grouped.map(({ bucket, items }, groupIdx) => (
               <div key={bucket}>
-                {/* Bucket separator — diamond marker with connecting lines */}
-                <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
+                {/* Bucket separator */}
+                <div className={cn('flex items-start gap-3 pr-5', TIMELINE_ITEM_LEFT)}>
                   <div className="flex flex-col items-center flex-shrink-0 w-6 self-stretch">
-                    <div className="w-px bg-muted-foreground/30" style={{ height: 8 }} />
-                    <div className="h-[7px] w-[7px] rotate-45 rounded-[1px] bg-background border border-muted-foreground/40 flex-shrink-0" />
-                    <div className="w-px bg-muted-foreground/30" style={{ height: 8 }} />
+                    <div className="w-px bg-border/40" style={{ height: 14 }} />
+                    <div className="h-[7px] w-[7px] rotate-45 rounded-[1px] bg-background border border-border/40 flex-shrink-0" />
+                    <div className="w-px bg-border/40" style={{ height: 14 }} />
                   </div>
-                  <span className="text-[10px] font-medium text-muted-foreground/40 uppercase tracking-wider" style={{ paddingTop: 6 }}>
-                    {BUCKET_LABELS[bucket]}
-                  </span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0" style={{ paddingTop: 11 }}>
+                    <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest whitespace-nowrap">
+                      {BUCKET_LABELS[bucket]}
+                    </span>
+                    <div className="flex-1 h-px bg-border/40" />
+                  </div>
                 </div>
 
                 {/* Items */}
@@ -307,11 +310,11 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                         className={cn('w-full flex items-start gap-3 text-left hover:bg-muted/30 transition-colors group', TIMELINE_ITEM_LEFT)}
                       >
                         <div className="flex flex-col items-center flex-shrink-0 w-6 self-stretch">
-                          <div className="w-px bg-muted-foreground/30" style={{ height: 8 }} />
+                          <div className="w-px bg-border/40" style={{ height: 8 }} />
                           <div className="h-6 w-6 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
                             <span className="text-[11px] font-bold text-indigo-400">#</span>
                           </div>
-                          {!isLast && <div className="w-px flex-1 bg-muted-foreground/30" />}
+                          {!isLast && <div className="w-px flex-1 bg-border/40" />}
                         </div>
                         <div className="flex-1 min-w-0 py-2 space-y-1">
                           <p className="text-xs font-medium text-foreground/75 truncate group-hover:text-foreground transition-colors leading-snug">
@@ -345,9 +348,9 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                     >
                       {/* Left column: avatar + connecting line */}
                       <div className="flex flex-col items-center flex-shrink-0 w-6 self-stretch">
-                        <div className="w-px bg-muted-foreground/30" style={{ height: 8 }} />
+                        <div className="w-px bg-border/40" style={{ height: 8 }} />
                         <AgentAvatar name={agentName} size="sm" />
-                        {!isLast && <div className="w-px flex-1 bg-muted-foreground/30" />}
+                        {!isLast && <div className="w-px flex-1 bg-border/40" />}
                       </div>
 
                       {/* Content */}

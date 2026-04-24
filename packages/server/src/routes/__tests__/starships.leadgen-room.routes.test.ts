@@ -56,6 +56,7 @@ jest.mock('@starships/models', () => ({
 jest.mock('fs', () => ({
   existsSync: jest.fn(),
   readFileSync: jest.fn(),
+  statSync: jest.fn(),
 }));
 
 import starshipsRouter from '@/routes/starships';

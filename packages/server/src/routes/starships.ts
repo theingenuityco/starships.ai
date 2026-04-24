@@ -1189,6 +1189,11 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
+    // Deploy default bundle tools — best-effort, does not fail starship creation.
+    ensureDefaultBundleForStarship({ starshipId: starship.id, userId }).catch((err) => {
+      console.error('[STARSHIP-CREATE] Failed to deploy default bundle', { starshipId: starship.id, error: (err as Error)?.message });
+    });
+
     sendSuccess(res, starship, 201);
   } catch (error) {
     handleError(error, res, 'creating starship');
@@ -3292,6 +3297,55 @@ function mapSizeToEmployeeRange(size: string): string | null {
   if (/^501[-–]1000$/.test(s)) return '501_1000';
   if (/1000\+/.test(s) || /^1001/.test(s)) return '1000_plus';
   return null;
+}
+
+/**
+ * Internal helper: idempotently deploy the default bundle (common tools) for a new starship.
+ * Uses the same hash-based deduplication as other bundle imports, so repeated calls are safe.
+ * Called best-effort from POST /starships — errors are logged but do not fail starship creation.
+ */
+async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId: string }): Promise<void> {
+  const { starshipId, userId } = opts;
+  const docsRoot = resolvePublicDocsRoot();
+  const bundleDir = path.join(docsRoot, 'room-bundles', 'default');
+  if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
+    console.error('[default-bundle] Bundle directory not found', { docsRoot, bundleDir });
+    throw Object.assign(new Error('Default room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
+  }
+
+  const reader = new DirectoryBundleReader(bundleDir);
+  const manifestEntry = reader.getEntry('manifest.json');
+  if (!manifestEntry) {
+    throw Object.assign(new Error('Default bundle is missing manifest.json'), { code: 'MANIFEST_MISSING' });
+  }
+
+  let manifestRaw: unknown;
+  try {
+    manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+  } catch {
+    throw Object.assign(new Error('Default bundle manifest.json is not valid JSON'), { code: 'MANIFEST_INVALID_JSON' });
+  }
+
+  const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+  if (!manifestParsed.success) {
+    throw Object.assign(new Error('Default bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
+  }
+
+  try {
+    assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+  } catch (err) {
+    throw err;
+  }
+
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+
+  await applyRoomBundleToStarship({
+    starshipId,
+    userId,
+    reader,
+    manifest: manifestParsed.data,
+    decisions: emptyDecisions,
+  });
 }
 
 /**

@@ -287,10 +287,39 @@ export class ConversationRepository extends BaseRepository {
           activeConversationIds = new Set(activeTurnRows.map((r) => r.conversation_id));
         }
 
+        // Fetch the latest agent_response message per conversation for preview
+        const lastMessageRows = await connection.query<{
+          conversation_id: string;
+          content: string;
+          agent_name: string | null;
+          created_at: string;
+        }>(
+          `SELECT DISTINCT ON (conversation_id)
+             conversation_id, content, agent_name, created_at
+           FROM messages
+           WHERE conversation_id = ANY($1::text[])
+             AND role = 'assistant'
+             AND message_type = 'agent_response'
+             AND content <> ''
+             AND content <> '__deleted__'
+           ORDER BY conversation_id, created_at DESC`,
+          [conversationIds]
+        );
+
+        const lastMessageByConvId = new Map<string, { content: string; agentName?: string; createdAt: string }>();
+        for (const row of lastMessageRows) {
+          lastMessageByConvId.set(row.conversation_id, {
+            content: row.content,
+            agentName: row.agent_name ?? undefined,
+            createdAt: row.created_at,
+          });
+        }
+
         return conversations.map((c) => ({
           ...c,
           agents: agentsByConversationId.get(c.id) || [],
           hasActiveTurn: options?.includeActiveTurn ? activeConversationIds.has(c.id) : undefined,
+          lastMessage: lastMessageByConvId.get(c.id),
         }));
       },
       'findByStarshipWithAgents',

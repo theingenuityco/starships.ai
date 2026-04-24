@@ -203,14 +203,13 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      <div className="h-0.5 bg-amber-500/70 flex-shrink-0" />
       {/* Column header */}
-      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border/50">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 flex-shrink-0">
-          <Icon name="check-circle" className="h-3.5 w-3.5 text-amber-500" />
-        </div>
-        <span className="text-sm font-semibold">Outputs</span>
+      <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border/40">
+        <Icon name="check-circle" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+        <span className="text-sm font-semibold tracking-tight">Outputs</span>
         {allApprovals.length > 0 && (
-          <span className="inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 h-[18px] min-w-[18px]">
+          <span className="inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
             {allApprovals.length}
           </span>
         )}
@@ -219,38 +218,38 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
       {/* Pending Approvals section */}
       <div className="border-b border-border/50">
         <div className={cn(
-          'flex items-center gap-2 px-4 py-2 border-b',
+          'flex items-center gap-2 px-5 py-2.5 border-b',
           allApprovals.length > 0
-            ? 'bg-amber-500/5 border-amber-500/20'
+            ? 'bg-amber-500/5 border-amber-500/15'
             : 'border-border/30'
         )}>
           <Icon
             name="alert-circle"
-            className={cn('h-3.5 w-3.5 flex-shrink-0', allApprovals.length > 0 ? 'text-amber-500' : 'text-muted-foreground/50')}
+            className={cn('h-3.5 w-3.5 flex-shrink-0', allApprovals.length > 0 ? 'text-amber-500' : 'text-muted-foreground/40')}
           />
           <span className={cn(
             'text-xs font-semibold',
-            allApprovals.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
+            allApprovals.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground/60'
           )}>
             Pending Approvals
           </span>
           {allApprovals.length > 0 && (
-            <span className="ml-auto text-[10px] text-amber-500 font-medium">{allApprovals.length} waiting</span>
+            <span className="ml-auto text-[10px] text-amber-500 font-semibold tabular-nums">{allApprovals.length} waiting</span>
           )}
         </div>
 
         <div className="max-h-[220px] overflow-y-auto">
           {roomsLoading ? (
             <div className="p-3 space-y-2">
-              <Skeleton className="h-14 w-full rounded-md" />
-              <Skeleton className="h-14 w-full rounded-md" />
+              <Skeleton className="h-14 w-full rounded-lg" />
+              <Skeleton className="h-14 w-full rounded-lg" />
             </div>
           ) : allApprovals.length === 0 ? (
-            <div className="flex items-center gap-2.5 px-4 py-3 text-xs text-muted-foreground">
-              <div className="h-6 w-6 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <Icon name="check" className="h-3 w-3 text-green-500" />
+            <div className="flex items-center gap-2.5 px-5 py-3">
+              <div className="h-5 w-5 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
+                <Icon name="check" className="h-2.5 w-2.5 text-green-500" />
               </div>
-              All clear — no pending approvals
+              <span className="text-xs text-muted-foreground/60">All clear — no pending approvals</span>
             </div>
           ) : (
             <div className="p-3 space-y-2">
@@ -276,36 +275,36 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
       </div>
 
       {/* Recent Outputs section */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border/30">
-        <Icon name="check-circle" className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0" />
-        <span className="text-xs font-semibold text-muted-foreground">Recent Outputs</span>
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-border/30">
+        <Icon name="check-circle" className="h-3.5 w-3.5 text-muted-foreground/40 flex-shrink-0" />
+        <span className="text-xs font-semibold text-muted-foreground/60">Recent Outputs</span>
         {recentOutputs.length > 0 && (
-          <span className="ml-auto inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px]">
+          <span className="ml-auto inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
             {recentOutputs.length}
           </span>
         )}
       </div>
 
       <ScrollArea className="flex-1 min-h-0">
-        <div className="p-3 space-y-0.5">
+        <div className="px-4 py-3 space-y-px">
           {convsLoading ? (
-            <div className="space-y-2 px-1">
+            <div className="space-y-2 p-1">
               {[1, 2, 3].map(i => (
                 <div key={i} className="flex items-center gap-2.5 px-2 py-2">
                   <Skeleton className="h-6 w-6 rounded-full flex-shrink-0" />
                   <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-4/5" />
                     <Skeleton className="h-2.5 w-20" />
                   </div>
                 </div>
               ))}
             </div>
           ) : recentOutputs.length === 0 ? (
-            <div className="py-10 text-center">
-              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
+            <div className="py-12 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/40">
                 <Icon name="check-circle" className="h-5 w-5 text-muted-foreground/30" />
               </div>
-              <p className="text-xs text-muted-foreground">No completed conversations yet</p>
+              <p className="text-xs text-muted-foreground/60">No completed conversations yet</p>
             </div>
           ) : (
             recentOutputs.map(conv => {
@@ -333,12 +332,12 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
                     {initial}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground/80 truncate group-hover:text-foreground transition-colors">
+                    <p className="text-xs text-foreground/80 truncate group-hover:text-foreground transition-colors leading-snug">
                       {conv.title || 'Untitled conversation'}
                     </p>
-                    <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
                       {agentName}
-                      <span className="mx-1 opacity-50">·</span>
+                      {' · '}
                       {relativeTime(conv.updatedAt ?? conv.createdAt)}
                     </p>
                   </div>

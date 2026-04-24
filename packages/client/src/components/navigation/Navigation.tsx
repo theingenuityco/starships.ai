@@ -179,29 +179,20 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isInstalledRoute: false,
-        isSchedulesRoute: false,
-        isMembersRoute: false,
+        isDashboardRoute: false,
       }
     }
     return {
-      isInstalledRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`),
-      isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
-      isMembersRoute: pathname.startsWith(`/ship/${starshipSlug}/members`),
+      isDashboardRoute: pathname.startsWith(`/ship/${starshipSlug}/dashboard`),
     }
   }, [pathname, starshipSlug])
 
-  const { isInstalledRoute, isSchedulesRoute, isMembersRoute } = routeChecks
+  const { isDashboardRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
   const starshipId = starshipData?.id ? String(starshipData.id) : null
 
-  const canManageConnectors = useMemo(() => {
-    if (!user?.id) return false
-    if (!starshipData?.id) return false
-    return Boolean(isInstanceAdmin === true || String(starshipData.ownerId) === String(user.id))
-  }, [isInstanceAdmin, starshipData?.id, starshipData?.ownerId, user?.id])
   const queryClient = useQueryClient()
 
   // Badge data:
@@ -301,30 +292,10 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && starshipSlug
         ? [
             {
-              href: `/ship/${starshipSlug}/members`,
-              label: 'Members',
-              icon: 'users',
-              isActive: isMembersRoute,
-            },
-          ]
-        : []),
-      ...(isAuthenticated && starshipSlug && canManageConnectors
-        ? [
-            {
-              href: `/ship/${starshipSlug}/installed`,
-              label: 'Connect Apps',
-              icon: 'plug',
-              isActive: isInstalledRoute,
-            },
-          ]
-        : []),
-      ...(isAuthenticated && starshipSlug
-        ? [
-            {
-              href: `/ship/${starshipSlug}/schedules`,
-              label: 'Schedules',
-              icon: 'clock',
-              isActive: isSchedulesRoute,
+              href: `/ship/${starshipSlug}/dashboard`,
+              label: 'Dashboard',
+              icon: 'dashboard',
+              isActive: isDashboardRoute,
             },
           ]
         : []),
@@ -339,7 +310,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, pathname, isSchedulesRoute, isInstalledRoute, isMembersRoute, isInstanceAdmin, canManageConnectors]
+    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

@@ -4,7 +4,6 @@ import React, { useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useStarshipConversations } from '@/hooks/useConversations'
@@ -155,7 +154,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
         )}
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="py-3">
           {convsLoading ? (
             <div className="space-y-3 px-6 pt-2">
@@ -272,7 +271,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
             </>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

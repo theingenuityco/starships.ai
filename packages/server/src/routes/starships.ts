@@ -3351,13 +3351,7 @@ async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId
   // This makes them available to all agents without requiring per-agent assignment.
   const agentRepo = new AgentRepository();
   const toolSlugs = manifestParsed.data.entities.tools.map((t) => t.fromSlug).filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
-  for (const toolSlug of toolSlugs) {
-    try {
-      await agentRepo.setStarshipToolPermissionBySlug({ starshipId, toolSlug, permission: 'allow' });
-    } catch {
-      // Tool may not exist if it was skipped during import — not fatal.
-    }
-  }
+  await agentRepo.setStarshipToolPermissionsBySlugs({ starshipId, toolSlugs, permission: 'allow' });
 }
 
 /**

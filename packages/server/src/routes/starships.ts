@@ -3346,6 +3346,18 @@ async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId
     manifest: manifestParsed.data,
     decisions: emptyDecisions,
   });
+
+  // Grant starship-level allow permission for every tool in the default bundle.
+  // This makes them available to all agents without requiring per-agent assignment.
+  const agentRepo = new AgentRepository();
+  const toolSlugs = manifestParsed.data.entities.tools.map((t) => t.fromSlug).filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+  for (const toolSlug of toolSlugs) {
+    try {
+      await agentRepo.setStarshipToolPermissionBySlug({ starshipId, toolSlug, permission: 'allow' });
+    } catch {
+      // Tool may not exist if it was skipped during import — not fatal.
+    }
+  }
 }
 
 /**

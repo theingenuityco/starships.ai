@@ -408,8 +408,6 @@ export class Agent implements NodeHandler {
     const builder = new BlueprintBuilder();
 
     const llmNodeRef = 'ai_assistant';
-    const argsNodeRef = 'prepare_tool_args';
-    const httpNodeRef = 'authorize_tool_call';
 
     const startRef = builder.addNode({
       type: 'start',
@@ -533,187 +531,134 @@ export class Agent implements NodeHandler {
       },
     });
 
-    const toolLoopConditionalRef = builder.addNode({
+    const batchExecuteNodeRef = 'batch_execute_tools';
+
+    // Execute all pending tool calls in a single parallel batch via the server endpoint.
+    builder.addNode({
+      type: 'connector_action',
+      name: 'Batch Execute Tools (Server)',
+      description: 'Dispatch all pending tool calls to the server in one request; server runs them in parallel',
+      ref: batchExecuteNodeRef,
+      parameters: {
+        connector: 'starships',
+        action: 'batch-execute-tools',
+        args: {
+          agentId: `{{ String(env("AGENT_ID") ?? "") }}`,
+          tools: `{{ (() => {
+            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+            return pending.map(tc => ({
+              toolSlug: String(tc?.function?.name ?? ""),
+              toolCallId: String(tc?.id ?? ""),
+              args: (function() {
+                const a = tc?.function?.arguments;
+                if (typeof a === 'string') { try { return JSON.parse(a); } catch { return {}; } }
+                return a ?? {};
+              })()
+            }));
+          })() }}`,
+        },
+        // 60 minutes: the slowest tool in the batch determines wall-clock time.
+        timeout: 60 * 60 * 1000,
+      },
+    });
+
+    const appendBatchResultsNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Append Batch Tool Results',
+      description: 'Append completed tool results to messages; retain only approval-pending calls in pendingToolCalls',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const resp = ctx.lastOutputOf("${batchExecuteNodeRef}") || {};
+            const body = resp?.body || {};
+            const next = { ...(state || {}) };
+            const prev = Array.isArray(state?.messages) ? state.messages : [];
+            const allPending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+
+            // If the outer envelope reports failure (or the node threw and produced no output),
+            // mark every pending call as an error.
+            if (body?.success !== true) {
+              // Distinguish between "node threw with no output" and "server returned success:false"
+              // so we can surface the real cause in logs and to the LLM.
+              const hasBody = resp && (typeof resp === 'object') && Object.keys(resp).length > 0;
+              console.error('[batch_execute_tools] batch node failed or returned error envelope', {
+                hasOutput: hasBody,
+                status: resp?.status,
+                errorCode: body?.error?.code,
+                errorMessage: body?.error?.message,
+                pendingCount: allPending.length,
+                pendingSlugs: allPending.map(tc => String(tc?.function?.name ?? '')),
+              });
+              const errMsg = body?.error?.message ?? (hasBody ? 'Batch tool execution failed' : 'Batch execute node produced no output — the connector action likely threw (check server logs for details)');
+              const errCode = body?.error?.code ?? 'INTERNAL_SERVER_ERROR';
+              const errorMessages = allPending
+                .map(tc => {
+                  const toolCallId = String(tc?.id ?? '');
+                  if (!toolCallId) return null;
+                  return { role: 'tool', toolCallId, content: JSON.stringify({ success: false, data: { code: errCode, message: errMsg } }) };
+                })
+                .filter(Boolean);
+              next.messages = [...prev, ...errorMessages];
+              next.pendingToolCalls = [];
+              next.pendingToolCallIndex = 0;
+              return next;
+            }
+
+            const results = Array.isArray(body?.data?.results) ? body.data.results : [];
+
+            // IDs of tools that ran to completion (success or error) in this batch.
+            const completedIds = new Set(
+              results.filter(r => r?.kind !== 'approval_required').map(r => String(r?.toolCallId ?? ''))
+            );
+
+            // Remove stale tool messages for IDs we are about to re-append (dedup).
+            const filtered = prev.filter(m => {
+              if (!m || typeof m !== 'object' || m.role !== 'tool') return true;
+              const id = String((m?.toolCallId ?? m?.tool_call_id) ?? '');
+              return !completedIds.has(id);
+            });
+
+            const newMessages = [];
+            const approvalPendingIds = new Set();
+
+            for (const r of results) {
+              const toolCallId = String(r?.toolCallId ?? '');
+              if (!toolCallId) continue;
+              if (r?.kind === 'approval_required') {
+                approvalPendingIds.add(toolCallId);
+                continue;
+              }
+              let payload;
+              if (r?.kind === 'success') {
+                const attachments = Array.isArray(r?.attachments) ? r.attachments : [];
+                payload = { success: true, data: r?.result, attachments };
+              } else {
+                payload = { success: false, data: { code: r?.code ?? 'INTERNAL_SERVER_ERROR', message: r?.message ?? 'Tool execution failed' } };
+              }
+              newMessages.push({ role: 'tool', toolCallId, content: JSON.stringify(payload) });
+            }
+
+            next.messages = [...filtered, ...newMessages];
+            // Retain only tools that still need approval so the blueprint can pause and resume cleanly.
+            next.pendingToolCalls = allPending.filter(tc => approvalPendingIds.has(String(tc?.id ?? '')));
+            next.pendingToolCallIndex = 0;
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    const batchOutcomeRef = builder.addNode({
       type: 'conditional',
-      name: 'Process Tool Calls',
-      description: 'Execute pending tool calls via server until done, then resume LLM',
+      name: 'Batch Tool Outcome',
+      description: 'Resume LLM when all tools are done; pause execution when any tool still awaits approval',
       parameters: {
         condition: `{{(() => {
           const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
-          const rawIdx = state?.pendingToolCallIndex;
-          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
-          if (!pending.length || idx >= pending.length) return "done_tools";
-          const slug = pending?.[idx]?.function?.name;
-          const tools = Array.isArray(state?.tools) ? state.tools : [];
-          const known = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug)) : false;
-          return known ? "call_tool" : "tool_not_allowed";
+          return pending.length > 0 ? "approval_required" : "done_tools";
         })()}}`,
-      },
-    });
-
-    builder.addNode({
-      type: 'code',
-      name: 'Prepare Tool Args',
-      ref: argsNodeRef,
-      description: 'Materialize current pending tool call arguments into a plain object',
-      parameters: {
-        code: `
-        async function main(ctx) {
-          const pending = Array.isArray(ctx.state?.pendingToolCalls) ? ctx.state.pendingToolCalls : [];
-          const rawIdx = ctx.state?.pendingToolCallIndex;
-          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
-          const tc = pending?.[idx];
-          let j = tc?.function?.arguments;
-          if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}
-          }
-          if (j && typeof j === 'object') { return j; }
-          throw new Error('Missing toolCall function.arguments');
-        }
-      `,
-        timeout: 3000,
-      },
-    });
-
-    // Server tool authorization/execution (connector_action via Starships connector template endpoint)
-    builder.addNode({
-      type: 'connector_action',
-      name: 'Authorize & Execute Tool (Server)',
-      description: 'Execute Starships connector endpoint to enforce permissions and execute tool remotely',
-      ref: httpNodeRef,
-      parameters: {
-        connector: 'starships',
-        action: 'authorize-and-maybe-execute-tool',
-        args: {
-          agentId: `{{ String(env("AGENT_ID") ?? "") }}`,
-          toolSlug: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.function?.name ?? ""); })() }}`,
-          toolCallId: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.id ?? ""); })() }}`,
-          args: `{{ lastOutputOf("${argsNodeRef}") }}`,
-          conversationId: `{{ String(env("CONVERSATION_ID") ?? "") }}`,
-        },
-        timeout: 30 * 60 * 1000,
-      },
-    });
-
-    const toolHttpOutcomeRef = builder.addNode({
-      type: 'conditional',
-      name: 'Tool HTTP Outcome',
-      description: 'Branch on TOOL_APPROVAL_REQUIRED vs normal tool result',
-      parameters: {
-        condition: `{{(() => {
-          const resp = lastOutputOf("${httpNodeRef}") || {};
-          const body = resp?.body || {};
-          const success = body?.success === true;
-          if (success) return "append_and_continue";
-          const code = body?.error?.code;
-          return code === "TOOL_APPROVAL_REQUIRED" ? "approval_required" : "append_and_continue";
-        })()}}`,
-      },
-    });
-
-    const appendToolResultNodeRef = builder.addNode({
-      type: 'mutate',
-      name: 'Append Tool Result',
-      description: 'Append tool result and advance to next tool call',
-      parameters: {
-        reducers: [
-          `
-          (state, ctx) => {
-            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
-            const rawIdx = state?.pendingToolCallIndex;
-            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
-            const tc = pending?.[idx];
-            const toolCallId = tc?.id ?? '';
-            const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
-            const body = resp?.body || {};
-            // Normalize tool-call result for the agent:
-            // - Always emit: { success: boolean, data: any }
-            //
-            // IMPORTANT: In server-tools mode, the *canonical* success/failure signal is the
-            // server-tools envelope (authorize-and-maybe-execute-tool):
-            // - Success: { success: true, data: { toolCallId, result } }
-            // - Error:   { success: false, error: { code, message, details } }
-            //
-            // We intentionally do NOT infer failure by inspecting the inner result payload (e.g. status codes).
-            // Tools that want non-2xx to be treated as failure must throw explicitly.
-            const attachments =
-              body?.data && typeof body.data === 'object' && Array.isArray(body.data.attachments) ? body.data.attachments : [];
-
-            let payload = { success: false, data: body, attachments };
-            if (body && typeof body === 'object') {
-              if (body.success === false) {
-                payload = { success: false, data: body.error != null ? body.error : body, attachments };
-              } else if (body.success === true) {
-                const inner =
-                  body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result')
-                    ? body.data.result
-                    : body.data;
-                payload = { success: true, data: inner, attachments };
-              }
-            }
-
-            const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
-            const next = { ...(state || {}) };
-            const prev = Array.isArray(state?.messages) ? state.messages : [];
-            const filtered = toolCallId
-              ? prev.filter((m) => {
-                  if (!m || typeof m !== 'object') return true;
-                  if (m.role !== 'tool') return true;
-                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
-                  return String(existingId) !== String(toolCallId);
-                })
-              : prev;
-            next.messages = [...filtered, { role: 'tool', toolCallId, content }];
-            const nextIdx = idx + 1;
-            if (pending.length > 0 && nextIdx >= pending.length) {
-              next.pendingToolCalls = [];
-              next.pendingToolCallIndex = 0;
-            } else {
-              next.pendingToolCallIndex = nextIdx;
-            }
-            return next;
-          }
-          `,
-        ],
-      },
-    });
-
-    const notAllowedNodeRef = builder.addNode({
-      type: 'mutate',
-      name: 'Handle Unknown Tool',
-      description: 'Append tool result error for unknown tool calls and advance',
-      parameters: {
-        reducers: [
-          `
-          (state, ctx) => {
-            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
-            const rawIdx = state?.pendingToolCallIndex;
-            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
-            const tc = pending?.[idx];
-            const slug = tc?.function?.name ?? 'unknown';
-            const toolCallId = tc?.id ?? '';
-            const next = { ...(state || {}) };
-            const payload = { success: false, data: { code: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." } };
-            const prev = Array.isArray(state?.messages) ? state.messages : [];
-            const filtered = toolCallId
-              ? prev.filter((m) => {
-                  if (!m || typeof m !== 'object') return true;
-                  if (m.role !== 'tool') return true;
-                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';
-                  return String(existingId) !== String(toolCallId);
-                })
-              : prev;
-            next.messages = [...filtered, { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
-            const nextIdx = idx + 1;
-            if (pending.length > 0 && nextIdx >= pending.length) {
-              next.pendingToolCalls = [];
-              next.pendingToolCallIndex = 0;
-            } else {
-              next.pendingToolCallIndex = nextIdx;
-            }
-            return next;
-          }
-          `,
-        ],
       },
     });
 
@@ -721,24 +666,19 @@ export class Agent implements NodeHandler {
       builder
         .addEdge(startRef, startConditionalRef)
         .addEdge(startConditionalRef, llmNodeRef, 'llm')
-        .addEdge(startConditionalRef, toolLoopConditionalRef, 'resume_tools')
+        .addEdge(startConditionalRef, batchExecuteNodeRef, 'resume_tools')
         .addEdge(llmNodeRef, conditionalNodeRef)
         .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
         .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')
         .addEdge(conditionalNodeRef, endRef, 'complete')
-        .addEdge(initToolCallsNodeRef, toolLoopConditionalRef)
-        .addEdge(toolLoopConditionalRef, argsNodeRef, 'call_tool')
-        .addEdge(argsNodeRef, httpNodeRef)
-        .addEdge(httpNodeRef, toolHttpOutcomeRef)
-        .addEdge(toolHttpOutcomeRef, appendToolResultNodeRef, 'append_and_continue')
-        .addEdge(appendToolResultNodeRef, toolLoopConditionalRef)
-        // CRITICAL: On TOOL_APPROVAL_REQUIRED, stop execution immediately and do NOT
-        // persist any interim tool result message. The real tool result is recorded
-        // only after the user approves/denies.
-        .addEdge(toolHttpOutcomeRef, endRef, 'approval_required')
-        .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
-        .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
-        .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
+        .addEdge(initToolCallsNodeRef, batchExecuteNodeRef)
+        .addEdge(batchExecuteNodeRef, appendBatchResultsNodeRef)
+        .addEdge(appendBatchResultsNodeRef, batchOutcomeRef)
+        .addEdge(batchOutcomeRef, llmNodeRef, 'done_tools')
+        // CRITICAL: On TOOL_APPROVAL_REQUIRED, stop execution immediately.
+        // pendingToolCalls is already narrowed to only the approval-pending tools by appendBatchResultsNodeRef.
+        // On resume, startConditionalRef will detect pendingToolCalls.length > 0 and jump back to batchExecuteNodeRef.
+        .addEdge(batchOutcomeRef, endRef, 'approval_required')
         .setMetadata('generatedBy', 'Agent.defaultAgentBlueprintServerTools')
         .build()
     );

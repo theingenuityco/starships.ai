@@ -4572,13 +4572,14 @@ export class ConversationService {
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent?.data?.execution;
         const nodeRef = execution?.currentNodeRef;
+        const results = execution?.results ?? [];
+        // Find the last result for the failed node to surface its error message.
+        const failedResult = results.slice().reverse().find((r) => r?.nodeRef === nodeRef);
+        const failedItem = failedResult?.items?.[0];
         console.error('[STREAMING] Node failed', {
           nodeRef,
           depth: execEvent.executionDepth,
-        });
-        // Print execution snapshot for diagnosis
-        console.error('[STREAMING] Execution snapshot (node_failed)', {
-          results: execution?.results?.[0]?.items?.[0],
+          error: failedItem?.error ?? failedItem?.json,
         });
         break;
       }

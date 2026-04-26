@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.300Z",
+  "metadata": {
+    "fromSlug": "search-agents",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Agents",
+      "description": "Search and list agents on the current starship for discovery. Supports search query and pagination. Returns a lean array (slug, name, description, category) without heavy fields like blueprint.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query (searches name, slug, description, category)"
+          },
+          "limit": {
+            "type": "number",
+            "maximum": 200,
+            "minimum": 1,
+            "description": "Page size (1-200, default: 50)"
+          },
+          "offset": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Pagination offset (0-based, default: 0)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "http_list",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "filter_and_paginate",
+            "ref": "e3",
+            "from": "http_list"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "filter_and_paginate"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const { q, limit = 50, offset = 0 } = ctx.input;\n  return {\n    q: q || '',\n    limit: Math.min(Math.max(limit, 1), 200),\n    offset: Math.max(offset, 0)\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "http_list",
+            "name": "List Agents",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "list-agents",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "filter_and_paginate",
+            "name": "Filter and Paginate",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const http = ctx.lastOutputOf('http_list');\n  const params = ctx.lastOutputOf('prepare');\n  const { q, limit, offset } = params;\n  \n  const body = http && typeof http === 'object' ? http.body : http;\n  const data = body && typeof body === 'object' && Array.isArray(body.data)\n    ? body.data\n    : (Array.isArray(body) ? body : []);\n  \n  // Map to lean format\n  const agents = data.map((a) => ({\n    slug: a && a.slug,\n    name: a && a.name,\n    description: a && a.description,\n  category: a && a.category,\n  }));\n  \n  // Client-side search filter\n  let filtered = agents;\n  if (q && q.trim()) {\n    const query = q.toLowerCase();\n    filtered = agents.filter((agent) => {\n      const searchable = [\n        agent.name,\n        agent.slug,\n        agent.description,\n        agent.category\n      ].join(' ').toLowerCase();\n      return searchable.includes(query);\n    });\n  }\n  \n  // Pagination\n  const total = filtered.length;\n  const paginated = filtered.slice(offset, offset + limit);\n  const hasMore = (offset + limit) < total;\n  \n  return {\n    agents: paginated,\n    count: paginated.length,\n    total: total,\n    limit: limit,\n    offset: offset,\n    hasMore: hasMore\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"filter_and_paginate\") }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

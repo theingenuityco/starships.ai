@@ -646,6 +646,39 @@ export class AgentRepository extends BaseRepository {
   /**
    * Upsert a starship-level tool permission by tool instance slug.
    */
+  async setStarshipToolPermissionsBySlugs(args: {
+    starshipId: string;
+    toolSlugs: string[];
+    permission: 'allow' | 'ask' | 'deny';
+  }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { starshipId, toolSlugs, permission } = args;
+        const slugs = toolSlugs.filter((s) => s.trim().length > 0);
+        if (!starshipId?.trim() || slugs.length === 0) return;
+
+        const connection = this.getConnection();
+        const placeholders = slugs.map((_, i) => `$${i + 2}`).join(', ');
+        const tools = await connection.query<{ id: string }>(
+          `SELECT id FROM tools WHERE starship_id = $1 AND slug IN (${placeholders})`,
+          [starshipId, ...slugs]
+        );
+        if (tools.length === 0) return;
+
+        const valueRows = tools.map((_, i) => `($1, $${i + 2}, $${tools.length + 2}, NOW(), NOW())`).join(', ');
+        await connection.query(
+          `INSERT INTO starship_tools (starship_id, tool_id, permission, created_at, updated_at)
+           VALUES ${valueRows}
+           ON CONFLICT (starship_id, tool_id)
+           DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()`,
+          [starshipId, ...tools.map((t) => t.id), permission]
+        );
+      },
+      'setStarshipToolPermissionsBySlugs',
+      'Agent'
+    );
+  }
+
   async setStarshipToolPermissionBySlug(args: {
     starshipId: string;
     toolSlug: string;

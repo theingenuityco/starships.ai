@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.255Z",
+  "metadata": {
+    "fromSlug": "search-context7-docs",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Context7 Docs",
+      "description": "Search for code libraries and frameworks by name or functionality. Returns library metadata including IDs needed for documentation lookup, descriptions, versions, and popularity metrics.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query describing the library type or functionality (e.g., 'http client', 'testing framework')"
+          },
+          "libraryName": {
+            "type": "string",
+            "description": "Optional: Filter results to a specific library name"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "search_libraries",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "search_libraries"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "search_libraries",
+            "name": "Search Libraries via Context7",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "search-libraries",
+              "timeout": 15000,
+              "connector": "context7"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('search_libraries') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

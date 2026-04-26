@@ -665,13 +665,13 @@ export class AgentRepository extends BaseRepository {
         );
         if (tools.length === 0) return;
 
-        const valueRows = tools.map((_, i) => `($1, $${i + 2}, '${permission}', NOW(), NOW())`).join(', ');
+        const valueRows = tools.map((_, i) => `($1, $${i + 2}, $${tools.length + 2}, NOW(), NOW())`).join(', ');
         await connection.query(
           `INSERT INTO starship_tools (starship_id, tool_id, permission, created_at, updated_at)
            VALUES ${valueRows}
            ON CONFLICT (starship_id, tool_id)
            DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()`,
-          [starshipId, ...tools.map((t) => t.id)]
+          [starshipId, ...tools.map((t) => t.id), permission]
         );
       },
       'setStarshipToolPermissionsBySlugs',

@@ -14,9 +14,10 @@ export class ZipBundleReader implements BundleReader {
   constructor(private readonly zip: AdmZip) {}
 
   getEntry(filePath: string): BundleEntry | null {
+    const normalized = filePath.replace(/^[./]+/, '');
+    if (normalized.includes('..') || normalized.startsWith('/')) return null;
     const direct = this.zip.getEntry(filePath);
     if (direct) return direct;
-    const normalized = filePath.replace(/^[./]+/, '');
     for (const entry of this.zip.getEntries()) {
       const name = entry.entryName.replace(/^[./]+/, '');
       if (name === normalized || name.endsWith('/' + normalized)) return entry;

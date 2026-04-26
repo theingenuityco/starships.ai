@@ -3331,11 +3331,7 @@ async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId
     throw Object.assign(new Error('Default bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
   }
 
-  try {
-    assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
-  } catch (err) {
-    throw err;
-  }
+  assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
 
   const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
 

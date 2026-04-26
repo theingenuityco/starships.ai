@@ -4,7 +4,7 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { ToolParams } from '@/types/node-parameters';
 import type { HostRuntime } from '@/types/node-handler';
 
-describe('Agent default blueprint - multiple tool calls (sequential)', () => {
+describe('Agent default blueprint - multiple tool calls (parallel batch)', () => {
   const makeTool = (slug: string, label: string): ToolParams => ({
     name: `Tool ${label}`,
     slug,
@@ -46,55 +46,29 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
 
     let llmCallCount = 0;
     const hostRuntime: HostRuntime = {
-      http: async (req) => {
-        const body = (req?.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
-        const toolSlug = String(body.toolSlug ?? '');
-        const toolCallId = String(body.toolCallId ?? '');
-        const args = (body.args && typeof body.args === 'object' ? (body.args as Record<string, unknown>) : {}) as Record<string, unknown>;
-
-        const label = toolSlug === 'tool_a' ? 'A' : toolSlug === 'tool_b' ? 'B' : 'UNKNOWN';
-
-        return {
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          url: String(req?.url ?? ''),
-          // Mirror server contract: { success: true, data: { toolCallId, result } }
-          body: {
-            success: true,
-            data: {
-              toolCallId,
-              result: { label, input: args },
-            },
-          },
-        };
+      http: async () => {
+        throw new Error('http not used in this test');
       },
       connectorAction: async ({ connector, action, args, timeoutMs }) => {
-        // Mirror Starships server contract for authorize-and-maybe-execute-tool
-        // Expected: { success: true, data: { toolCallId, result } }
+        // Mirror Starships batch-execute-tools server contract:
+        // args.tools[] → results[]
         const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
-        const toolSlug = String(objArgs.toolSlug ?? '');
-        const toolCallId = String(objArgs.toolCallId ?? '');
-        const toolInput = (objArgs.args && typeof objArgs.args === 'object' ? (objArgs.args as Record<string, unknown>) : {}) as Record<
-          string,
-          unknown
-        >;
+        const tools = Array.isArray(objArgs.tools) ? (objArgs.tools as Array<Record<string, unknown>>) : [];
 
-        const label = toolSlug === 'tool_a' ? 'A' : toolSlug === 'tool_b' ? 'B' : 'UNKNOWN';
+        const results = tools.map((t) => {
+          const toolSlug = String(t.toolSlug ?? '');
+          const toolCallId = String(t.toolCallId ?? '');
+          const toolInput = (t.args && typeof t.args === 'object' ? (t.args as Record<string, unknown>) : {}) as Record<string, unknown>;
+          const label = toolSlug === 'tool_a' ? 'A' : toolSlug === 'tool_b' ? 'B' : 'UNKNOWN';
+          return { kind: 'success', toolCallId, result: { label, input: toolInput } };
+        });
 
         return {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: {
-            success: true,
-            data: {
-              toolCallId,
-              result: { label, input: toolInput },
-            },
-          },
+          body: { success: true, data: { results } },
           url: `connector://${String(connector)}/${String(action)}`,
-          // preserve for debugging parity if needed
           timeoutMs,
         };
       },
@@ -206,21 +180,24 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
       },
       connectorAction: async ({ connector, action, args, timeoutMs }) => {
         const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
-        const toolCallId = String(objArgs.toolCallId ?? '');
+        const tools = Array.isArray(objArgs.tools) ? (objArgs.tools as Array<Record<string, unknown>>) : [];
+
+        const results = tools.map((t) => {
+          const toolCallId = String(t.toolCallId ?? '');
+          return {
+            kind: 'success',
+            toolCallId,
+            // Inner tool result looks like an HTTP 400 response.
+            // The agent wrapper should NOT reinterpret this as failure.
+            result: { status: 400, statusText: 'Bad Request', body: { success: false, error: { code: 'VALIDATION_ERROR', message: 'bad' } } },
+          };
+        });
 
         return {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: {
-            success: true,
-            data: {
-              toolCallId,
-              // Inner tool result looks like an HTTP 400 response.
-              // The agent wrapper should NOT reinterpret this as failure.
-              result: { status: 400, statusText: 'Bad Request', body: { success: false, error: { code: 'VALIDATION_ERROR', message: 'bad' } } },
-            },
-          },
+          body: { success: true, data: { results } },
           url: `connector://${String(connector)}/${String(action)}`,
           timeoutMs,
         };
@@ -298,26 +275,21 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
       },
       connectorAction: async ({ connector, action, args, timeoutMs }) => {
         const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
-        const toolSlug = String(objArgs.toolSlug ?? '');
-        const toolCallId = String(objArgs.toolCallId ?? '');
-        const toolInput = (objArgs.args && typeof objArgs.args === 'object' ? (objArgs.args as Record<string, unknown>) : {}) as Record<
-          string,
-          unknown
-        >;
+        const tools = Array.isArray(objArgs.tools) ? (objArgs.tools as Array<Record<string, unknown>>) : [];
 
-        const label = toolSlug === 'tool_a' ? 'A' : 'UNKNOWN';
+        const results = tools.map((t) => {
+          const toolSlug = String(t.toolSlug ?? '');
+          const toolCallId = String(t.toolCallId ?? '');
+          const toolInput = (t.args && typeof t.args === 'object' ? (t.args as Record<string, unknown>) : {}) as Record<string, unknown>;
+          const label = toolSlug === 'tool_a' ? 'A' : 'UNKNOWN';
+          return { kind: 'success', toolCallId, result: { label, input: toolInput } };
+        });
 
         return {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: {
-            success: true,
-            data: {
-              toolCallId,
-              result: { label, input: toolInput },
-            },
-          },
+          body: { success: true, data: { results } },
           url: `connector://${String(connector)}/${String(action)}`,
           timeoutMs,
         };
@@ -376,5 +348,100 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
     expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
     expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ success: true, data: { label: 'A', input: { value: 'one' } } });
     expect(msgs[3]).toMatchObject({ role: 'assistant', content: 'done' });
+  });
+
+  it('pauses execution and retains only approval-pending tools when batch returns mixed results', async () => {
+    const toolA = makeTool('tool_a', 'A');
+    const toolB = makeTool('tool_b', 'B');
+
+    let llmCallCount = 0;
+    const hostRuntime: HostRuntime = {
+      http: async () => {
+        throw new Error('http not used in this test');
+      },
+      connectorAction: async ({ connector, action, args, timeoutMs }) => {
+        const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const tools = Array.isArray(objArgs.tools) ? (objArgs.tools as Array<Record<string, unknown>>) : [];
+
+        const results = tools.map((t) => {
+          const toolSlug = String(t.toolSlug ?? '');
+          const toolCallId = String(t.toolCallId ?? '');
+          const toolInput = (t.args && typeof t.args === 'object' ? (t.args as Record<string, unknown>) : {}) as Record<string, unknown>;
+          if (toolSlug === 'tool_a') {
+            return { kind: 'success', toolCallId, result: { label: 'A', input: toolInput } };
+          }
+          // tool_b requires approval
+          return { kind: 'approval_required', toolCallId, approvalId: 'appr_1', agentId: 'agent_1', toolSlug };
+        });
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: { success: true, data: { results } },
+          url: `connector://${String(connector)}/${String(action)}`,
+          timeoutMs,
+        };
+      },
+      llm: async () => {
+        llmCallCount++;
+        async function* stream() {
+          yield {
+            id: 'resp_1',
+            model: 'test-model',
+            created: 0,
+            choices: [
+              {
+                index: 0,
+                delta: {
+                  tool_calls: [
+                    { index: 0, id: 'call_1', type: 'function', function: { name: 'tool_a', arguments: '{"value":"one"}' } },
+                    { index: 1, id: 'call_2', type: 'function', function: { name: 'tool_b', arguments: '{"value":"two"}' } },
+                  ],
+                },
+              },
+            ],
+          };
+          yield { id: 'resp_1', model: 'test-model', created: 0, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] };
+        }
+        return stream();
+      },
+    };
+
+    const agent = new Agent({
+      name: 'TestAgent',
+      model: 'test-model',
+      state: {
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [toolA, toolB],
+      },
+    });
+
+    const blueprint = agent.getCurrentBlueprint();
+    const execution = ExecutionItemUtils.createExecution();
+    execution.state = {
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [toolA, toolB],
+    };
+
+    const engine = new Engine({ hostRuntime, failOnNodeError: false });
+    await engine.executeBlueprint(blueprint, execution);
+
+    // LLM called once; execution pauses at approval — no second LLM call.
+    expect(llmCallCount).toBe(1);
+
+    const state = execution.state as Record<string, unknown>;
+    const msgs = state.messages as Array<Record<string, unknown>>;
+    // user, assistant(toolCalls), tool(call_1 — completed) — call_2 is NOT appended (approval pending)
+    expect(msgs).toHaveLength(3);
+    expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
+    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ success: true, data: { label: 'A' } });
+
+    // Only the approval-pending tool remains in pendingToolCalls.
+    const pending = state.pendingToolCalls as Array<Record<string, unknown>>;
+    expect(Array.isArray(pending)).toBe(true);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ id: 'call_2' });
   });
 });

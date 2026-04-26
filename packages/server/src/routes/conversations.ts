@@ -1491,6 +1491,7 @@ async function executeOneToolCallForBatch(params: {
   roomConversationId: string;
   toolCallMessageId: string | null;
   baseEngineConfig: Record<string, unknown>;
+  agentRepo: AgentRepository;
 }): Promise<BatchToolCallResult> {
   const {
     toolSlug,
@@ -1503,9 +1504,8 @@ async function executeOneToolCallForBatch(params: {
     roomConversationId,
     toolCallMessageId,
     baseEngineConfig,
+    agentRepo,
   } = params;
-
-  const agentRepo = new AgentRepository();
   const permCacheKey = `${starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
   const cachedPerm = getCachedPermission(permCacheKey);
   const readPermission = async (): Promise<'allow' | 'ask' | 'deny' | null> =>
@@ -1672,6 +1672,7 @@ async function executeOneToolCallForBatch(params: {
  */
 router.post(
   '/conversations/:conversationId/tool-calls/batch-execute',
+  rateLimiters.messaging,
   jwtAuthMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
@@ -1696,7 +1697,8 @@ router.post(
                 args: z.record(z.string(), z.unknown()).optional(),
               })
             )
-            .min(1),
+            .min(1)
+            .max(50),
         }),
         req.body,
         res,
@@ -1788,11 +1790,11 @@ router.post(
       });
 
       // Resolve the assistant message that triggered each tool call (best-effort, in parallel).
+      const msgRepo = new MessageRepository();
       const toolCallMessageIds = await Promise.all(
         tools.map(async ({ toolCallId }) => {
           try {
-            const repo = new MessageRepository();
-            const msg = await repo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
+            const msg = await msgRepo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
             const id = msg && typeof msg.id === 'string' ? String(msg.id).trim() : '';
             return id || null;
           } catch {
@@ -1801,23 +1803,32 @@ router.post(
         })
       );
 
-      // Execute all tool calls in parallel.
-      const results = await Promise.all(
-        tools.map((tool, i) =>
-          executeOneToolCallForBatch({
-            toolSlug: tool.toolSlug,
-            toolCallId: tool.toolCallId,
-            args: tool.args,
-            agentId,
-            agentName: agent.name,
-            conversationId,
-            starshipId: conversation.starshipId,
-            roomConversationId,
-            toolCallMessageId: toolCallMessageIds[i],
-            baseEngineConfig: baseEngineConfig as unknown as Record<string, unknown>,
-          })
-        )
-      );
+      // Execute all tool calls in parallel, capped at 10 concurrent to guard the DB connection pool.
+      const sharedAgentRepo = new AgentRepository();
+      const BATCH_CONCURRENCY = 10;
+      const allResults: BatchToolCallResult[] = [];
+      for (let i = 0; i < tools.length; i += BATCH_CONCURRENCY) {
+        const chunk = tools.slice(i, i + BATCH_CONCURRENCY);
+        const chunkResults = await Promise.all(
+          chunk.map((tool, j) =>
+            executeOneToolCallForBatch({
+              toolSlug: tool.toolSlug,
+              toolCallId: tool.toolCallId,
+              args: tool.args,
+              agentId,
+              agentName: agent.name,
+              conversationId,
+              starshipId: conversation.starshipId,
+              roomConversationId,
+              toolCallMessageId: toolCallMessageIds[i + j],
+              baseEngineConfig: baseEngineConfig as unknown as Record<string, unknown>,
+              agentRepo: sharedAgentRepo,
+            })
+          )
+        );
+        allResults.push(...chunkResults);
+      }
+      const results = allResults;
 
       sendSuccess(res, { results }, 200);
     } catch (e) {

@@ -202,11 +202,11 @@ export class TopupService {
     let credited = false;
 
     await connection.transaction(async (client) => {
-      const rows = await client.query<{ id: string; wallet_id: string; amount_usd: string; status: string }>(
+      const topupRes = await client.query<{ id: string; wallet_id: string; amount_usd: string; status: string }>(
         'SELECT id, wallet_id, amount_usd, status FROM topups WHERE id = $1 FOR UPDATE',
         [topupId]
       );
-      const locked = rows.rows?.[0];
+      const locked = topupRes.rows?.[0];
       if (!locked || locked.status === 'completed') return;
 
       const creditsGranted = toCreditsString((Number(locked.amount_usd) || 0) * Number(CREDITS_PER_USD));

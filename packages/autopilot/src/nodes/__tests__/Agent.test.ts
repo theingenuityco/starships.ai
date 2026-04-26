@@ -171,14 +171,14 @@ describe('Agent Node Handler', () => {
 
       // Verify default blueprint was created
       const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(12); // start, end, conditional(start/resume), llm, conditional (2x), code, connector_action, mutate (2x incl init+append), mutate(notAllowed)
+      expect(blueprint.nodes).toHaveLength(9); // start, end, conditional(start/resume), llm, conditional(check-tool-calls), mutate(init), connector_action(batch), mutate(append), conditional(batch-outcome)
       expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'conditional')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'connector_action')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'mutate')).toBe(true);
-      expect(blueprint.edges).toHaveLength(17); // Updated count to match actual blueprint generation
+      expect(blueprint.edges).toHaveLength(12); // start→startConditional, startConditional→llm/resumeTools, llm→checkToolCalls, checkToolCalls→continue/init/complete, init→batch, batch→append, append→outcome, outcome→llm/end
     });
 
     it('should validate blueprint structure', () => {

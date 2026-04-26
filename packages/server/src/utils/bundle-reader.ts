@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import AdmZip from 'adm-zip';
 
 export interface BundleEntry {
   getData(): Buffer;
@@ -8,22 +7,6 @@ export interface BundleEntry {
 
 export interface BundleReader {
   getEntry(filePath: string): BundleEntry | null;
-}
-
-export class ZipBundleReader implements BundleReader {
-  constructor(private readonly zip: AdmZip) {}
-
-  getEntry(filePath: string): BundleEntry | null {
-    const normalized = filePath.replace(/^[./]+/, '');
-    if (normalized.includes('..') || normalized.startsWith('/')) return null;
-    const direct = this.zip.getEntry(filePath);
-    if (direct) return direct;
-    for (const entry of this.zip.getEntries()) {
-      const name = entry.entryName.replace(/^[./]+/, '');
-      if (name === normalized || name.endsWith('/' + normalized)) return entry;
-    }
-    return null;
-  }
 }
 
 export class DirectoryBundleReader implements BundleReader {

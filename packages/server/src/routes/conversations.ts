@@ -1492,6 +1492,7 @@ async function executeOneToolCallForBatch(params: {
   toolCallMessageId: string | null;
   baseEngineConfig: Record<string, unknown>;
   agentRepo: AgentRepository;
+  toolRepo: ToolRepository;
 }): Promise<BatchToolCallResult> {
   const {
     toolSlug,
@@ -1505,6 +1506,7 @@ async function executeOneToolCallForBatch(params: {
     toolCallMessageId,
     baseEngineConfig,
     agentRepo,
+    toolRepo,
   } = params;
   const permCacheKey = `${starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
   const cachedPerm = getCachedPermission(permCacheKey);
@@ -1530,7 +1532,6 @@ async function executeOneToolCallForBatch(params: {
   }
 
   if (permission === 'ask') {
-    const toolRepo = new ToolRepository();
     const resolvedTool = await toolRepo.findBySlugAndStarship(toolSlug, starshipId);
     if (!resolvedTool) {
       return { kind: 'error', toolCallId, code: 'RESOURCE_NOT_FOUND', message: 'Tool not found' };
@@ -1604,7 +1605,6 @@ async function executeOneToolCallForBatch(params: {
   }
 
   // permission === 'allow'
-  const toolRepo = new ToolRepository();
   const toolCacheKey = `${starshipId}:${toolSlug}`;
   const cachedTool = getCachedTool(toolCacheKey);
   const tool = cachedTool !== undefined ? cachedTool : await toolRepo.findBySlugAndStarship(toolSlug, starshipId);
@@ -1805,6 +1805,7 @@ router.post(
 
       // Execute all tool calls in parallel, capped at 10 concurrent to guard the DB connection pool.
       const sharedAgentRepo = new AgentRepository();
+      const sharedToolRepo = new ToolRepository();
       const BATCH_CONCURRENCY = 10;
       const allResults: BatchToolCallResult[] = [];
       for (let i = 0; i < tools.length; i += BATCH_CONCURRENCY) {
@@ -1823,6 +1824,7 @@ router.post(
               toolCallMessageId: toolCallMessageIds[i + j],
               baseEngineConfig: baseEngineConfig as unknown as Record<string, unknown>,
               agentRepo: sharedAgentRepo,
+              toolRepo: sharedToolRepo,
             })
           )
         );

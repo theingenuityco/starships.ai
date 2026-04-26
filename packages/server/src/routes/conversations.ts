@@ -1464,6 +1464,378 @@ router.post(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Internal type + helper used by the batch tool-execution endpoint below.
+// The single-tool endpoint (authorize-and-maybe-execute) is unchanged.
+// ---------------------------------------------------------------------------
+
+type BatchToolCallResult =
+  | {
+      kind: 'success';
+      toolCallId: string;
+      result: unknown;
+      attachments: ToolResultAttachment[];
+      attachmentErrors: ToolResultAttachmentError[];
+    }
+  | { kind: 'approval_required'; toolCallId: string; approvalId: string; agentId: string; toolSlug: string }
+  | { kind: 'error'; toolCallId: string; code: string; message: string };
+
+async function executeOneToolCallForBatch(params: {
+  toolSlug: string;
+  toolCallId: string;
+  args: Record<string, unknown> | undefined;
+  agentId: string;
+  agentName: string;
+  conversationId: string;
+  starshipId: string;
+  roomConversationId: string;
+  toolCallMessageId: string | null;
+  baseEngineConfig: Record<string, unknown>;
+}): Promise<BatchToolCallResult> {
+  const {
+    toolSlug,
+    toolCallId,
+    args,
+    agentId,
+    agentName,
+    conversationId,
+    starshipId,
+    roomConversationId,
+    toolCallMessageId,
+    baseEngineConfig,
+  } = params;
+
+  const agentRepo = new AgentRepository();
+  const permCacheKey = `${starshipId}:${agentId}:${toolSlug}:${roomConversationId || 'no-room'}`;
+  const cachedPerm = getCachedPermission(permCacheKey);
+  const readPermission = async (): Promise<'allow' | 'ask' | 'deny' | null> =>
+    roomConversationId
+      ? await agentRepo.getEffectiveToolPermissionBySlugInRoom(agentId, starshipId, toolSlug, roomConversationId)
+      : await agentRepo.getEffectiveToolPermissionBySlug(agentId, starshipId, toolSlug);
+
+  let permission = cachedPerm !== undefined ? cachedPerm : await readPermission();
+  if (cachedPerm === undefined) {
+    setCachedPermission(permCacheKey, permission);
+  } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
+    const fresh = await readPermission();
+    permission = fresh;
+    setCachedPermission(permCacheKey, fresh);
+  }
+
+  if (!permission) {
+    return { kind: 'error', toolCallId, code: 'FORBIDDEN', message: 'Tool is not available to agent' };
+  }
+  if (permission === 'deny') {
+    return { kind: 'error', toolCallId, code: 'FORBIDDEN', message: 'Tool permission denied' };
+  }
+
+  if (permission === 'ask') {
+    const toolRepo = new ToolRepository();
+    const resolvedTool = await toolRepo.findBySlugAndStarship(toolSlug, starshipId);
+    if (!resolvedTool) {
+      return { kind: 'error', toolCallId, code: 'RESOURCE_NOT_FOUND', message: 'Tool not found' };
+    }
+
+    const approvals = new ToolCallApprovalRepository();
+    const existing = await approvals.findByConversationAndToolCallId(conversationId, toolCallId).catch(() => null);
+
+    if (existing) {
+      if (existing.starshipId !== starshipId) {
+        return { kind: 'error', toolCallId, code: 'FORBIDDEN', message: 'Tool approval does not belong to this starship' };
+      }
+      if (existing.agentId !== agentId) {
+        return { kind: 'error', toolCallId, code: 'FORBIDDEN', message: 'Tool approval does not belong to this agent' };
+      }
+      if (existing.status === 'pending') {
+        return { kind: 'approval_required', toolCallId, approvalId: existing.id, agentId, toolSlug };
+      }
+      if (existing.status === 'denied' || existing.status === 'expired') {
+        return { kind: 'error', toolCallId, code: 'TOOL_APPROVAL_DENIED', message: 'Tool approval denied' };
+      }
+      // status === 'approved' — execute using the approved tool + args
+      const toolById = await toolRepo.findById(existing.toolId);
+      if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft' || !toolById.blueprint) {
+        return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
+      }
+      const runtimeEnv = {
+        ...(baseEngineConfig.runtimeEnv as Record<string, unknown>),
+        ...(toolCallMessageId ? { TOOL_CALL_MESSAGE_ID: toolCallMessageId } : {}),
+      };
+      const toolEngineConfig = { ...baseEngineConfig, runtimeEnv };
+      try {
+        const result = await executeToolBlueprint({
+          blueprint: toolById.blueprint,
+          toolConfig: (toolById.configuration || {}) as Record<string, unknown>,
+          toolArgs: existing.argsJson || {},
+          runnerConfig: toolEngineConfig,
+        });
+        const normalized = await replaceBase64ImagesWithAttachments({ value: result, starshipId, conversationId, maxImages: 8 });
+        return { kind: 'success', toolCallId, result: normalized.value, attachments: normalized.attachments, attachmentErrors: normalized.attachmentErrors };
+      } catch (e) {
+        const msg = getSafeErrorMessageWithCause(e);
+        console.error('[batch-execute] approved tool blueprint execution failed', { toolSlug, toolCallId, conversationId, agentId, error: msg });
+        return { kind: 'error', toolCallId, code: 'INTERNAL_SERVER_ERROR', message: msg };
+      }
+    }
+
+    // First time seeing this toolCallId — create a pending approval and notify the UI.
+    let approvalId: string;
+    try {
+      const approval = await approvals.createPending({
+        starshipId,
+        conversationId,
+        agentId,
+        toolId: resolvedTool.id,
+        toolCallId,
+        argsJson: args || {},
+      });
+      approvalId = approval.id;
+    } catch (e) {
+      return { kind: 'error', toolCallId, code: 'INTERNAL_SERVER_ERROR', message: getSafeErrorMessageWithCause(e) };
+    }
+
+    const bus = ConversationStreamBus.getInstance();
+    await new UIActionService(bus).publish(conversationId, {
+      action: 'tool_approval_required',
+      payload: { approvalId, conversationId, starshipId, agentId, agentName, toolId: resolvedTool.id, toolSlug, toolCallId, args: args || {} },
+    });
+
+    return { kind: 'approval_required', toolCallId, approvalId, agentId, toolSlug };
+  }
+
+  // permission === 'allow'
+  const toolRepo = new ToolRepository();
+  const toolCacheKey = `${starshipId}:${toolSlug}`;
+  const cachedTool = getCachedTool(toolCacheKey);
+  const tool = cachedTool !== undefined ? cachedTool : await toolRepo.findBySlugAndStarship(toolSlug, starshipId);
+  if (cachedTool === undefined) {
+    setCachedTool(toolCacheKey, tool);
+  }
+  if (!tool || tool.status === 'draft' || !tool.blueprint) {
+    return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
+  }
+
+  const runtimeEnv = {
+    ...(baseEngineConfig.runtimeEnv as Record<string, unknown>),
+    ...(toolCallMessageId ? { TOOL_CALL_MESSAGE_ID: toolCallMessageId } : {}),
+  };
+  const toolEngineConfig = { ...baseEngineConfig, runtimeEnv };
+
+  const bus = ConversationStreamBus.getInstance();
+  const uiActions = new UIActionService(bus);
+
+  try {
+    const result = await executeToolBlueprint({
+      blueprint: tool.blueprint,
+      toolConfig: (tool.configuration || {}) as Record<string, unknown>,
+      toolArgs: args || {},
+      runnerConfig: toolEngineConfig,
+      eventCallback: async (evt: unknown) => {
+        try {
+          if (!evt || typeof evt !== 'object') return;
+          if (!('type' in evt) || !('data' in evt)) return;
+          const type = (evt as Record<string, unknown>)['type'];
+          if (type !== 'ui_action') return;
+          const data = (evt as Record<string, unknown>)['data'];
+          if (!data || typeof data !== 'object') return;
+          const dataRec = data as Record<string, unknown>;
+          const action = typeof dataRec.action === 'string' ? dataRec.action : '';
+          if (!action.trim()) return;
+          const payload =
+            dataRec.payload && typeof dataRec.payload === 'object' && !Array.isArray(dataRec.payload)
+              ? (dataRec.payload as Record<string, unknown>)
+              : undefined;
+          await uiActions.publish(conversationId, payload ? { action: action.trim(), payload } : { action: action.trim() });
+        } catch {
+          // best-effort
+        }
+      },
+    });
+    const normalized = await replaceBase64ImagesWithAttachments({ value: result, starshipId, conversationId, maxImages: 8 });
+    return { kind: 'success', toolCallId, result: normalized.value, attachments: normalized.attachments, attachmentErrors: normalized.attachmentErrors };
+  } catch (e) {
+    const msg = getSafeErrorMessageWithCause(e);
+    console.error('[batch-execute] tool blueprint execution failed', { toolSlug, toolCallId, conversationId, agentId, error: msg });
+    return { kind: 'error', toolCallId, code: 'INTERNAL_SERVER_ERROR', message: msg };
+  }
+}
+
+/**
+ * POST /conversations/:conversationId/tool-calls/batch-execute
+ *
+ * Executes all tool calls in a single agent turn in parallel.
+ * Called from the agent's default blueprint (server-tools mode) instead of the
+ * sequential authorize-and-maybe-execute loop.
+ *
+ * Always returns 200 so the connector_action node does not throw on non-2xx.
+ * Response: { success: true, data: { results: BatchToolCallResult[] } }
+ */
+router.post(
+  '/conversations/:conversationId/tool-calls/batch-execute',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramValidation) return;
+      const { conversationId } = paramValidation;
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 200);
+        return;
+      }
+
+      const bodyValidation = validateData(
+        z.object({
+          agentId: IdSchema,
+          tools: z
+            .array(
+              z.object({
+                toolSlug: z.string().min(1),
+                toolCallId: z.string().min(1),
+                args: z.record(z.string(), z.unknown()).optional(),
+              })
+            )
+            .min(1),
+        }),
+        req.body,
+        res,
+        'batch tool execution payload'
+      );
+      if (!bodyValidation) return;
+
+      const { agentId, tools } = bodyValidation as {
+        agentId: string;
+        tools: Array<{ toolSlug: string; toolCallId: string; args?: Record<string, unknown> }>;
+      };
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 200);
+        return;
+      }
+
+      const ok = await verifyResourceAccess200({
+        resourceStarshipId: conversation.starshipId,
+        userId: authUserId,
+        resourceType: 'conversation',
+        resourceId: conversationId,
+        res,
+      });
+      if (!ok) return;
+
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
+      if (
+        !(await enforceRoomParticipantMembershipForConversation({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+          statusCode: 200,
+        }))
+      ) {
+        return;
+      }
+
+      const authStarshipId = (req as unknown as { authContext?: { starshipId?: string } })?.authContext?.starshipId;
+      if (authStarshipId && authStarshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Conversation does not belong to authenticated starship', 200, {
+          conversationId,
+          starshipId: conversation.starshipId,
+          authStarshipId,
+        });
+        return;
+      }
+
+      const agentService = new AgentService();
+      const agent = await agentService.getAgent(agentId);
+      if (!agent || agent.starshipId !== conversation.starshipId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 200, { agentId });
+        return;
+      }
+
+      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
+      const roomConversationId = roomCtx?.roomConversationId ? String(roomCtx.roomConversationId) : '';
+
+      // Build connector/LLM config once for the whole batch; per-tool runtimeEnv is patched
+      // inside executeOneToolCallForBatch using the individual toolCallMessageId.
+      const baseRuntimeEnv = buildAutopilotRuntimeEnv({
+        starshipId: conversation.starshipId,
+        conversationId,
+        roomId: roomConversationId || undefined,
+        authUserId,
+        agentId,
+      });
+      const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
+        starshipId: conversation.starshipId,
+        authUserId,
+        runtimeEnv: baseRuntimeEnv,
+      });
+
+      // Resolve the assistant message that triggered each tool call (best-effort, in parallel).
+      const toolCallMessageIds = await Promise.all(
+        tools.map(async ({ toolCallId }) => {
+          try {
+            const repo = new MessageRepository();
+            const msg = await repo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId);
+            const id = msg && typeof msg.id === 'string' ? String(msg.id).trim() : '';
+            return id || null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      // Execute all tool calls in parallel.
+      const results = await Promise.all(
+        tools.map((tool, i) =>
+          executeOneToolCallForBatch({
+            toolSlug: tool.toolSlug,
+            toolCallId: tool.toolCallId,
+            args: tool.args,
+            agentId,
+            agentName: agent.name,
+            conversationId,
+            starshipId: conversation.starshipId,
+            roomConversationId,
+            toolCallMessageId: toolCallMessageIds[i],
+            baseEngineConfig: baseEngineConfig as unknown as Record<string, unknown>,
+          })
+        )
+      );
+
+      sendSuccess(res, { results }, 200);
+    } catch (e) {
+      const msg = getSafeErrorMessageWithCause(e);
+      console.error('[batch-execute] unhandled route error', {
+        params: req.params,
+        toolSlugs: Array.isArray(req.body?.tools) ? req.body.tools.map((t: { toolSlug?: unknown }) => t?.toolSlug) : [],
+        error: msg,
+        stack: e instanceof Error ? e.stack : undefined,
+      });
+      const extracted = extractConnectorActionApiError(e);
+      const code = extracted?.code ?? 'INTERNAL_SERVER_ERROR';
+      const message = extracted?.message ?? msg;
+      sendError(res, code as unknown as StandardErrorCode, message, 200, extracted?.details);
+    }
+  }
+);
+
 /**
  * POST /conversations/:conversationId/tool-approvals/:approvalId/approve
  */

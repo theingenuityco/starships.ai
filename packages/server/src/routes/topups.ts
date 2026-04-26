@@ -85,4 +85,27 @@ router.post('/wallets/:starshipId/topup', rateLimiters.financial, jwtAuthMiddlew
   }
 });
 
+/**
+ * POST /topups/:topupId/finalize
+ * Client-side fallback: verify Stripe payment and apply credits.
+ * Safe to call after a successful Stripe redirect — idempotent if webhook already ran.
+ */
+router.post('/topups/:topupId/finalize', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const topupId = String(req.params?.topupId || '').trim();
+    if (!topupId) {
+      sendError(res, 'VALIDATION_ERROR', 'topupId is required', 400);
+      return;
+    }
+
+    const userId = req.user?.id || '';
+    const topupService = new TopupService();
+    const result = await topupService.finalizeTopup({ topupId, userId });
+
+    sendSuccess(res, result);
+  } catch (error) {
+    handleError(error, res, 'finalizing topup');
+  }
+});
+
 export default router;

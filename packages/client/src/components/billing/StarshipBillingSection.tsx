@@ -6,6 +6,7 @@ import AmountSelector from '@/components/billing/AmountSelector'
 import LedgerHistoryTable from '@/components/billing/LedgerHistoryTable'
 import PromoRedeemForm from '@/components/billing/PromoRedeemForm'
 import { useWallet } from '@/hooks/useWallet'
+import { useFinalizeTopup } from '@/hooks/useTopup'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
@@ -25,6 +26,7 @@ function TopupStatusCallout({ starshipId }: { starshipId?: string }): React.JSX.
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
+  const { mutate: finalizeTopup } = useFinalizeTopup()
 
   const topup = searchParams.get('topup')
   const topupId = searchParams.get('topupId') ?? undefined
@@ -60,10 +62,16 @@ function TopupStatusCallout({ starshipId }: { starshipId?: string }): React.JSX.
   }
 
   useEffect(() => {
-    if (topup !== 'success') return
-    if (!starshipId) return
-    queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
-  }, [queryClient, starshipId, topup])
+    if (topup !== 'success' || !starshipId) return
+    const refreshWallet = () => queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+    if (topupId) {
+      // Ensure credits are applied even if the Stripe webhook was delayed or failed.
+      // The server verifies the Stripe session before granting credits (idempotent).
+      finalizeTopup(topupId, { onSettled: refreshWallet })
+    } else {
+      refreshWallet()
+    }
+  }, [queryClient, starshipId, topup, topupId, finalizeTopup])
 
   if (topup !== 'success' && topup !== 'cancelled' && topup !== 'failure') return null
 

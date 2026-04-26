@@ -1,9 +1,12 @@
-import { TopupRepository } from '@starships/models';
+import Stripe from 'stripe';
+import { TopupRepository, WalletRepository, LedgerRepository, getConnection } from '@starships/models';
 import { WalletService } from '@/services/WalletService';
 import { StripeService } from '@/services/StripeService';
 import { StarshipService } from '@/services/StarshipService';
 import type { TopupModel, CreateTopupRequest } from '@starships/protocol';
 import { logger } from '@/utils/logger';
+import { ForbiddenError, NotFoundError } from '@starships/errors';
+import { CREDITS_PER_USD, toCreditsString } from '@/config/credits';
 
 /**
  * Topup Service - Orchestrates wallet topup operations
@@ -153,6 +156,88 @@ export class TopupService {
       logger.error('[TOPUP] Failed to fetch topups', { walletId, operation: 'getTopupsByWalletId' }, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Verify a Stripe checkout session and apply credits for a pending topup.
+   * Acts as a client-side fallback when the webhook is delayed or fails.
+   * Safe to call multiple times — idempotent via the topup status check.
+   */
+  async finalizeTopup({ topupId, userId }: { topupId: string; userId: string }): Promise<{ topup: TopupModel; credited: boolean }> {
+    const topup = await this.topupRepository.findById(topupId);
+    if (!topup) {
+      throw new NotFoundError('Topup', topupId);
+    }
+
+    const walletRepo = new WalletRepository();
+    const wallet = await walletRepo.findById(topup.walletId);
+    if (!wallet) {
+      throw new NotFoundError('Wallet', topup.walletId);
+    }
+
+    const hasAccess = await this.starshipService.hasOwnerAccess(userId, wallet.starshipId);
+    if (!hasAccess) {
+      throw new ForbiddenError('Access denied to this topup');
+    }
+
+    if (topup.status === 'completed') {
+      return { topup, credited: true };
+    }
+
+    if (topup.status !== 'pending' || !topup.stripeSessionId) {
+      return { topup, credited: false };
+    }
+
+    const session = await StripeService.getCheckoutSession(topup.stripeSessionId);
+    if (session.payment_status !== 'paid') {
+      return { topup, credited: false };
+    }
+
+    const paymentIntentId =
+      typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : (session.payment_intent as Stripe.PaymentIntent | null)?.id ?? null;
+
+    const connection = getConnection();
+    let credited = false;
+
+    await connection.transaction(async (client) => {
+      const rows = await client.query<{ id: string; wallet_id: string; amount_usd: string; status: string }>(
+        'SELECT id, wallet_id, amount_usd, status FROM topups WHERE id = $1 FOR UPDATE',
+        [topupId]
+      );
+      const locked = rows.rows?.[0];
+      if (!locked || locked.status === 'completed') return;
+
+      const creditsGranted = toCreditsString((Number(locked.amount_usd) || 0) * Number(CREDITS_PER_USD));
+      const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, locked.wallet_id, creditsGranted);
+
+      const topupRepo = new TopupRepository();
+      await topupRepo.markCompletedWithClient(locked.id, paymentIntentId, null, client);
+
+      const ledgerRepo = new LedgerRepository();
+      await ledgerRepo.createWithClient(client, {
+        walletId: locked.wallet_id,
+        type: 'TOPUP',
+        amount: creditsGranted,
+        balanceAfter: balance,
+        meta: {
+          topupId: locked.id,
+          stripeSession: topup.stripeSessionId,
+          stripePaymentIntent: paymentIntentId,
+          amountUsd: locked.amount_usd,
+          creditsGranted,
+          creditsPerUsd: Number(CREDITS_PER_USD),
+          source: 'client_finalize',
+        },
+      });
+
+      credited = true;
+    });
+
+    logger.info('[TOPUP] Finalized topup from client callback', { topupId, credited, userId });
+    const updated = await this.topupRepository.findById(topupId);
+    return { topup: updated ?? topup, credited };
   }
 
   /**

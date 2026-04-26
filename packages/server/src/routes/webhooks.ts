@@ -90,7 +90,7 @@ router.post('/webhooks', shopifyRawJson, shopifyComplianceWebhookHandler);
  * - Route is a thin controller: verify signature + delegate to service layer.
  * - All DB mutations happen inside `StripeWebhookService`.
  */
-router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req: Request, res: Response): Promise<void> => {
+router.post('/webhooks/stripe', express.raw({ type: '*/*' }), async (req: Request, res: Response): Promise<void> => {
   const sig = req.headers['stripe-signature'] as string | undefined;
   if (!sig) {
     logger.warn('[WEBHOOK] Missing Stripe signature header');

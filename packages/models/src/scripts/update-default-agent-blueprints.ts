@@ -1,17 +1,15 @@
 /**
- * Update all agent + agent_template blueprints to the latest generated default Agent blueprint.
+ * Update all agent blueprints to the latest generated default Agent blueprint.
  *
- * This script intentionally overwrites the existing blueprint JSON for:
- * - agents.blueprint
- * - agent_templates.blueprint
+ * This script intentionally overwrites the existing blueprint JSON for agents.blueprint.
  *
  * NOTE:
  * The default Agent blueprint is runtime-configurable via template evaluation (Engine/Eval) and
  * reads LLM settings from execution.state at runtime (e.g. state.model, state.temperature, ...).
- * Because of that, the "default blueprint" itself is now identical across agents/templates.
+ * Because of that, the "default blueprint" itself is now identical across all agents.
  *
  * IMPORTANT:
- * - This script updates ONLY the blueprint columns (no updated_at writes).
+ * - This script updates ONLY the blueprint column (no updated_at writes).
  * - It preserves existing blueprint.metadata.createdAt when present, so reruns are idempotent
  *   unless the underlying blueprint shape changes.
  *
@@ -23,10 +21,8 @@
  *   --dry-run           Print counts only (default)
  *   --apply             Perform updates
  *   --force             Update every row even if the blueprint JSON is identical (no skipping)
- *   --only=agents       Only update agents table
- *   --only=templates    Only update agent_templates table
- *   --starship=<id>     Only update agents for a specific starship_id (templates are global and unaffected)
- *   --limit=<n>         Limit number of rows processed per table (for safe testing)
+ *   --starship=<id>     Only update agents for a specific starship_id
+ *   --limit=<n>         Limit number of rows processed (for safe testing)
  *   --batch=<n>         Batch size for updates (default: 100)
  */
 
@@ -36,19 +32,7 @@ import { getEnvConfig } from '@starships/env';
 import { logger } from '@/helpers/logging';
 import { createConnection } from '@/helpers/database';
 
-type OnlyMode = 'agents' | 'templates' | 'all';
-
 type AgentRow = {
-  id: string;
-  name: string;
-  model: string;
-  temperature: string | number | null;
-  max_tokens: number | null;
-  timeout: number;
-  blueprint: unknown;
-};
-
-type AgentTemplateRow = {
   id: string;
   name: string;
   model: string;
@@ -64,7 +48,6 @@ function parseArgs(argv: string[]) {
     apply: boolean;
     dryRun: boolean;
     force: boolean;
-    only: OnlyMode;
     starshipId?: string;
     limit?: number;
     batchSize: number;
@@ -72,7 +55,6 @@ function parseArgs(argv: string[]) {
     apply: false,
     dryRun: true,
     force: false,
-    only: 'all',
     batchSize: 100,
   };
 
@@ -89,11 +71,6 @@ function parseArgs(argv: string[]) {
     }
     if (arg === '--force' || arg === '--no-skip') {
       out.force = true;
-      continue;
-    }
-    if (arg.startsWith('--only=')) {
-      const v = arg.split('=')[1];
-      if (v === 'agents' || v === 'templates') out.only = v;
       continue;
     }
     if (arg.startsWith('--starship=')) {
@@ -197,7 +174,6 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
   logger.info(`Starting default-agent-blueprint update (${opts.dryRun ? 'dry-run' : 'apply'})`, {
     component: 'update-default-agent-blueprints',
     metadata: {
-      only: opts.only,
       force: opts.force,
       starshipId: opts.starshipId,
       limit: opts.limit,
@@ -218,88 +194,42 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
   await db.connect();
 
   try {
-    if (opts.only === 'all' || opts.only === 'agents') {
-      const where = opts.starshipId ? 'WHERE starship_id = $1' : '';
-      const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
-      const sql = `
-        SELECT id, name, model, temperature, max_tokens, timeout, blueprint
-        FROM agents
-        ${where}
-        ORDER BY created_at ASC
-        ${limit}
-      `;
-      const rows = (await db.query<AgentRow>(sql, opts.starshipId ? [opts.starshipId] : [])) || [];
-      logger.info(`Loaded ${rows.length} agent(s)`, { component: 'update-default-agent-blueprints' });
+    const where = opts.starshipId ? 'WHERE starship_id = $1' : '';
+    const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
+    const sql = `
+      SELECT id, name, model, temperature, max_tokens, timeout, blueprint
+      FROM agents
+      ${where}
+      ORDER BY created_at ASC
+      ${limit}
+    `;
+    const rows = (await db.query<AgentRow>(sql, opts.starshipId ? [opts.starshipId] : [])) || [];
+    logger.info(`Loaded ${rows.length} agent(s)`, { component: 'update-default-agent-blueprints' });
 
-      const updates: Array<{ id: string; blueprint: Blueprint }> = [];
-      let skipped = 0;
+    const updates: Array<{ id: string; blueprint: Blueprint }> = [];
+    let skipped = 0;
 
-      const generated = buildDefaultBlueprint();
-      for (const r of rows) {
-        const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
-        const next = setBlueprintCreatedAt(generated, existingCreatedAt);
+    const generated = buildDefaultBlueprint();
+    for (const r of rows) {
+      const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
+      const next = setBlueprintCreatedAt(generated, existingCreatedAt);
 
-        // Only update if the blueprint meaningfully changes (unless forced).
-        if (!opts.force && stableStringify(r.blueprint) === stableStringify(next)) {
-          skipped++;
-          continue;
-        }
-
-        updates.push({ id: r.id, blueprint: next });
+      // Only update if the blueprint meaningfully changes (unless forced).
+      if (!opts.force && stableStringify(r.blueprint) === stableStringify(next)) {
+        skipped++;
+        continue;
       }
 
-      if (opts.dryRun) {
-        logger.info(`Dry run: would update ${updates.length} agent blueprint(s) (skipped ${skipped})`, {
-          component: 'update-default-agent-blueprints',
-        });
-      } else {
-        const updated = await updateInBatches(db, { batchSize: opts.batchSize }, updates, 'UPDATE agents SET blueprint = $2 WHERE id = $1');
-        logger.info(`✅ Updated ${updated} agent blueprint(s) (skipped ${skipped})`, { component: 'update-default-agent-blueprints' });
-      }
+      updates.push({ id: r.id, blueprint: next });
     }
 
-    if (opts.only === 'all' || opts.only === 'templates') {
-      const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
-      const sql = `
-        SELECT id, name, model, temperature, max_tokens, timeout, blueprint
-        FROM agent_templates
-        ORDER BY created_at ASC
-        ${limit}
-      `;
-      const rows = (await db.query<AgentTemplateRow>(sql)) || [];
-      logger.info(`Loaded ${rows.length} agent template(s)`, { component: 'update-default-agent-blueprints' });
-
-      const updates: Array<{ id: string; blueprint: Blueprint }> = [];
-      let skipped = 0;
-
-      const generated = buildDefaultBlueprint();
-      for (const r of rows) {
-        const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
-        const next = setBlueprintCreatedAt(generated, existingCreatedAt);
-
-        if (!opts.force && stableStringify(r.blueprint) === stableStringify(next)) {
-          skipped++;
-          continue;
-        }
-
-        updates.push({ id: r.id, blueprint: next });
-      }
-
-      if (opts.dryRun) {
-        logger.info(`Dry run: would update ${updates.length} agent_template blueprint(s) (skipped ${skipped})`, {
-          component: 'update-default-agent-blueprints',
-        });
-      } else {
-        const updated = await updateInBatches(
-          db,
-          { batchSize: opts.batchSize },
-          updates,
-          'UPDATE agent_templates SET blueprint = $2 WHERE id = $1'
-        );
-        logger.info(`✅ Updated ${updated} agent_template blueprint(s) (skipped ${skipped})`, {
-          component: 'update-default-agent-blueprints',
-        });
-      }
+    if (opts.dryRun) {
+      logger.info(`Dry run: would update ${updates.length} agent blueprint(s) (skipped ${skipped})`, {
+        component: 'update-default-agent-blueprints',
+      });
+    } else {
+      const updated = await updateInBatches(db, { batchSize: opts.batchSize }, updates, 'UPDATE agents SET blueprint = $2 WHERE id = $1');
+      logger.info(`✅ Updated ${updated} agent blueprint(s) (skipped ${skipped})`, { component: 'update-default-agent-blueprints' });
     }
   } finally {
     await db.disconnect();

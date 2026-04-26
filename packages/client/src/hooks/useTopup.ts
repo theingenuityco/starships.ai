@@ -1,6 +1,6 @@
 import api from '@/lib/api'
 import type { FetchResponse } from '@/lib/types'
-import type { ApiResponse, CreateTopupResponse } from '@starships/protocol'
+import type { ApiResponse, CreateTopupResponse, TopupModel } from '@starships/protocol'
 import { useMutation } from '@tanstack/react-query'
 
 export const TOPUP_MUTATION_KEYS = {
@@ -14,6 +14,17 @@ export function useTopup() {
         amount_usd: amountUsd,
         walletId,
       })
+      return response.data.data
+    },
+  })
+}
+
+export function useFinalizeTopup() {
+  return useMutation({
+    mutationFn: async (topupId: string): Promise<{ topup: TopupModel; credited: boolean }> => {
+      const response: FetchResponse<ApiResponse<{ topup: TopupModel; credited: boolean }>> = await api.post(
+        `/api/v1/topups/${topupId}/finalize`
+      )
       return response.data.data
     },
   })

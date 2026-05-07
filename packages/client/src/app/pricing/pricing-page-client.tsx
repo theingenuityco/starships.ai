@@ -286,7 +286,7 @@ export default function PricingPageClient(): React.JSX.Element {
                             : column.plan.shipClass === 'frigate'
                               ? 'Best for growing teams'
                               : 'Best for scaled operations'
-                          const ctaHref = isEnterprise ? 'mailto:tech@theingenuity.co' : getPlanCtaHref(column.plan.priceId)
+                          const ctaHref = isEnterprise ? 'https://github.com/brayn003/starships.ai' : getPlanCtaHref(column.plan.priceId)
                           const ctaText = isEnterprise ? 'Talk to us' : 'Choose plan'
                           return (
                             <th
@@ -431,7 +431,7 @@ export default function PricingPageClient(): React.JSX.Element {
                 <h3 className="text-2xl font-semibold text-white md:text-3xl">Request a custom quote</h3>
                 <p className="mt-2 max-w-2xl text-sm text-white/90">Looking for enterprise solutions? Email us what you need.</p>
               </div>
-              <a href="mailto:tech@theingenuity.co" className={`${landingWhiteCtaOnGradientLg} shrink-0 self-center md:self-center`}>
+              <a href="https://github.com/brayn003/starships.ai" className={`${landingWhiteCtaOnGradientLg} shrink-0 self-center md:self-center`}>
                 Contact us
               </a>
             </div>

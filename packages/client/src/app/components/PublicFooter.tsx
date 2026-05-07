@@ -52,7 +52,7 @@ export function PublicFooter(props: {
     {
       title: 'Company',
       links: [
-        { label: 'Contact', href: 'mailto:tech@theingenuity.co', external: true },
+        { label: 'GitHub', href: 'https://github.com/brayn003/starships.ai', external: true },
         { label: 'Discord', href: 'https://discord.gg/wzF7xfjrKv', external: true },
       ],
     },
@@ -113,12 +113,14 @@ export function PublicFooter(props: {
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2.5">
               <a
-                href="mailto:tech@theingenuity.co"
-                aria-label="Email"
+                href="https://github.com/brayn003/starships.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
                 className={socialDark}
-                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'mailto:tech@theingenuity.co' })}
+                onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/brayn003/starships.ai' })}
               >
-                <Icon name="mail" className="h-5 w-5" />
+                <Icon name="github" className="h-5 w-5" />
               </a>
               <a
                 href="https://discord.gg/wzF7xfjrKv"
@@ -193,13 +195,13 @@ export function PublicFooter(props: {
           <p className="normal-case tracking-normal text-white/70">
             Built by{' '}
             <a
-              href="https://theingenuity.co"
+              href="https://github.com/brayn003"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-md px-1 py-0.5 font-semibold text-white transition-colors duration-100 hover:bg-white/10"
-              onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://theingenuity.co' })}
+              onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: 'https://github.com/brayn003' })}
             >
-              The Ingenuity Co
+              @brayn003
             </a>
           </p>
         </div>

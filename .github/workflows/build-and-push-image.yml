@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: theingenuityco/starships.ai
+  IMAGE_NAME: ${{ github.repository }}
   # Increase Node heap for Docker image builds (MB)
   NODE_MAX_OLD_SPACE_SIZE: 6144
 
@@ -309,7 +309,7 @@ jobs:
         id: meta_runner
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/theingenuityco/autopilot-runner
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/autopilot-runner
           tags: |
             type=raw,value=${{ needs.calculate-version.outputs.new_release_version }},enable=${{ needs.calculate-version.outputs.new_release_published == 'true' }}
             type=sha,format=short
@@ -366,7 +366,7 @@ jobs:
         id: meta_runner
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/theingenuityco/autopilot-runner
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/autopilot-runner
           tags: |
             type=raw,value=${{ needs.calculate-version.outputs.new_release_version }},enable=${{ needs.calculate-version.outputs.new_release_published == 'true' }}
             type=sha,format=short
@@ -420,7 +420,7 @@ jobs:
         id: meta_runner
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/theingenuityco/autopilot-runner
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/autopilot-runner
           tags: |
             type=raw,value=${{ needs.calculate-version.outputs.new_release_version }},enable=${{ needs.calculate-version.outputs.new_release_published == 'true' }}
             type=sha,format=short
@@ -509,8 +509,8 @@ jobs:
 
             if [[ "${{ needs.build-dev-manifest.result }}" == "success" ]]; then
               echo "✅ **Build Status:** Docker images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "   - Main app: \`ghcr.io/theingenuityco/starships.ai:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
-              echo "   - Autopilot runner: \`ghcr.io/theingenuityco/autopilot-runner:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "   - Main app: \`ghcr.io/${{ github.repository }}:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "   - Autopilot runner: \`ghcr.io/${{ github.repository_owner }}/autopilot-runner:${{ needs.calculate-version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
             else
               echo "❌ **Build Status:** Docker image build failed" >> $GITHUB_STEP_SUMMARY
             fi

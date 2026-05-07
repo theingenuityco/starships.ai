@@ -120,11 +120,6 @@ export function getEnvConfig(): EnvironmentConfig {
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
 
-    // Stripe Configuration
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-
     // Google Analytics
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
 

@@ -61,11 +61,6 @@ export interface EnvironmentConfig {
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;
 
-  // Stripe Configuration
-  STRIPE_SECRET_KEY: string;
-  STRIPE_PUBLISHABLE_KEY: string;
-  STRIPE_WEBHOOK_SECRET?: string;
-
   // Google Analytics
   GA_MEASUREMENT_ID?: string;
 

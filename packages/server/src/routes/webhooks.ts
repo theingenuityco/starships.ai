@@ -1,15 +1,9 @@
 import express, { Request, Response, Router } from 'express';
 import crypto from 'crypto';
-import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
-import { StripeWebhookService } from '@/services/StripeWebhookService';
 import { ConnectorEventIngestionService } from '@/services/ConnectorEventIngestionService';
-import { getEnvConfig } from '@starships/env';
 import { AppError } from '@starships/errors';
-
-const envConfig = getEnvConfig();
-const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 const router: Router = Router();
 
@@ -82,63 +76,6 @@ async function shopifyComplianceWebhookHandler(req: Request, res: Response): Pro
  * - `${PUBLIC_URL}/api/v1/webhooks`
  */
 router.post('/webhooks', shopifyRawJson, shopifyComplianceWebhookHandler);
-
-/**
- * POST /api/v1/webhooks/stripe
- *
- * IMPORTANT:
- * - Route is a thin controller: verify signature + delegate to service layer.
- * - All DB mutations happen inside `StripeWebhookService`.
- */
-router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req: Request, res: Response): Promise<void> => {
-  const sig = req.headers['stripe-signature'] as string | undefined;
-  if (!sig) {
-    logger.warn('[WEBHOOK] Missing Stripe signature header');
-    res.status(400).send('Missing Stripe signature');
-    return;
-  }
-
-  const signingSecret = (envConfig.STRIPE_WEBHOOK_SECRET || '').trim();
-  if (!signingSecret) {
-    logger.error('[WEBHOOK] STRIPE_WEBHOOK_SECRET is not configured; refusing to process Stripe webhooks');
-    res.status(500).send('Stripe webhook signing secret not configured');
-    return;
-  }
-
-  // express.raw() should produce a Buffer; if a JSON parser ran first, the body may already be consumed.
-  if (!Buffer.isBuffer(req.body)) {
-    logger.error('[WEBHOOK] Stripe webhook received non-raw body; cannot verify signature safely', {
-      bodyType: typeof req.body,
-    });
-    res.status(400).send('Invalid webhook payload');
-    return;
-  }
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, signingSecret);
-  } catch (err) {
-    logger.error('[WEBHOOK] Stripe signature verification failed', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    res.status(400).send(`Webhook Error: ${(err as Error).message}`);
-    return;
-  }
-
-  try {
-    await StripeWebhookService.handleEvent(event);
-  } catch (err) {
-    logger.error('[WEBHOOK] Error handling Stripe webhook', {
-      type: event.type,
-      id: event.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    res.status(500).send('Internal error');
-    return;
-  }
-
-  res.json({ received: true });
-});
 
 /**
  * POST /api/v1/webhooks/connectors/:provider

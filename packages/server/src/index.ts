@@ -29,8 +29,6 @@ import roomRoutes from '@/routes/rooms';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
 import walletRoutes from '@/routes/wallets';
-import topupRoutes from '@/routes/topups';
-import promoRoutes from '@/routes/promo';
 import userRoutes from '@/routes/users';
 import usageRoutes from '@/routes/usage';
 import openrouterRoutes from '@/routes/openrouter';
@@ -46,7 +44,6 @@ import datasetRoutes from '@/routes/datasets';
 import autopilotAwaitsRoutes from '@/routes/autopilot-awaits';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import connectorTemplateRoutes from '@/routes/connector-templates';
-import subscriptionRoutes from '@/routes/subscriptions';
 import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
 import notificationRoutes from '@/routes/notifications';
@@ -95,7 +92,7 @@ app.use(cors());
 app.use(requestIdMiddleware);
 // Apply global rate limiting (before routes but after request ID)
 app.use(globalRateLimiter);
-// Mount Stripe webhooks BEFORE JSON parser to preserve raw body for signature verification
+// Mount webhooks BEFORE JSON parser to preserve raw body for signature verification
 app.use('/api/v1', webhooksRoutes);
 // Parse JSON for all other routes
 app.use(express.json());
@@ -117,8 +114,6 @@ app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
 app.use('/api/v1', docsRoutes);
 app.use('/api/v1', walletRoutes);
-app.use('/api/v1', topupRoutes);
-app.use('/api/v1', promoRoutes);
 app.use('/api/v1', usageRoutes);
 app.use('/api/v1', openrouterRoutes);
 app.use('/api/v1', llmModelsRoutes);
@@ -131,7 +126,6 @@ app.use('/api/v1', datasetRoutes);
 app.use('/api/v1', autopilotAwaitsRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', connectorTemplateRoutes);
-app.use('/api/v1', subscriptionRoutes);
 app.use('/api/v1', starshipInvitesRoutes);
 app.use('/api/v1', presenceRoutes);
 app.use('/api/v1', notificationRoutes);

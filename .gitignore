@@ -77,3 +77,4 @@ github-runners/lambda/package/
 # github-runners terraform configuration (contains secrets)
 github-runners/**/terraform.tfvars
 
+backups/

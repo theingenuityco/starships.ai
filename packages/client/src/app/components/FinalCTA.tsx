@@ -17,10 +17,10 @@ export default function FinalCTA() {
             type="button"
             className={`${landingSecondaryCtaDark} h-12 w-full min-w-[11rem] px-8 sm:w-auto`}
             onClick={() => {
-              window.location.href = 'mailto:tech@theingenuity.co'
+              window.open('https://github.com/brayn003/starships.ai', '_blank')
             }}
           >
-            <Icon name="chat" className="h-4 w-4" /> Contact us
+            <Icon name="github" className="h-4 w-4" /> View on GitHub
           </button>
           <button
             type="button"

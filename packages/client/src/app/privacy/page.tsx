@@ -26,18 +26,16 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-base font-semibold text-foreground">1. Data Controller</h2>
             <p className="mt-2 text-muted-foreground">For the purposes of applicable data protection laws, the data controller responsible for your personal data is:</p>
             <address className="mt-2 not-italic text-muted-foreground">
-              <div>The Ingenuity Labs Inc.</div>
-              <div>8 The Green Ste B</div>
-              <div>Dover, DE 19901</div>
+              <div>Rudraprasad Das</div>
               <div className="mt-2">
-                Email:{' '}
-                <a href="mailto:tech@theingenuity.co" className="underline underline-offset-2">
-                  tech@theingenuity.co
+                GitHub:{' '}
+                <a href="https://github.com/brayn003" className="underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+                  github.com/brayn003
                 </a>
               </div>
             </address>
             <p className="mt-2 text-xs text-muted-foreground">
-              For EU/EEA residents: If you have questions about GDPR compliance or wish to exercise your data protection rights, please contact us using the details above.
+              Note: The Starships.ai service is no longer operational. This page is preserved as part of the archived open-source repository.
             </p>
           </section>
 
@@ -158,13 +156,11 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-base font-semibold text-foreground">13. Contact</h2>
             <p className="mt-2 text-muted-foreground">If you have any questions about this Privacy Policy or our handling of personal data, please contact:</p>
             <address className="mt-2 not-italic text-muted-foreground">
-              <div>The Ingenuity Labs Inc.</div>
-              <div>8 The Green Ste B</div>
-              <div>Dover, DE 19901</div>
+              <div>Rudraprasad Das</div>
               <div className="mt-2">
-                Email:{' '}
-                <a href="mailto:tech@theingenuity.co" className="underline underline-offset-2">
-                  tech@theingenuity.co
+                GitHub:{' '}
+                <a href="https://github.com/brayn003" className="underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+                  github.com/brayn003
                 </a>
               </div>
             </address>

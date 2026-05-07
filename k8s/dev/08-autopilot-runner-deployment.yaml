@@ -23,7 +23,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: autopilot-runner
-          image: ghcr.io/theingenuityco/autopilot-runner:latest
+          image: ghcr.io/<YOUR_GITHUB_ORG>/autopilot-runner:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 50051

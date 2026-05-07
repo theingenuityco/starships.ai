@@ -5,7 +5,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: theingenuityco/starships.ai
+  IMAGE_NAME: ${{ github.repository }}
   AWS_REGION: ap-south-1
   EKS_CLUSTER: starships-prod
   NAMESPACE: starships-prod
@@ -251,7 +251,7 @@ jobs:
 
           # Keep Autopilot Runner in sync with the same tag (built in the same pipeline).
           kubectl set image deployment/autopilot-runner \
-            autopilot-runner=${{ env.REGISTRY }}/theingenuityco/autopilot-runner:${IMAGE_TAG} \
+            autopilot-runner=${{ env.REGISTRY }}/${{ github.repository_owner }}/autopilot-runner:${IMAGE_TAG} \
             -n ${{ env.NAMESPACE }}
 
           # Force restarts so secrets/env updates apply immediately.

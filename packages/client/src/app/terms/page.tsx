@@ -147,16 +147,17 @@ export default function TermsOfServicePage() {
             <h2 className="text-base font-semibold text-foreground">15. Contact Information</h2>
             <p className="mt-2 text-muted-foreground">If you have any questions about these Terms, please contact us at:</p>
             <address className="mt-2 not-italic text-muted-foreground">
-              <div>The Ingenuity Labs Inc.</div>
-              <div>8 The Green Ste B</div>
-              <div>Dover, DE 19901</div>
+              <div>Rudraprasad Das</div>
               <div className="mt-2">
-                Email:{' '}
-                <a href="mailto:tech@theingenuity.co" className="underline underline-offset-2">
-                  tech@theingenuity.co
+                GitHub:{' '}
+                <a href="https://github.com/brayn003" className="underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+                  github.com/brayn003
                 </a>
               </div>
             </address>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Note: The Starships.ai service is no longer operational. This page is preserved as part of the archived open-source repository.
+            </p>
           </section>
 
           <section className="pt-4 border-t border-border mt-8 text-xs text-muted-foreground">

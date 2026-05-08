@@ -1,0 +1,172 @@
+'use client'
+
+import * as React from 'react'
+import { motion } from 'motion/react'
+import { useRouter } from 'next/navigation'
+import { Orbitron } from 'next/font/google'
+import { AUTH_QUERY_KEYS, setStoredToken } from '@/hooks/useAuth'
+import { AuthLoadingScreen } from '@/components/ui/simple-loading'
+import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
+import { StarTheme } from '@/components/theme-context'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter'
+import { useQueryClient } from '@tanstack/react-query'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
+
+export default function SetupPageClient() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+
+  const [statusChecked, setStatusChecked] = React.useState(false)
+  const [displayName, setDisplayName] = React.useState('')
+  const [email, setEmail] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+  // On mount: verify setup is still required; redirect away if not.
+  React.useEffect(() => {
+    fetch('/api/v1/setup/status')
+      .then(r => r.json())
+      .then(json => {
+        if (!json.data?.setupRequired) {
+          router.replace('/login')
+        } else {
+          setStatusChecked(true)
+        }
+      })
+      .catch(() => {
+        // Network error — render the form anyway; POST will catch any real issue.
+        setStatusChecked(true)
+      })
+  }, [router])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch('/api/v1/setup/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          displayName: displayName.trim() || undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.data) {
+        throw new Error(data.error?.message || 'Setup failed. Please check your details and try again.')
+      }
+
+      const { user, token, starship } = data.data
+      setStoredToken(token)
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+      queryClient.invalidateQueries()
+
+      if (starship?.slug) {
+        router.push(`/ship/${starship.slug}`)
+      } else {
+        router.push('/account')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!statusChecked) {
+    return <AuthLoadingScreen />
+  }
+
+  return (
+    <StarTheme theme="dark">
+      <div className="min-h-[100dvh] bg-black relative overflow-hidden flex items-center justify-center">
+        <AuthMarketingPanel className="fixed inset-0" />
+
+        <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
+          <div className="px-4 sm:px-8 flex items-center h-8">
+            <span className="flex items-center gap-2">
+              <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+              <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>
+                starships.ai
+              </span>
+            </span>
+          </div>
+        </header>
+
+        <div className="w-full flex items-center justify-center px-6 py-16 relative z-10">
+          <div className="w-full max-w-md">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-6 text-center">
+              <h1 className="text-3xl font-bold text-primary">Set up your instance</h1>
+              <p className="text-muted-foreground mt-2 text-sm">Create the first admin account to get started.</p>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="displayName">Display name <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Input
+                    id="displayName"
+                    type="text"
+                    placeholder="Your name"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    autoComplete="name"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="admin@example.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                  />
+                  {password.length > 0 && <PasswordStrengthMeter password={password} />}
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creating account…' : 'Create admin account'}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </StarTheme>
+  )
+}

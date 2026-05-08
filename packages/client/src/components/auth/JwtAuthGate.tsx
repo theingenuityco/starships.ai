@@ -4,6 +4,8 @@ import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { LoginForm } from '@/components/auth/LoginForm'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef } from 'react'
 
 interface JwtAuthGateProps {
   children: React.ReactNode
@@ -15,6 +17,33 @@ interface JwtAuthGateProps {
  */
 export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const setupChecked = useRef(false)
+
+  // On first unauthenticated render, check if first-time setup is required.
+  // Retries on server errors to handle the startup window before DB migrations finish.
+  useEffect(() => {
+    if (isAuthenticated || isLoading || setupChecked.current) return
+    setupChecked.current = true
+
+    let cancelled = false
+    const check = async (attempts = 0) => {
+      try {
+        const r = await fetch('/api/v1/setup/status')
+        if (!r.ok) throw new Error('not ready')
+        const json = await r.json()
+        if (!cancelled && json.data?.setupRequired) {
+          router.replace('/setup')
+        }
+      } catch {
+        if (!cancelled && attempts < 5) {
+          setTimeout(() => check(attempts + 1), 1000)
+        }
+      }
+    }
+    check()
+    return () => { cancelled = true }
+  }, [isAuthenticated, isLoading, router])
 
   if (isLoading) {
     return (

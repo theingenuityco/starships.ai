@@ -40,7 +40,7 @@ interface EnvGroupState {
 }
 
 // Keys shown flat at the top — the minimum a deployer must touch.
-const PRIMARY_KEYS = ['POSTGRES_PASSWORD', 'JWT_SECRET', 'OPENROUTER_API_KEY']
+const PRIMARY_KEYS = ['POSTGRES_PASSWORD', 'OPENROUTER_API_KEY']
 
 // Keys that go into the "Database connection" tier-1 collapsible.
 const DB_CONNECTION_KEYS = ['POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_USER', 'POSTGRES_DATABASE', 'POSTGRES_SSL']

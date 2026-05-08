@@ -89,7 +89,7 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
   },
   {
     key: 'JWT_SECRET',
-    group: 'core',
+    group: 'auth',
     description: 'Secret used to sign JWT tokens — must be at least 32 characters',
     required: true,
     sensitive: true,

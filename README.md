@@ -3,8 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Open-source AI agent automation platform</strong><br/>
-  <em>Archived May 2026 &mdash; open-sourced as a production reference implementation</em>
+  <strong>Open-source AI agent automation platform</strong>
 </p>
 
 <p align="center">
@@ -23,15 +22,13 @@
 
 ---
 
-> **This project is archived.** starships.ai was an AI agent automation platform built in 2025–2026. The service is no longer running. The codebase is open-sourced as-is under the MIT license — use it as a reference implementation, fork it, or learn from it.
->
-> Read the [POSTMORTEM.md](./POSTMORTEM.md) for the full story on what was built, what was tried, and why we shut down.
+> **Archived.** The service is no longer running. The codebase is open-sourced as-is under the MIT license — use it as a reference implementation, fork it, or learn from it. See [POSTMORTEM.md](./POSTMORTEM.md) for context.
 
 ---
 
-## What was starships.ai?
+## What is starships.ai?
 
-starships.ai was a **team workspace for running AI agents against real systems**. You create a **starship** (workspace), deploy **agents** and **tools**, connect external services via **connectors**, and run work through **conversations** (chat) or **schedules** (cron).
+starships.ai is a **team workspace for running AI agents against real systems**. You create a **starship** (workspace), deploy **agents** and **tools**, connect external services via **connectors**, and run work through **conversations** (chat) or **schedules** (cron).
 
 The execution engine — **Autopilot** — is a JSON-defined DAG runner with parallel execution, event-driven resumption (agents can pause and wait for a webhook), streaming SSE output, and an optional remote gRPC runner. **Blueprints** are the unit of logic: a graph of typed nodes wired by edges, executed by the engine with auth and secrets injected at runtime.
 
@@ -230,7 +227,7 @@ curl -N \
 
 | Doc | What's inside |
 |---|---|
-| [POSTMORTEM.md](./POSTMORTEM.md) | What was built, what was tried, why we shut down |
+| [POSTMORTEM.md](./POSTMORTEM.md) | Project background and context |
 | [public-docs/](./public-docs/README.md) | Full reference — blueprints/nodes, connectors, conversations, datasets, views, widgets |
 | [packages/autopilot/README.md](./packages/autopilot/README.md) | Engine quick-start, node reference, BlueprintBuilder, hostRuntime guide |
 | [packages/server/README.md](./packages/server/README.md) | API overview, environment variables, execution flow |

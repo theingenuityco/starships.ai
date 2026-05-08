@@ -1,6 +1,6 @@
 # @starships/server
 
-Express API server for **starships.ai** (the “Aether Core Server”). It owns authentication, starships (workspaces), agents, tools, connectors, billing/credits, schedules, and conversation execution. Conversation turns stream to clients over **Server‑Sent Events (SSE)**.
+Express API server for **starships.ai**. It owns authentication, starships (workspaces), agents, tools, connectors, usage ledger (wallet/credits), schedules, and conversation execution. Conversation turns stream to clients over **Server‑Sent Events (SSE)**.
 
 ## Run (recommended)
 
@@ -155,7 +155,6 @@ Scheduler/worker processes (require Redis):
 ### Webhooks
 
 - `POST /webhooks` (generic webhook entrypoint; currently used for compliance flows that require raw-body verification)
-- `POST /webhooks/stripe` (Stripe webhook ingestion)
 - `POST /webhooks/connectors/:provider` (global connector webhook ingestion; routes by provider-derived external account id)
 
 Connector webhook ingestion notes:
@@ -167,10 +166,6 @@ Connector webhook ingestion notes:
 Operational helper:
 
 - `pnpm -C packages/server connectors:backfill-webhook-bindings` (dry-run by default; add `--apply` to write)
-
-### Subscriptions (Stripe)
-
-- `GET /subscriptions/plans` (prices with ship-class metadata)
 
 ## Quick cURL sanity checks
 

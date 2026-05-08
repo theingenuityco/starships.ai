@@ -9,7 +9,6 @@ import {
 } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { WalletService } from './WalletService';
-import { SubscriptionPlanCatalogService } from './SubscriptionPlanCatalogService';
 import { logger } from '@/utils/logger';
 
 export interface CreateStarshipData {
@@ -56,11 +55,7 @@ export class StarshipService {
   async createStarship(data: CreateStarshipData): Promise<StarshipModel> {
     const shipClass = data.shipClass ?? 'scout';
 
-    // Default entitlements should come from the Scout plan when available (Stripe metadata),
-    // falling back to hard-coded Scout defaults if the plan catalog is unavailable/missing.
-    const scoutEntitlements = shipClass === 'scout' ? await SubscriptionPlanCatalogService.getEntitlementsForShipClass('scout') : null;
-    const fallbackScout = { maxAgents: 20, maxConcurrentTurns: 3 };
-    const defaultEntitlements = scoutEntitlements ?? fallbackScout;
+    const defaultEntitlements = { maxAgents: 20, maxConcurrentTurns: 3 };
 
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,

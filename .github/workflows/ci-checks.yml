@@ -48,11 +48,6 @@ jobs:
       POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
       POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
 
-      # Stripe Configuration
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-
       # Email Service Configuration (required for build)
       EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
       EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}

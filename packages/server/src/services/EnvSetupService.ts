@@ -28,6 +28,7 @@ export interface EnvVarDef {
 export interface EnvVarState extends EnvVarDef {
   isSet: boolean;
   maskedValue: string | null;
+  generated: boolean;
 }
 
 export interface EnvGroupState {
@@ -565,14 +566,13 @@ export class EnvSetupService {
       const isSet = rawValue !== undefined && rawValue.trim() !== '';
       const maskedValue = isSet ? (def.sensitive ? maskValue(rawValue!.trim()) : rawValue!.trim()) : null;
 
-      // Static defaults pre-fill the input value; generated defaults are shown as
-      // placeholder text so the user can read them (a password field hides pre-filled values).
-      const generatedPlaceholder = !isSet ? GENERATED_DEFAULTS[def.key] : undefined;
+      const generatedDefault = !isSet ? GENERATED_DEFAULTS[def.key] : undefined;
       const state: EnvVarState = {
         ...def,
-        placeholder: def.placeholder ?? generatedPlaceholder,
+        default: def.default ?? generatedDefault,
         isSet,
         maskedValue,
+        generated: !!generatedDefault,
       };
 
       if (!groupMap.has(def.group)) groupMap.set(def.group, []);

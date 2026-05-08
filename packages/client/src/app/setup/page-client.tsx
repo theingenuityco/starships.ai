@@ -31,6 +31,7 @@ interface EnvVarState {
   needsRestart: boolean
   isSet: boolean
   maskedValue: string | null
+  generated: boolean
 }
 
 interface EnvGroupState {
@@ -89,7 +90,7 @@ interface EnvRowProps {
 }
 
 function EnvRow({ def, value, onChange }: EnvRowProps) {
-  const [reveal, setReveal] = React.useState(false)
+  const [reveal, setReveal] = React.useState(def.generated)
   // Priority: masked value (sensitive+set) → explicit placeholder → default
   const placeholder = def.sensitive && def.isSet
     ? (def.maskedValue ?? '')

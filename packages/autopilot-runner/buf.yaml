@@ -1,5 +1,5 @@
 version: v1beta1
-name: buf.build/<YOUR_GITHUB_ORG>/autopilot-runner
+name: buf.build/theingenuityco/autopilot-runner
 deps: []
 build:
   roots:

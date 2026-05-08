@@ -22,10 +22,6 @@ jest.mock('bcrypt', () => ({
   },
 }));
 
-jest.mock('stripe', () => {
-  return jest.fn().mockImplementation(() => ({}));
-});
-
 jest.mock('@/middleware/verify-starship-access', () => ({
   verifyStarshipAccess: jest.fn(),
   verifyStarshipOwnerAccess: jest.fn(),

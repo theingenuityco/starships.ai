@@ -164,9 +164,6 @@ jobs:
             VERSION=dev-${{ github.sha }}
             ENVIRONMENT=development
             NODE_MAX_OLD_SPACE_SIZE=${{ env.NODE_MAX_OLD_SPACE_SIZE }}
-          secrets: |
-            stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
-            stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
   build-dev-arm64:
     name: Build Dev Image (arm64)
@@ -230,9 +227,6 @@ jobs:
             VERSION=dev-${{ github.sha }}
             ENVIRONMENT=development
             NODE_MAX_OLD_SPACE_SIZE=${{ env.NODE_MAX_OLD_SPACE_SIZE }}
-          secrets: |
-            stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
-            stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
   build-dev-manifest:
     name: Build Dev Image (multi-arch manifest)

@@ -21,7 +21,6 @@ export interface EnvVarDef {
   required: boolean;
   sensitive: boolean;
   default?: string;
-  generateDefault?: () => string;
   placeholder?: string;
   needsRestart: boolean;
 }
@@ -94,7 +93,6 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     description: 'Secret used to sign JWT tokens — must be at least 32 characters',
     required: true,
     sensitive: true,
-    generateDefault: () => crypto.randomBytes(32).toString('hex'),
     needsRestart: true,
   },
   {
@@ -335,7 +333,6 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     description: 'Key for encrypting secrets stored in the database — generate with: openssl rand -hex 32',
     required: true,
     sensitive: true,
-    generateDefault: () => crypto.randomBytes(32).toString('hex'),
     needsRestart: false,
   },
 
@@ -547,9 +544,12 @@ const ALLOWED_KEYS = new Set(ENV_VAR_DEFINITIONS.map(d => d.key));
 // Override via ENV_FILE_PATH for non-standard working directories or tests.
 const ROOT_ENV_PATH = process.env.ENV_FILE_PATH ?? path.resolve(process.cwd(), '.env');
 
-// Generated defaults are memoised at module level so repeated calls to getEnvState()
-// (e.g. two browser tabs open during setup) always return the same pre-filled value.
-const generatedDefaultCache = new Map<string, string>();
+// Computed once at module load so every getEnvState() call returns the same value
+// (consistent across requests and browser tabs during a single setup session).
+const GENERATED_DEFAULTS: Record<string, string> = {
+  JWT_SECRET: crypto.randomBytes(32).toString('hex'),
+  ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
+};
 
 function maskValue(value: string): string {
   if (value.length <= 4) return '••••';
@@ -565,17 +565,8 @@ export class EnvSetupService {
       const isSet = rawValue !== undefined && rawValue.trim() !== '';
       const maskedValue = isSet ? (def.sensitive ? maskValue(rawValue!.trim()) : rawValue!.trim()) : null;
 
-      // Resolve a generated default if the static default is absent and the var is not already set.
-      // Results are cached so every getEnvState() call returns the same value within a process lifetime.
-      const resolvedDefault = def.default ?? (!isSet && def.generateDefault
-        ? (generatedDefaultCache.get(def.key) ?? (() => {
-            const v = def.generateDefault!();
-            generatedDefaultCache.set(def.key, v);
-            return v;
-          })())
-        : undefined);
-      const { generateDefault: _omit, ...defWithoutGenerator } = def;
-      const state: EnvVarState = { ...defWithoutGenerator, default: resolvedDefault, isSet, maskedValue };
+      const resolvedDefault = def.default ?? (!isSet ? GENERATED_DEFAULTS[def.key] : undefined);
+      const state: EnvVarState = { ...def, default: resolvedDefault, isSet, maskedValue };
 
       if (!groupMap.has(def.group)) groupMap.set(def.group, []);
       groupMap.get(def.group)!.push(state);

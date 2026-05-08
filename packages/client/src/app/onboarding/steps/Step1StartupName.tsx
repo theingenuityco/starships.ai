@@ -33,7 +33,7 @@ export function Step1StartupName({
           <StarshipsLogo width={28} height={28} className="text-white" />
           <span className="text-sm font-medium tracking-wide text-white/70">starships.ai</span>
         </Link>
-        <span className="text-xs text-white/30 tabular-nums">1 / 4</span>
+        <span className="text-xs text-white/30 tabular-nums">1 / 2</span>
       </div>
 
       {/* Main content */}

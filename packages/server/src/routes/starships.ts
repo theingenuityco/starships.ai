@@ -3270,45 +3270,18 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
 });
 
 /**
- * POST /starships/:id/automate/provision-leadgen
+ * POST /starships/:id/automate/save-company-info
  *
- * Called by the /automate onboarding flow post-auth. Ensures the leadgen room exists for the
- * starship, then seeds the ICP Profiles and Accounts datasets with the data collected during
- * onboarding (ICP profile + preview accounts).
- *
- * Starship owner / instance-admin only.
+ * Called by the /onboarding flow post-auth. Persists company name, website URL, and bio
+ * to the starship record. Starship owner / instance-admin only.
  */
-const ProvisionLeadgenBodySchema = z.object({
+const SaveCompanyInfoBodySchema = z.object({
   companyName: z.string().min(1).max(200).optional(),
   websiteUrl: z.string().url().max(500).optional(),
   bio: z.string().max(2000).optional(),
-  icp: z.object({
-    id: z.string().min(1).max(200),
-    name: z.string().min(1).max(200),
-    description: z.string().max(2000).default(''),
-    traits: z.object({
-      industry: z.string().max(200).default(''),
-      roles: z.array(z.string().max(100)).max(20).default([]),
-      companySize: z.string().max(100).default(''),
-      geography: z.string().max(200).default(''),
-    }),
-    estimatedAccountCount: z.number().int().min(0).default(0),
-  }),
-  accounts: z
-    .array(
-      z.object({
-        company: z.string().max(500),
-        role: z.string().max(300).default(''),
-        industry: z.string().max(300).default(''),
-        size: z.string().max(100).default(''),
-        location: z.string().max(500).default(''),
-      })
-    )
-    .max(50)
-    .default([]),
 });
 
-router.post('/starships/:id/automate/provision-leadgen', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:id/automate/save-company-info', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
@@ -3317,90 +3290,22 @@ router.post('/starships/:id/automate/provision-leadgen', jwtAuthMiddleware, asyn
     if (!user) return;
     if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
 
-    const bodyValidation = validateData(ProvisionLeadgenBodySchema, req.body, res, 'provision-leadgen body');
+    const bodyValidation = validateData(SaveCompanyInfoBodySchema, req.body, res, 'save-company-info body');
     if (!bodyValidation) return;
 
-    const starshipId = paramValidation.id;
-    const { companyName, websiteUrl, bio, icp, accounts } = bodyValidation;
-
-    // 1. Persist company-level data to the starship so future room setup wizards can skip re-asking.
+    const { companyName, websiteUrl, bio } = bodyValidation;
     if (companyName || websiteUrl || bio) {
       const starshipService = new StarshipService();
       const updates: { name?: string; websiteUrl?: string; description?: string } = {};
       if (companyName) updates.name = companyName;
       if (websiteUrl) updates.websiteUrl = websiteUrl;
       if (bio) updates.description = bio;
-      await starshipService.updateStarship(starshipId, updates);
+      await starshipService.updateStarship(paramValidation.id, updates);
     }
 
-    // 2. Ensure the leadgen room exists (idempotent).
-    //    importSummary is only present when the room was freshly created; it is absent when an
-    //    existing room was reused. We only seed datasets on a fresh creation so that returning
-    //    users who already have a leadgen room are not affected.
-    const { room } = await ensureLeadGenRoomInternal({ starshipId, userId: user.id });
-
-    // 3. Resolve the Accounts dataset pinned to the room (needed for the redirect URL regardless).
-    const roomDatasetsRepo = new RoomDatasetsRepository();
-    const datasetRepo = new StarshipDatasetRepository();
-
-    const pins = await roomDatasetsRepo.list(room.conversationId);
-
-    let icpProfilesDatasetId: string | null = null;
-    let accountsDatasetId: string | null = null;
-
-    for (const pin of pins) {
-      const dataset = await datasetRepo.findById(pin.datasetId);
-      if (!dataset) continue;
-      if (dataset.slug === 'icp-profiles') icpProfilesDatasetId = dataset.id;
-      if (dataset.slug === 'accounts') accountsDatasetId = dataset.id;
-    }
-
-    // 4. Seed datasets with the onboarding data.
-    //    This always runs — ensureLeadGenRoomInternal already guarantees the room structure is
-    //    not redeployed when one exists, so seeding here is safe for both first-time and repeat
-    //    /automate runs.
-    const rowRepo = new StarshipDatasetRowRepository();
-
-    if (icpProfilesDatasetId) {
-      const icpRow: Record<string, unknown> = {
-        icp_name: icp.name,
-        target_industries: icp.traits.industry || null,
-        target_geos: icp.traits.geography || null,
-        target_employee_ranges: icp.traits.companySize || null,
-        buyer_personas: icp.traits.roles?.length ? icp.traits.roles.join(', ') : null,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        notes: icp.description || null,
-      };
-      await rowRepo.appendMany(icpProfilesDatasetId, [{ data: icpRow }]);
-    }
-
-    if (accountsDatasetId && accounts.length > 0) {
-      const accountRows = accounts.map((a) => {
-        const parts = a.location ? a.location.split(',') : [];
-        const city = parts[0]?.trim() || null;
-        const country = parts.length > 1 ? parts[parts.length - 1].trim() : null;
-        const employeeRange = mapSizeToEmployeeRange(a.size);
-
-        const data: Record<string, unknown> = {
-          account_name: a.company,
-          industry: a.industry || null,
-          status: 'new',
-          source: 'onboarding',
-          created_at: new Date().toISOString(),
-        };
-        if (employeeRange) data.employee_range = employeeRange;
-        if (city) data.city = city;
-        if (country) data.country = country;
-
-        return { data };
-      });
-      await rowRepo.appendMany(accountsDatasetId, accountRows);
-    }
-
-    sendSuccess(res, { room, accountsDatasetId });
+    sendSuccess(res, {}, 200);
   } catch (error) {
-    handleError(error, res, 'provisioning leadgen room from automate onboarding');
+    handleError(error, res, 'saving company info from onboarding');
   }
 });
 

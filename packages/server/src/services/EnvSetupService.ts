@@ -56,8 +56,9 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     key: 'PUBLIC_URL',
     group: 'core',
     description: 'Publicly accessible URL of this instance (e.g. https://app.example.com)',
-    required: true,
+    required: false,
     sensitive: false,
+    default: 'http://localhost:8080',
     needsRestart: true,
   },
   {

@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { IcpProfile, IcpAccountPreview } from '@starships/protocol'
-import StarryBackground from '@/app/components/StarryBackground'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { DatasetTable } from '../components/DatasetTable'
 import Link from 'next/link'
@@ -58,8 +57,6 @@ export function Step4DatasetPreview({
 
   return (
     <div className="relative min-h-screen flex flex-col text-white" style={{ backgroundColor: '#050b24' }}>
-      <StarryBackground position="absolute" className="opacity-50" />
-
       {/* Minimal header */}
       <div className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
         <Link href="/" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">

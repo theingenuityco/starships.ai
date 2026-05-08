@@ -35,14 +35,14 @@ pnpm postgres:shell         # Interactive psql
 This is a pnpm monorepo with Turbo managing build/test/lint task graphs. Key packages under `packages/`:
 
 - **`@starships/client`** — Next.js 16 / React 19 frontend. Serves the main UI at `/`. Uses TanStack Query for data fetching, Radix UI + Tailwind for components, Three.js for 3D elements.
-- **`@starships/server`** — Express 5 API backend. All routes under `/api/v1`. Handles auth (JWT), billing (Stripe), storage (AWS S3), email (AWS SES), and orchestrates autopilot execution.
+- **`@starships/server`** — Express 5 API backend. All routes under `/api/v1`. Handles auth (JWT), usage ledger (wallet/credits), storage (AWS S3), email (AWS SES), and orchestrates autopilot execution.
 - **`@starships/autopilot`** — The core workflow/DAG execution engine. Agents, tools, and connectors are defined here. Runs either in-process (local child process) or delegated to the remote runner.
 - **`@starships/autopilot-runner`** — Remote gRPC service (ConnectRPC + Protocol Buffers) that can execute autopilot workflows. Optional; controlled by `RUNNER_URL` env var.
 - **`@starships/models`** — Database layer. All PostgreSQL schema, migrations, seeds, and query helpers live here.
 - **`@starships/protocol`** — Shared TypeScript types used across server/client/autopilot.
 - **`@starships/env`** — Centralised environment variable parsing and validation.
 - **`@starships/errors`** — Shared error class hierarchy.
-- **`@starships/reverse-proxy`** — Local dev reverse proxy that unifies client (`:3000`), server (`:3001`), and docs (`:3002`) behind `localhost:8080`.
+- **`@starships/reverse-proxy`** — Local dev reverse proxy that unifies client (`:3000`), server (`:4000`), and docs (`:3001`) behind `localhost:8080`.
 - **`packages/docs`** — Next.js + Fumadocs documentation site at `/docs`.
 
 ### Data Flow

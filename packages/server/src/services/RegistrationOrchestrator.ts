@@ -12,6 +12,7 @@
 
 import { ServiceFactory } from './ServiceFactory';
 import { logger } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
 import { InvalidTokenError, EmailVerificationSendError, ConflictError } from '../errors';
 import { StarshipService } from './StarshipService';
 
@@ -74,13 +75,17 @@ export class RegistrationOrchestrator {
       throw new ConflictError('An account with this email already exists. Please sign in instead.');
     }
 
+    const env = getEnvConfig();
+    // When emails are disabled, skip verification entirely so the user can log in immediately.
+    const skipVerification = !env.ENABLE_EMAILS;
+
     // Create user with email unverified (password is hashed in UserService.createUser)
     const displayName = userData.displayName || userData.email.split('@')[0];
     const user = await userService.createUser({
       email: userData.email,
       password: userData.password,
       displayName,
-      emailVerified: false,
+      emailVerified: skipVerification,
     });
 
     // Create a default starship immediately for ALL new signups (password + invite flows).
@@ -101,6 +106,13 @@ export class RegistrationOrchestrator {
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
+    }
+
+    if (skipVerification) {
+      return {
+        emailVerificationSent: false,
+        message: 'Registration successful! You can now sign in.',
+      };
     }
 
     // Send email verification

@@ -42,10 +42,11 @@ router.get('/setup/env', rateLimiters.public, async (req: Request, res: Response
     }
 
     const envService = new EnvSetupService();
-    // Strip maskedValue so we don't leak partial secret content before any auth exists.
+    // For sensitive vars, strip maskedValue entirely (don't leak any chars of secrets
+    // on a public endpoint). Non-sensitive vars keep their current value as a hint.
     const groups = envService.getEnvState().map(group => ({
       ...group,
-      vars: group.vars.map(v => ({ ...v, maskedValue: null })),
+      vars: group.vars.map(v => ({ ...v, maskedValue: v.sensitive ? null : v.maskedValue })),
     }));
     sendSuccess(res, { groups });
   } catch (error) {

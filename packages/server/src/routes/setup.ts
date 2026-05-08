@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { SetupService } from '@/services/SetupService';
-import { EnvSetupService, ENV_VAR_DEFINITIONS } from '@/services/EnvSetupService';
+import { EnvSetupService, ENV_VAR_DEFINITIONS, GENERATED_DEFAULTS } from '@/services/EnvSetupService';
 import { handleError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { EmailSchema, PasswordSchema } from '@/schemas/common';
@@ -68,14 +68,22 @@ router.post('/setup/env', rateLimiters.auth, async (req: Request, res: Response)
 
     const missingRequired = ENV_VAR_DEFINITIONS
       .filter(d => d.required)
-      .filter(d => !body.values[d.key]?.trim() && !process.env[d.key]);
+      .filter(d => !body.values[d.key]?.trim() && !process.env[d.key] && !GENERATED_DEFAULTS[d.key]);
     if (missingRequired.length > 0) {
       res.status(422).json({ error: { message: `Missing required vars: ${missingRequired.map(d => d.key).join(', ')}` } });
       return;
     }
 
+    // Fill in server-generated defaults for any fields the user left blank.
+    const values = { ...body.values };
+    for (const [key, generated] of Object.entries(GENERATED_DEFAULTS)) {
+      if (!values[key]?.trim() && !process.env[key]) {
+        values[key] = generated;
+      }
+    }
+
     const envService = new EnvSetupService();
-    const { restartRequired } = envService.writeEnvFile(body.values);
+    const { restartRequired } = envService.writeEnvFile(values);
     sendSuccess(res, { ok: true, restartRequired });
   } catch (error) {
     handleError(error, res, 'write setup env');

@@ -546,7 +546,7 @@ const ROOT_ENV_PATH = process.env.ENV_FILE_PATH ?? path.resolve(process.cwd(), '
 
 // Computed once at module load so every getEnvState() call returns the same value
 // (consistent across requests and browser tabs during a single setup session).
-const GENERATED_DEFAULTS: Record<string, string> = {
+export const GENERATED_DEFAULTS: Record<string, string> = {
   JWT_SECRET: crypto.randomBytes(32).toString('hex'),
   ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
 };
@@ -565,8 +565,15 @@ export class EnvSetupService {
       const isSet = rawValue !== undefined && rawValue.trim() !== '';
       const maskedValue = isSet ? (def.sensitive ? maskValue(rawValue!.trim()) : rawValue!.trim()) : null;
 
-      const resolvedDefault = def.default ?? (!isSet ? GENERATED_DEFAULTS[def.key] : undefined);
-      const state: EnvVarState = { ...def, default: resolvedDefault, isSet, maskedValue };
+      // Static defaults pre-fill the input value; generated defaults are shown as
+      // placeholder text so the user can read them (a password field hides pre-filled values).
+      const generatedPlaceholder = !isSet ? GENERATED_DEFAULTS[def.key] : undefined;
+      const state: EnvVarState = {
+        ...def,
+        placeholder: def.placeholder ?? generatedPlaceholder,
+        isSet,
+        maskedValue,
+      };
 
       if (!groupMap.has(def.group)) groupMap.set(def.group, []);
       groupMap.get(def.group)!.push(state);

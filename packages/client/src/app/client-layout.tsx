@@ -32,6 +32,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
   const isPublicSimplePage =
     pathname === '/login' ||
+    pathname === '/setup' ||
     pathname === '/onboarding' ||
     pathname === '/accept-invite' ||
     pathname === '/forgot-password' ||

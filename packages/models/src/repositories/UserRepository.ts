@@ -45,6 +45,17 @@ export class UserRepository extends BaseRepository {
     }, 'findByEmail');
   }
 
+  async hasAnyAdmin(): Promise<boolean> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      const result = await connection.queryOne<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM users WHERE is_instance_admin = true',
+        []
+      );
+      return (result?.count ?? 0) > 0;
+    }, 'hasAnyAdmin');
+  }
+
   async create(entity: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();

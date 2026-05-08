@@ -2,6 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import { useAuth } from '@/hooks/useAuth'
+import { useSetupRedirect } from '@/hooks/useSetupRedirect'
 import { motion } from 'motion/react'
 import { LoginForm } from '@/components/auth/LoginForm'
 
@@ -15,6 +16,9 @@ interface JwtAuthGateProps {
  */
 export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const { isAuthenticated, isLoading } = useAuth()
+
+  // On first unauthenticated render, check if first-time setup is required.
+  useSetupRedirect({ skip: isAuthenticated || isLoading })
 
   if (isLoading) {
     return (

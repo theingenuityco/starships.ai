@@ -3,6 +3,7 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
+import { useSetupRedirect } from '@/hooks/useSetupRedirect'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import * as React from 'react'
@@ -29,6 +30,9 @@ export default function LoginPageClient() {
 
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
   const selectedStarshipId = mounted ? getSelectedStarshipId() : null
+
+  // Redirect to /setup if no admin user exists yet (fresh deploy).
+  useSetupRedirect()
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {

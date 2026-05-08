@@ -49,6 +49,7 @@ import presenceRoutes from '@/routes/presence';
 import notificationRoutes from '@/routes/notifications';
 import heartbeatRoutes from '@/routes/heartbeats';
 import automateRoutes from '@/routes/automate';
+import setupRoutes from '@/routes/setup';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -102,6 +103,7 @@ app.use(cookieParser());
 
 // API Routes
 app.use('/api/v1', authRoutes); // Authentication routes (public)
+app.use('/api/v1', setupRoutes); // First-run setup routes (public, self-locks after first admin)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
 app.use('/api/v1', attachmentRoutes);

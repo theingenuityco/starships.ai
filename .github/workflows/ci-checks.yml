@@ -65,7 +65,6 @@ jobs:
 
       # Analytics (optional for CI)
       GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
-      META_PIXEL_ID: ${{ vars.META_PIXEL_ID || '' }}
       POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
       POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
 

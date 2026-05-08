@@ -76,7 +76,7 @@ const getStoredToken = (): string | null => {
   return token
 }
 
-const setStoredToken = (token: string | null) => {
+export const setStoredToken = (token: string | null) => {
   if (typeof window === 'undefined') return
   if (token) {
     localStorage.setItem('starships_auth_token', token)

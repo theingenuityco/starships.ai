@@ -6,7 +6,6 @@ import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
-import { marketingPublicPageWash } from '@/app/components/landing/landingSurface'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 import { NotificationSoundBootstrap } from '@/components/global/NotificationSoundBootstrap'
 
@@ -22,31 +21,6 @@ interface ClientLayoutProps {
   children: React.ReactNode
 }
 
-// Enhanced animation variants
-// const dashboardVariants = {
-//   initial: { opacity: 0, scale: 0.95 },
-//   animate: { opacity: 1, scale: 1 },
-//   exit: { opacity: 0, scale: 1.05 },
-// }
-
-// const pageVariants = {
-//   initial: { opacity: 0, y: 20 },
-//   animate: { opacity: 1, y: 0 },
-//   exit: { opacity: 0, y: -20 },
-// }
-
-// Note: Public header is rendered by individual public pages (e.g., landing, marketplace)
-
-// const LoadingSpinner = () => (
-//   <div className="flex items-center justify-center h-screen bg-background">
-//     <motion.div
-//       className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
-//       animate={{ rotate: 360 }}
-//       transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-//     />
-//   </div>
-// )
-
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -55,19 +29,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { data: starships = [] } = useUserStarships(user?.id ?? '', !!user?.id)
   const selectedStarshipId = getSelectedStarshipId()
   const primaryStarship = pickPrimaryStarshipForUser(starships, user?.id, selectedStarshipId)
-  const isDashboard = pathname === '/'
-  const isExploreRoute = typeof pathname === 'string' && (pathname === '/explore' || pathname.startsWith('/explore/'))
-  const isMarketplaceRoute = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
-  const isMarketplace = isExploreRoute || isMarketplaceRoute
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
   const isPublicSimplePage =
-    pathname === '/' ||
-    pathname === '/new' ||
-    pathname === '/pricing' ||
-    pathname === '/use-cases' ||
-    pathname.startsWith('/use-cases/') ||
-    pathname === '/onboarding' ||
     pathname === '/login' ||
+    pathname === '/onboarding' ||
     pathname === '/accept-invite' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
@@ -79,15 +44,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     if (!pathname) return
 
     const titleForPath = (path: string): string | null => {
-      // Public pages
-      if (path === '/') return 'Starships.ai | Hire your AI staff, brief them in plain language'
-      if (path === '/use-cases') return 'Use cases | Starships.ai'
-      if (path === '/use-cases/lead-generation') return 'Lead generation | Use cases | Starships.ai'
-      if (path === '/use-cases/wordpress-site') return 'WordPress site | Use cases | Starships.ai'
-      if (path.startsWith('/use-cases/')) return 'Use cases | Starships.ai'
-      if (path === '/explore' || path === '/marketplace') return 'Explore | Starships.ai'
-      if (path.startsWith('/explore/') || path.startsWith('/marketplace/')) return 'Explore | Starships.ai'
-      if (path === '/pricing') return 'Pricing | Starships.ai'
       if (path === '/login') return 'Login | Starships.ai'
       if (path === '/forgot-password') return 'Forgot Password | Starships.ai'
       if (path === '/reset-password') return 'Reset Password | Starships.ai'
@@ -140,21 +96,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     if (nextTitle && document.title !== nextTitle) document.title = nextTitle
   }, [pathname])
 
-  // Marketplace is a "starship-free zone": don't persist / highlight a selected starship
-  // while the user is browsing public marketplace pages.
-  useEffect(() => {
-    if (!isAuthenticated) return
-    if (!isMarketplace) return
-    setSelectedStarship(null)
-  }, [isAuthenticated, isMarketplace, setSelectedStarship])
-
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
 
   // Close the mobile navigation menu on route changes.
-  // This prevents cases where a click triggers a redirect but the overlay stays open.
   useEffect(() => {
     if (!isMobile) return
     setShowMobileMenu(false)
@@ -176,80 +123,18 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   if (isPublicSimplePage) {
-    // Public pages - no authentication required
-    const isPricing = pathname === '/pricing'
     return (
       <div className="h-full w-full">
         <NotificationSoundBootstrap />
         <Suspense fallback={null}>
           <EmailChangeToastHandler />
         </Suspense>
-        {isPricing ? (
-          <StarTheme theme="light" className="min-h-[100dvh] w-full bg-white text-slate-900">
-            {children}
-          </StarTheme>
-        ) : (
-          children
-        )}
+        {children}
       </div>
     )
   }
 
-  // Public page with optional navigation (shown only when authenticated)
-  if (isMarketplace) {
-    // Unauthenticated users: simple public view without nav
-    if (!isAuthenticated) {
-      // Explore pages handle their own public layout (header/hero/footer). Avoid wrapping them
-      // in the "inner container" chrome unless authenticated.
-      if (isExploreRoute) {
-        return (
-          <StarTheme theme="light">
-            <NotificationSoundBootstrap />
-            <EmailChangeToastHandler />
-            <div className={`min-h-[100dvh] w-full ${marketingPublicPageWash} text-slate-900`}>{children}</div>
-          </StarTheme>
-        )
-      }
-
-      return (
-        <StarTheme>
-          <NotificationSoundBootstrap />
-          <EmailChangeToastHandler />
-          <div className="relative h-[100dvh] overflow-hidden bg-card">
-            <div className="flex h-full w-full min-h-0 p-0 md:p-4">
-              <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-                <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </div>
-        </StarTheme>
-      )
-    }
-
-    return (
-      <StarTheme>
-        <NotificationSoundBootstrap />
-        <EmailChangeToastHandler />
-        <div className="relative h-[100dvh] flex overflow-hidden bg-card">
-          {/* Main Content Area - takes remaining space */}
-          <div className="flex-1 min-h-0 min-w-0 p-0 md:pt-4 md:pr-4 md:pb-4 md:pl-0">
-            <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
-              <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">
-                {children}
-              </main>
-            </div>
-          </div>
-        </div>
-      </StarTheme>
-    )
-  }
-
-  // Hide navigation only on landing page
-  const shouldHideNavigation = isDashboard
-
-  // Regular pages with conditional navigation sidebar
+  // Regular pages with navigation sidebar (requires auth)
   return (
     <JwtAuthGate>
       <StarTheme>
@@ -265,24 +150,19 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           }}
         >
           <div className="relative h-[100dvh] flex overflow-hidden bg-card">
-            {/* Sidebar Navigation - conditionally rendered */}
-            {!shouldHideNavigation && (
-              <>
-                {/* Desktop: always visible */}
-                {!isMobile && (
-                  <div className="flex-shrink-0 relative z-50">
-                    <aside className="relative h-full">
-                      <Navigation isMobile={false} isOpen={true} />
-                    </aside>
-                  </div>
-                )}
-
-                {/* Mobile: overlay navigation */}
-                {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
-              </>
+            {/* Desktop: always visible */}
+            {!isMobile && (
+              <div className="flex-shrink-0 relative z-50">
+                <aside className="relative h-full">
+                  <Navigation isMobile={false} isOpen={true} />
+                </aside>
+              </div>
             )}
 
-            {/* Main Content Area - padded "pane" with rounded edges */}
+            {/* Mobile: overlay navigation */}
+            {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
+
+            {/* Main Content Area */}
             <div className="flex-1 min-h-0 min-w-0 p-0 md:pt-4 md:pr-4 md:pb-4 md:pl-0">
               <div className="h-full w-full overflow-hidden bg-background md:rounded-2xl md:border md:border-border/60 md:shadow-sm">
                 <main className="h-full w-full min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[calc(var(--mobile-bottom-filter-bar-height,0px)+env(safe-area-inset-bottom,0px))]">

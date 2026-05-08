@@ -229,7 +229,7 @@ function MoreSettings({ groups, values, onChange }: MoreSettingsProps) {
 
 // ── Step 1: Environment config ────────────────────────────────────────────────
 
-function EnvStep({ onNext }: { onNext: (restartRequired: boolean) => void }) {
+function EnvStep({ onNext }: { onNext: () => void }) {
   const [allVars, setAllVars] = React.useState<EnvVarState[]>([])
   const [moreGroups, setMoreGroups] = React.useState<EnvGroupState[]>([])
   const [values, setValues] = React.useState<Record<string, string>>({})
@@ -291,7 +291,7 @@ function EnvStep({ onNext }: { onNext: (restartRequired: boolean) => void }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error?.message || 'Failed to save configuration.')
-      onNext(data.data?.restartRequired ?? false)
+      onNext()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
     } finally {
@@ -346,7 +346,7 @@ function EnvStep({ onNext }: { onNext: (restartRequired: boolean) => void }) {
         </Button>
         <button
           type="button"
-          onClick={() => onNext(false)}
+          onClick={onNext}
           className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline-offset-2 hover:underline"
         >
           Skip for now
@@ -358,7 +358,7 @@ function EnvStep({ onNext }: { onNext: (restartRequired: boolean) => void }) {
 
 // ── Step 2: Admin account ─────────────────────────────────────────────────────
 
-function AdminStep({ onBack, restartRequired }: { onBack: () => void; restartRequired: boolean }) {
+function AdminStep({ onBack }: { onBack: () => void }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -408,13 +408,6 @@ function AdminStep({ onBack, restartRequired }: { onBack: () => void; restartReq
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {restartRequired && (
-        <Alert>
-          <AlertDescription>
-            Some saved settings require a server restart to take effect. Restart the server before continuing if changes aren&apos;t reflected.
-          </AlertDescription>
-        </Alert>
-      )}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -483,7 +476,6 @@ export default function SetupPageClient() {
   const router = useRouter()
   const [statusChecked, setStatusChecked] = React.useState(false)
   const [step, setStep] = React.useState<1 | 2>(1)
-  const [envRestartRequired, setEnvRestartRequired] = React.useState(false)
 
   React.useEffect(() => {
     fetch('/api/v1/setup/status')
@@ -536,8 +528,8 @@ export default function SetupPageClient() {
 
             <motion.div key={`c-${step}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
               {step === 1
-                ? <EnvStep onNext={(restartRequired) => { setEnvRestartRequired(restartRequired); setStep(2) }} />
-                : <AdminStep onBack={() => setStep(1)} restartRequired={envRestartRequired} />
+                ? <EnvStep onNext={() => setStep(2)} />
+                : <AdminStep onBack={() => setStep(1)} />
               }
             </motion.div>
           </div>

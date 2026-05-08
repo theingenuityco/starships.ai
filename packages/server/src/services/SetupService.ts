@@ -41,6 +41,8 @@ export class SetupService {
   }
 
   async initializeInstance(data: SetupInitRequest): Promise<SetupInitResult> {
+    // TODO: concurrent calls can race past this guard — both reads see hasAdmin=false and proceed.
+    // A DB-level unique partial index on is_instance_admin=true would enforce the invariant atomically.
     const hasAdmin = await this.userRepository.hasAnyAdmin();
     if (hasAdmin) {
       throw new ConflictError('Instance is already initialized. An admin user exists.');

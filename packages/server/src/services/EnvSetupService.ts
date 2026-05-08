@@ -93,6 +93,7 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     description: 'Secret used to sign JWT tokens — must be at least 32 characters',
     required: true,
     sensitive: true,
+    generateDefault: () => crypto.randomBytes(32).toString('hex'),
     needsRestart: true,
   },
   {
@@ -545,6 +546,10 @@ const ALLOWED_KEYS = new Set(ENV_VAR_DEFINITIONS.map(d => d.key));
 // Override via ENV_FILE_PATH for non-standard working directories or tests.
 const ROOT_ENV_PATH = process.env.ENV_FILE_PATH ?? path.resolve(process.cwd(), '.env');
 
+// Generated defaults are memoised at module level so repeated calls to getEnvState()
+// (e.g. two browser tabs open during setup) always return the same pre-filled value.
+const generatedDefaultCache = new Map<string, string>();
+
 function maskValue(value: string): string {
   if (value.length <= 4) return '••••';
   return value.slice(0, 4) + '•'.repeat(Math.min(value.length - 4, 12));
@@ -560,7 +565,14 @@ export class EnvSetupService {
       const maskedValue = isSet ? (def.sensitive ? maskValue(rawValue!.trim()) : rawValue!.trim()) : null;
 
       // Resolve a generated default if the static default is absent and the var is not already set.
-      const resolvedDefault = def.default ?? (!isSet && def.generateDefault ? def.generateDefault() : undefined);
+      // Results are cached so every getEnvState() call returns the same value within a process lifetime.
+      const resolvedDefault = def.default ?? (!isSet && def.generateDefault
+        ? (generatedDefaultCache.get(def.key) ?? (() => {
+            const v = def.generateDefault!();
+            generatedDefaultCache.set(def.key, v);
+            return v;
+          })())
+        : undefined);
       const { generateDefault: _omit, ...defWithoutGenerator } = def;
       const state: EnvVarState = { ...defWithoutGenerator, default: resolvedDefault, isSet, maskedValue };
 

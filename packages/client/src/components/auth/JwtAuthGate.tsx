@@ -5,22 +5,22 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSetupRedirect } from '@/hooks/useSetupRedirect'
 import { motion } from 'motion/react'
 import { LoginForm } from '@/components/auth/LoginForm'
+import { useEffect, useState } from 'react'
 
 interface JwtAuthGateProps {
   children: React.ReactNode
 }
 
-/**
- * JWT Authentication gate component
- * Shows login UI for unauthenticated users, or renders children for authenticated users
- */
 export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const { isAuthenticated, isLoading } = useAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
 
   // On first unauthenticated render, check if first-time setup is required.
-  useSetupRedirect({ skip: isAuthenticated || isLoading })
+  useSetupRedirect({ skip: isAuthenticated || isLoading || !mounted })
 
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div className="flex flex-col items-center space-y-4" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>

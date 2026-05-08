@@ -3,6 +3,7 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
+import { useSetupRedirect } from '@/hooks/useSetupRedirect'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import * as React from 'react'
@@ -31,28 +32,7 @@ export default function LoginPageClient() {
   const selectedStarshipId = mounted ? getSelectedStarshipId() : null
 
   // Redirect to /setup if no admin user exists yet (fresh deploy).
-  // Retries up to 5 times to handle the server startup window where migrations
-  // are still running (server starts accepting connections before schema is ready).
-  React.useEffect(() => {
-    let cancelled = false
-    const check = async (attempts = 0) => {
-      try {
-        const r = await fetch('/api/v1/setup/status')
-        if (!r.ok) throw new Error('not ready')
-        const json = await r.json()
-        if (cancelled) return
-        if (json.data?.setupRequired) {
-          router.replace('/setup')
-        }
-      } catch {
-        if (!cancelled && attempts < 5) {
-          setTimeout(() => check(attempts + 1), 1000)
-        }
-      }
-    }
-    check()
-    return () => { cancelled = true }
-  }, [router])
+  useSetupRedirect()
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {

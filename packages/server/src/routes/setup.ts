@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { SetupService } from '@/services/SetupService';
-import { EnvSetupService } from '@/services/EnvSetupService';
+import { EnvSetupService, ENV_VAR_DEFINITIONS } from '@/services/EnvSetupService';
 import { handleError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { EmailSchema, PasswordSchema } from '@/schemas/common';
@@ -42,7 +42,11 @@ router.get('/setup/env', rateLimiters.public, async (req: Request, res: Response
     }
 
     const envService = new EnvSetupService();
-    const groups = envService.getEnvState();
+    // Strip maskedValue so we don't leak partial secret content before any auth exists.
+    const groups = envService.getEnvState().map(group => ({
+      ...group,
+      vars: group.vars.map(v => ({ ...v, maskedValue: null })),
+    }));
     sendSuccess(res, { groups });
   } catch (error) {
     handleError(error, res, 'get setup env state');
@@ -61,6 +65,14 @@ router.post('/setup/env', rateLimiters.auth, async (req: Request, res: Response)
 
     const body = validateData(SetupEnvSchema, req.body, res, 'env configuration data');
     if (!body) return;
+
+    const missingRequired = ENV_VAR_DEFINITIONS
+      .filter(d => d.required)
+      .filter(d => !body.values[d.key]?.trim() && !process.env[d.key]);
+    if (missingRequired.length > 0) {
+      res.status(422).json({ error: { message: `Missing required vars: ${missingRequired.map(d => d.key).join(', ')}` } });
+      return;
+    }
 
     const envService = new EnvSetupService();
     const { restartRequired } = envService.writeEnvFile(body.values);

@@ -57,15 +57,11 @@ export class SetupService {
       emailVerified: true,
     });
 
-    // Elevate to instance admin before creating the starship so any
-    // admin-only access checks during starship setup pass correctly.
-    const updatedUser = (await this.userRepository.update(user.id, { isInstanceAdmin: true })) as UserModel;
-
     let createdStarship: StarshipModel | null = null;
     try {
       createdStarship = await StarshipService.createDefaultStarship(user.id);
     } catch (error) {
-      // Compensating rollback
+      // Compensating rollback — user is not yet admin, so a simple delete suffices.
       try {
         await userService.deleteUser(user.id);
       } catch {
@@ -77,6 +73,10 @@ export class SetupService {
       });
       throw error;
     }
+
+    // Elevate to instance admin only after starship creation succeeds,
+    // so a rollback on starship failure never leaves an orphaned admin user.
+    const updatedUser = (await this.userRepository.update(user.id, { isInstanceAdmin: true })) as UserModel;
 
     const token = await generateJWT({
       id: updatedUser.id,

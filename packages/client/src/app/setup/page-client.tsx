@@ -229,7 +229,7 @@ function MoreSettings({ groups, values, onChange }: MoreSettingsProps) {
 
 // ── Step 1: Environment config ────────────────────────────────────────────────
 
-function EnvStep({ onNext }: { onNext: () => void }) {
+function EnvStep({ onNext }: { onNext: (restartRequired: boolean) => void }) {
   const [allVars, setAllVars] = React.useState<EnvVarState[]>([])
   const [moreGroups, setMoreGroups] = React.useState<EnvGroupState[]>([])
   const [values, setValues] = React.useState<Record<string, string>>({})
@@ -263,7 +263,9 @@ function EnvStep({ onNext }: { onNext: () => void }) {
         }
         setValues(initial)
       })
-      .catch(() => {/* allow skipping on network failure */})
+      .catch(() => {
+        setError('Could not load default configuration — you can still fill in values manually.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -289,7 +291,7 @@ function EnvStep({ onNext }: { onNext: () => void }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error?.message || 'Failed to save configuration.')
-      onNext()
+      onNext(data.data?.restartRequired ?? false)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
     } finally {
@@ -305,7 +307,7 @@ function EnvStep({ onNext }: { onNext: () => void }) {
     )
   }
 
-const byKey = Object.fromEntries(allVars.map(v => [v.key, v]))
+  const byKey = Object.fromEntries(allVars.map(v => [v.key, v]))
   const primaryVars = PRIMARY_KEYS.map(k => byKey[k]).filter(Boolean)
   const dbVars = DB_CONNECTION_KEYS.map(k => byKey[k]).filter(Boolean)
   const redisVars = REDIS_KEYS.map(k => byKey[k]).filter(Boolean)
@@ -344,7 +346,7 @@ const byKey = Object.fromEntries(allVars.map(v => [v.key, v]))
         </Button>
         <button
           type="button"
-          onClick={onNext}
+          onClick={() => onNext(false)}
           className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline-offset-2 hover:underline"
         >
           Skip for now
@@ -356,7 +358,7 @@ const byKey = Object.fromEntries(allVars.map(v => [v.key, v]))
 
 // ── Step 2: Admin account ─────────────────────────────────────────────────────
 
-function AdminStep({ onBack }: { onBack: () => void }) {
+function AdminStep({ onBack, restartRequired }: { onBack: () => void; restartRequired: boolean }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -390,7 +392,7 @@ function AdminStep({ onBack }: { onBack: () => void }) {
       const { user, token, starship } = data.data
       setStoredToken(token)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
-      queryClient.invalidateQueries()
+      queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEYS.me() })
 
       if (starship?.slug) {
         router.push(`/ship/${starship.slug}`)
@@ -406,6 +408,13 @@ function AdminStep({ onBack }: { onBack: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {restartRequired && (
+        <Alert>
+          <AlertDescription>
+            Some saved settings require a server restart to take effect. Restart the server before continuing if changes aren&apos;t reflected.
+          </AlertDescription>
+        </Alert>
+      )}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -474,6 +483,7 @@ export default function SetupPageClient() {
   const router = useRouter()
   const [statusChecked, setStatusChecked] = React.useState(false)
   const [step, setStep] = React.useState<1 | 2>(1)
+  const [envRestartRequired, setEnvRestartRequired] = React.useState(false)
 
   React.useEffect(() => {
     fetch('/api/v1/setup/status')
@@ -525,7 +535,10 @@ export default function SetupPageClient() {
             </motion.div>
 
             <motion.div key={`c-${step}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
-              {step === 1 ? <EnvStep onNext={() => setStep(2)} /> : <AdminStep onBack={() => setStep(1)} />}
+              {step === 1
+                ? <EnvStep onNext={(restartRequired) => { setEnvRestartRequired(restartRequired); setStep(2) }} />
+                : <AdminStep onBack={() => setStep(1)} restartRequired={envRestartRequired} />
+              }
             </motion.div>
           </div>
         </div>

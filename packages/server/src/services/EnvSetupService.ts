@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 export type EnvGroup =
   | 'core'
@@ -20,6 +21,7 @@ export interface EnvVarDef {
   required: boolean;
   sensitive: boolean;
   default?: string;
+  generateDefault?: () => string;
   placeholder?: string;
   needsRestart: boolean;
 }
@@ -329,9 +331,9 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     key: 'ENCRYPTION_KEY',
     group: 'auth',
     description: 'Key for encrypting secrets stored in the database — generate with: openssl rand -hex 32',
-    required: false,
+    required: true,
     sensitive: true,
-    default: '0000000000000000000000000000000000000000000000000000000000000000',
+    generateDefault: () => crypto.randomBytes(32).toString('hex'),
     needsRestart: false,
   },
 
@@ -540,7 +542,8 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
 
 const ALLOWED_KEYS = new Set(ENV_VAR_DEFINITIONS.map(d => d.key));
 
-const ROOT_ENV_PATH = path.resolve(__dirname, '../../../../.env');
+// Override via ENV_FILE_PATH for non-standard working directories or tests.
+const ROOT_ENV_PATH = process.env.ENV_FILE_PATH ?? path.resolve(process.cwd(), '.env');
 
 function maskValue(value: string): string {
   if (value.length <= 4) return '••••';
@@ -556,7 +559,10 @@ export class EnvSetupService {
       const isSet = rawValue !== undefined && rawValue.trim() !== '';
       const maskedValue = isSet ? (def.sensitive ? maskValue(rawValue!.trim()) : rawValue!.trim()) : null;
 
-      const state: EnvVarState = { ...def, isSet, maskedValue };
+      // Resolve a generated default if the static default is absent and the var is not already set.
+      const resolvedDefault = def.default ?? (!isSet && def.generateDefault ? def.generateDefault() : undefined);
+      const { generateDefault: _omit, ...defWithoutGenerator } = def;
+      const state: EnvVarState = { ...defWithoutGenerator, default: resolvedDefault, isSet, maskedValue };
 
       if (!groupMap.has(def.group)) groupMap.set(def.group, []);
       groupMap.get(def.group)!.push(state);
@@ -585,18 +591,19 @@ export class EnvSetupService {
       // File doesn't exist yet — start fresh
     }
 
-    // Build a map of key → line-index for existing key=value lines
+    // Build a map of key → line-index for existing key=value lines.
+    // Use a strict match (no spaces around =) consistent with how we write values back.
     const keyLineIndex = new Map<string, number>();
     for (let i = 0; i < existingLines.length; i++) {
-      const line = existingLines[i];
-      const match = line.match(/^([A-Z0-9_]+)\s*=/);
+      const match = existingLines[i].match(/^([A-Z0-9_]+)=/);
       if (match) keyLineIndex.set(match[1], i);
     }
 
-    // Apply updates: overwrite existing lines or collect new ones
+    // Apply updates: overwrite existing lines or collect new ones.
     const newLines: string[] = [];
     for (const [key, value] of Object.entries(updates)) {
       if (value === '') continue; // skip empty submissions
+      if (value.includes('\n')) throw new Error(`Value for ${key} must not contain newlines`);
 
       const formatted = `${key}=${value}`;
       if (keyLineIndex.has(key)) {
@@ -604,17 +611,21 @@ export class EnvSetupService {
       } else {
         newLines.push(formatted);
       }
-
-      // Apply to process.env in-memory immediately
-      process.env[key] = value;
     }
 
-    const content = [...existingLines, ...newLines].join('\n');
+    // Strip any trailing empty element produced by a trailing newline in the existing file,
+    // then re-add a single trailing newline so the file always ends with one.
+    const trimmedLines = existingLines[existingLines.length - 1] === '' ? existingLines.slice(0, -1) : existingLines;
+    const content = [...trimmedLines, ...newLines].join('\n') + '\n';
 
-    // Atomic write: tmp → rename
+    // Atomic write: tmp → rename. Update process.env only after the file is durably written.
     const tmpPath = ROOT_ENV_PATH + '.tmp';
     fs.writeFileSync(tmpPath, content, 'utf-8');
     fs.renameSync(tmpPath, ROOT_ENV_PATH);
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== '') process.env[key] = value;
+    }
 
     const restartRequired = Object.keys(updates).some(key => {
       const def = ENV_VAR_DEFINITIONS.find(d => d.key === key);

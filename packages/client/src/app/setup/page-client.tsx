@@ -347,7 +347,7 @@ function EnvStep({ onNext }: { onNext: () => void }) {
         <button
           type="button"
           onClick={onNext}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline-offset-2 hover:underline"
+          className="text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200 transition-colors"
         >
           Skip for now
         </button>
@@ -462,7 +462,7 @@ function AdminStep({ onBack }: { onBack: () => void }) {
       <button
         type="button"
         onClick={onBack}
-        className="w-full text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline-offset-2 hover:underline"
+        className="w-full text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-200 transition-colors"
       >
         ← Back to environment settings
       </button>

@@ -1,7 +1,6 @@
 export type PublicEnvConfig = {
   PUBLIC_URL: string;
   ENABLE_INDEXING: string;
-  META_PIXEL_ID: string;
   /**
    * Google Analytics measurement ID (public).
    * Example: G-XXXXXXXXXX
@@ -45,7 +44,6 @@ export function getPublicEnvConfig(): PublicEnvConfig {
     // Intentionally no default to avoid accidentally using production in dev/staging.
     PUBLIC_URL: readEnv('PUBLIC_URL'),
     ENABLE_INDEXING: readEnv('ENABLE_INDEXING'),
-    META_PIXEL_ID: readEnv('META_PIXEL_ID'),
     GA_MEASUREMENT_ID: readEnv('GA_MEASUREMENT_ID'),
     POSTHOG_KEY: readEnv('POSTHOG_KEY'),
     POSTHOG_HOST: readEnv('POSTHOG_HOST'),

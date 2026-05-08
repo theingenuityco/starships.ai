@@ -433,14 +433,6 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     needsRestart: false,
   },
   {
-    key: 'META_PIXEL_ID',
-    group: 'analytics',
-    description: 'Meta (Facebook) Pixel ID',
-    required: false,
-    sensitive: false,
-    needsRestart: false,
-  },
-  {
     key: 'SENTRY_DSN_CLIENT',
     group: 'analytics',
     description: 'Sentry DSN for client-side (Next.js) error tracking',

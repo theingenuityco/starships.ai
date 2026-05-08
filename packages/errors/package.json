@@ -21,7 +21,7 @@
     "error-handling"
   ],
   "author": "Starships.ai Team",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "dependencies": {
     "@starships/protocol": "workspace:*"

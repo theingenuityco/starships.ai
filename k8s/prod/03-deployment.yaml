@@ -45,7 +45,7 @@ spec:
 
       containers:
         - name: starships
-          image: 'ghcr.io/<YOUR_GITHUB_ORG>/starships.ai:latest' # Update via CI/CD
+          image: 'ghcr.io/theingenuityco/starships.ai:latest' # Update via CI/CD
           imagePullPolicy: Always
 
           ports:

@@ -2,6 +2,12 @@
   "name": "starships.ai",
   "private": true,
   "version": "3.14.3",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theingenuityco/starships.ai"
+  },
+  "homepage": "https://github.com/theingenuityco/starships.ai#readme",
   "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "packages/*"

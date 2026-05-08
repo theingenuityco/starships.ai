@@ -92,7 +92,7 @@ interface EnvRowProps {
 function EnvRow({ def, value, onChange }: EnvRowProps) {
   const [reveal, setReveal] = React.useState(def.generated)
   const placeholder = def.isSet
-    ? (def.maskedValue ?? 'Already configured')
+    ? (def.maskedValue ?? '')
     : (def.placeholder ?? def.default ?? '')
 
   return (

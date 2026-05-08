@@ -31,22 +31,33 @@ If you start only the client (`pnpm --filter @starships/client dev`), you must s
 
 - **Auth & account**
   - `/login`
-  - `/profile`
   - `/forgot-password`, `/reset-password`
+  - `/account`
+  - `/accept-invite`
+  - `/onboarding`
+  - `/upgrade`
 - **Starship workspace**
-  - `/ship/[slug]/conversations` (SSE streaming turn output)
-  - `/ship/[slug]/agents`
+  - `/ship/[slug]/dashboard` (and `/dashboard/preview`)
+  - `/ship/[slug]/conversations`, `/ship/[slug]/conversations/[conversationId]`
+  - `/ship/[slug]/rooms`, `/ship/[slug]/rooms/[roomSlug]/*` (room conversations + threads)
+  - `/ship/[slug]/agent/[agentSlug]`
+  - `/ship/[slug]/tool/[toolSlug]`
   - `/ship/[slug]/tools`
   - `/ship/[slug]/connectors`
   - `/ship/[slug]/schedules`
-  - `/ship/[slug]/billing/*`
-  - `/ship/[slug]/settings/*`
-- **Marketplace**
-  - `/marketplace` (tool templates and other catalog content)
+  - `/ship/[slug]/automations`
+  - `/ship/[slug]/datasets`, `/ship/[slug]/datasets/[datasetId]`
+  - `/ship/[slug]/views`, `/ship/[slug]/views/[viewId]`, `/ship/[slug]/views/[viewId]/edit`
+  - `/ship/[slug]/tasks`
+  - `/ship/[slug]/members`
+  - `/ship/[slug]/notifications`
+  - `/ship/[slug]/installed`
+  - `/ship/[slug]/management`
+  - `/ship/[slug]/settings`, `/ship/[slug]/settings/[tab]`
 - **Instance admin (guarded by `isInstanceAdmin`)**
   - `/admin/platform-secrets`
-  - `/admin/connector-templates/*`
-  - `/admin/agents/pending`
+  - `/admin/connector-templates`
+  - `/admin/llm-models`
 
 ## Troubleshooting
 

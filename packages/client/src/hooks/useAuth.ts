@@ -272,14 +272,6 @@ interface AutomatePendingData {
   companyName: string
   websiteUrl?: string
   bio?: string
-  icp: {
-    id: string
-    name: string
-    description: string
-    traits: { industry: string; roles: string[]; companySize: string; geography: string }
-    estimatedAccountCount: number
-  }
-  accounts: Array<{ company: string; role: string; industry: string; size: string; location: string }>
   createdAt: number
 }
 
@@ -321,25 +313,18 @@ async function handleAutomatePostAuth(args: {
       // Ignore; proceed anyway
     }
 
-    // Provision the leadgen room and seed it with the ICP profile + preview accounts
-    const provisionRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/automate/provision-leadgen`, {
+    // Persist company data to the starship
+    const saveRes = await fetch(`/api/v1/starships/${encodeURIComponent(starship.id)}/automate/save-company-info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         companyName: pending.companyName,
         websiteUrl: pending.websiteUrl,
         bio: pending.bio,
-        icp: pending.icp,
-        accounts: pending.accounts,
       }),
     })
 
-    if (!provisionRes.ok) return false
-
-    const provisionJson = (await provisionRes.json()) as { data?: { room?: { slug: string }; accountsDatasetId?: string | null } }
-    const roomSlug = provisionJson.data?.room?.slug
-    const accountsDatasetId = provisionJson.data?.accountsDatasetId
-    if (!roomSlug) return false
+    if (!saveRes.ok) return false
 
     // Clear storage
     try {
@@ -348,10 +333,7 @@ async function handleAutomatePostAuth(args: {
       // Ignore
     }
 
-    // Redirect to the Accounts dataset if we have its ID, otherwise fall back to the room.
-    const target = accountsDatasetId
-      ? `/ship/${starship.slug}/datasets/${encodeURIComponent(accountsDatasetId)}`
-      : `/ship/${starship.slug}/rooms/${encodeURIComponent(roomSlug)}`
+    const target = `/ship/${starship.slug}`
 
     // Prevent LoginPageClient's "already authenticated" redirect effect from overriding
     // the redirect on OAuth flows (where the auth_code param is quickly removed),

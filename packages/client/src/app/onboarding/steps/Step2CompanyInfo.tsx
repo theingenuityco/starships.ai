@@ -81,7 +81,7 @@ export function Step2CompanyInfo({
           <StarshipsLogo width={28} height={28} className="text-white" />
           <span className="text-sm font-medium tracking-wide text-white/70">starships.ai</span>
         </Link>
-        <span className="text-xs text-white/30 tabular-nums">2 / 4</span>
+        <span className="text-xs text-white/30 tabular-nums">2 / 2</span>
       </div>
 
       {/* Main content */}
@@ -183,7 +183,7 @@ export function Step2CompanyInfo({
                 disabled={!canSubmit || isFetchingBio}
                 className="flex-1 rounded-none bg-primary px-6 py-3.5 text-base font-semibold text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isFetchingBio ? 'Fetching…' : 'Analyze →'}
+                {isFetchingBio ? 'Fetching…' : 'Continue →'}
               </button>
             </div>
           </form>

@@ -286,6 +286,17 @@ export function LoginForm({
     if (!result.success) {
       return
     }
+
+    // Emails disabled: user is already verified — switch to login tab
+    setActiveTab('login')
+    onTabChange?.('login')
+    setLoginData(prev => ({ ...prev, email: registerData.email }))
+    setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
+    setEmailVerificationStatus({
+      needsVerification: false,
+      email: registerData.email,
+      message: result.message || 'Registration successful! You can now sign in.',
+    })
   }
 
   // Resend verification handler following established patterns

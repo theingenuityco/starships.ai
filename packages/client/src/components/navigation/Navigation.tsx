@@ -187,7 +187,7 @@ export function Navigation(props: NavigationProps) {
       isDashboardRoute: pathname.startsWith(`/ship/${starshipSlug}/dashboard`),
       isDatasetsRoute: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
       isTasksRoute: pathname.startsWith(`/ship/${starshipSlug}/tasks`),
-      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/installed`) || pathname.startsWith(`/ship/${starshipSlug}/agent/`),
+      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`) || pathname.startsWith(`/ship/${starshipSlug}/agent/`),
     }
   }, [pathname, starshipSlug])
 
@@ -311,7 +311,7 @@ export function Navigation(props: NavigationProps) {
               isActive: isTasksRoute,
             },
             {
-              href: `/ship/${starshipSlug}/installed`,
+              href: `/ship/${starshipSlug}/agents`,
               label: 'Agents',
               icon: 'bot',
               isActive: isAgentsRoute,

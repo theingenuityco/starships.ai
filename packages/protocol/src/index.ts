@@ -55,6 +55,7 @@ export * from './domains/schedule';
 export * from './domains/heartbeat';
 export * from './domains/task-board';
 export * from './domains/dataset';
+export * from './domains/doc';
 export * from './domains/widget';
 export * from './domains/view';
 export * from './domains/room';

@@ -10,7 +10,7 @@ import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import type { AgentModel, RoomPinnedDataset, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -41,10 +41,12 @@ export function RoomConversationIndexView(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
+  pinnedDocs?: RoomPinnedDoc[] | null
   assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
+  docLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
   toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
@@ -54,6 +56,7 @@ export function RoomConversationIndexView(props: {
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
+  availableDocs?: Array<{ id: string; title: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
@@ -61,6 +64,8 @@ export function RoomConversationIndexView(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
+  onPinDoc?: (docId: string) => void
+  onUnpinDoc?: (docId: string) => void
   onAssignTool?: (toolId: string) => void
   onUnassignTool?: (toolId: string) => void
   /** Open a draft conversation (no persistence until first message). */
@@ -79,7 +84,7 @@ export function RoomConversationIndexView(props: {
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets' | 'docs'>('suggestions')
 
   // Optional deep-link support: preselect an agent in the room starter composer.
   // Used as a replacement for the removed `/dm/...` routes.
@@ -225,8 +230,9 @@ export function RoomConversationIndexView(props: {
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedDocs = (props.pinnedDocs || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const assignedTools = (props.assignedTools || []).slice()
-  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0
+  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 || pinnedDocs.length > 0
 
   const openPinnedDataset = (datasetId: string) => {
     const id = String(datasetId || '').trim()
@@ -342,6 +348,14 @@ export function RoomConversationIndexView(props: {
                     <span>Database</span>
                   </span>
                 </button>
+                {pinnedDocs.length > 0 ? (
+                  <button type="button" onClick={() => setStarterTab('docs')} className={starterBadgeClass(starterTab === 'docs')} role="tab" aria-selected={starterTab === 'docs'}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon name="file-text" className="h-3.5 w-3.5" />
+                      <span>Docs</span>
+                    </span>
+                  </button>
+                ) : null}
               </div>
 
               <div className="mt-4">
@@ -399,6 +413,27 @@ export function RoomConversationIndexView(props: {
                     ) : null}
                   </div>
                 )
+              ) : null}
+
+              {starterTab === 'docs' ? (
+                pinnedDocs.length > 0 ? (
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {pinnedDocs.map(p => {
+                      const id = String(p.docId)
+                      const title = props.docLabelById?.get(id) || `Doc ${id.slice(0, 8)}`
+                      const effectiveSlug = (props.starshipSlug || '').trim()
+                      const href = effectiveSlug ? `/ship/${encodeURIComponent(effectiveSlug)}/docs/${encodeURIComponent(id)}` : null
+                      return href ? (
+                        <Button key={`starter:doc:${id}`} type="button" size="sm" variant="outline" asChild>
+                          <a href={href}>
+                            <Icon name="file-text" className="h-4 w-4 mr-1.5" />
+                            {title}
+                          </a>
+                        </Button>
+                      ) : null
+                    })}
+                  </div>
+                ) : null
               ) : null}
 
             </div>

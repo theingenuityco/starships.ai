@@ -1,5 +1,5 @@
 import api from '@/lib/api'
-import type { ApiResponse, RoomModel, RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment, TaskBoardModel } from '@starships/protocol'
+import type { ApiResponse, RoomModel, RoomPinnedDataset, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment, TaskBoardModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
@@ -48,14 +48,15 @@ export function useStarshipRooms(starshipId: string, enabled: boolean = true) {
 export function useRoomPins(roomConversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ROOM_QUERY_KEYS.pins(roomConversationId),
-    queryFn: async (): Promise<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }> => {
-      const response: FetchResponse<ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[] }>> = await api.get(
+    queryFn: async (): Promise<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[]; docs: RoomPinnedDoc[] }> => {
+      const response: FetchResponse<ApiResponse<{ views: RoomPinnedView[]; datasets: RoomPinnedDataset[]; taskBoards: RoomPinnedTaskBoard[]; docs: RoomPinnedDoc[] }>> = await api.get(
         `/api/v1/rooms/${encodeURIComponent(roomConversationId)}/pins`
       )
       return {
         views: response.data.data?.views || [],
         datasets: response.data.data?.datasets || [],
         taskBoards: response.data.data?.taskBoards || [],
+        docs: response.data.data?.docs || [],
       }
     },
     enabled: !!roomConversationId && enabled,
@@ -466,6 +467,41 @@ export function useUnpinRoomTaskBoard(roomId: string) {
     },
     onError: (error: unknown) => {
       toast.error('Failed to unpin task board', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function usePinRoomDoc(roomId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { docId: string; position?: number }) => {
+      const response: FetchResponse<ApiResponse<{ pin: RoomPinnedDoc }>> = await api.post(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/docs`, {
+        docId: args.docId,
+        ...(args.position !== undefined ? { position: args.position } : {}),
+      })
+      return response.data.data?.pin
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to pin doc', { description: getSafeErrorMessage(error) })
+    },
+  })
+}
+
+export function useUnpinRoomDoc(roomId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (docId: string) => {
+      const response: FetchResponse<ApiResponse<{ removed: boolean }>> = await api.delete(`/api/v1/rooms/${encodeURIComponent(roomId)}/pins/docs/${encodeURIComponent(docId)}`)
+      return response.data.data
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ROOM_QUERY_KEYS.pins(roomId) })
+    },
+    onError: (error: unknown) => {
+      toast.error('Failed to unpin doc', { description: getSafeErrorMessage(error) })
     },
   })
 }

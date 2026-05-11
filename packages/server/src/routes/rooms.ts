@@ -16,11 +16,13 @@ import {
   ConversationRepository,
   NotificationRepository,
   RoomDatasetsRepository,
+  RoomDocsRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
   RoomViewsRepository,
   RoomRepository,
   StarshipDatasetRepository,
+  StarshipDocRepository,
   StarshipMemberRepository,
   TaskBoardRepository,
   ToolRepository,
@@ -1670,14 +1672,16 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     const viewsRepo = new RoomViewsRepository();
     const datasetsRepo = new RoomDatasetsRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
+    const docsRepo = new RoomDocsRepository();
 
-    const [views, datasets, taskBoards] = await Promise.all([
+    const [views, datasets, taskBoards, docs] = await Promise.all([
       viewsRepo.list(access.room.conversationId),
       datasetsRepo.list(access.room.conversationId),
       boardsRepo.list(access.room.conversationId),
+      docsRepo.list(access.room.conversationId),
     ]);
 
-    sendSuccess(res, { views, datasets, taskBoards }, 200);
+    sendSuccess(res, { views, datasets, taskBoards, docs }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
   }
@@ -2817,6 +2821,128 @@ router.post('/rooms/:roomId/pins/task-boards/reorder', jwtAuthMiddleware, async 
     sendSuccess(res, { taskBoards }, 200);
   } catch (error) {
     handleError(error, res, 'reordering pinned task boards');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Doc pin routes
+// ---------------------------------------------------------------------------
+
+router.post('/rooms/:roomId/pins/docs', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const body = validateData(z.object({ docId: IdSchema, position: z.number().int().min(0).optional() }), req.body, res, 'pin doc');
+    if (!body) return;
+
+    const roomRepo = new RoomRepository();
+    const room = await roomRepo.findByConversationId(params.roomId);
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+
+    const docRepo = new StarshipDocRepository(getConnection());
+    const doc = await docRepo.findById(body.docId);
+    if (!doc) {
+      sendError(res, 'VALIDATION_ERROR', 'Doc not found', 400, { docId: body.docId });
+      return;
+    }
+    if (String(doc.starshipId) !== String(room.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Pinned doc must belong to the same starship as the room', 400, {
+        docId: body.docId,
+        roomStarshipId: room.starshipId,
+        docStarshipId: doc.starshipId,
+      });
+      return;
+    }
+
+    const pinnedRepo = new RoomDocsRepository();
+    const pin = await pinnedRepo.upsert({
+      roomConversationId: room.conversationId,
+      docId: body.docId,
+      position: body.position ?? null,
+      createdBy: authUserId,
+    });
+    sendSuccess(res, { pin }, 200);
+  } catch (error) {
+    handleError(error, res, 'pinning doc');
+  }
+});
+
+router.delete('/rooms/:roomId/pins/docs/:docId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema, docId: IdSchema }), req.params, res, 'pin parameter');
+    if (!params) return;
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const roomRepo = new RoomRepository();
+    const room = await roomRepo.findByConversationId(params.roomId);
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+
+    const pinnedRepo = new RoomDocsRepository();
+    const removed = await pinnedRepo.remove(room.conversationId, params.docId);
+    sendSuccess(res, { removed }, 200);
+  } catch (error) {
+    handleError(error, res, 'unpinning doc');
+  }
+});
+
+router.post('/rooms/:roomId/pins/docs/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    const body = validateData(z.object({ docIds: z.array(IdSchema) }), req.body, res, 'reorder pinned docs');
+    if (!body) return;
+
+    const roomRepo = new RoomRepository();
+    const room = await roomRepo.findByConversationId(params.roomId);
+    if (!room) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
+      return;
+    }
+    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
+
+    const pinnedRepo = new RoomDocsRepository();
+    const existing = await pinnedRepo.list(room.conversationId);
+    const existingIds = existing.map((p) => String(p.docId));
+    const nextIds = body.docIds.map((x) => String(x));
+
+    const uniq = new Set(nextIds);
+    if (uniq.size !== nextIds.length) {
+      sendError(res, 'VALIDATION_ERROR', 'Duplicate docIds in reorder list', 400);
+      return;
+    }
+    if (existingIds.length !== nextIds.length || existingIds.some((id) => !uniq.has(id))) {
+      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned docs', 400, {
+        pinnedCount: existingIds.length,
+        providedCount: nextIds.length,
+      });
+      return;
+    }
+
+    const docs = await pinnedRepo.reorder(room.conversationId, nextIds);
+    sendSuccess(res, { docs }, 200);
+  } catch (error) {
+    handleError(error, res, 'reordering pinned docs');
   }
 });
 

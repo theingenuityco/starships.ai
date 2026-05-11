@@ -180,6 +180,7 @@ export function Navigation(props: NavigationProps) {
         isDashboardRoute: false,
         isDatasetsRoute: false,
         isTasksRoute: false,
+        isDocsRoute: false,
         isAgentsRoute: false,
       }
     }
@@ -187,11 +188,12 @@ export function Navigation(props: NavigationProps) {
       isDashboardRoute: pathname.startsWith(`/ship/${starshipSlug}/dashboard`),
       isDatasetsRoute: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
       isTasksRoute: pathname.startsWith(`/ship/${starshipSlug}/tasks`),
+      isDocsRoute: pathname.startsWith(`/ship/${starshipSlug}/docs`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`) || pathname.startsWith(`/ship/${starshipSlug}/agent/`),
     }
   }, [pathname, starshipSlug])
 
-  const { isDashboardRoute, isDatasetsRoute, isTasksRoute, isAgentsRoute } = routeChecks
+  const { isDashboardRoute, isDatasetsRoute, isTasksRoute, isDocsRoute, isAgentsRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -311,6 +313,12 @@ export function Navigation(props: NavigationProps) {
               isActive: isTasksRoute,
             },
             {
+              href: `/ship/${starshipSlug}/docs`,
+              label: 'Docs',
+              icon: 'file-text',
+              isActive: isDocsRoute,
+            },
+            {
               href: `/ship/${starshipSlug}/agents`,
               label: 'Agents',
               icon: 'bot',
@@ -329,7 +337,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isDatasetsRoute, isTasksRoute, isAgentsRoute, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isDatasetsRoute, isTasksRoute, isDocsRoute, isAgentsRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

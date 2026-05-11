@@ -6,8 +6,13 @@ export function createBundleRouter(registry: BundleRegistry): Router {
 
   // GET /api/v1/bundles
   router.get('/', (_req: Request, res: Response) => {
-    const bundles = registry.list();
-    res.json(bundles);
+    try {
+      const bundles = registry.list();
+      res.json(bundles);
+    } catch (err) {
+      console.error('[bundle-service] Failed to list bundles', err);
+      res.status(500).json({ error: 'Failed to list bundles', detail: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   // GET /api/v1/bundles/:id

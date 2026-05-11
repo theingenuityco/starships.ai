@@ -4124,7 +4124,9 @@ router.get('/starships/:id/bundle-service/bundles', jwtAuthMiddleware, async (re
 
     const upstream = await fetch(`${bundleServiceUrl.replace(/\/$/, '')}/api/v1/bundles`);
     if (!upstream.ok) {
-      sendError(res, 'SERVICE_UNREACHABLE', 'Bundle service returned an error', 502);
+      const body = await upstream.text().catch(() => '');
+      console.error('[bundle-service] upstream error', { status: upstream.status, body });
+      sendError(res, 'SERVICE_UNREACHABLE', `Bundle service returned ${upstream.status}${body ? `: ${body.slice(0, 200)}` : ''}`, 502);
       return;
     }
 

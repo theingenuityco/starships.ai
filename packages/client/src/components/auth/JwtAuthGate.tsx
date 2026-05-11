@@ -18,9 +18,9 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
   useEffect(() => setMounted(true), [])
 
   // On first unauthenticated render, check if first-time setup is required.
-  useSetupRedirect({ skip: isAuthenticated || isLoading || !mounted })
+  const { isChecking: isSetupChecking } = useSetupRedirect({ skip: isAuthenticated || isLoading || !mounted })
 
-  if (!mounted || isLoading) {
+  if (!mounted || isLoading || isSetupChecking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div className="flex flex-col items-center space-y-4" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>

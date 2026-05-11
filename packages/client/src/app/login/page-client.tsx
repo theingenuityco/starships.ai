@@ -32,7 +32,7 @@ export default function LoginPageClient() {
   const selectedStarshipId = mounted ? getSelectedStarshipId() : null
 
   // Redirect to /setup if no admin user exists yet (fresh deploy).
-  useSetupRedirect()
+  const { isChecking: isSetupChecking } = useSetupRedirect()
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
@@ -129,8 +129,8 @@ export default function LoginPageClient() {
     }
   }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout, user?.id, selectedStarshipId])
 
-  // Show loading state while checking authentication or mounting
-  if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {
+  // Show loading state while checking authentication, setup status, or mounting
+  if (!mounted || isSetupChecking || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {
     return <AuthLoadingScreen message="Loading..." />
   }
 

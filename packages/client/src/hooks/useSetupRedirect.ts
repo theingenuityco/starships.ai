@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -9,10 +9,18 @@ import { useRouter } from 'next/navigation'
  * may still be running.
  *
  * Pass skip=true to suppress the check (e.g. while auth state is still loading).
+ * Returns { isChecking } — true from the first render where skip=false until the
+ * status check resolves, so callers can suppress their UI and avoid a flash
+ * before the redirect fires.
  */
-export function useSetupRedirect({ skip = false }: { skip?: boolean } = {}) {
+export function useSetupRedirect({ skip = false }: { skip?: boolean } = {}): { isChecking: boolean } {
   const router = useRouter()
   const hasChecked = useRef(false)
+  const [checkDone, setCheckDone] = useState(false)
+
+  // Derived synchronously: if we haven't skipped and haven't finished checking,
+  // we're still in-flight — even on the very first render where skip just became false.
+  const isChecking = !skip && !checkDone
 
   useEffect(() => {
     if (skip || hasChecked.current) return
@@ -24,16 +32,26 @@ export function useSetupRedirect({ skip = false }: { skip?: boolean } = {}) {
         const r = await fetch('/api/v1/setup/status')
         if (!r.ok) throw new Error('not ready')
         const json = await r.json()
-        if (!cancelled && json.data?.setupRequired) {
-          router.replace('/setup')
+        if (!cancelled) {
+          if (json.data?.setupRequired) {
+            router.replace('/setup')
+          } else {
+            setCheckDone(true)
+          }
         }
       } catch {
-        if (!cancelled && attempts < 5) {
-          setTimeout(() => check(attempts + 1), 1000)
+        if (!cancelled) {
+          if (attempts < 5) {
+            setTimeout(() => check(attempts + 1), 1000)
+          } else {
+            setCheckDone(true)
+          }
         }
       }
     }
     check()
     return () => { cancelled = true }
   }, [skip, router])
+
+  return { isChecking }
 }

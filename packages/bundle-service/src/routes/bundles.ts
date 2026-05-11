@@ -38,9 +38,9 @@ export function createBundleRouter(registry: BundleRegistry): Router {
     }
   });
 
-  // GET /api/v1/bundles/:id/files/*
-  router.get('/:id/files/*', (req: Request, res: Response) => {
-    const filePath = (req.params as Record<string, string>)[0];
+  // GET /api/v1/bundles/:id/files/*filePath
+  router.get('/:id/files/*filePath', (req: Request, res: Response) => {
+    const filePath = (req.params as Record<string, string>).filePath;
     if (!filePath) {
       res.status(400).json({ error: 'File path required' });
       return;

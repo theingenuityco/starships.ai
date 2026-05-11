@@ -1,0 +1,7 @@
+{
+  "name": "Default System Tools",
+  "description": "Core system tools for web search, web fetch, and agent/tool management",
+  "version": "1.0.0",
+  "tags": ["system", "tools", "utilities"],
+  "kind": "tool"
+}

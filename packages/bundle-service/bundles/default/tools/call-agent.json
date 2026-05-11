@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.300Z",
+  "metadata": {
+    "fromSlug": "call-agent",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Call Agent",
+      "description": "Delegate work into a child conversation. Requires that content includes agent mention token(s) like <@a:AGENT_ID>; routing inside the child conversation triggers the mentioned agent(s).",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "User message content. Must include at least one agent mention token like <@a:AGENT_ID>."
+          },
+          "childConversationId": {
+            "type": "string",
+            "description": "Optional existing child conversation id to continue in"
+          },
+          "parentConversationId": {
+            "type": "string",
+            "description": "Optional parent conversation id. Defaults to the current conversation when available."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "route_mode",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "create_child_conversation",
+            "ref": "e3",
+            "from": "route_mode",
+            "condition": "true"
+          },
+          {
+            "to": "prep_link_message",
+            "ref": "e4",
+            "from": "create_child_conversation"
+          },
+          {
+            "to": "format_result_new",
+            "ref": "e5",
+            "from": "send_message_new"
+          },
+          {
+            "to": "end_1",
+            "ref": "e6",
+            "from": "format_result_new"
+          },
+          {
+            "to": "send_message_new",
+            "ref": "e7",
+            "from": "route_mode",
+            "condition": "false"
+          },
+          {
+            "to": "send_message_new",
+            "ref": "e8",
+            "from": "send_message_existing"
+          },
+          {
+            "to": "should_link_parent_message",
+            "ref": "e10",
+            "from": "prep_link_message"
+          },
+          {
+            "to": "send_message_existing",
+            "ref": "e11",
+            "from": "should_link_parent_message",
+            "condition": "true"
+          },
+          {
+            "to": "send_message_new",
+            "ref": "e12",
+            "from": "should_link_parent_message",
+            "condition": "false"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Call Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n  async function main(ctx) {\n    const input = ctx.input || {};\n\n    const content = typeof input.content === 'string' ? input.content : '';\n    if (!content || String(content).trim().length === 0) {\n      throw new Error('content is required for calling agent');\n    }\n\n    if (!String(content).includes('<@a:')) {\n      throw new Error('content must include at least one agent mention token like <@a:AGENT_ID>');\n    }\n\n    let parentConversationId = input.parentConversationId;\n    try {\n      const fromEnv = ctx.env && ctx.env('CONVERSATION_ID');\n      if (!parentConversationId && fromEnv) {\n        parentConversationId = String(fromEnv);\n      }\n    } catch (e) {}\n\n    return {\n      parentConversationId,\n      childConversationId: typeof input.childConversationId === 'string' ? input.childConversationId : null,\n      content,\n    };\n  }\n",
+              "timeout": 3000
+            },
+            "description": "Build request payload including parentConversationId when available"
+          },
+          {
+            "ref": "route_mode",
+            "name": "Route Mode",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ !(lastOutputOf(\"prepare\") || {}).childConversationId }}"
+            },
+            "description": "Decide whether to create a new child conversation or use existing"
+          },
+          {
+            "ref": "create_child_conversation",
+            "name": "Create Child Conversation",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => {\n  const prep = lastOutputOf(\"prepare\") || {};\n  let parentConversationId = prep.parentConversationId;\n  try {\n    const fromEnv = env(\"CONVERSATION_ID\");\n    if (!parentConversationId && fromEnv) {\n      parentConversationId = String(fromEnv);\n    }\n  } catch (e) {}\n  return {\n    title: \"Delegated\",\n    starshipId: String(env(\"STARSHIP_ID\")),\n    parentConversationId: parentConversationId || undefined,\n  };\n})() }}",
+              "action": "create-conversation",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "POST /conversations - create a new child conversation linked to current one"
+          },
+          {
+            "ref": "send_message_new",
+            "name": "Send Message (New Child)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => {\n  const prep = lastOutputOf(\"prepare\") || {};\n\n  // Prefer explicit existing childConversationId when provided\n  let cid = prep.childConversationId ? String(prep.childConversationId) : \"\";\n\n  // Otherwise derive from newly created child conversation response\n  if (!cid) {\n    const raw = lastOutputOf(\"create_child_conversation\") || {};\n    const hasBody = raw && typeof raw === \"object\" && Object.prototype.hasOwnProperty.call(raw, \"body\");\n    const payload = hasBody ? raw.body : raw;\n    const data = payload && typeof payload === \"object\" && Object.prototype.hasOwnProperty.call(payload, \"data\") ? payload.data : payload;\n    cid = data && typeof data === \"object\" && data.id ? String(data.id) : \"\";\n  }\n\n  return {\n    conversationId: cid,\n    content: String(prep.content || \"\"),\n    sync: true,\n  };\n})() }}",
+              "action": "send-message",
+              "timeout": 1800000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "POST /conversations/:conversationId/messages - send message into new child conversation"
+          },
+          {
+            "ref": "format_result_new",
+            "name": "Format Result (New Child)",
+            "type": "code",
+            "parameters": {
+              "code": "\nasync function main(ctx) {\n  const http = ctx.input;\n  const body = http && typeof http === 'object' ? http.body : http;\n  const data = body && typeof body === 'object' && body.data ? body.data : body;\n  const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;\n  const messages = conversation && typeof conversation === 'object' && Array.isArray(conversation.messages) ? conversation.messages : null;\n  const lastRaw = messages && messages.length > 0 ? messages[messages.length - 1] : null;\n  const lastMessage = (() => {\n    if (!lastRaw || typeof lastRaw !== 'object') return null;\n    const m = lastRaw;\n    const role = typeof m.role === 'string' ? m.role : '';\n    const content = typeof m.content === 'string' ? m.content : '';\n    const messageType = typeof m.messageType === 'string' ? m.messageType : '';\n    const out = {\n      ...(role ? { role } : {}),\n      ...(messageType ? { messageType } : {}),\n      ...(content ? { content } : {}),\n    };\n    // Only keep toolCallId when this is a tool result (minimal linking metadata).\n    const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';\n    if (role === 'tool' && toolCallId) {\n      return { ...out, toolCallId };\n    }\n    return out;\n  })();\n\n  // Extract child conversation id (newly created OR existing)\n  let childConversationId = null;\n  try {\n    const raw = ctx.lastOutputOf && ctx.lastOutputOf('create_child_conversation')\n      ? ctx.lastOutputOf('create_child_conversation')\n      : null;\n    const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n    const payload = hasBody ? raw.body : raw;\n    const convo = payload && typeof payload === 'object' && payload.data ? payload.data : payload;\n    if (convo && typeof convo === 'object' && convo.id) {\n      childConversationId = String(convo.id);\n    }\n  } catch (e) {\n    // best-effort only\n  }\n\n  if (!childConversationId) {\n    try {\n      const prep = (ctx.lastOutputOf && ctx.lastOutputOf('prepare')) || {};\n      if (prep && prep.childConversationId) childConversationId = String(prep.childConversationId);\n    } catch (e) {}\n  }\n\n  if (!childConversationId) {\n    try {\n      const linkPrep = (ctx.lastOutputOf && ctx.lastOutputOf('prep_link_message')) || {};\n      if (linkPrep && linkPrep.childConversationId) childConversationId = String(linkPrep.childConversationId);\n    } catch (e) {}\n  }\n\n  const status = (http && typeof http === 'object' && http.status) ? http.status : 0;\n  const success = status >= 200 && status < 300;\n\n  // When the delegated agent hits an ask-first tool, the server will pause the turn with\n  // status=waiting_for_tools and return from the sync call. Surface this so callers\n  // don't interpret it as \"completed\".\n  const turn = (data && typeof data === 'object' && data.turn && typeof data.turn === 'object') ? data.turn : null;\n  const turnStatus = turn && typeof turn.status === 'string' ? turn.status : null;\n\n  return {\n    childConversationId,\n    lastMessage,\n    status: success\n      ? (turnStatus === 'waiting_for_tools'\n          ? 'Delegated agent is awaiting tool approval'\n          : 'Agent call completed successfully')\n      : 'Agent call failed',\n  };\n}\n",
+              "timeout": 2000
+            },
+            "description": "Format result for newly created child conversation"
+          },
+          {
+            "ref": "send_message_existing",
+            "name": "Update Parent Message (linkedConversationId)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => {\n  const prep = lastOutputOf(\"prep_link_message\") || {};\n  return {\n    messageId: String(prep.messageId || \"\"),\n    linkedConversationId: String(prep.linkedConversationId || \"\"),\n  };\n})() }}",
+              "action": "update-message",
+              "timeout": 20000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "PUT /messages/:messageId - set linkedConversationId on the calling message (thread entry point)"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"format_result_new\") }}"
+            },
+            "description": "Return call result"
+          },
+          {
+            "ref": "prep_link_message",
+            "name": "Prepare Thread Link (Parent Message)",
+            "type": "code",
+            "parameters": {
+              "code": "\nasync function main(ctx) {\n  // Extract child conversation id from create_child_conversation response\n  let childConversationId = '';\n  try {\n    const raw = ctx.lastOutputOf('create_child_conversation') || {};\n    const payload = (raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body'))\n      ? raw.body\n      : raw;\n    const data = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')\n      ? payload.data\n      : payload;\n    if (data && typeof data === 'object' && data.id) {\n      childConversationId = String(data.id);\n    }\n  } catch (e) {}\n\n  // TOOL_CALL_MESSAGE_ID is only present when this tool is executed from an assistant tool call message.\n  let messageId = '';\n  try {\n    const v = ctx.env && ctx.env('TOOL_CALL_MESSAGE_ID');\n    if (v) messageId = String(v);\n  } catch (e) {}\n\n  const shouldLink = Boolean(messageId && childConversationId);\n\n  return {\n    shouldLink,\n    messageId: messageId || null,\n    linkedConversationId: childConversationId || null,\n    childConversationId: childConversationId || null,\n  };\n}\n",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "should_link_parent_message",
+            "name": "Link Parent Message?",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ Boolean((lastOutputOf(\"prep_link_message\") || {}).shouldLink) }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

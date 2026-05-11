@@ -50,7 +50,7 @@ import { getEnvConfig } from '@starships/env';
 import OpenAI from 'openai';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
-import { BundleEntry, BundleReader, DirectoryBundleReader } from '@/utils/bundle-reader';
+import { BundleEntry, BundleReader, DirectoryBundleReader, RemoteBundleReader } from '@/utils/bundle-reader';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -3160,19 +3160,35 @@ async function ensureLeadGenRoomInternal(opts: {
     return { room: existingRoom };
   }
 
-  // No existing room; apply the lead-generation bundle from disk.
-  const docsRoot = resolvePublicDocsRoot();
-  const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
-  if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
-    console.error('[leadgen] Bundle directory not found', { docsRoot, bundleDir });
-    throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
+  // No existing room; apply the lead-generation bundle.
+  // Prefer the bundle service when configured; fall back to disk.
+  let reader: DirectoryBundleReader | RemoteBundleReader;
+  const bundleServiceUrl = getEnvConfig().BUNDLE_SERVICE_URL;
+  if (bundleServiceUrl) {
+    try {
+      reader = await RemoteBundleReader.create(bundleServiceUrl, 'lead-generation');
+    } catch (err) {
+      console.error('[leadgen] Failed to fetch bundle from bundle service, falling back to disk', { bundleServiceUrl, error: err instanceof Error ? err.message : String(err) });
+      const docsRoot = resolvePublicDocsRoot();
+      const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
+      if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
+        throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
+      }
+      reader = new DirectoryBundleReader(bundleDir);
+    }
+  } else {
+    const docsRoot = resolvePublicDocsRoot();
+    const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
+    if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
+      console.error('[leadgen] Bundle directory not found', { docsRoot, bundleDir });
+      throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
+    }
+    reader = new DirectoryBundleReader(bundleDir);
   }
-
-  const reader = new DirectoryBundleReader(bundleDir);
 
   const manifestEntry = reader.getEntry('manifest.json');
   if (!manifestEntry) {
-    console.error('[leadgen] manifest.json missing from bundle directory', { bundleDir });
+    console.error('[leadgen] manifest.json missing from bundle');
     throw Object.assign(new Error('Lead generation room bundle is missing manifest.json'), { code: 'MANIFEST_MISSING' });
   }
 
@@ -3180,20 +3196,20 @@ async function ensureLeadGenRoomInternal(opts: {
   try {
     manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
   } catch {
-    console.error('[leadgen] manifest.json is not valid JSON', { bundleDir });
+    console.error('[leadgen] manifest.json is not valid JSON');
     throw Object.assign(new Error('Lead generation room bundle manifest.json is not valid JSON'), { code: 'MANIFEST_INVALID_JSON' });
   }
 
   const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
   if (!manifestParsed.success) {
-    console.error('[leadgen] manifest.json shape is invalid', { bundleDir, issues: manifestParsed.error.issues });
+    console.error('[leadgen] manifest.json shape is invalid', { issues: manifestParsed.error.issues });
     throw Object.assign(new Error('Lead generation room bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
   }
 
   try {
     assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
   } catch (err) {
-    console.error('[leadgen] manifest.json contains invalid file paths', { bundleDir, error: err instanceof Error ? err.message : String(err) });
+    console.error('[leadgen] manifest.json contains invalid file paths', { error: err instanceof Error ? err.message : String(err) });
     throw err;
   }
 
@@ -3241,6 +3257,8 @@ async function ensureLeadGenRoomInternal(opts: {
     conversationId: createdRoom.conversationId,
     imported: importSummary.imported,
   });
+
+  if (reader instanceof RemoteBundleReader) reader.cleanup();
 
   return { room: createdRoom, importSummary };
 }
@@ -4080,5 +4098,117 @@ router.post(
     }
   }
 );
+
+/**
+ * GET /starships/:id/bundle-service/bundles
+ *
+ * List bundles available from the configured bundle service.
+ * Returns 503 if BUNDLE_SERVICE_URL is not configured.
+ *
+ * Starship owner / instance-admin only.
+ */
+router.get('/starships/:id/bundle-service/bundles', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+
+    const bundleServiceUrl = getEnvConfig().BUNDLE_SERVICE_URL;
+    if (!bundleServiceUrl) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Bundle service is not configured on this instance', 503);
+      return;
+    }
+
+    const upstream = await fetch(`${bundleServiceUrl.replace(/\/$/, '')}/api/v1/bundles`);
+    if (!upstream.ok) {
+      sendError(res, 'SERVICE_UNREACHABLE', 'Bundle service returned an error', 502);
+      return;
+    }
+
+    const bundles = await upstream.json();
+    sendSuccess(res, bundles);
+  } catch (error) {
+    handleError(error, res, 'listing bundles from bundle service');
+  }
+});
+
+/**
+ * POST /starships/:id/bundle-service/:bundleId/install
+ *
+ * Download a bundle from the configured bundle service and install it into the starship.
+ * This performs a clean install with no conflict resolution (all resources are created fresh).
+ *
+ * For conflict resolution, download the bundle ZIP directly from the bundle service
+ * and use the /import-room-bundle/analyze and /import-room-bundle/apply endpoints instead.
+ *
+ * Starship owner / instance-admin only.
+ */
+router.post('/starships/:id/bundle-service/:bundleId/install', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  let reader: RemoteBundleReader | null = null;
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema, bundleId: z.string().min(1) }), req.params, res, 'route parameters');
+    if (!paramValidation) return;
+
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+
+    const bundleServiceUrl = getEnvConfig().BUNDLE_SERVICE_URL;
+    if (!bundleServiceUrl) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Bundle service is not configured on this instance', 503);
+      return;
+    }
+
+    reader = await RemoteBundleReader.create(bundleServiceUrl, paramValidation.bundleId);
+
+    const manifestEntry = reader.getEntry('manifest.json');
+    if (!manifestEntry) {
+      sendError(res, 'VALIDATION_ERROR', 'Bundle is missing manifest.json', 400);
+      return;
+    }
+
+    let manifestRaw: unknown;
+    try {
+      manifestRaw = JSON.parse(manifestEntry.getData().toString('utf-8'));
+    } catch {
+      sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json is not valid JSON', 400);
+      return;
+    }
+
+    const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+    if (!manifestParsed.success) {
+      sendError(res, 'VALIDATION_ERROR', 'Bundle manifest.json has an unexpected shape', 400, { issues: manifestParsed.error.issues });
+      return;
+    }
+
+    try {
+      assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+    } catch (err) {
+      sendError(res, 'VALIDATION_ERROR', 'Bundle manifest contains invalid file paths', 400, {
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+
+    const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+
+    const importSummary = await applyRoomBundleToStarship({
+      starshipId: paramValidation.id,
+      userId: user.id,
+      reader,
+      manifest: manifestParsed.data,
+      decisions: emptyDecisions,
+    });
+
+    sendSuccess(res, importSummary, 201);
+  } catch (error) {
+    handleError(error, res, 'installing bundle from bundle service');
+  } finally {
+    reader?.cleanup();
+  }
+});
 
 export default router;

@@ -13,7 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev",
+    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=15",
     "dev:with-workers": "turbo run build && concurrently --verbose -n app,scheduler,worker,hb-sched,hb-worker -c \"cyan,magenta,green,yellow,blue\" \"NODE_OPTIONS=--no-node-snapshot turbo run dev\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:worker\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run heartbeat:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run heartbeat:worker\"",
     "dev:bundle-service": "pnpm --filter @starships/bundle-service dev",
     "lint": "turbo run lint",

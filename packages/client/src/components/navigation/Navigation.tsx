@@ -178,14 +178,20 @@ export function Navigation(props: NavigationProps) {
     if (!starshipSlug) {
       return {
         isDashboardRoute: false,
+        isDatasetsRoute: false,
+        isTasksRoute: false,
+        isAgentsRoute: false,
       }
     }
     return {
       isDashboardRoute: pathname.startsWith(`/ship/${starshipSlug}/dashboard`),
+      isDatasetsRoute: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
+      isTasksRoute: pathname.startsWith(`/ship/${starshipSlug}/tasks`),
+      isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`) || pathname.startsWith(`/ship/${starshipSlug}/agent/`),
     }
   }, [pathname, starshipSlug])
 
-  const { isDashboardRoute } = routeChecks
+  const { isDashboardRoute, isDatasetsRoute, isTasksRoute, isAgentsRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -292,6 +298,24 @@ export function Navigation(props: NavigationProps) {
               icon: 'dashboard',
               isActive: isDashboardRoute,
             },
+            {
+              href: `/ship/${starshipSlug}/datasets`,
+              label: 'Datasets',
+              icon: 'database',
+              isActive: isDatasetsRoute,
+            },
+            {
+              href: `/ship/${starshipSlug}/tasks`,
+              label: 'Tasks',
+              icon: 'list',
+              isActive: isTasksRoute,
+            },
+            {
+              href: `/ship/${starshipSlug}/agents`,
+              label: 'Agents',
+              icon: 'bot',
+              isActive: isAgentsRoute,
+            },
           ]
         : []),
       ...(isAuthenticated && isInstanceAdmin
@@ -305,7 +329,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isDatasetsRoute, isTasksRoute, isAgentsRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "update-widget-6pa7"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Update Widget",
+      "description": "Update an existing widget by id with partial changes (props are merged, not replaced; optional name/description). Returns the updated widget record.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "widgetId"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Update widget name (optional)"
+          },
+          "props": {
+            "type": "object",
+            "description": "Props to merge with existing props"
+          },
+          "widgetId": {
+            "type": "string",
+            "description": "Widget ID to update"
+          },
+          "description": {
+            "type": "string",
+            "description": "Update widget description (optional)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "validate_input",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "update_widget",
+            "ref": "e2",
+            "from": "validate_input"
+          },
+          {
+            "to": "extract_result",
+            "ref": "e3",
+            "from": "update_widget"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "extract_result"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "validate_input",
+            "name": "Validate Input",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              const widgetId = typeof input.widgetId === 'string' ? input.widgetId.trim() : '';\n              const props = input.props && typeof input.props === 'object' ? input.props : null;\n              const name = typeof input.name === 'string' ? input.name.trim() : null;\n              const description = typeof input.description === 'string' ? input.description.trim() : null;\n\n              if (!widgetId) throw new Error('widgetId is required');\n\n              // At least one field must be provided for update\n              if (!props && !name && !description) {\n                throw new Error('At least one of props, name, or description must be provided');\n              }\n\n              const updateData = {};\n              if (props) updateData.props = props;\n              if (name) updateData.name = name;\n              if (description) updateData.description = description;\n\n              return { widgetId, ...updateData };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate update inputs"
+          },
+          {
+            "ref": "update_widget",
+            "name": "Update Widget",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf(\"validate_input\") }}",
+              "action": "update-widget",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Update widget via API"
+          },
+          {
+            "ref": "extract_result",
+            "name": "Extract Result",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {\n                return payload.data;\n              }\n              return payload;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract updated widget"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"extract_result\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

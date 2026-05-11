@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-github-pull-requests-yzxa"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List GitHub Pull Requests",
+      "description": "List pull requests in a GitHub repository using the GitHub connector. Supports filtering by state, head, base, and sorting options.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo"
+        ],
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "Filter pulls by base branch name"
+          },
+          "head": {
+            "type": "string",
+            "description": "Filter pulls by head user or head organization and branch name in the format user:ref-name or organization:ref-name"
+          },
+          "page": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The page number of the results to fetch"
+          },
+          "repo": {
+            "type": "string",
+            "description": "The name of the repository without the .git extension. The name is not case sensitive."
+          },
+          "sort": {
+            "enum": [
+              "created",
+              "updated",
+              "popularity",
+              "long-running"
+            ],
+            "type": "string",
+            "description": "What to sort results by"
+          },
+          "owner": {
+            "type": "string",
+            "description": "The account owner of the repository. The name is not case sensitive."
+          },
+          "state": {
+            "enum": [
+              "open",
+              "closed",
+              "all"
+            ],
+            "type": "string",
+            "description": "Either open, closed, or all to filter by state"
+          },
+          "per_page": {
+            "type": "number",
+            "maximum": 100,
+            "minimum": 1,
+            "description": "The number of results per page (max 100)"
+          },
+          "direction": {
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "type": "string",
+            "description": "The direction to sort the results by"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_prs",
+            "ref": "start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_prs"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "list_prs",
+            "name": "List Pull Requests",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "list-pull-requests",
+              "timeout": 15000,
+              "connector": "github"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

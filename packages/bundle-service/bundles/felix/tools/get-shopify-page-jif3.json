@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-shopify-page-jif3"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Shopify Page",
+      "description": "Retrieve detailed information about a specific page by its ID",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The page ID to retrieve"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_page",
+            "ref": "start_to_get_page",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "get_page_to_end",
+            "from": "get_page"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_page",
+            "name": "Get Shopify Page",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "get_page",
+              "timeout": 15000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

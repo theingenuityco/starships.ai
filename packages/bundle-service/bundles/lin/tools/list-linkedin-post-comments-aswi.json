@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-linkedin-post-comments-aswi"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List LinkedIn Post Comments",
+      "description": "Retrieve comments on a specific LinkedIn post with pagination support. Returns detailed comment threads for monitoring engagement opportunities. (Works for both personal and organization posts)",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "entityUrn"
+        ],
+        "properties": {
+          "limit": {
+            "type": "number",
+            "default": 100,
+            "description": "Maximum number of comments to retrieve"
+          },
+          "entityUrn": {
+            "type": "string",
+            "description": "Post URN to monitor (e.g., urn:li:ugcPost:12345)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_comments",
+            "ref": "start_to_get_comments",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "get_comments_to_end",
+            "from": "get_comments"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "get_comments",
+            "name": "Get Post Comments",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { postUrn: input.entityUrn, count: input.limit } }}",
+              "action": "get-post-comments",
+              "timeout": 15000,
+              "connector": "linkedin",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('get_comments') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "export-google-drive-file-chpi"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Export Google Drive File",
+      "description": "Exports a Google Sheets file to a specified format (CSV, XLSX, PDF, etc.)",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "fileId"
+        ],
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The Google Sheets file ID to export"
+          },
+          "mimeType": {
+            "type": "string",
+            "default": "text/csv",
+            "description": "Export format MIME type. Options: text/csv (default), application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (XLSX), application/pdf, text/tab-separated-values (TSV)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "export_file",
+            "ref": "edge_start_export",
+            "from": "start"
+          },
+          {
+            "to": "extract_content",
+            "ref": "edge_export_extract",
+            "from": "export_file"
+          },
+          {
+            "to": "end",
+            "ref": "edge_extract_end",
+            "from": "extract_content"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "export_file",
+            "name": "Export Sheets File",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { fileId: ctx.input.fileId, mimeType: ctx.input.mimeType || 'text/csv' } }}",
+              "action": "export-file",
+              "timeout": 30000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "extract_content",
+            "name": "Extract Exported Content",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.lastOutputOf('export_file');\n  return response.body;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

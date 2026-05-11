@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-github-issue-comment-n610"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create GitHub Issue Comment",
+      "description": "Create a comment on a GitHub issue or pull request using the GitHub connector",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo",
+          "issue_number",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The contents of the comment"
+          },
+          "repo": {
+            "type": "string",
+            "description": "The name of the repository"
+          },
+          "owner": {
+            "type": "string",
+            "description": "The account owner of the repository"
+          },
+          "issue_number": {
+            "type": "number",
+            "description": "The number that identifies the issue or pull request"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "create_comment",
+            "ref": "start_to_create",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "create_to_end",
+            "from": "create_comment"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "create_comment",
+            "name": "Create Issue Comment",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ owner: ctx.lastOutputOf('__initial__').owner, repo: ctx.lastOutputOf('__initial__').repo, issue_number: ctx.lastOutputOf('__initial__').issue_number, body: ctx.lastOutputOf('__initial__').body }) }}",
+              "action": "create-issue-comment",
+              "timeout": 15000,
+              "connector": "github"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

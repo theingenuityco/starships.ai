@@ -514,6 +514,15 @@ export const ENV_VAR_DEFINITIONS: EnvVarDef[] = [
     needsRestart: false,
   },
   {
+    key: 'BUNDLE_SERVICE_URL',
+    group: 'misc',
+    description: 'URL of the bundle service (leave empty to use local disk bundles)',
+    required: false,
+    sensitive: false,
+    default: '',
+    needsRestart: false,
+  },
+  {
     key: 'REVALIDATE_TOKEN',
     group: 'misc',
     description: 'Shared secret for Next.js ISR on-demand revalidation',

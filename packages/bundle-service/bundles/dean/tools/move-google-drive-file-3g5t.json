@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "move-google-drive-file-3g5t"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Move Google Drive File",
+      "description": "Move a file or folder to a different location in Google Drive by changing its parent folders. NOTE: Requires the google_drive connector template's update-file endpoint to be updated with query parameter mapping for addParents and removeParents. Currently returns file metadata without moving it.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "fileId"
+        ],
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "The ID of the file or folder to move"
+          },
+          "addParents": {
+            "type": "string",
+            "description": "Comma-separated list of parent folder IDs to add (destination folders)"
+          },
+          "removeParents": {
+            "type": "string",
+            "description": "Comma-separated list of parent folder IDs to remove (current location). If not specified, the file will keep its current parents."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "validate_input",
+            "ref": "edge_start_validate",
+            "from": "start"
+          },
+          {
+            "to": "move_file",
+            "ref": "edge_validate_move",
+            "from": "validate_input"
+          },
+          {
+            "to": "end",
+            "ref": "edge_move_end",
+            "from": "move_file"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "validate_input",
+            "name": "Validate Input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const fileId = input.fileId;\n  const addParents = input.addParents;\n  const removeParents = input.removeParents;\n  \n  if (!fileId) {\n    throw new Error('fileId is required');\n  }\n  \n  if (!addParents && !removeParents) {\n    throw new Error('At least one of addParents or removeParents must be specified');\n  }\n  \n  return {\n    fileId: fileId,\n    addParents: addParents,\n    removeParents: removeParents\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "move_file",
+            "name": "Move File via Google Drive API",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { fileId: (lastOutputOf('validate_input') || {}).fileId, addParents: (lastOutputOf('validate_input') || {}).addParents, removeParents: (lastOutputOf('validate_input') || {}).removeParents } }}",
+              "action": "update-file",
+              "timeout": 15000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

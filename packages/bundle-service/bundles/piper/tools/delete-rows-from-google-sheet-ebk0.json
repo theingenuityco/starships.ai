@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "delete-rows-from-google-sheet-ebk0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Delete Rows from Google Sheet",
+      "description": "Delete rows from a Google Sheet using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "sheetId",
+          "startIndex",
+          "endIndex"
+        ],
+        "properties": {
+          "sheetId": {
+            "type": "number",
+            "description": "The sheet ID where rows will be deleted"
+          },
+          "endIndex": {
+            "type": "number",
+            "description": "The end index of rows to delete (exclusive)"
+          },
+          "startIndex": {
+            "type": "number",
+            "description": "The start index of rows to delete (0-based)"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "delete_rows",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "delete_rows"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "delete_rows",
+            "name": "Delete Rows",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "sheetId": "{{ Number(input.sheetId) }}",
+                "endIndex": "{{ Number(input.endIndex) }}",
+                "startIndex": "{{ Number(input.startIndex) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}"
+              },
+              "action": "delete-rows",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('delete_rows') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  return {\n    success: true,\n    spreadsheetId: resp.body.spreadsheetId,\n    replies: resp.body.replies\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

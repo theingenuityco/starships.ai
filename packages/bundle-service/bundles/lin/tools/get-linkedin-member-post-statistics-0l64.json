@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-linkedin-member-post-statistics-0l64"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get LinkedIn Member Post Statistics",
+      "description": "Retrieve performance metrics for a specific LinkedIn post. Select from impressions, reach, reactions, comments, or shares. Supports daily or total aggregation. (Member posts only)",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "postUrn",
+          "queryType"
+        ],
+        "properties": {
+          "postUrn": {
+            "type": "string",
+            "description": "Post URN to analyze (e.g., urn:li:ugcPost:12345)"
+          },
+          "queryType": {
+            "enum": [
+              "IMPRESSION",
+              "MEMBERS_REACHED",
+              "RESHARE",
+              "REACTION",
+              "COMMENT"
+            ],
+            "type": "string",
+            "description": "Metric type to retrieve"
+          },
+          "aggregation": {
+            "enum": [
+              "DAILY",
+              "TOTAL"
+            ],
+            "type": "string",
+            "default": "TOTAL",
+            "description": "Aggregation type - DAILY for time-series data or TOTAL for aggregate metrics"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare_args",
+            "ref": "start_to_analytics",
+            "from": "start"
+          },
+          {
+            "to": "format_result",
+            "ref": "analytics_to_end",
+            "from": "get_analytics"
+          },
+          {
+            "to": "end",
+            "ref": "format_to_end",
+            "from": "format_result"
+          },
+          {
+            "to": "get_analytics",
+            "ref": "prepare_to_analytics",
+            "from": "prepare_args"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "get_analytics",
+            "name": "Get Post Analytics",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.lastOutputOf('prepare_args') }}",
+              "action": "get-post-analytics",
+              "timeout": 15000,
+              "connector": "linkedin",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ ctx.lastOutputOf('format_result') }}"
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format Result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const raw = ctx.lastOutputOf('get_analytics')?.body?.elements?.[0];\n  if (!raw) return null;\n  \n  const metricType = Object.values(raw.metricType || {})[0] || 'UNKNOWN';\n  const start = raw.dateRange?.start;\n  const end = raw.dateRange?.end;\n  \n  return {\n    metricType,\n    count: raw.count,\n    startDate: start ? `${start.year}-${String(start.month).padStart(2, '0')}-${String(start.day).padStart(2, '0')}` : null,\n    endDate: end ? `${end.year}-${String(end.month).padStart(2, '0')}-${String(end.day).padStart(2, '0')}` : null\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "prepare_args",
+            "name": "Prepare Arguments",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input;\n  \n  return {\n    postUrn: input.postUrn,\n    queryType: input.queryType,\n    aggregation: input.aggregation || 'TOTAL'\n  };\n}",
+              "timeout": 3000
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

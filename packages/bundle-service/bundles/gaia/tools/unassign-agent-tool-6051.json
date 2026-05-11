@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "unassign-agent-tool-6051"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Unassign Agent Tool",
+      "description": "Unassign a tool from an agent by slug on the current starship (deletes the Agent→Tool relationship). Returns { ok: true } on success.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "agentSlug",
+          "toolSlug"
+        ],
+        "properties": {
+          "toolSlug": {
+            "type": "string",
+            "description": "Tool slug to remove from the agent"
+          },
+          "agentSlug": {
+            "type": "string",
+            "description": "Agent slug to update"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "fetch_agent",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "update_tools",
+            "ref": "e3",
+            "from": "fetch_agent"
+          },
+          {
+            "to": "http_update",
+            "ref": "e4",
+            "from": "update_tools"
+          },
+          {
+            "to": "lean",
+            "ref": "e5",
+            "from": "http_update"
+          },
+          {
+            "to": "end_1",
+            "ref": "e6",
+            "from": "lean"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              if (!input.agentSlug) throw new Error('agentSlug is required');\n              if (!input.toolSlug) throw new Error('toolSlug is required');\n\n              return {\n                agentSlug: input.agentSlug,\n                toolSlug: input.toolSlug\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate inputs and prepare context"
+          },
+          {
+            "ref": "fetch_agent",
+            "name": "Fetch Agent",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "slug": "{{ (lastOutputOf(\"prepare\") || {}).agentSlug }}",
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "get-agent",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /starships/:starshipId/agents/:slug"
+          },
+          {
+            "ref": "update_tools",
+            "name": "Remove Tool Relationship",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const fetchResponse = ctx.lastOutputOf('fetch_agent') || {};\n              const agentData = fetchResponse.body?.data || fetchResponse.body;\n\n              if (!agentData || !agentData.id) {\n                throw new Error('Failed to fetch agent');\n              }\n\n              const prep = ctx.lastOutputOf('prepare') || {};\n              const toolSlug = prep.toolSlug;\n\n              return {\n                agentId: String(agentData.id),\n                toolSlug: String(toolSlug),\n                timeout: 10000\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "DELETE /agents/:id/tools/:toolSlug?starshipId=..."
+          },
+          {
+            "ref": "http_update",
+            "name": "Unassign Tool",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "agentId": "{{ (lastOutputOf(\"update_tools\") || {}).agentId }}",
+                "toolSlug": "{{ (lastOutputOf(\"update_tools\") || {}).toolSlug }}"
+              },
+              "action": "unassign-agent-tool",
+              "timeout": "{{ (lastOutputOf(\"update_tools\") || {}).timeout }}",
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "DELETE /agents/:id/tools/:toolSlug"
+          },
+          {
+            "ref": "lean",
+            "name": "Lean Result",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              // If we reached here, connector_action succeeded (failOnNon2xx would have failed the run).\n              return { ok: true };\n            }\n          ",
+              "timeout": 1000
+            },
+            "description": "Return minimal success payload"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"lean\") }}"
+            },
+            "description": "Return { ok: true }"
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

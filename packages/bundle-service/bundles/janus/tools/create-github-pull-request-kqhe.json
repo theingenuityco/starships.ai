@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-github-pull-request-kqhe"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create GitHub Pull Request",
+      "description": "Create a new pull request on GitHub using the GitHub connector's create-pull-request endpoint",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo",
+          "title",
+          "head",
+          "base"
+        ],
+        "properties": {
+          "base": {
+            "type": "string",
+            "description": "The name of the branch you want the changes pulled into"
+          },
+          "body": {
+            "type": "string",
+            "description": "The contents of the pull request"
+          },
+          "head": {
+            "type": "string",
+            "description": "The name of the branch where your changes are implemented"
+          },
+          "repo": {
+            "type": "string",
+            "description": "The name of the repository without the .git extension. The name is not case sensitive."
+          },
+          "draft": {
+            "type": "boolean",
+            "description": "Indicates whether the pull request is a draft"
+          },
+          "owner": {
+            "type": "string",
+            "description": "The account owner of the repository. The name is not case sensitive."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the pull request"
+          },
+          "maintainer_can_modify": {
+            "type": "boolean",
+            "description": "Indicates whether maintainers can modify the pull request"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "create_pr",
+            "ref": "start_to_create",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "create_to_end",
+            "from": "create_pr"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "create_pr",
+            "name": "Create Pull Request",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "create-pull-request",
+              "timeout": 15000,
+              "connector": "github"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

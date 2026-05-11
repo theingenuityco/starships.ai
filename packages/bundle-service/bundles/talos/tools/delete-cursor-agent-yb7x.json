@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "delete-cursor-agent-yb7x"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Delete Cursor Agent",
+      "description": "Permanently delete a Cursor cloud agent. This action cannot be undone.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "agentId"
+        ],
+        "properties": {
+          "agentId": {
+            "type": "string",
+            "description": "Unique identifier for the cloud agent to delete (e.g., bc_abc123)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "delete_agent",
+            "ref": "start_to_delete",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "delete_to_end",
+            "from": "delete_agent"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "delete_agent",
+            "name": "Delete Agent",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ id: (input.agentId || '') }) }}",
+              "action": "delete-agent",
+              "timeout": 15000,
+              "connector": "cursor",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ ((lastOutputOf('delete_agent') || {}).body ?? lastOutputOf('delete_agent')) }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

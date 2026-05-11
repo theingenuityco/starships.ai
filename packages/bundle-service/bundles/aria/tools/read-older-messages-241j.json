@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "read-older-messages-241j"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Read Older Messages",
+      "description": "Read older conversation history beyond the agent prompt window. `offset` skips that many most recent messages (tail offset), then returns the next `limit` older messages (chronological order).",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "limit",
+          "offset"
+        ],
+        "properties": {
+          "limit": {
+            "type": "number",
+            "description": "How many messages to return (1-200). Keep this small to reduce tokens."
+          },
+          "offset": {
+            "type": "number",
+            "description": "How many most recent messages to skip (tail offset). Example: offset=30 reads messages immediately older than the newest 30."
+          },
+          "conversationId": {
+            "type": "string",
+            "description": "Conversation id (optional; defaults to the current CONVERSATION_ID runtime env)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "http_get_messages",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e3",
+            "from": "http_get_messages"
+          },
+          {
+            "to": "slim",
+            "ref": "e4",
+            "from": "unwrap"
+          },
+          {
+            "to": "end_1",
+            "ref": "e5",
+            "from": "slim"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};\n              const limitRaw = input.limit;\n              const offsetRaw = input.offset;\n\n              const limit = Math.max(1, Math.min(200, Number(limitRaw)));\n              if (!Number.isFinite(limit)) throw new Error('limit must be a number');\n\n              const offset = Math.max(0, Math.min(100000, Number(offsetRaw)));\n              if (!Number.isFinite(offset)) throw new Error('offset must be a number');\n\n              const conversationId =\n                (typeof input.conversationId === 'string' && input.conversationId.trim().length > 0\n                  ? input.conversationId.trim()\n                  : String(ctx.env && ctx.env('CONVERSATION_ID')));\n\n              if (!conversationId || conversationId === 'undefined' || conversationId === 'null') {\n                throw new Error('conversationId is required (either provide it or ensure CONVERSATION_ID is set)');\n              }\n\n              return { conversationId, limit, offset, timeout: 10000 };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate limit/offset and resolve conversationId"
+          },
+          {
+            "ref": "http_get_messages",
+            "name": "Get Conversation Messages (Starships)",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "limit": "{{ (lastOutputOf(\"prepare\") || {}).limit }}",
+                "offset": "{{ (lastOutputOf(\"prepare\") || {}).offset }}",
+                "conversationId": "{{ (lastOutputOf(\"prepare\") || {}).conversationId }}"
+              },
+              "action": "get-conversation-messages",
+              "timeout": "{{ (lastOutputOf(\"prepare\") || {}).timeout }}",
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /conversations/:conversationId/messages via Starships connector endpoint catalog"
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const resp = ctx.lastOutputOf('http_get_messages') || {};\n              const body = resp && typeof resp === 'object' ? resp.body : undefined;\n              if (body && typeof body === 'object') {\n                if (body.success === true) return body.data ?? body;\n                if (body.success === false) return body.error ?? body;\n              }\n              return body ?? resp;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return body.data/body.error where applicable; otherwise return body/resp"
+          },
+          {
+            "ref": "slim",
+            "name": "Slim",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const data = ctx.input;\n              const prepared = ctx.lastOutputOf('prepare') || {};\n\n              // Pass through error-like payloads unchanged.\n              if (data && typeof data === 'object') {\n                const t = data;\n                if (typeof t.code === 'string' && typeof t.message === 'string') return t;\n              }\n\n              const msgs = data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : [];\n              \n              // Filter/redact nested read-conversation-messages payloads to prevent recursive ballooning.\n              const looksLikeNestedRead = (s) => {\n                if (typeof s !== 'string') return false;\n                const str = s.trim();\n                if (!str) return false;\n                // Cheap pre-check to avoid parsing most strings.\n                if (!(str.startsWith('{') && str.includes('\"messages\"'))) return false;\n                try {\n                  const obj = JSON.parse(str);\n                  if (!obj || typeof obj !== 'object') return false;\n                  if (!Array.isArray(obj.messages)) return false;\n                  if (!('limit' in obj) || !('offset' in obj)) return false;\n                  // Extra hint: this tool's output shape includes these keys.\n                  if (!('hasMoreBefore' in obj) && !('oldestCursor' in obj)) return false;\n                  return true;\n                } catch {\n                  return false;\n                }\n              };\n\n              const outMessages = msgs.map((m) => {\n                const content = m && typeof m.content === 'string' ? m.content : '';\n                const nested = looksLikeNestedRead(content);\n                return {\n                  id: m && m.id,\n                  role: m && m.role,\n                  createdAt: m && m.createdAt,\n                  // If nested, strip content entirely (leave a marker so callers can tell it was redacted).\n                  content: nested ? '' : content,\n                  ...(nested ? { redacted: true, redactionReason: 'nested_read_conversation_messages' } : {}),\n                };\n              });\n\n              return {\n                conversationId: data && data.conversationId,\n                limit: prepared.limit,\n                offset: prepared.offset,\n                hasMoreBefore: data && data.hasMoreBefore,\n                oldestCursor: data && data.oldestCursor,\n                messages: outMessages,\n              };\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return a minimal, token-efficient message list"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"slim\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

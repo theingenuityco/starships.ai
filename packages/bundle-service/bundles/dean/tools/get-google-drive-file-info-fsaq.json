@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-google-drive-file-info-fsaq"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Google Drive File Info",
+      "description": "Get detailed metadata for a specific Google Drive file including name, type, size, creation/modification dates, parent folders, sharing settings, and more.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "fileId"
+        ],
+        "properties": {
+          "fields": {
+            "type": "string",
+            "description": "Optional custom fields to include (default: 'id, name, mimeType, createdTime, modifiedTime, size, parents, webViewLink, description')"
+          },
+          "fileId": {
+            "type": "string",
+            "description": "The ID of the file to retrieve metadata for"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_file_metadata",
+            "ref": "start_to_get_file",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "get_file_to_end",
+            "from": "get_file_metadata"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_file_metadata",
+            "name": "Get File Metadata",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ fileId: input.fileId, fields: input.fields }) }}",
+              "action": "get-file",
+              "timeout": 15000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

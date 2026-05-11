@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-google-drive-storage-info-3x68"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Google Drive Storage Info",
+      "description": "Get information about the user's Google Drive account including storage quota, used space, available space, and user details.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "string",
+            "description": "Optional fields to include (default: 'user, storageQuota')"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_storage_info",
+            "ref": "start_to_get_storage",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "get_storage_to_end",
+            "from": "get_storage_info"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_storage_info",
+            "name": "Get Drive Storage Info",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { fields: (lastOutputOf('__initial__') || {}).fields || 'user, storageQuota' } }}",
+              "action": "get-about",
+              "timeout": 15000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

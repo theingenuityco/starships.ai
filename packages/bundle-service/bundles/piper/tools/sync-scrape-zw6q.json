@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "sync-scrape-zw6q"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Sync Scrape",
+      "description": "Synchronously fetch and scrape web page content via HTTP GET",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Absolute HTTP(S) URL to scrape"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Optional HTTP headers (e.g., User-Agent, Accept)",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeout": {
+            "type": "number",
+            "default": 30000,
+            "description": "Request timeout in milliseconds (default: 30000)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "fetch",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "extract",
+            "ref": "e2",
+            "from": "fetch"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "extract"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "fetch",
+            "name": "Fetch Page",
+            "type": "http_request",
+            "parameters": {
+              "url": "{{ input.url }}",
+              "method": "GET",
+              "headers": "{{ input.headers || {} }}",
+              "timeout": "{{ input.timeout || 30000 }}"
+            }
+          },
+          {
+            "ref": "extract",
+            "name": "Extract Content",
+            "type": "transform",
+            "parameters": {
+              "transforms": [
+                {
+                  "path": "/url",
+                  "value": "{{ input.url }}",
+                  "operation": "add"
+                },
+                {
+                  "path": "/status",
+                  "value": "{{ input.status }}",
+                  "operation": "add"
+                },
+                {
+                  "path": "/headers",
+                  "value": "{{ input.headers }}",
+                  "operation": "add"
+                },
+                {
+                  "path": "/content",
+                  "value": "{{ input.body }}",
+                  "operation": "add"
+                }
+              ]
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('extract') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.216Z",
+  "metadata": {
+    "fromSlug": "search-connector-actions",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Connector Actions",
+      "description": "Search and list endpoint names from a connector template. Returns a lightweight catalog of endpoint names and optional descriptions without full definitions. Supports pagination and search. Saves significant context tokens compared to fetching the full template.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "connectorId"
+        ],
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query (searches name/path/description of actions)"
+          },
+          "limit": {
+            "type": "number",
+            "maximum": 200,
+            "minimum": 1,
+            "description": "Page size (1-200)"
+          },
+          "offset": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Pagination offset (0-based)"
+          },
+          "connectorId": {
+            "type": "string",
+            "description": "The connector template ID or slug"
+          },
+          "includeDescriptions": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to include endpoint descriptions in the list (default: false)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_template",
+            "ref": "start_to_get",
+            "from": "start"
+          },
+          {
+            "to": "list_endpoints",
+            "ref": "get_to_list",
+            "from": "get_template"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_endpoints"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "get_template",
+            "name": "List Template Actions",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ templateId: String((input || {}).connectorId), q: (input || {}).q, limit: (input || {}).limit, offset: (input || {}).offset }) }}",
+              "action": "admin-list-connector-template-actions",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Fetch the connector template actions with pagination and search"
+          },
+          {
+            "ref": "list_endpoints",
+            "name": "List Endpoints",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('get_template') || {};\n  const initialArgs = ctx.lastOutputOf('__initial__') || {};\n\n  const connectorId = initialArgs.connectorId;\n  const includeDescriptions = initialArgs.includeDescriptions === true;\n\n  const body = resp.body;\n  if (!body || body.success !== true) {\n    throw new Error(`Failed to list actions for connector template: ${connectorId}`);\n  }\n\n  const data = body.data ?? {};\n  const actions = Array.isArray(data.actions)\n    ? data.actions\n    : Array.isArray(data.items)\n      ? data.items\n      : Array.isArray(data.results)\n        ? data.results\n        : Array.isArray(data)\n     ? data\n       : [];\n\n  const endpointList = (actions || [])\n  .map((a) => {\n      const name = a?.name ?? a?.actionName ?? a?.action?.name;\n   const description = a?.description ?? a?.action?.description ?? '';\n\n      if (!name) return null;\n      return includeDescriptions ? { name, description } : name;\n    })\n    .filter(Boolean);\n\n  // Extract pagination metadata from API response\n  const total = data.total ?? endpointList.length;\n  const limit = data.limit ?? initialArgs.limit ?? endpointList.length;\n  const offset = data.offset ?? initialArgs.offset ?? 0;\n  const hasMore = (offset + endpointList.length) < total;\n\n  return {\n    connectorId,\n    endpoints: endpointList,\n    count: endpointList.length,\n    total,\n    limit,\n    offset,\n    hasMore\n  };\n}",
+              "timeout": 5000
+            },
+            "description": "Extract endpoint names and optional descriptions from the template with pagination metadata"
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('list_endpoints') }}"
+            },
+            "description": "Return the result with pagination metadata"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

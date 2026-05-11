@@ -1,0 +1,102 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-shopify-pages-gfqn"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Shopify Pages",
+      "description": "List all pages in the online store with optional filtering by title and published status",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "maximum": 250,
+            "minimum": 1,
+            "description": "Maximum number of pages to return (default 50, max 250)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Filter by page title"
+          },
+          "since_id": {
+            "type": "string",
+            "description": "Return pages after this ID for pagination"
+          },
+          "published_status": {
+            "enum": [
+              "published",
+              "unpublished",
+              "any"
+            ],
+            "type": "string",
+            "description": "Filter by published status"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_pages",
+            "ref": "start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "extract_body",
+            "ref": "list_to_extract",
+            "from": "list_pages"
+          },
+          {
+            "to": "end",
+            "ref": "extract_to_end",
+            "from": "extract_body"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "list_pages",
+            "name": "List Shopify Pages",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "list_pages",
+              "timeout": 15000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "extract_body",
+            "name": "Extract Pages",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  return ctx.lastOutputOf('list_pages').body;\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

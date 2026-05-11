@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-tools-1l2o"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Tools",
+      "description": "List all tools deployed on the current starship for discovery (not a permission list). Returns a lean array (slug, name, description, category) without heavy fields like blueprint.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "http_list",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "summarize",
+            "ref": "e2",
+            "from": "http_list"
+          },
+          {
+            "to": "end_1",
+            "ref": "e3",
+            "from": "summarize"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "http_list",
+            "name": "List Tools (Starships)",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "list-tools",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "List tools via Starships connector action"
+          },
+          {
+            "ref": "summarize",
+            "name": "Summarize Tools",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              // Expect the HTTP node to return a response object with { status, headers, body, url }.\n              // The body may be a bare array of tools or an object with a data array property.\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n\n              const isObject = payload && typeof payload === 'object';\n              const data = isObject && Array.isArray(payload.data)\n                ? payload.data\n                : (Array.isArray(payload) ? payload : []);\n\n              // Return a lean summary to avoid leaking large/templated blueprint contents\n              return data.map((t) => ({\n                slug: t && t.slug,\n                name: t && t.name,\n                description: t && t.description,\n                category: t && t.category,\n              }));\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Strip heavy fields (e.g., blueprint) and return a lean list"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"summarize\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

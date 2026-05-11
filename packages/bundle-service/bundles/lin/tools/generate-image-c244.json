@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "generate-image-c244"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Generate Image",
+      "description": "Generate images from text prompts using DALL-E 3 API. Returns image URLs that can be uploaded to WordPress media library. Supports customizable size, quality, and style parameters for WordPress content creation.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "size": {
+            "enum": [
+              "1024x1024",
+              "1792x1024",
+              "1024x1792"
+            ],
+            "type": "string",
+            "default": "1024x1024",
+            "description": "The size of the generated image. Square (1024x1024) is best for featured images, landscape (1792x1024) for headers, portrait (1024x1792) for sidebars."
+          },
+          "style": {
+            "enum": [
+              "vivid",
+              "natural"
+            ],
+            "type": "string",
+            "default": "vivid",
+            "description": "The style of the generated image. 'vivid' produces hyper-real and dramatic images. 'natural' produces more natural, less hyper-real looking images."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "A text description of the desired image. Be detailed and specific for best results."
+          },
+          "quality": {
+            "enum": [
+              "standard",
+              "hd"
+            ],
+            "type": "string",
+            "default": "standard",
+            "description": "The quality of the image. 'hd' creates images with finer details and greater consistency."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare_prompt",
+            "ref": "edge_start_prepare",
+            "from": "start",
+            "label": "Prepare generation prompt"
+          },
+          {
+            "to": "generate_image",
+            "ref": "edge_prepare_generate",
+            "from": "prepare_prompt",
+            "label": "Generate image with LLM"
+          },
+          {
+            "to": "extract_image",
+            "ref": "edge_generate_extract",
+            "from": "generate_image",
+            "label": "Extract image data"
+          },
+          {
+            "to": "format_response",
+            "ref": "edge_extract_format",
+            "from": "extract_image",
+            "label": "Format for WordPress"
+          },
+          {
+            "to": "end",
+            "ref": "edge_format_end",
+            "from": "format_response",
+            "label": "Return result"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": "Receive image generation parameters"
+          },
+          {
+            "ref": "prepare_prompt",
+            "name": "Prepare Prompt",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  \n  // Validate required fields\n  if (!input.prompt || typeof input.prompt !== 'string') {\n    throw new Error('prompt is required and must be a string');\n  }\n  \n  // Set defaults\n  const size = input.size || '1024x1024';\n  const quality = input.quality || 'standard';\n  const style = input.style || 'vivid';\n  \n  // Validate enum values\n  const validSizes = ['1024x1024', '1792x1024', '1024x1792'];\n  const validQualities = ['standard', 'hd'];\n  const validStyles = ['vivid', 'natural'];\n  \n  if (!validSizes.includes(size)) {\n    throw new Error('size must be one of: ' + validSizes.join(', '));\n  }\n  \n  if (!validQualities.includes(quality)) {\n    throw new Error('quality must be one of: ' + validQualities.join(', '));\n  }\n  \n  if (!validStyles.includes(style)) {\n    throw new Error('style must be one of: ' + validStyles.join(', '));\n  }\n  \n  // Build enhanced prompt with style guidance\n  let enhancedPrompt = input.prompt;\n  \n  if (style === 'vivid') {\n    enhancedPrompt = 'Create a vivid, hyper-realistic, dramatic image: ' + input.prompt;\n  } else {\n    enhancedPrompt = 'Create a natural, realistic image: ' + input.prompt;\n  }\n  \n  if (quality === 'hd') {\n    enhancedPrompt = enhancedPrompt + '. High detail, sharp focus, professional quality.';\n  }\n  \n  // Parse size dimensions\n  const dimensions = size.split('x');\n  const width = parseInt(dimensions[0]);\n  const height = parseInt(dimensions[1]);\n  \n  return {\n    messages: [\n      {\n        role: 'user',\n        content: enhancedPrompt\n      }\n    ],\n    imageConfig: {\n      size: size,\n      width: width,\n      height: height,\n      quality: quality,\n      n: 1\n    },\n    originalPrompt: input.prompt,\n    requestedSize: size,\n    requestedQuality: quality,\n    requestedStyle: style\n  };\n}",
+              "timeout": 3000
+            },
+            "description": "Validate input and prepare LLM prompt with image config"
+          },
+          {
+            "ref": "generate_image",
+            "name": "Generate Image",
+            "type": "llm",
+            "parameters": {
+              "model": "google/gemini-3-pro-image-preview",
+              "stream": false,
+              "timeout": 120000,
+              "messages": "{{ (input || {}).messages }}",
+              "maxTokens": 4096,
+              "modalities": [
+                "text",
+                "image"
+              ],
+              "imageConfig": "{{ (input || {}).imageConfig }}",
+              "temperature": 0.7
+            },
+            "description": "Call Gemini model to generate image"
+          },
+          {
+            "ref": "extract_image",
+            "name": "Extract Image",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const llmResponse = ctx.input || {};\n  const preparedData = ctx.lastOutputOf('prepare_prompt') || {};\n  \n  // Extract the response\n  const choices = llmResponse.choices || [];\n  if (!choices.length) {\n    throw new Error('No response from image generation model');\n  }\n  \n  const message = choices[0].message || {};\n  const content = message.content || '';\n  \n  // The model response should contain image data or URL\n  // For now, we'll extract what we can from the response\n  return {\n    llmResponse: llmResponse,\n    content: content,\n    model: llmResponse.model || 'google/gemini-2.0-flash-exp:free',\n    usage: llmResponse.usage || {},\n    originalPrompt: preparedData.originalPrompt,\n    enhancedPrompt: (preparedData.messages || [])[0]?.content || '',\n    requestedSize: preparedData.requestedSize,\n    requestedQuality: preparedData.requestedQuality,\n    requestedStyle: preparedData.requestedStyle\n  };\n}",
+              "timeout": 3000
+            },
+            "description": "Extract image data from LLM response"
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const extracted = ctx.input || {};\n  \n  return {\n    success: true,\n    image: {\n      content: extracted.content,\n      model: extracted.model\n    },\n    metadata: {\n      model: extracted.model,\n      size: extracted.requestedSize || '1024x1024',\n      quality: extracted.requestedQuality || 'standard',\n      style: extracted.requestedStyle || 'vivid',\n      original_prompt: extracted.originalPrompt,\n      enhanced_prompt: extracted.enhancedPrompt,\n      usage: extracted.usage\n    },\n    wordpress_ready: {\n      content: extracted.content,\n      alt_text: extracted.originalPrompt,\n      caption: extracted.originalPrompt,\n      description: 'Generated by Gemini: ' + extracted.originalPrompt\n    },\n    raw_response: extracted.llmResponse\n  };\n}",
+              "timeout": 3000
+            },
+            "description": "Format response for WordPress integration"
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('format_response') }}"
+            },
+            "description": "Return formatted result"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

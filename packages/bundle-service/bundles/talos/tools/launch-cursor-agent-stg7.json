@@ -1,0 +1,147 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "launch-cursor-agent-stg7"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Launch Cursor Agent",
+      "description": "Start a new Cursor cloud agent to work on a GitHub repository with AI-powered coding assistance",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "prompt",
+          "repository"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "description": "Git ref (branch name, tag, or commit hash) to use as the base branch"
+          },
+          "model": {
+            "type": "string",
+            "description": "AI model to use (e.g., 'claude-4-sonnet'). Leave empty for auto-selection"
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Clear instruction text for what the agent should accomplish"
+          },
+          "branchName": {
+            "type": "string",
+            "description": "Custom branch name for the agent to create"
+          },
+          "repository": {
+            "type": "string",
+            "pattern": "^https://github\\.com/[^/]+/[^/]+$",
+            "description": "Full GitHub repository URL (e.g., https://github.com/org/repo)"
+          },
+          "webhookUrl": {
+            "type": "string",
+            "description": "URL to receive webhook notifications about agent status changes"
+          },
+          "autoCreatePr": {
+            "type": "boolean",
+            "description": "Whether to automatically create a pull request when the agent completes. Default: false"
+          },
+          "webhookSecret": {
+            "type": "string",
+            "minLength": 32,
+            "description": "Secret key for webhook payload verification (minimum 32 characters)"
+          },
+          "skipReviewerRequest": {
+            "type": "boolean",
+            "description": "Whether to skip adding the user as a reviewer to the pull request. Only applies if autoCreatePr is true"
+          },
+          "openAsCursorGithubApp": {
+            "type": "boolean",
+            "description": "Whether to open the pull request as the Cursor GitHub App instead of as the user. Only applies if autoCreatePr is true"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "build_args",
+            "ref": "start_to_build",
+            "from": "start"
+          },
+          {
+            "to": "launch_agent",
+            "ref": "build_to_launch",
+            "from": "build_args"
+          },
+          {
+            "to": "extract_body",
+            "ref": "launch_to_extract",
+            "from": "launch_agent"
+          },
+          {
+            "to": "end",
+            "ref": "extract_to_end",
+            "from": "extract_body"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "build_args",
+            "name": "Build Launch Arguments",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n\n  const args = {\n    prompt: {\n      text: input.prompt\n    },\n    source: {\n      repository: input.repository\n    }\n  };\n\n  // Add optional model\n  if (input.model) {\n    args.model = input.model;\n  }\n\n  // Add optional ref to source\n  if (input.ref) {\n    args.source.ref = input.ref;\n  }\n\n  // Build target object if any target fields are present\n  if (input.branchName || input.autoCreatePr || input.skipReviewerRequest || input.openAsCursorGithubApp) {\n    args.target = {};\n    if (input.branchName) args.target.branchName = input.branchName;\n    if (input.autoCreatePr !== undefined) args.target.autoCreatePr = input.autoCreatePr;\n    if (input.skipReviewerRequest !== undefined) args.target.skipReviewerRequest = input.skipReviewerRequest;\n    if (input.openAsCursorGithubApp !== undefined) args.target.openAsCursorGithubApp = input.openAsCursorGithubApp;\n  }\n\n  // Build webhook object if webhook fields are present\n  if (input.webhookUrl) {\n    args.webhook = {\n      url: input.webhookUrl\n    };\n    if (input.webhookSecret) {\n      args.webhook.secret = input.webhookSecret;\n    }\n  }\n\n  return args;\n}",
+              "timeout": 5000
+            },
+            "description": "Construct the API payload structure from input parameters"
+          },
+          {
+            "ref": "launch_agent",
+            "name": "Launch Cursor Agent",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf('build_args') }}",
+              "action": "launch-agent",
+              "timeout": 30000,
+              "connector": "cursor",
+              "failOnNon2xx": true
+            },
+            "description": "Call the Cursor Cloud Agents API to launch a new agent"
+          },
+          {
+            "ref": "extract_body",
+            "name": "Extract Response Body",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.input || {};\n  return response.body || response;\n}",
+              "timeout": 3000
+            },
+            "description": "Extract the agent details from the API response"
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('extract_body') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -162,6 +162,37 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
 
+  packages/bundle-service:
+    dependencies:
+      '@starships/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      archiver:
+        specifier: ^7.0.1
+        version: 7.0.1
+      express:
+        specifier: ^5.1.0
+        version: 5.2.0
+    devDependencies:
+      '@types/archiver':
+        specifier: ^6.0.3
+        version: 6.0.4
+      '@types/express':
+        specifier: ^5.0.3
+        version: 5.0.3
+      '@types/node':
+        specifier: ^22.10.6
+        version: 22.16.0
+      tsc-alias:
+        specifier: ^1.8.16
+        version: 1.8.16
+      tsx:
+        specifier: ^4.20.3
+        version: 4.20.3
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/client:
     dependencies:
       '@dnd-kit/core':
@@ -4530,6 +4561,9 @@ packages:
   '@types/adm-zip@0.5.7':
     resolution: {integrity: sha512-DNEs/QvmyRLurdQPChqq0Md4zGvPwHerAJYWk9l2jCbD1VPpnzRJorOdiq4zsw09NFbYnhfsoEhWtxIzXpn2yw==}
 
+  '@types/archiver@6.0.4':
+    resolution: {integrity: sha512-ULdQpARQ3sz9WH4nb98mJDYA0ft2A8C4f4fovvUcFwINa1cgGjY36JCAYuP5YypRq4mco1lJp1/7jEMS2oR0Hg==}
+
   '@types/archiver@7.0.0':
     resolution: {integrity: sha512-/3vwGwx9n+mCQdYZ2IKGGHEFL30I96UgBlk8EtRDDFQ9uxM1l4O5Ci6r00EMAkiDaTqD9DQ6nVrWRICnBPtzzg==}
 
@@ -4785,14 +4819,8 @@ packages:
   '@types/node@24.0.15':
     resolution: {integrity: sha512-oaeTSbCef7U/z7rDeJA138xpG3NuKc64/rZ2qmUFkFJmnMsAPaluIifqyWd8hSSMxyP9oie3dLAqYPblag9KgA==}
 
-  '@types/node@24.10.1':
-    resolution: {integrity: sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==}
-
   '@types/node@24.10.13':
     resolution: {integrity: sha512-oH72nZRfDv9lADUBSo104Aq7gPHpQZc4BTx38r9xf9pg5LfP6EzSyH2n7qFmmxRQXh7YlUXODcYsg6PuTDSxGg==}
-
-  '@types/node@24.10.3':
-    resolution: {integrity: sha512-gqkrWUsS8hcm0r44yn7/xZeV1ERva/nLgrLxFRUGb7aoNMIJfZJ3AC261zDQuOAKC7MiXai1WCpYc48jAHoShQ==}
 
   '@types/node@24.6.2':
     resolution: {integrity: sha512-d2L25Y4j+W3ZlNAeMKcy7yDsK425ibcAOO2t7aPTz6gNMH0z2GThtwENCDc0d/Pw9wgyRqE5Px1wkV7naz8ang==}
@@ -12972,7 +13000,7 @@ snapshots:
       '@antfu/install-pkg': 1.1.0
       '@antfu/utils': 9.3.0
       '@iconify/types': 2.0.0
-      debug: 4.4.1
+      debug: 4.4.3
       globals: 15.15.0
       kolorist: 1.8.0
       local-pkg: 1.1.2
@@ -16344,6 +16372,10 @@ snapshots:
     dependencies:
       '@types/node': 24.10.13
 
+  '@types/archiver@6.0.4':
+    dependencies:
+      '@types/readdir-glob': 1.1.5
+
   '@types/archiver@7.0.0':
     dependencies:
       '@types/readdir-glob': 1.1.5
@@ -16371,7 +16403,7 @@ snapshots:
 
   '@types/bcrypt@5.0.2':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 24.10.13
 
   '@types/body-parser@1.19.6':
     dependencies:
@@ -16390,7 +16422,7 @@ snapshots:
 
   '@types/cors@2.8.19':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 24.10.13
 
   '@types/d3-array@3.2.2': {}
 
@@ -16553,7 +16585,7 @@ snapshots:
   '@types/fs-extra@11.0.4':
     dependencies:
       '@types/jsonfile': 6.1.4
-      '@types/node': 24.8.1
+      '@types/node': 24.10.13
 
   '@types/geojson@7946.0.16': {}
 
@@ -16643,7 +16675,7 @@ snapshots:
 
   '@types/node-fetch@2.6.12':
     dependencies:
-      '@types/node': 24.10.1
+      '@types/node': 24.10.13
       form-data: 4.0.4
 
   '@types/node@20.19.13':
@@ -16662,15 +16694,7 @@ snapshots:
     dependencies:
       undici-types: 7.8.0
 
-  '@types/node@24.10.1':
-    dependencies:
-      undici-types: 7.16.0
-
   '@types/node@24.10.13':
-    dependencies:
-      undici-types: 7.16.0
-
-  '@types/node@24.10.3':
     dependencies:
       undici-types: 7.16.0
 
@@ -16692,7 +16716,7 @@ snapshots:
 
   '@types/pg@8.15.5':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 24.10.13
       pg-protocol: 1.10.3
       pg-types: 2.2.0
 
@@ -16776,13 +16800,13 @@ snapshots:
 
   '@types/web-push@3.6.4':
     dependencies:
-      '@types/node': 24.10.3
+      '@types/node': 24.10.13
 
   '@types/webxr@0.5.24': {}
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 24.8.1
+      '@types/node': 24.10.13
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -23079,7 +23103,7 @@ snapshots:
   readable-stream@3.6.2:
     dependencies:
       inherits: 2.0.4
-      string_decoder: 1.1.1
+      string_decoder: 1.3.0
       util-deprecate: 1.0.2
 
   readable-stream@4.7.0:

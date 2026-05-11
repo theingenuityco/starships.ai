@@ -69,6 +69,9 @@ export interface EnvironmentConfig {
   RUNNER_PORT?: number;
   RUNNER_AUTH_TOKEN?: string;
 
+  // Bundle service (optional)
+  BUNDLE_SERVICE_URL?: string;
+
   // Email Service Configuration (Amazon SES)
   /**
    * Global gate for outbound email delivery.

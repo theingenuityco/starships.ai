@@ -37,7 +37,7 @@
     "@types/lodash": "^4.17.20",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
-    "axios": "^1.13.5",
+    "axios": "^1.15.2",
     "axios-retry": "^4.0.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.29.1",

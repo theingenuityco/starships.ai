@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import type { RoomPinnedDataset, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -17,16 +17,19 @@ export function RoomResourcesPane(props: {
   pinnedViews?: RoomPinnedView[] | null
   pinnedDatasets?: RoomPinnedDataset[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
+  pinnedDocs?: RoomPinnedDoc[] | null
   assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   datasetLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
+  docLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
   toolSlugById?: Map<string, string> | null
   canManagePins?: boolean | null
   availableViews?: Array<{ id: string; name: string }> | null
   availableDatasets?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
+  availableDocs?: Array<{ id: string; title: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
@@ -34,6 +37,8 @@ export function RoomResourcesPane(props: {
   onUnpinDataset?: (datasetId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
+  onPinDoc?: (docId: string) => void
+  onUnpinDoc?: (docId: string) => void
   onAssignTool?: (toolId: string) => void
   onUnassignTool?: (toolId: string) => void
   onOpenPinnedView?: (viewId: string) => void
@@ -46,13 +51,15 @@ export function RoomResourcesPane(props: {
   const [pickViewId, setPickViewId] = useState<string>('')
   const [pickDatasetId, setPickDatasetId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
+  const [pickDocId, setPickDocId] = useState<string>('')
   const [pickToolId, setPickToolId] = useState<string>('')
 
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedDocs = (props.pinnedDocs || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const assignedTools = (props.assignedTools || []).slice()
-  const totalSaved = assignedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length
+  const totalSaved = assignedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length + pinnedDocs.length
 
   const roomLabel = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -79,6 +86,15 @@ export function RoomResourcesPane(props: {
 
   const openPinnedBoard = () => {
     const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tasks` : null
+    if (!href) return
+    props.onClose()
+    router.push(href)
+  }
+
+  const openPinnedDoc = (docId: string) => {
+    const id = String(docId || '').trim()
+    if (!id) return
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/docs/${encodeURIComponent(id)}` : null
     if (!href) return
     props.onClose()
     router.push(href)
@@ -343,6 +359,54 @@ export function RoomResourcesPane(props: {
                   <Row icon="list" label={props.taskBoardLabelById?.get(String(p.boardId)) || String(p.boardId)} onClick={() => openPinnedBoard()} />
                   {props.canManagePins ? (
                     <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTaskBoard?.(String(p.boardId))}>
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-border/60 pt-6 space-y-3">
+          <div className="text-xs font-medium text-muted-foreground">Docs</div>
+          {props.canManagePins ? (
+            <div className="flex items-center gap-2">
+              <Select value={pickDocId} onValueChange={setPickDocId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Add a doc" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(props.availableDocs || []).map(d => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                onClick={() => {
+                  const id = pickDocId.trim()
+                  if (!id) return
+                  props.onPinDoc?.(id)
+                  setPickDocId('')
+                }}
+                disabled={!pickDocId.trim()}
+              >
+                Add
+              </Button>
+            </div>
+          ) : null}
+          {pinnedDocs.length === 0 ? (
+            <div className="text-sm text-muted-foreground">None</div>
+          ) : (
+            <div className="space-y-1">
+              {pinnedDocs.map(p => (
+                <div key={`pdoc:${p.docId}`} className="flex items-center justify-between gap-2">
+                  <Row icon="file-text" label={props.docLabelById?.get(String(p.docId)) || String(p.docId)} onClick={() => openPinnedDoc(String(p.docId))} />
+                  {props.canManagePins ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinDoc?.(String(p.docId))}>
                       Remove
                     </Button>
                   ) : null}

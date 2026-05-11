@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import Icon from '@/components/primitives/Icon'
 import { cn } from '@/lib/utils'
 import { useBundleServiceBundles, useInstallBundleFromService, type BundleSummary } from '@/hooks/useBundleService'
+import { getSafeErrorMessage } from '@/lib/error-utils'
 
 interface Props {
   open: boolean
@@ -35,7 +36,7 @@ function entityCount(bundle: BundleSummary): string {
 }
 
 export function BundleServiceModal({ open, onOpenChange, starshipId, kindFilter, title = 'Browse bundles', description = 'Install pre-built bundles from the bundle service.' }: Props) {
-  const { data: bundles = [], isLoading, isError } = useBundleServiceBundles(starshipId)
+  const { data: bundles = [], isLoading, isError, error } = useBundleServiceBundles(starshipId)
   const install = useInstallBundleFromService(starshipId)
   const [installingId, setInstallingId] = useState<string | null>(null)
 
@@ -69,9 +70,12 @@ export function BundleServiceModal({ open, onOpenChange, starshipId, kindFilter,
               ))}
             </div>
           ) : isError ? (
-            <div className="rounded-xl border border-border/60 bg-card/10 p-4 text-center">
-              <p className="text-sm text-muted-foreground">Could not reach the bundle service.</p>
-              <p className="text-xs text-muted-foreground mt-1">Make sure <code className="font-mono">BUNDLE_SERVICE_URL</code> is configured.</p>
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+              <p className="text-sm font-medium text-destructive">Failed to load bundles</p>
+              <p className="text-xs text-muted-foreground mt-1">{getSafeErrorMessage(error)}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Make sure <code className="font-mono">BUNDLE_SERVICE_URL</code> is set in your <code className="font-mono">.env</code> and the bundle service is running.
+              </p>
             </div>
           ) : visible.length === 0 ? (
             <div className="rounded-xl border border-border/60 bg-card/10 p-4 text-center">

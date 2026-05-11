@@ -111,7 +111,7 @@ export default function AgentsPage(): React.JSX.Element {
     if (isSearching) {
       return (
         <div className="flex items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground text-center">Searching "{q}"…</p>
+          <p className="text-sm text-muted-foreground text-center">Searching &quot;{q}&quot;…</p>
         </div>
       )
     }
